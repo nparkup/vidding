@@ -1,34 +1,32 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DdayBadge, GradeBadge, ScoreBar } from "@/components/Badges";
+import { Suspense } from "react";
+import { DdayBadge } from "@/components/Badges";
+import { ProfileScore } from "@/components/ProfileScore";
 import { Checklist } from "@/components/Checklist";
-import { bidPriceGuide, documentChecklist, evaluate, keyPoints } from "@/lib/analysis";
+import { bidPriceGuide, daysLeft, documentChecklist, keyPoints } from "@/lib/analysis";
 import { dateTime, won, wonFull } from "@/lib/format";
-import { getBid } from "@/lib/store";
-import type { License, Region } from "@/lib/types";
+import { getBid, getBids } from "@/lib/store";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 600;
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | undefined>> };
+export async function generateStaticParams() {
+  return (await getBids()).map((b) => ({ id: b.id }));
+}
+
+type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const bid = await getBid((await params).id);
   return { title: bid ? `${bid.title} 공고 분석` : "공고 분석" };
 }
 
-export default async function BidDetail({ params, searchParams }: Props) {
+export default async function BidDetail({ params }: Props) {
   const { id } = await params;
-  const sp = await searchParams;
   const bid = await getBid(id);
   if (!bid) notFound();
 
-  const lic = (sp.lic ?? "").split(",").filter(Boolean) as License[];
-  const rg = (sp.rg ?? "").split(",").filter(Boolean) as Region[];
-  const profile = lic.length
-    ? { licenses: lic, regions: rg, minAmount: Number(sp.min ?? 0), maxAmount: Number(sp.max ?? 1e10), pastPerformance: Number(sp.max ?? 0) }
-    : null;
-  const ev = profile ? evaluate(bid, profile) : null;
   const guide = bidPriceGuide(bid);
   const points = keyPoints(bid);
   const docs = documentChecklist(bid);
@@ -47,7 +45,7 @@ export default async function BidDetail({ params, searchParams }: Props) {
       <header className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <DdayBadge days={ev?.daysLeft ?? Math.ceil((new Date(bid.closeAt).getTime() - Date.now()) / 86400000)} />
+            <DdayBadge days={daysLeft(bid.closeAt)} />
             <span className="chip">{bid.category}</span>
             <span className="chip">{bid.contractMethod}</span>
             <span className="chip">공고번호 {bid.bidNtceNo}-{bid.bidNtceOrd}</span>
@@ -123,31 +121,9 @@ export default async function BidDetail({ params, searchParams }: Props) {
           {/* 가능성 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold">입찰 가능성</h2>
-            {ev ? (
-              <>
-                <div className="mt-4 flex items-end justify-between">
-                  <p className="text-5xl font-extrabold tabular-nums text-mint">{ev.score}<span className="text-lg text-ink-300">/100</span></p>
-                  <GradeBadge grade={ev.grade} />
-                </div>
-                <ul className="mt-5 space-y-4">
-                  {ev.factors.map((f) => (
-                    <li key={f.label}>
-                      <div className="mb-1 flex justify-between text-sm">
-                        <span className="font-semibold">{f.label}</span>
-                        <span className="tabular-nums text-ink-300">{f.score}/{f.max}</span>
-                      </div>
-                      <ScoreBar value={f.score} max={f.max} />
-                      <p className="mt-1 text-xs text-ink-500">{f.note}</p>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <div className="mt-4 rounded-xl bg-paper p-4 text-sm text-ink-500">
-                귀사 조건을 입력하면 이 공고의 참가 가능 여부와 점수를 계산해 드립니다.
-                <Link href="/bids" className="mt-3 block font-semibold text-mint-600">공고 검색에서 조건 입력 →</Link>
-              </div>
-            )}
+            <Suspense fallback={<p className="mt-4 text-sm text-ink-300">계산 중…</p>}>
+              <ProfileScore bid={bid} />
+            </Suspense>
           </section>
 
           {/* 투찰 가이드 */}

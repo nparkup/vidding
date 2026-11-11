@@ -5,7 +5,7 @@ import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getBids } from "@/lib/store";
 
 export const metadata: Metadata = { title: "주간 분석보고서 샘플" };
-export const dynamic = "force-dynamic";
+export const revalidate = 600;
 
 export default async function SampleReport() {
   const bids = await getBids();

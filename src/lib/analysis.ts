@@ -45,7 +45,7 @@ export function evaluate(bid: Bid, c: MatchCriteria, now = new Date()): MatchRes
   const factors: Factor[] = [];
   const left = daysLeft(bid.closeAt, now);
 
-  const licenseOk = bid.licenses.length === 0 || bid.licenses.some((l) => c.licenses.includes(l));
+  const licenseOk = bid.licenses.length === 0 ? !bid.licenseRaw : bid.licenses.some((l) => c.licenses.includes(l));
   factors.push({
     label: "면허 요건",
     score: licenseOk ? 30 : 0,
@@ -53,11 +53,11 @@ export function evaluate(bid: Bid, c: MatchCriteria, now = new Date()): MatchRes
     ok: licenseOk,
     note: licenseOk
       ? `보유 면허로 참가 가능 (${bid.licenses.join(", ") || "제한 없음"})`
-      : `필요 면허 미보유: ${bid.licenses.join(" 또는 ")}`,
+      : `필요 면허 미보유: ${bid.licenses.join(" 또는 ") || bid.licenseRaw}`,
   });
   if (!licenseOk) blockers.push("면허 요건 미충족");
 
-  const regionOk = bid.region === "전국" || c.regions.includes(bid.region);
+  const regionOk = bid.region === "전국" || (bid.regions ?? [bid.region]).some((r) => c.regions.includes(r));
   factors.push({
     label: "참가 지역",
     score: regionOk ? 20 : 0,
@@ -105,7 +105,7 @@ export function evaluate(bid: Bid, c: MatchCriteria, now = new Date()): MatchRes
     max: 10,
     ok: perfScore >= 7,
     note: perf
-      ? `유사실적 ${Math.round(perfRatio * 100)}% 수준 (기초금액 대비)${c.creditGrade ? `, 신용 ${c.creditGrade}` : ""}`
+      ? `유사실적 ${perfRatio >= 2 ? "200% 이상" : `${Math.round(perfRatio * 100)}% 수준`} (기초금액 대비)${c.creditGrade ? `, 신용 ${c.creditGrade}` : ""}`
       : "실적 정보 미입력 (보수적으로 평가)",
   });
 

@@ -43,7 +43,7 @@ export default async function AdminBids({ searchParams }: { searchParams: Promis
                   </td>
                   <td className="text-xs">{b.category}</td>
                   <td className="text-xs">{b.region}</td>
-                  <td className="max-w-[160px] text-xs text-ink-500">{b.licenses.join(", ") || "-"}</td>
+                  <td className="max-w-[160px] text-xs text-ink-500">{b.licenseRaw || b.licenses.join(", ") || "-"}</td>
                   <td className="whitespace-nowrap tabular-nums">{won(b.baseAmount)}</td>
                   <td className="text-xs">{b.contractMethod}</td>
                   <td>

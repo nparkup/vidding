@@ -36,8 +36,10 @@ export interface Bid {
   category: ServiceCategory;
   agency: string;           // 공고기관
   demandAgency: string;     // 수요기관
-  region: Region;           // 참가가능지역 (전국 = 제한 없음)
+  region: Region;           // 참가가능지역 대표값 (전국 = 제한 없음)
+  regions?: Region[];       // 참가가능지역이 여러 시·도일 때 전체 목록
   licenses: License[];      // 면허제한 (OR 조건)
+  licenseRaw?: string;      // 나라장터 원문 투찰가능업종 (목록에 없는 업종 포함)
   baseAmount: number;       // 기초금액(원) / 추정가격
   contractMethod: ContractMethod;
   lowerLimitRate?: number;  // 낙찰하한율(%)

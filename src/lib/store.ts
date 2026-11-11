@@ -47,7 +47,13 @@ function bidCache(): BidCache {
 
 export async function getBids(): Promise<Bid[]> {
   const c = bidCache();
-  if (Date.now() - new Date(c.syncedAt).getTime() > STALE_MS) await syncBids();
+  const stale = Date.now() - new Date(c.syncedAt).getTime() > STALE_MS;
+  if (stale) {
+    const first = new Date(c.syncedAt).getTime() === 0;
+    // 첫 수집만 기다리고, 이후에는 캐시를 바로 보여주며 백그라운드에서 갱신
+    if (first) await syncBids();
+    else void syncBids().catch(() => {});
+  }
   return bidCache().items;
 }
 
@@ -55,13 +61,20 @@ export async function getBid(id: string): Promise<Bid | undefined> {
   return (await getBids()).find((b) => b.id === id);
 }
 
-export async function syncBids(): Promise<BidCache> {
+let inflight: Promise<BidCache> | null = null;
+
+export function syncBids(): Promise<BidCache> {
+  inflight ??= doSync().finally(() => { inflight = null; });
+  return inflight;
+}
+
+async function doSync(): Promise<BidCache> {
   if (!hasServiceKey()) {
     g.__ipchalBids = { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock" };
     return g.__ipchalBids;
   }
   try {
-    const items = await fetchFacilityBids(72);
+    const items = await fetchFacilityBids(3);
     g.__ipchalBids = { items, syncedAt: new Date().toISOString(), source: "g2b" };
   } catch (e) {
     // API 실패 시 목업으로 서비스 유지 (오류는 관리자 화면에 표시)

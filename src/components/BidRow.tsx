@@ -21,8 +21,8 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
           {match && <GradeBadge grade={match.grade} score={match.score} />}
         </div>
         <p className="mt-2 truncate text-[16px] font-semibold group-hover:text-mint-600">{bid.title}</p>
-        <p className="mt-1 text-sm text-ink-500">
-          {bid.demandAgency} · 면허 {bid.licenses.join(", ") || "제한없음"}
+        <p className="mt-1 line-clamp-1 text-sm text-ink-500">
+          {bid.demandAgency} · 면허 {bid.licenseRaw || bid.licenses.join(", ") || "제한없음"}
         </p>
         {match && !match.eligible && <p className="mt-1 text-xs font-medium text-coral">{match.blockers.join(" · ")}</p>}
       </div>

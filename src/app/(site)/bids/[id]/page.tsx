@@ -70,8 +70,8 @@ export default async function BidDetail({ params, searchParams }: Props) {
               {[
                 ["기초금액", won(bid.baseAmount)],
                 ["용역 기간", `${bid.periodMonths}개월`],
-                ["참가 지역", bid.region === "전국" ? "제한 없음" : `${bid.region} 제한`],
-                ["필요 면허", bid.licenses.join(", ") || "제한 없음"],
+                ["참가 지역", bid.region === "전국" ? "제한 없음" : `${(bid.regions ?? [bid.region]).join("·")} 제한`],
+                ["필요 면허", bid.licenseRaw || bid.licenses.join(", ") || "제한 없음"],
                 ["낙찰하한율", bid.lowerLimitRate ? `${bid.lowerLimitRate}%` : "해당 없음"],
                 ["공동도급", bid.jointContract ? "허용" : "불가(단독)"],
                 ["중소기업 제한", bid.smallBizOnly ? "예" : "아니오"],

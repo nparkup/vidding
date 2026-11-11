@@ -1,4 +1,3 @@
-import { BarChart3, Bell, ClipboardList, Inbox, Search, Star } from "lucide-react";
 import type { Digest } from "@/lib/digest";
 import type { MatchResult } from "@/lib/analysis";
 import { dday, won } from "@/lib/format";
@@ -7,11 +6,11 @@ import { GradeBadge, ScoreBar } from "../Badges";
 /** 히어로 아래 큰 제품 화면 미리보기 (실제 공고 데이터로 채움) */
 export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResult }) {
   const menu = [
-    { Icon: Inbox, t: "오늘의 공고", on: true, n: digest.recommended.length },
-    { Icon: Star, t: "관심 공고" },
-    { Icon: ClipboardList, t: "서류 체크리스트" },
-    { Icon: BarChart3, t: "주간 보고서" },
-    { Icon: Bell, t: "알림 설정" },
+    { t: "오늘의 공고", on: true, n: digest.recommended.length },
+    { t: "관심 공고" },
+    { t: "서류 체크리스트" },
+    { t: "주간 보고서" },
+    { t: "알림 설정" },
   ];
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white text-left shadow-lift sm:rounded-3xl">
@@ -30,9 +29,8 @@ export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResu
         <aside className="hidden border-r border-ink-100 p-4 md:block">
           <p className="px-2 text-[11px] font-semibold text-ink-300">메뉴</p>
           <ul className="mt-2 space-y-1 text-sm">
-            {menu.map(({ Icon, t, on, n }) => (
+            {menu.map(({ t, on, n }) => (
               <li key={t} className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${on ? "bg-mint-50 font-semibold text-mint-700" : "text-ink-500"}`}>
-                <Icon className="h-4 w-4" />
                 <span className="flex-1">{t}</span>
                 {n !== undefined && <span className="rounded-full bg-mint px-1.5 text-[11px] font-bold text-white">{n}</span>}
               </li>
@@ -53,7 +51,7 @@ export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResu
               <p className="font-bold">오늘의 맞춤 공고</p>
             </div>
             <span className="hidden items-center gap-1.5 rounded-xl border border-ink-100 px-3 py-1.5 text-xs text-ink-400 sm:flex">
-              <Search className="h-3.5 w-3.5" /> 공고명·기관 검색
+              공고명·기관 검색
             </span>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2">

@@ -1,4 +1,4 @@
-import { Box, Cyl, Sparkle, iso, type Faces } from "./iso";
+import { Box, Cyl, iso, type Faces } from "./iso";
 
 /** 공고문·체크리스트·아침 메일이 놓인 책상 (밝은 배경용) */
 
@@ -57,8 +57,6 @@ export function DeskArt({ className = "" }: { className?: string }) {
         <line x1="14" y1="14" x2="32" y2="32" stroke="#24304A" strokeWidth="8" strokeLinecap="round" />
         <circle cx="-6" cy="-6" r="5" fill="#fff" opacity="0.8" />
       </g>
-      <Sparkle cx={-40} cy={-20} r={8} fill="#3DD6A3" />
-      <Sparkle cx={150} cy={30} r={6} fill="#F0A63A" />
     </svg>
   );
 }

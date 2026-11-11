@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { evaluate } from "@/lib/analysis";
@@ -16,7 +15,7 @@ export function ProfileScore({ bid }: { bid: Bid }) {
     return (
       <div className="mt-4 rounded-xl bg-paper p-4 text-sm text-ink-500">
         귀사 조건을 입력하면 이 공고의 참가 가능 여부와 점수를 계산해 드립니다.
-        <Link href="/bids" className="mt-3 inline-flex items-center gap-1 font-semibold text-mint-600">공고 검색에서 조건 입력 <ArrowRight className="h-4 w-4" /></Link>
+        <Link href="/bids" className="mt-3 block font-semibold text-mint-600">공고 검색에서 조건 입력</Link>
       </div>
     );
   }

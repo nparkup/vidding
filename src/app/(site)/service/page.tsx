@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Database, Filter, Layers, Mail, ScanSearch } from "lucide-react";
 import { DeskArt } from "@/components/art/Desk";
 import { EmailPreview } from "@/components/EmailPreview";
 import { PageHero } from "@/components/PageHero";
@@ -12,11 +11,11 @@ export const metadata: Metadata = { title: "서비스 소개" };
 export const revalidate = 600;
 
 const STEPS = [
-  { Icon: Database, t: "수집", d: "매일 세 번, 공공데이터포털의 나라장터 전 업종 입찰공고를 수집합니다.", items: ["입찰공고정보서비스", "사전규격정보서비스"] },
-  { Icon: Layers, t: "분류", d: "용역·공사·물품 전 공고를 공고명과 투찰가능업종으로 21개 업종에 나눕니다.", items: ["청소·시설관리", "건축·전기·통신 공사", "IT·설계·연구 용역", "의료·급식 물품"] },
-  { Icon: Filter, t: "1차 선별", d: "고객사별 면허·참가가능지역·수행 가능 규모로 참가 불가 공고를 제외합니다.", items: ["면허제한", "지역제한", "금액 범위", "중소기업 제한"] },
-  { Icon: ScanSearch, t: "분석", d: "참가조건과 마감일, 제출서류를 정리하고 입찰 가능성 점수를 매깁니다.", items: ["경쟁 강도", "실적 대비 규모", "준비 기간", "낙찰하한율"] },
-  { Icon: Mail, t: "전달", d: "영업일 오전 7시 요약 메일, 매주 월요일 분석보고서로 전달합니다.", items: ["일일 요약 메일", "주간 보고서", "매니저 상담"] },
+  { t: "수집", d: "매일 세 번, 공공데이터포털의 나라장터 전 업종 입찰공고를 수집합니다.", items: ["입찰공고정보서비스", "사전규격정보서비스"] },
+  { t: "분류", d: "용역·공사·물품 전 공고를 공고명과 투찰가능업종으로 21개 업종에 나눕니다.", items: ["청소·시설관리", "건축·전기·통신 공사", "IT·설계·연구 용역", "의료·급식 물품"] },
+  { t: "1차 선별", d: "고객사별 면허·참가가능지역·수행 가능 규모로 참가 불가 공고를 제외합니다.", items: ["면허제한", "지역제한", "금액 범위", "중소기업 제한"] },
+  { t: "분석", d: "참가조건과 마감일, 제출서류를 정리하고 입찰 가능성 점수를 매깁니다.", items: ["경쟁 강도", "실적 대비 규모", "준비 기간", "낙찰하한율"] },
+  { t: "전달", d: "영업일 오전 7시 요약 메일, 매주 월요일 분석보고서로 전달합니다.", items: ["일일 요약 메일", "주간 보고서", "매니저 상담"] },
 ];
 
 export default async function ServicePage() {
@@ -31,7 +30,7 @@ export default async function ServicePage() {
         art={<DeskArt className="w-full" />}
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link href="/apply" className="btn-mint">무료 진단 받기 <ArrowRight className="h-4 w-4" /></Link>
+          <Link href="/apply" className="btn-mint">무료 진단 받기</Link>
           <Link href="/report/sample" className="btn-ghost">주간 보고서 샘플</Link>
         </div>
       </PageHero>
@@ -40,11 +39,10 @@ export default async function ServicePage() {
         <p className="eyebrow">매일 새벽부터 아침 7시까지</p>
         <h2 className="h-section mt-3">공고 한 건이 메일이 되기까지</h2>
         <ol className="mt-10 grid gap-4 lg:grid-cols-5">
-          {STEPS.map(({ Icon, t, d, items }, i) => (
+          {STEPS.map(({ t, d, items }, i) => (
             <li key={t} className="card relative flex flex-col p-6">
               <div className="flex items-center justify-between">
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-mint-50 text-mint-600"><Icon className="h-5 w-5" /></span>
-                <span className="text-sm font-extrabold tabular-nums text-ink-200">0{i + 1}</span>
+                <span className="text-sm font-extrabold tabular-nums text-mint-600">0{i + 1}</span>
               </div>
               <p className="mt-5 text-xl font-bold">{t}</p>
               <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-500">{d}</p>

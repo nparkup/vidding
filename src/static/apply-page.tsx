@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "무료 진단 신청" };
 export default function Apply() {
   return (
     <ApplyLayout>
-      <ApplyForm email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@ipchalpartner.kr"} />
+      <ApplyForm email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@ipchalmatelab.kr"} />
     </ApplyLayout>
   );
 }

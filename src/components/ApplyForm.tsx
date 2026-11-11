@@ -47,7 +47,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
       `보유 면허: ${licenses.join(", ") || "-"}`, `영업 지역: ${regions.join(", ") || "-"}`, `수행 규모: ${won(minAmount)} ~ ${won(maxAmount)}`,
       `문의: ${s("message")}`, "", `(사이트 진단 결과: 참가 가능 공고 ${ok.length}건)`,
     ];
-    if (email) window.location.href = `mailto:${email}?subject=${encodeURIComponent(`[입찰파트너 무료진단] ${s("company")}`)}&body=${encodeURIComponent(lines.join("\n"))}`;
+    if (email) window.location.href = `mailto:${email}?subject=${encodeURIComponent(`[입찰메이트랩 무료진단] ${s("company")}`)}&body=${encodeURIComponent(lines.join("\n"))}`;
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -74,7 +74,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
           {error && <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">회사명, 이메일, 연락처는 꼭 입력해 주세요.</p>}
           {plan && <input type="hidden" name="message" value={`관심 요금제: ${plan}`} />}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div><label className="label" htmlFor="company">회사명 *</label><input id="company" name="company" required className="input" placeholder="(주)입찰파트너" /></div>
+            <div><label className="label" htmlFor="company">회사명 *</label><input id="company" name="company" required className="input" placeholder="(주)한빛클린서비스" /></div>
             <div><label className="label" htmlFor="contactName">담당자</label><input id="contactName" name="contactName" className="input" placeholder="홍길동 대표" /></div>
             <div><label className="label" htmlFor="email">이메일 *</label><input id="email" name="email" type="email" required className="input" placeholder="공고를 받을 이메일" /></div>
             <div><label className="label" htmlFor="phone">연락처 *</label><input id="phone" name="phone" required className="input" placeholder="010-0000-0000" /></div>

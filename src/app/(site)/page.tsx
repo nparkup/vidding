@@ -31,7 +31,7 @@ const COMPARE = [
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 체크리스트 제공"],
   ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 채점과 S·A·B·C 등급"],
-  ["담당 인력", "고객사 직원이 직접", "입찰파트너 전담 매니저"],
+  ["담당 인력", "고객사 직원이 직접", "입찰메이트랩 전담 매니저"],
 ];
 
 const TRUST = [
@@ -53,7 +53,7 @@ const FAQ = [
   { q: "프로그램을 설치하거나 매일 접속해야 하나요?", a: "아닙니다. 조건만 한 번 등록하시면 영업일마다 이메일로 받아 보시면 됩니다. 필요할 때만 웹에서 공고 분석을 열어보시면 됩니다." },
   { q: "공고 데이터는 어디서 오나요?", a: "조달청 나라장터가 공공데이터포털로 공개하는 입찰공고·낙찰·사전규격 정보를 매일 수집해 분석합니다." },
   { q: "입찰 가능성 점수는 어떻게 계산하나요?", a: "입찰 특화 알고리즘이 6개 항목을 가중 채점합니다. 면허 요건 30점, 참가 지역 20점, 사업 규모 15점은 필수 조건으로 먼저 판정하고, 하나라도 맞지 않으면 39점 이하로 제한해 제외합니다. 통과한 공고는 유사 공고 평균 참여업체 수로 본 경쟁 강도 15점, 기초금액 대비 실적 10점, 남은 준비 기간 10점을 더해 100점 만점으로 산출하고, 85점 이상 S, 72점 이상 A, 58점 이상 B, 그 아래는 C 등급을 붙입니다." },
-  { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰파트너는 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
+  { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트랩은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
 
 export default async function Home() {
@@ -105,7 +105,7 @@ export default async function Home() {
             <span>받은편지함 · 오전 7:00</span>
             <span className="rounded-full bg-mint-50 px-2 py-0.5 font-bold text-mint-600">새 메일</span>
           </div>
-          <p className="mt-2 text-sm font-bold">[입찰파트너] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
+          <p className="mt-2 text-sm font-bold">[입찰메이트랩] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
           <ul className="mt-3 divide-y divide-ink-100">
             {digest.recommended.slice(0, 4).map((r) => (
               <li key={r.bid.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -413,7 +413,7 @@ export default async function Home() {
       {/* 비교 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">왜 입찰파트너인가요</p>
+          <p className="eyebrow">왜 입찰메이트랩인가요</p>
           <h2 className="h-section mt-3">입찰정보 사이트는 많은데,<br />왜 여전히 힘들까요?</h2>
         </div>
         <div className="mt-12 grid gap-4 lg:grid-cols-2">
@@ -430,7 +430,7 @@ export default async function Home() {
           </div>
           <div className="relative overflow-hidden rounded-3xl bg-ink p-7 text-white">
             <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-mint/25 blur-3xl" />
-            <p className="relative text-sm font-semibold text-mint-400">입찰파트너</p>
+            <p className="relative text-sm font-semibold text-mint-400">입찰메이트랩</p>
             <ul className="relative mt-5 space-y-4">
               {COMPARE.map(([k, , b]) => (
                 <li key={k} className="flex gap-3">
@@ -537,7 +537,7 @@ export default async function Home() {
         <div>
           <p className="eyebrow">자주 묻는 질문</p>
           <h2 className="h-section mt-3">궁금한 점이<br />있으신가요?</h2>
-          <p className="mt-4 text-ink-500">평일 09:00–18:00 · hello@ipchalpartner.kr</p>
+          <p className="mt-4 text-ink-500">평일 09:00–18:00 · hello@ipchalmatelab.kr</p>
         </div>
         <div className="space-y-3">
           {FAQ.map((f, i) => (

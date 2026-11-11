@@ -20,7 +20,7 @@ export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResu
         <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
         <span className="h-3 w-3 rounded-full bg-[#28C840]" />
         <span className="mx-auto hidden w-1/2 truncate rounded-lg bg-white px-3 py-1 text-center text-xs text-ink-400 ring-1 ring-ink-100 sm:block">
-          입찰파트너 · {digest.client.company} 전용 공고함
+          입찰메이트랩 · {digest.client.company} 전용 공고함
         </span>
       </div>
 
@@ -38,7 +38,7 @@ export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResu
           </ul>
           <div className="mt-6 rounded-2xl bg-ink p-3 text-white">
             <p className="text-[11px] text-ink-300">담당 매니저</p>
-            <p className="mt-0.5 text-sm font-semibold">입찰파트너 매니저</p>
+            <p className="mt-0.5 text-sm font-semibold">입찰메이트랩 매니저</p>
             <p className="mt-2 text-[11px] leading-relaxed text-ink-200">관심 공고 서류를 마감 전 함께 확인해 드려요.</p>
           </div>
         </aside>

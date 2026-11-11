@@ -5,7 +5,7 @@ import { getSyncInfo, listInquiries } from "@/lib/store";
 import { logout } from "../actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: { default: "관리자", template: "%s | 입찰파트너 관리자" } };
+export const metadata = { title: { default: "관리자", template: "%s | 입찰메이트랩 관리자" } };
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const newInq = (await listInquiries()).filter((q) => q.status === "신규").length;

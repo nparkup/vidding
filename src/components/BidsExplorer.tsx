@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { BidRow } from "./BidRow";
@@ -130,7 +131,7 @@ function ProfileForm({ onApply }: { onApply: (p: Record<string, string>) => void
   return (
     <details className="card mt-4 p-4">
       <summary className="cursor-pointer list-none text-sm font-semibold">
-        <span className="text-mint-600">＋ 내 면허·지역·규모 입력하고 입찰 가능성 점수 보기</span>
+        <span className="inline-flex items-center gap-1.5 text-mint-600"><Plus className="h-4 w-4" />내 면허·지역·규모 입력하고 입찰 가능성 점수 보기</span>
       </summary>
       <form
         className="mt-4 space-y-4"

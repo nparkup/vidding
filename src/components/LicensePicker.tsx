@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { LICENSE_GROUPS } from "@/lib/types";
 import { normalizeLicense } from "@/lib/licenses";
@@ -58,7 +59,7 @@ export function LicensePicker({
           <details key={g.group} open={i < openGroups || n > 0} className="group rounded-xl border border-ink-100 bg-white/60 px-3 py-2">
             <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-ink-700">
               <span>{g.group}</span>
-              <span className="text-xs font-medium text-ink-300">{n > 0 ? <b className="text-mint-600">{n}개 선택</b> : `${g.items.length}개`} <span className="ml-1 inline-block transition group-open:rotate-180">▾</span></span>
+              <span className="text-xs font-medium text-ink-300">{n > 0 ? <b className="text-mint-600">{n}개 선택</b> : `${g.items.length}개`} <ChevronDown className="ml-1 inline-block h-3.5 w-3.5 align-[-2px] transition group-open:rotate-180" /></span>
             </summary>
             <div className="mt-2 flex flex-wrap gap-1.5 pb-1">{g.items.map(chip)}</div>
           </details>

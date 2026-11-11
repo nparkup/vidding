@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BidRow } from "@/components/BidRow";
@@ -17,7 +18,7 @@ export default async function Done({ searchParams }: { searchParams: Promise<{ i
   return (
     <div className="container-x py-14 sm:py-20">
       <div className="card p-8 text-center sm:p-12">
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-mint text-2xl text-white">✓</span>
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-mint text-white"><Check className="h-7 w-7" strokeWidth={3} /></span>
         <h1 className="mt-5 text-3xl font-extrabold tracking-tight">{q.company}님, 신청이 접수되었습니다.</h1>
         <p className="mt-3 text-ink-500">영업일 기준 1일 이내 담당 매니저가 {q.phone}로 연락드립니다.</p>
         <div className="mx-auto mt-8 grid max-w-lg grid-cols-2 gap-3">

@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BidRow } from "./BidRow";
@@ -54,7 +55,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
     return (
       <div className="space-y-4">
         <div className="card p-6 text-center sm:p-8">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-mint text-xl text-white">✓</span>
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-mint text-white"><Check className="h-6 w-6" strokeWidth={3} /></span>
           <p className="mt-4 text-2xl font-extrabold">{result.company || "귀사"} 조건의 진단 결과</p>
           <p className="mt-2 text-sm text-ink-500">메일 앱이 열리지 않았다면 {email}로 회사명과 연락처를 보내 주세요.</p>
           <div className="mx-auto mt-6 grid max-w-sm grid-cols-2 gap-3">

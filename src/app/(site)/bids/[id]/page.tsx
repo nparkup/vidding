@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -40,7 +41,7 @@ export default async function BidDetail({ params }: Props) {
 
   return (
     <div className="container-x py-10 sm:py-14">
-      <Link href="/bids" className="text-sm text-ink-500 hover:text-ink">← 공고 목록</Link>
+      <Link href="/bids" className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink"><ArrowLeft className="h-4 w-4" />공고 목록</Link>
 
       <header className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">

@@ -46,7 +46,7 @@ export const NARA_APIS = [
     path: "/as/ScsbidInfoService",
     required: false,
     approved: true,
-    usage: "과거 유사 공고의 낙찰률·참여업체 수 → 입찰 가능성 점수·투찰 가이드",
+    usage: "과거 유사 공고의 낙찰률·참여업체 수로 입찰 가능성 점수·투찰 가이드 산출",
     operations: {
       serviceResult: "getScsbidListSttusServc",
       serviceOpening: "getOpengResultListInfoServc",
@@ -59,7 +59,7 @@ export const NARA_APIS = [
     path: "/ao/HrcspSsstndrdInfoService",
     required: false,
     approved: true,
-    usage: "본공고 전 사전규격 알림 → 고객이 미리 서류를 준비",
+    usage: "본공고 전 사전규격 알림으로 고객이 미리 서류를 준비",
     operations: {
       serviceList: "getPublicPrcureThngInfoServc",
     },
@@ -71,7 +71,7 @@ export const NARA_APIS = [
     path: "/ao/CntrctInfoService",
     required: false,
     approved: true,
-    usage: "발주기관별 기존 계약 이력 → 재발주 시기 예측·현 수행업체 파악",
+    usage: "발주기관별 기존 계약 이력으로 재발주 시기 예측·현 수행업체 파악",
     operations: {
       serviceList: "getCntrctInfoListServc",
     },

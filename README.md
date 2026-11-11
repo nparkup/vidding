@@ -78,3 +78,22 @@ npm run dev                  # http://localhost:3000
 
 - 낙찰정보 연동으로 경쟁강도·사정률 실데이터 반영
 - 사전규격 알림
+
+## GitHub Pages (정적 공개 사이트)
+
+`https://nparkup.github.io/vidding/` 로 공개되는 버전입니다. 서버가 없으므로 아래처럼 동작합니다.
+
+| 기능 | Pages 버전 |
+|---|---|
+| 메인·서비스·요금제·보고서 샘플 | 그대로 |
+| 공고 검색·공고 분석·가능성 점수 | 그대로 (점수 계산은 브라우저에서) |
+| 나라장터 공고 | `.github/workflows/pages.yml` 이 영업일 06:40·11:40·16:40(KST)에 수집 후 재배포 |
+| 무료 진단 신청 | 브라우저에서 추천 공고 표시 + 메일 앱으로 신청 내용 전송 (`APPLY_EMAIL` 변수) |
+| 관리자·고객 DB·메일 자동 발송 | 제외 (서버 배포 시 사용) |
+
+설정 (저장소 Settings):
+1. Pages → Source: **GitHub Actions**
+2. Secrets and variables → Actions → Secrets: `DATA_GO_KR_SERVICE_KEY`
+3. Secrets and variables → Actions → Variables: `APPLY_EMAIL` (신청 받을 이메일)
+
+로컬에서 확인: `npx tsx --conditions=react-server scripts/fetch-bids.ts data/bids.json && BIDS_FILE=data/bids.json PAGES_BASE_PATH=/vidding node scripts/build-static.mjs` → `out/`

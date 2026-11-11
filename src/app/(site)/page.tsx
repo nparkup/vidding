@@ -9,7 +9,7 @@ import { PLANS } from "@/lib/plans";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getBids } from "@/lib/store";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 600;
 
 const SERVICES = [
   { t: "매일 아침 맞춤 공고 요약 이메일", d: "영업일 오전 7시, 오늘 볼 공고만 골라 메일로 보내 드립니다. 나라장터에 접속할 필요가 없습니다.", tag: "매일" },

@@ -45,7 +45,21 @@ function bidCache(): BidCache {
   return g.__ipchalBids;
 }
 
+/** 정적 빌드(GitHub Pages): scripts/fetch-bids.ts 가 미리 받아 둔 파일을 그대로 사용 */
+function fileBids(): BidCache | null {
+  const f = process.env.BIDS_FILE;
+  if (!f) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("fs") as typeof import("fs");
+  return JSON.parse(fs.readFileSync(f, "utf8")) as BidCache;
+}
+
 export async function getBids(): Promise<Bid[]> {
+  const fromFile = fileBids();
+  if (fromFile) {
+    g.__ipchalBids = fromFile;
+    return fromFile.items;
+  }
   const c = bidCache();
   const stale = Date.now() - new Date(c.syncedAt).getTime() > STALE_MS;
   if (stale) {

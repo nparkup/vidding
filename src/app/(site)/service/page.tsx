@@ -6,7 +6,7 @@ import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getBids } from "@/lib/store";
 
 export const metadata: Metadata = { title: "서비스 소개" };
-export const dynamic = "force-dynamic";
+export const revalidate = 600;
 
 const STEPS = [
   { n: "01", t: "수집", d: "매일 새벽, 공공데이터포털의 나라장터 입찰공고·사전규격 데이터를 수집합니다.", items: ["입찰공고정보서비스", "사전규격정보서비스"] },

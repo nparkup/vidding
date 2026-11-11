@@ -140,7 +140,7 @@ export default async function BidDetail({ params }: Props) {
             </p>
           </section>
 
-          <section className="rounded-2xl bg-mint p-6 text-white">
+          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-6 text-white shadow-glow">
             <p className="font-bold">이 공고, 함께 준비할까요?</p>
             <p className="mt-2 text-sm opacity-90">프로 요금제부터 담당 매니저가 서류 누락 여부를 마감 전 한 번 더 확인해 드립니다.</p>
             <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>

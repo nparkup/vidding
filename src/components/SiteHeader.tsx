@@ -11,19 +11,20 @@ const NAV = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
+    <header className="sticky top-0 z-40 border-b border-ink-100/70 bg-white/85 backdrop-blur-xl">
       <div className="container-x flex h-16 items-center justify-between">
         <Logo />
-        <nav className="hidden items-center gap-1 rounded-full border border-ink-100 bg-white/70 p-1 text-[15px] font-medium text-ink-500 md:flex">
+        <nav className="hidden items-center gap-1 text-[15px] font-semibold text-ink-500 md:flex">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="rounded-full px-4 py-1.5 transition hover:bg-paper hover:text-ink">
+            <Link key={n.href} href={n.href} className="rounded-full px-4 py-2 transition hover:bg-paper hover:text-ink">
               {n.label}
             </Link>
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Link href="/apply" className="btn-primary btn-sm sm:px-4">
-            무료 진단 받기 <ArrowRight className="hidden h-4 w-4 sm:block" />
+          <Link href="/bids" className="hidden px-3 text-sm font-semibold text-ink-500 hover:text-ink lg:block">오늘의 공고</Link>
+          <Link href="/apply" className="btn-mint btn-sm sm:px-4">
+            2주 무료 체험 <ArrowRight className="hidden h-4 w-4 sm:block" />
           </Link>
           <details className="relative md:hidden">
             <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full border border-ink-100 bg-white" aria-label="메뉴">

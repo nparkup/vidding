@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/store";
 import { cronAuthorized } from "../auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 /**
  * 매시 정각 호출 권장. 설정된 발송 시각(KST) 이후 첫 호출에서 발송하고,

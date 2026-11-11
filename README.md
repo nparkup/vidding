@@ -65,7 +65,7 @@ npm run dev                  # http://localhost:3000
 | `GET /api/cron/daily` | 매시 (06~08시 KST) | 설정한 발송 시각 이후 첫 호출에서 영업일이면 전 고객사에 맞춤 공고 메일 발송. 같은 날 중복 발송 안 함 |
 | `GET /api/cron/weekly` | 매주 월요일 07:30 KST | 프로·파트너 고객사 주간 보고서 초안 생성 (매니저가 코멘트 후 발송) |
 
-두 엔드포인트 모두 `Authorization: Bearer $CRON_SECRET` 헤더가 필요합니다. Vercel에서는 `vercel.json`의 crons가 이 헤더를 자동으로 붙입니다 (Hobby 요금제는 하루 1회만 허용되므로 daily 주기를 `0 22 * * *` 로 바꾸세요). 다른 서버에서는 crontab으로 curl 호출하면 됩니다.
+두 엔드포인트 모두 `Authorization: Bearer $CRON_SECRET` 헤더가 필요합니다. Vercel에서는 `vercel.json`의 crons가 이 헤더를 자동으로 붙입니다 (기본값은 매일 07:00 KST 1회, Hobby 요금제 제한에 맞춤. 함수는 서울 리전 icn1에서 실행). 다른 서버에서는 crontab으로 curl 호출하면 됩니다.
 
 ## 배포 체크리스트
 

@@ -13,8 +13,9 @@ function weekLabel(d = new Date()) {
 
 export default async function Reports({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
   const sp = await searchParams;
-  const clients = listClients().filter((c) => c.plan !== "basic");
-  const reports = listReports();
+  const all = await listClients();
+  const clients = all.filter((c) => c.plan !== "basic");
+  const reports = await listReports();
   return (
     <>
       <PageHead title="주간 보고서" desc="프로·파트너 고객사에 매주 월요일 발송합니다. 자동 초안에 매니저 코멘트를 더해 발송하세요." />
@@ -36,7 +37,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
             <tbody>
               {reports.map((r) => (
                 <tr key={r.id}>
-                  <td><Link href={`/admin/reports/${r.id}`} className="font-semibold hover:text-mint-600">{getClient(r.clientId)?.company ?? r.clientId}</Link></td>
+                  <td><Link href={`/admin/reports/${r.id}`} className="font-semibold hover:text-mint-600">{all.find((c) => c.id === r.clientId)?.company ?? r.clientId}</Link></td>
                   <td>{r.weekLabel}</td>
                   <td className="text-xs text-ink-300">{shortDate(r.createdAt)}</td>
                   <td><Status value={r.status} /></td>

@@ -7,6 +7,7 @@ const ITEMS = [
   { href: "/admin", label: "대시보드", icon: "M3 12l9-8 9 8M5 10v10h14V10" },
   { href: "/admin/clients", label: "고객사", icon: "M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 21a8 8 0 0116 0" },
   { href: "/admin/bids", label: "공고 수집·선별", icon: "M4 6h16M4 12h16M4 18h10" },
+  { href: "/admin/mail", label: "메일 발송", icon: "M4 6h16v12H4zM4 7l8 6 8-6" },
   { href: "/admin/reports", label: "주간 보고서", icon: "M7 3h7l5 5v13H7zM14 3v5h5" },
   { href: "/admin/inquiries", label: "상담 신청", icon: "M4 5h16v11H8l-4 4z" },
   { href: "/admin/settings", label: "설정·API", icon: "M12 15a3 3 0 100-6 3 3 0 000 6zM19 12h2M3 12h2M12 3v2M12 19v2" },

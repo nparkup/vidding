@@ -6,7 +6,8 @@ import { evaluate } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
 import { won } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
-import { getBids, listClients } from "@/lib/store";
+import { SEED_CLIENTS } from "@/lib/mock/seed";
+import { getBids } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ const FAQ = [
 
 export default async function Home() {
   const bids = await getBids();
-  const sampleClient = listClients()[0];
+  const sampleClient = SEED_CLIENTS[0];
   const digest = buildDigest(sampleClient, bids);
   const featured = digest.recommended[0]?.bid ?? bids[0];
   const featuredEval = evaluate(featured, sampleClient);

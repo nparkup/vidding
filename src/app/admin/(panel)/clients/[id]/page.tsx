@@ -8,11 +8,11 @@ import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { planName } from "@/lib/plans";
 import { getBids, getClient } from "@/lib/store";
-import { toggleWatchAction } from "../../../actions";
+import { sendTestDigest, toggleWatchAction } from "../../../actions";
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const c = getClient(id);
+  const c = await getClient(id);
   if (!c) notFound();
   const bids = await getBids();
   const ranked = rank(bids, c);
@@ -25,6 +25,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
     <>
       <PageHead title={c.company} desc={`${c.contactName} · ${c.email} · ${c.phone}`}>
         <Link href={`/admin/clients/new?id=${c.id}`} className="btn-ghost btn-sm">조건 수정</Link>
+        <form action={sendTestDigest.bind(null, c.id)}><button className="btn-ghost btn-sm">지금 메일 보내기</button></form>
         <Link href={`/admin/reports?client=${c.id}`} className="btn-primary btn-sm">주간 보고서 작성</Link>
       </PageHead>
 

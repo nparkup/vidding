@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { EmailPreview } from "@/components/EmailPreview";
 import { buildDigest } from "@/lib/digest";
-import { getBids, listClients } from "@/lib/store";
+import { SEED_CLIENTS } from "@/lib/mock/seed";
+import { getBids } from "@/lib/store";
 
 export const metadata: Metadata = { title: "서비스 소개" };
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ const STEPS = [
 
 export default async function ServicePage() {
   const bids = await getBids();
-  const digest = buildDigest(listClients()[0], bids);
+  const digest = buildDigest(SEED_CLIENTS[0], bids);
   return (
     <>
       <section className="container-x py-14 sm:py-20">

@@ -1,124 +1,146 @@
 import "server-only";
-import type { Bid, ClientProfile, Inquiry, WeeklyReport } from "./types";
+import type { AppSettings, Bid, ClientProfile, Inquiry, MailLog, WeeklyReport } from "./types";
+import { adapter } from "./db";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
 import { fetchFacilityBids, hasServiceKey } from "./nara/client";
 
 /**
- * 간이 데이터 저장소 (프로세스 메모리).
- * 운영 전환 시 이 파일의 함수 시그니처를 유지한 채 DB(PostgreSQL 등)로 교체하면 된다.
+ * 데이터 저장소.
+ * - 고객사·상담·보고서·발송기록·설정: lib/db 어댑터(PostgreSQL 또는 JSON 파일)에 영구 저장
+ * - 공고: 나라장터에서 다시 받을 수 있으므로 메모리 캐시
  */
-interface DB {
-  clients: ClientProfile[];
-  inquiries: Inquiry[];
-  reports: WeeklyReport[];
-  bids: { items: Bid[]; syncedAt: string; source: "mock" | "g2b"; error?: string };
-  settings: { sendHour: number; sendOnWeekdaysOnly: boolean };
+
+/* ---------- 데모 시드 ---------- */
+const g = globalThis as unknown as { __ipchalSeeded?: Promise<void>; __ipchalBids?: BidCache };
+
+function ensureSeeded(): Promise<void> {
+  if (process.env.SEED_DEMO === "false") return Promise.resolve();
+  g.__ipchalSeeded ??= (async () => {
+    const db = adapter();
+    if (await db.isEmpty("clients")) for (const c of SEED_CLIENTS) await db.put("clients", c, c.joinedAt);
+    if (await db.isEmpty("inquiries")) for (const q of SEED_INQUIRIES) await db.put("inquiries", q, q.createdAt);
+    if (await db.isEmpty("reports")) for (const r of SEED_REPORTS) await db.put("reports", r, r.createdAt);
+  })();
+  return g.__ipchalSeeded;
 }
 
-const g = globalThis as unknown as { __ipchalDB?: DB };
-
-function db(): DB {
-  if (!g.__ipchalDB) {
-    g.__ipchalDB = {
-      clients: structuredClone(SEED_CLIENTS),
-      inquiries: structuredClone(SEED_INQUIRIES),
-      reports: structuredClone(SEED_REPORTS),
-      bids: { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock" },
-      settings: { sendHour: 7, sendOnWeekdaysOnly: true },
-    };
-  }
-  return g.__ipchalDB;
+async function col<T>(name: Parameters<ReturnType<typeof adapter>["list"]>[0]) {
+  await ensureSeeded();
+  return adapter().list<T>(name);
 }
+async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id: string) {
+  await ensureSeeded();
+  return adapter().get<T>(name, id);
+}
+
+export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
+interface BidCache { items: Bid[]; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
+function bidCache(): BidCache {
+  g.__ipchalBids ??= { items: buildMockBids(), syncedAt: new Date(0).toISOString(), source: "mock" };
+  return g.__ipchalBids;
+}
+
 export async function getBids(): Promise<Bid[]> {
-  const d = db();
-  const stale = Date.now() - new Date(d.bids.syncedAt).getTime() > STALE_MS;
-  if (hasServiceKey() && (d.bids.source === "mock" || stale) && !d.bids.error) {
-    await syncBids();
-  } else if (!hasServiceKey() && stale) {
-    d.bids = { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock" };
-  }
-  return d.bids.items;
+  const c = bidCache();
+  if (Date.now() - new Date(c.syncedAt).getTime() > STALE_MS) await syncBids();
+  return bidCache().items;
 }
 
 export async function getBid(id: string): Promise<Bid | undefined> {
   return (await getBids()).find((b) => b.id === id);
 }
 
-export async function syncBids(): Promise<DB["bids"]> {
-  const d = db();
+export async function syncBids(): Promise<BidCache> {
   if (!hasServiceKey()) {
-    d.bids = { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock" };
-    return d.bids;
+    g.__ipchalBids = { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock" };
+    return g.__ipchalBids;
   }
   try {
     const items = await fetchFacilityBids(72);
-    d.bids = { items, syncedAt: new Date().toISOString(), source: "g2b" };
+    g.__ipchalBids = { items, syncedAt: new Date().toISOString(), source: "g2b" };
   } catch (e) {
-    // API 실패 시 목업으로 서비스 유지
-    d.bids = { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock", error: (e as Error).message };
+    // API 실패 시 목업으로 서비스 유지 (오류는 관리자 화면에 표시)
+    g.__ipchalBids = { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock", error: (e as Error).message };
   }
-  return d.bids;
+  return g.__ipchalBids;
 }
 
 export function getSyncInfo() {
-  const { syncedAt, source, error, items } = db().bids;
+  const { syncedAt, source, error, items } = bidCache();
   return { syncedAt, source, error, count: items.length, hasKey: hasServiceKey() };
 }
 
 /* ---------- 고객사 ---------- */
-export const listClients = () => db().clients;
-export const getClient = (id: string) => db().clients.find((c) => c.id === id);
+export const listClients = () => col<ClientProfile>("clients");
+export const getClient = (id: string) => one<ClientProfile>("clients", id);
 
-export function upsertClient(c: ClientProfile) {
-  const d = db();
-  const i = d.clients.findIndex((x) => x.id === c.id);
-  if (i >= 0) d.clients[i] = c;
-  else d.clients.unshift(c);
+export async function upsertClient(c: ClientProfile) {
+  await ensureSeeded();
+  await adapter().put("clients", c, c.joinedAt);
 }
 
-export function toggleWatch(clientId: string, bidId: string) {
-  const c = getClient(clientId);
+export async function toggleWatch(clientId: string, bidId: string) {
+  const c = await getClient(clientId);
   if (!c) return;
   c.watchlist = c.watchlist.includes(bidId) ? c.watchlist.filter((x) => x !== bidId) : [...c.watchlist, bidId];
+  await upsertClient(c);
 }
 
 /* ---------- 상담 신청 ---------- */
-export const listInquiries = () => db().inquiries;
-export const getInquiry = (id: string) => db().inquiries.find((q) => q.id === id);
+export const listInquiries = () => col<Inquiry>("inquiries");
+export const getInquiry = (id: string) => one<Inquiry>("inquiries", id);
 
-export function addInquiry(q: Omit<Inquiry, "id" | "createdAt" | "status">): Inquiry {
-  const item: Inquiry = { ...q, id: `q-${Date.now().toString(36)}`, createdAt: new Date().toISOString(), status: "신규" };
-  db().inquiries.unshift(item);
+export async function addInquiry(q: Omit<Inquiry, "id" | "createdAt" | "status">): Promise<Inquiry> {
+  await ensureSeeded();
+  const item: Inquiry = { ...q, id: `q-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, createdAt: new Date().toISOString(), status: "신규" };
+  await adapter().put("inquiries", item, item.createdAt);
   return item;
 }
 
-export function setInquiryStatus(id: string, status: Inquiry["status"]) {
-  const q = getInquiry(id);
-  if (q) q.status = status;
+export async function setInquiryStatus(id: string, status: Inquiry["status"]) {
+  const q = await getInquiry(id);
+  if (q) await adapter().put("inquiries", { ...q, status });
 }
 
 /* ---------- 주간 보고서 ---------- */
-export const listReports = () => db().reports;
-export const getReport = (id: string) => db().reports.find((r) => r.id === id);
+export const listReports = () => col<WeeklyReport>("reports");
+export const getReport = (id: string) => one<WeeklyReport>("reports", id);
 
-export function addReport(r: Omit<WeeklyReport, "id" | "createdAt">): WeeklyReport {
-  const item: WeeklyReport = { ...r, id: `r-${Date.now().toString(36)}`, createdAt: new Date().toISOString() };
-  db().reports.unshift(item);
+export async function addReport(r: Omit<WeeklyReport, "id" | "createdAt">): Promise<WeeklyReport> {
+  await ensureSeeded();
+  const item: WeeklyReport = { ...r, id: `r-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, createdAt: new Date().toISOString() };
+  await adapter().put("reports", item, item.createdAt);
   return item;
 }
 
-export function setReportStatus(id: string, status: WeeklyReport["status"]) {
-  const r = getReport(id);
-  if (r) r.status = status;
+export async function setReportStatus(id: string, status: WeeklyReport["status"]) {
+  const r = await getReport(id);
+  if (r) await adapter().put("reports", { ...r, status });
+}
+
+/* ---------- 메일 발송 기록 ---------- */
+export const listMailLog = () => col<MailLog>("mail_log");
+
+export async function addMailLog(m: Omit<MailLog, "id" | "createdAt">): Promise<MailLog> {
+  const item: MailLog = { ...m, id: `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, createdAt: new Date().toISOString() };
+  await adapter().put("mail_log", item, item.createdAt);
+  return item;
 }
 
 /* ---------- 설정 ---------- */
-export const getSettings = () => db().settings;
-export function updateSettings(s: Partial<DB["settings"]>) {
-  Object.assign(db().settings, s);
+const DEFAULT_SETTINGS: AppSettings = { sendHour: 7, sendOnWeekdaysOnly: true };
+
+export async function getSettings(): Promise<AppSettings> {
+  const s = await adapter().get<AppSettings & { id: string }>("settings", "app");
+  return { ...DEFAULT_SETTINGS, ...(s ?? {}) };
+}
+
+export async function updateSettings(s: Partial<AppSettings>) {
+  const cur = await getSettings();
+  await adapter().put("settings", { id: "app", ...cur, ...s });
 }

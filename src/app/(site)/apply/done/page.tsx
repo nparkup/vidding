@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Done({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   const { id } = await searchParams;
-  const q = id ? getInquiry(id) : undefined;
+  const q = id ? await getInquiry(id) : undefined;
   if (!q) notFound();
   const results = rank(await getBids(), q);
   const ok = results.filter((r) => r.eligible);

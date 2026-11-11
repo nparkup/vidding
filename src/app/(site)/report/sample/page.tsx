@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { WeeklyReportView } from "@/components/WeeklyReportView";
-import { getBids, listClients } from "@/lib/store";
+import { SEED_CLIENTS } from "@/lib/mock/seed";
+import { getBids } from "@/lib/store";
 
 export const metadata: Metadata = { title: "주간 분석보고서 샘플" };
 export const dynamic = "force-dynamic";
 
 export default async function SampleReport() {
   const bids = await getBids();
-  const client = listClients()[1] ?? listClients()[0];
+  const client = SEED_CLIENTS[1];
   return (
     <div className="container-x py-10 sm:py-14">
       <p className="eyebrow">샘플</p>

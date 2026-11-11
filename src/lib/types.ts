@@ -100,3 +100,20 @@ export interface WeeklyReport {
   highlightBidIds: string[];
   note: string;
 }
+
+export interface MailLog {
+  id: string;
+  kind: "daily" | "weekly" | "test";
+  clientId: string;
+  to: string;
+  subject: string;
+  status: "발송" | "실패" | "미발송(SMTP 미설정)";
+  error?: string;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface AppSettings {
+  sendHour: number;
+  sendOnWeekdaysOnly: boolean;
+}

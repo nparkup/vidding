@@ -11,7 +11,7 @@ const STATUSES: Inquiry["status"][] = ["신규", "연락완료", "체험전환",
 
 export default async function Inquiries() {
   const bids = await getBids();
-  const list = listInquiries();
+  const list = await listInquiries();
   return (
     <>
       <PageHead title="상담 신청" desc="사이트 무료 진단 신청 내역입니다. 고객사로 전환하면 조건이 그대로 등록됩니다." />

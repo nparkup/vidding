@@ -9,7 +9,7 @@ export const metadata = { title: "고객사" };
 
 export default async function Clients() {
   const bids = await getBids();
-  const clients = listClients();
+  const clients = await listClients();
   return (
     <>
       <PageHead title="고객사" desc="면허·지역·규모 조건으로 매일 공고를 선별합니다.">

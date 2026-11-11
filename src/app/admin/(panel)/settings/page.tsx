@@ -2,14 +2,15 @@ import { PageHead } from "@/components/AdminUI";
 import { NARA_APIS } from "@/lib/nara/endpoints";
 import { usingDevPassword } from "@/lib/auth";
 import { dateTime } from "@/lib/format";
-import { getSettings, getSyncInfo } from "@/lib/store";
+import { smtpConfigured } from "@/lib/mail/send";
+import { getSettings, getSyncInfo, storageKind } from "@/lib/store";
 import { saveSettings } from "../../actions";
 
 export const metadata = { title: "설정·API" };
 
-export default function Settings() {
+export default async function Settings() {
   const sync = getSyncInfo();
-  const s = getSettings();
+  const s = await getSettings();
   return (
     <>
       <PageHead title="설정·API" desc="공공데이터포털 연동 상태와 발송 설정을 관리합니다." />
@@ -49,9 +50,16 @@ export default function Settings() {
               </select>
             </div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="weekdays" defaultChecked={s.sendOnWeekdaysOnly} className="h-4 w-4 accent-[#0FA37F]" /> 영업일(월~금, 공휴일 제외)만 발송</label>
-            <p className="text-xs text-ink-300">실제 발송은 메일 서비스(SES, SendGrid 등) 연동 후 동작합니다.</p>
+            <p className="text-xs text-ink-300">휴일 목록은 src/lib/holidays.ts 에서 관리합니다.</p>
             <button className="btn-primary btn-sm">저장</button>
           </form>
+          <section className="card space-y-2 p-5 text-sm">
+            <h2 className="font-bold">연동 상태</h2>
+            <p>데이터 저장: <b>{storageKind() === "postgres" ? "PostgreSQL (DATABASE_URL)" : "로컬 파일 (data/runtime-db.json)"}</b></p>
+            <p>메일 발송: <b className={smtpConfigured() ? "text-mint-600" : "text-coral"}>{smtpConfigured() ? "SMTP 설정됨" : "SMTP 미설정 (기록만 남김)"}</b></p>
+            <p>자동 발송: <b className={process.env.CRON_SECRET ? "text-mint-600" : "text-coral"}>{process.env.CRON_SECRET ? "CRON_SECRET 설정됨" : "CRON_SECRET 미설정"}</b></p>
+            <p className="text-xs text-ink-300">스케줄러가 매시 /api/cron/daily, 매주 월요일 /api/cron/weekly 를 Authorization: Bearer CRON_SECRET 헤더로 호출합니다.</p>
+          </section>
           <section className="card p-5">
             <h2 className="font-bold">보안</h2>
             <p className={`mt-2 text-sm ${usingDevPassword() ? "text-coral" : "text-ink-500"}`}>

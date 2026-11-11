@@ -12,7 +12,7 @@ export const metadata = { title: "공고 수집·선별" };
 export default async function AdminBids({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
   const { cat } = await searchParams;
   const bids = (await getBids()).filter((b) => !cat || b.category === cat);
-  const clients = listClients().filter((c) => c.status !== "일시중지");
+  const clients = (await listClients()).filter((c) => c.status !== "일시중지");
   const sync = getSyncInfo();
 
   return (

@@ -6,8 +6,8 @@ import { sendReport } from "../../../actions";
 
 export default async function ReportDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const r = getReport(id);
-  const client = r ? getClient(r.clientId) : undefined;
+  const r = await getReport(id);
+  const client = r ? await getClient(r.clientId) : undefined;
   if (!r || !client) notFound();
   return (
     <>

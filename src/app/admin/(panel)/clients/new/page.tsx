@@ -6,8 +6,8 @@ export const metadata = { title: "고객사 등록" };
 
 export default async function NewClient({ searchParams }: { searchParams: Promise<{ id?: string; from?: string }> }) {
   const sp = await searchParams;
-  const existing = sp.id ? getClient(sp.id) : undefined;
-  const inq = sp.from ? getInquiry(sp.from) : undefined;
+  const existing = sp.id ? await getClient(sp.id) : undefined;
+  const inq = sp.from ? await getInquiry(sp.from) : undefined;
   const init = existing ?? (inq ? { ...inq, id: undefined, status: "체험" as const, fromInquiry: inq.id } : {});
   return (
     <>

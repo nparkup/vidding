@@ -5,8 +5,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE, adminPassword, sessionToken } from "@/lib/auth";
 import {
-  addReport, getClient, getInquiry, setInquiryStatus, setReportStatus, syncBids, toggleWatch, updateSettings, upsertClient,
+  addReport, getClient, getInquiry, setInquiryStatus, syncBids, toggleWatch, updateSettings, upsertClient,
 } from "@/lib/store";
+import { runDailyDigest, sendDigestTo, sendWeeklyReport } from "@/lib/jobs";
 import { LICENSES, REGIONS, CATEGORIES, type ClientProfile, type Inquiry, type License, type Region, type ServiceCategory, type PlanId } from "@/lib/types";
 
 async function guard() {
@@ -37,7 +38,7 @@ export async function runSync() {
 
 export async function toggleWatchAction(clientId: string, bidId: string) {
   await guard();
-  toggleWatch(clientId, bidId);
+  await toggleWatch(clientId, bidId);
   revalidatePath(`/admin/clients/${clientId}`);
 }
 
@@ -66,24 +67,24 @@ function parseClient(form: FormData, base?: ClientProfile): ClientProfile {
 export async function saveClient(form: FormData) {
   await guard();
   const id = String(form.get("id") ?? "");
-  const base = id ? getClient(id) : undefined;
+  const base = id ? await getClient(id) : undefined;
   const c = parseClient(form, base);
-  upsertClient(c);
+  await upsertClient(c);
   const fromInquiry = String(form.get("fromInquiry") ?? "");
-  if (fromInquiry) setInquiryStatus(fromInquiry, "체험전환");
+  if (fromInquiry) await setInquiryStatus(fromInquiry, "체험전환");
   revalidatePath("/admin", "layout");
   redirect(`/admin/clients/${c.id}`);
 }
 
 export async function setInquiryStatusAction(id: string, status: Inquiry["status"]) {
   await guard();
-  if (getInquiry(id)) setInquiryStatus(id, status);
+  if (await getInquiry(id)) await setInquiryStatus(id, status);
   revalidatePath("/admin/inquiries");
 }
 
 export async function createReport(form: FormData) {
   await guard();
-  const r = addReport({
+  const r = await addReport({
     clientId: String(form.get("clientId")),
     weekLabel: String(form.get("weekLabel") || "이번 주"),
     note: String(form.get("note") ?? ""),
@@ -96,14 +97,25 @@ export async function createReport(form: FormData) {
 
 export async function sendReport(id: string) {
   await guard();
-  // TODO: 메일 발송 연동 (SES / SendGrid 등). 현재는 상태만 변경.
-  setReportStatus(id, "발송완료");
+  await sendWeeklyReport(id);
   revalidatePath(`/admin/reports/${id}`);
   revalidatePath("/admin/reports");
 }
 
 export async function saveSettings(form: FormData) {
   await guard();
-  updateSettings({ sendHour: Number(form.get("sendHour") ?? 7), sendOnWeekdaysOnly: form.get("weekdays") === "on" });
+  await updateSettings({ sendHour: Number(form.get("sendHour") ?? 7), sendOnWeekdaysOnly: form.get("weekdays") === "on" });
   revalidatePath("/admin/settings");
+}
+
+export async function sendTestDigest(clientId: string) {
+  await guard();
+  await sendDigestTo(clientId);
+  revalidatePath("/admin", "layout");
+}
+
+export async function runDailyNow() {
+  await guard();
+  await runDailyDigest({ force: true });
+  revalidatePath("/admin", "layout");
 }

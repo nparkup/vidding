@@ -6,28 +6,29 @@ import { dateTime, won } from "@/lib/format";
 import { planName } from "@/lib/plans";
 import { getBids, getSettings, getSyncInfo, listClients, listInquiries, listReports } from "@/lib/store";
 import { CATEGORIES } from "@/lib/types";
-import { runSync } from "../actions";
+import { runDailyNow, runSync } from "../actions";
 
 export const metadata = { title: "대시보드" };
 
 export default async function Dashboard() {
   const bids = await getBids();
-  const clients = listClients();
+  const clients = await listClients();
   const active = clients.filter((c) => c.status !== "일시중지");
-  const inquiries = listInquiries();
+  const inquiries = await listInquiries();
   const sync = getSyncInfo();
-  const settings = getSettings();
+  const settings = await getSettings();
   const open = bids.filter((b) => daysLeft(b.closeAt) > 0);
   const today = bids.filter((b) => Date.now() - new Date(b.postedAt).getTime() < 24 * 3600 * 1000);
   const digests = active.map((c) => buildDigest(c, bids));
   const totalRecs = digests.reduce((s, d) => s + d.recommended.length, 0);
-  const draftReports = listReports().filter((r) => r.status === "초안").length;
+  const draftReports = (await listReports()).filter((r) => r.status === "초안").length;
   const maxCat = Math.max(1, ...CATEGORIES.map((c) => open.filter((b) => b.category === c).length));
 
   return (
     <>
       <PageHead title="대시보드" desc={`공고 갱신 ${dateTime(sync.syncedAt)} · ${sync.source === "g2b" ? "나라장터 API" : "목업 데이터"}`}>
-        <form action={runSync}><button className="btn-primary btn-sm">공고 다시 수집</button></form>
+        <form action={runSync}><button className="btn-ghost btn-sm">공고 다시 수집</button></form>
+        <form action={runDailyNow}><button className="btn-primary btn-sm">오늘 메일 지금 발송</button></form>
       </PageHead>
 
       {sync.error && <p className="mb-4 rounded-xl bg-coral-100 p-3 text-sm text-coral">API 수집 실패로 목업 데이터를 사용 중입니다: {sync.error}</p>}

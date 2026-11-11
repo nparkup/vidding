@@ -10,7 +10,7 @@ export async function submitInquiry(form: FormData) {
   const regions = form.getAll("regions").map(String).filter((r): r is Region => (REGIONS as string[]).includes(r));
   const [minAmount, maxAmount] = s("size").split("-").map(Number);
   if (!s("company") || !s("email") || !s("phone")) redirect("/apply?error=1");
-  const q = addInquiry({
+  const q = await addInquiry({
     company: s("company"),
     contactName: s("contactName"),
     email: s("email"),

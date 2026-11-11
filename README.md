@@ -50,10 +50,29 @@ npm run dev                  # http://localhost:3000
 - `src/lib/nara/` 나라장터 API 클라이언트 (키 있으면 실데이터, 실패 시 목업 폴백)
 - `src/lib/analysis.ts` 1차 선별(면허·지역·금액), 가능성 점수, 체크리스트, 투찰 가이드
 - `src/lib/digest.ts` 일일 맞춤 메일 구성
-- `src/lib/store.ts` 데이터 저장소 (현재 메모리, DB로 교체 예정)
+- `src/lib/db.ts` 저장소 어댑터: `DATABASE_URL`이 있으면 PostgreSQL(테이블 자동 생성), 없으면 `data/runtime-db.json`
+- `src/lib/store.ts` 고객사·상담·보고서·발송기록·설정 저장, 공고는 메모리 캐시
+- `src/lib/mail/` 메일 템플릿(일일 요약, 주간 보고서)과 SMTP 발송. SMTP 미설정 시 기록만 남김
+- `src/lib/jobs.ts` 일일 발송(영업일·중복 방지), 주간 보고서 초안 생성
+- `src/lib/holidays.ts` 공휴일 목록 (매년 갱신)
+
+## 자동 발송
+
+| 엔드포인트 | 권장 주기 | 동작 |
+|---|---|---|
+| `GET /api/cron/daily` | 매시 (06~08시 KST) | 설정한 발송 시각 이후 첫 호출에서 영업일이면 전 고객사에 맞춤 공고 메일 발송. 같은 날 중복 발송 안 함 |
+| `GET /api/cron/weekly` | 매주 월요일 07:30 KST | 프로·파트너 고객사 주간 보고서 초안 생성 (매니저가 코멘트 후 발송) |
+
+두 엔드포인트 모두 `Authorization: Bearer $CRON_SECRET` 헤더가 필요합니다. Vercel에서는 `vercel.json`의 crons가 이 헤더를 자동으로 붙입니다 (Hobby 요금제는 하루 1회만 허용되므로 daily 주기를 `0 22 * * *` 로 바꾸세요). 다른 서버에서는 crontab으로 curl 호출하면 됩니다.
+
+## 배포 체크리스트
+
+- `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `CRON_SECRET` 설정
+- `DATABASE_URL` 설정 (Vercel 등 서버리스는 파일 저장이 유지되지 않으므로 필수), `SEED_DEMO=false`
+- `SMTP_*`, `MAIL_FROM`, `SITE_URL` 설정
+- `DATA_GO_KR_SERVICE_KEY` 설정 후 관리자 > 설정·API 에서 연동 상태 확인
 
 ## 다음 단계
 
-- DB(PostgreSQL 등) 연결로 고객사·상담 데이터 영구 저장
-- 메일 발송(SES/SendGrid) + 영업일 07:00 스케줄러
 - 낙찰정보 연동으로 경쟁강도·사정률 실데이터 반영
+- 사전규격 알림

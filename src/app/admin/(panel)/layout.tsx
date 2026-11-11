@@ -7,8 +7,8 @@ import { logout } from "../actions";
 export const dynamic = "force-dynamic";
 export const metadata = { title: { default: "관리자", template: "%s | 입찰파트너 관리자" } };
 
-export default function PanelLayout({ children }: { children: React.ReactNode }) {
-  const newInq = listInquiries().filter((q) => q.status === "신규").length;
+export default async function PanelLayout({ children }: { children: React.ReactNode }) {
+  const newInq = (await listInquiries()).filter((q) => q.status === "신규").length;
   const sync = getSyncInfo();
   return (
     <div className="min-h-screen bg-[#F3F4F6] lg:grid lg:grid-cols-[240px_1fr]">

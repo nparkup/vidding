@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
 
 export interface FeatureTab {
   label: string;
@@ -37,8 +36,8 @@ export function FeatureTabs({ tabs }: { tabs: FeatureTab[] }) {
           <p className="text-sm font-bold tracking-wide text-mint-600">Feature 0{i + 1}</p>
           <h3 className="mt-3 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">{t.title}</h3>
           <p className="lead mt-4">{t.desc}</p>
-          <Link href={t.href} className="group mt-7 inline-flex items-center gap-1 font-semibold text-mint-600">
-            {t.cta} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+          <Link href={t.href} className="mt-7 inline-block font-semibold text-mint-600 underline-offset-4 hover:underline">
+            {t.cta}
           </Link>
         </div>
         <div key={`p-${t.label}`} className="animate-fade-up rounded-3xl bg-gradient-to-br from-mint-50 via-paper to-sky-100/60 p-4 sm:p-6">

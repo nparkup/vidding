@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import { PageHead } from "@/components/AdminUI";
 import { NARA_APIS } from "@/lib/nara/endpoints";
 import { usingDevPassword } from "@/lib/auth";
@@ -40,7 +39,7 @@ export default async function Settings() {
                 </div>
                 <p className="mt-1 text-sm text-ink-500">{a.usage}</p>
                 <p className="mt-2 break-all font-mono text-xs text-ink-300">{a.path} · {Object.values(a.operations).join(", ")}</p>
-                <a href={`https://www.data.go.kr/data/${a.datasetId}/openapi.do`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-mint-600">공공데이터포털에서 활용신청 <ArrowRight className="h-3.5 w-3.5" /></a>
+                <a href={`https://www.data.go.kr/data/${a.datasetId}/openapi.do`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-mint-600">공공데이터포털에서 활용신청</a>
               </li>
             ))}
           </ul>

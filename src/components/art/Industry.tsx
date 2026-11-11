@@ -1,4 +1,4 @@
-import { Box, Cyl, Flat, Person, Sparkle, Tree, iso, type Faces } from "./iso";
+import { Box, Cyl, Flat, Person, Tree, iso, type Faces } from "./iso";
 
 /** 업종별 작은 아이소메트릭 장면 (밝은 카드 배경용) */
 
@@ -43,9 +43,6 @@ export function CleaningArt({ className = "" }: { className?: string }) {
       <path d={`M${iso(112, 100, 0)[0] - 10},${iso(112, 100, 0)[1]} l10,-34 l10,34 Z`} fill="#F0A63A" />
       <path d={`M${iso(112, 100, 0)[0] - 4},${iso(112, 100, 0)[1] - 8} l4,-14 l4,14 Z`} fill="#FFFFFF" opacity="0.8" />
       <Person x={60} y={76} body="#12B886" hat="#077A59" />
-      <Sparkle cx={-60} cy={-20} r={9} fill="#3DD6A3" />
-      <Sparkle cx={50} cy={-48} r={7} fill="#93C5FD" />
-      <Sparkle cx={-6} cy={-62} r={5} fill="#F0A63A" />
     </svg>
   );
 }
@@ -84,7 +81,6 @@ export function FacilityArt({ className = "" }: { className?: string }) {
         </>
       )} />
       <Person x={112} y={120} body="#3B82F6" hat="#F0A63A" />
-      <Sparkle cx={70} cy={-60} r={7} fill="#3DD6A3" />
     </svg>
   );
 }
@@ -108,9 +104,6 @@ export function SecurityArt({ className = "" }: { className?: string }) {
       <Box x={20} y={112} w={10} d={8} h={16} c={{ top: "#F0A63A", left: "#D68A1E", right: "#F6C26E" }} />
       <Box x={30} y={115} z={12} w={58} d={2.4} h={3} c={{ top: "#FFFFFF", left: "#EF5A43", right: "#FFFFFF" }} leftDeco={(q) => [8, 24, 40].map((u) => <polygon key={u} points={q(u, 0, u + 8, 3)} fill="#FFFFFF" />)} />
       <Person x={80} y={100} body="#24304A" hat="#121D33" />
-      {/* 방패 */}
-      <path d="M-94,-44 l16,-6 l16,6 v12 c0,10 -8,16 -16,20 c-8,-4 -16,-10 -16,-20 Z" fill="#12B886" />
-      <path d="M-84,-32 l5,5 l10,-10" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -134,8 +127,6 @@ export function PestArt({ className = "" }: { className?: string }) {
       ))}
       <Person x={40} y={104} body="#DBEAFE" head="#F6C9A8" hat="#3B82F6" />
       <Box x={84} y={104} w={24} d={18} h={14} c={W} leftDeco={(q) => <polygon points={q(8, 3, 16, 11)} fill="#EF5A43" />} />
-      <path d="M-96,-36 l22,0 M-85,-47 l0,22" stroke="#12B886" strokeWidth="6" strokeLinecap="round" />
-      <Sparkle cx={60} cy={-66} r={6} fill="#3DD6A3" />
     </svg>
   );
 }

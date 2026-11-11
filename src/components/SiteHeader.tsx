@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Logo } from "./Logo";
 
 const NAV = [
@@ -24,7 +24,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <Link href="/bids" className="hidden px-3 text-sm font-semibold text-ink-500 hover:text-ink lg:block">오늘의 공고</Link>
           <Link href="/apply" className="btn-mint btn-sm sm:px-4">
-            2주 무료 체험 <ArrowRight className="hidden h-4 w-4 sm:block" />
+            2주 무료 체험
           </Link>
           <details className="relative md:hidden">
             <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full border border-ink-100 bg-white" aria-label="메뉴">

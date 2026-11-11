@@ -1,20 +1,5 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BadgeCheck,
-  Building2,
-  Check,
-  Database,
-  Eye,
-  Gavel,
-  Lock,
-  MapPinned,
-  Plus,
-  RefreshCw,
-  Sparkles,
-  Users,
-  X,
-} from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { HeroCity } from "@/components/art/HeroCity";
 import { CleaningArt, SecurityArt } from "@/components/art/Industry";
 import { DeskArt } from "@/components/art/Desk";
@@ -49,12 +34,12 @@ const COMPARE = [
 ];
 
 const TRUST = [
-  { Icon: Database, t: "공공데이터 원본 그대로", d: "조달청 나라장터가 공공데이터포털로 공개하는 공고 데이터를 가공 없이 받아 씁니다." },
-  { Icon: RefreshCw, t: "영업일 하루 세 번 갱신", d: "아침·점심·저녁에 새 공고를 다시 받아 정정 공고와 마감 변경을 놓치지 않습니다." },
-  { Icon: MapPinned, t: "17개 시·도 지역제한 판정", d: "공고문의 참가 가능 지역을 읽어 귀사 소재지로 참가할 수 있는지 먼저 가립니다." },
-  { Icon: Eye, t: "점수 근거 공개", d: "가능성 점수는 면허·지역·규모·경쟁·실적·기간 항목별로 왜 그 점수인지 함께 보여 드립니다." },
-  { Icon: Gavel, t: "투찰은 귀사가 직접", d: "법령상 투찰은 대리할 수 없습니다. 저희는 판단과 준비를 돕고, 결정과 투찰은 귀사가 합니다." },
-  { Icon: Lock, t: "필요한 정보만 받습니다", d: "회사명, 면허, 지역, 규모, 연락처만으로 시작합니다. 공동인증서나 비밀번호는 받지 않습니다." },
+  { t: "공공데이터 원본 그대로", d: "조달청 나라장터가 공공데이터포털로 공개하는 공고 데이터를 가공 없이 받아 씁니다." },
+  { t: "영업일 하루 세 번 갱신", d: "아침·점심·저녁에 새 공고를 다시 받아 정정 공고와 마감 변경을 놓치지 않습니다." },
+  { t: "17개 시·도 지역제한 판정", d: "공고문의 참가 가능 지역을 읽어 귀사 소재지로 참가할 수 있는지 먼저 가립니다." },
+  { t: "점수 근거 공개", d: "가능성 점수는 면허·지역·규모·경쟁·실적·기간 항목별로 왜 그 점수인지 함께 보여 드립니다." },
+  { t: "투찰은 귀사가 직접", d: "법령상 투찰은 대리할 수 없습니다. 저희는 판단과 준비를 돕고, 결정과 투찰은 귀사가 합니다." },
+  { t: "필요한 정보만 받습니다", d: "회사명, 면허, 지역, 규모, 연락처만으로 시작합니다. 공동인증서나 비밀번호는 받지 않습니다." },
 ];
 
 const PERSONAS = [
@@ -286,7 +271,7 @@ export default async function Home() {
         <SecurityArt className="pointer-events-none absolute right-[2%] top-36 hidden w-52 rotate-6 animate-float opacity-90 xl:block 2xl:right-[8%]" />
         <div className="container-x relative pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
-            <Sparkles className="h-3.5 w-3.5" /> 모든 업종 중소기업을 위한 공공입찰 대행 파트너
+            모든 업종 중소기업을 위한 공공입찰 대행 파트너
           </p>
           <h1 className="mx-auto mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.15] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
             공고는 저희가 찾고,
@@ -297,7 +282,7 @@ export default async function Home() {
             면허·지역·규모에 맞는 나라장터 공고를 매일 골라 참가조건, 제출서류, 입찰 가능성까지 정리해 아침마다 보내 드립니다.
           </p>
           <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/apply" className="btn-mint px-7 text-base">2주 무료로 시작하기 <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/apply" className="btn-mint px-7 text-base">2주 무료로 시작하기</Link>
             <Link href="/bids" className="btn-ghost px-7 text-base">오늘의 공고 둘러보기</Link>
           </div>
           <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-ink-400">
@@ -320,7 +305,7 @@ export default async function Home() {
           <div className="flex w-max animate-marquee gap-3">
             {[...agencies, ...agencies].map((a, i) => (
               <span key={i} className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-ink-100 bg-white px-4 py-2 text-sm font-medium text-ink-500">
-                <Building2 className="h-4 w-4 text-ink-300" />{a}
+                {a}
               </span>
             ))}
           </div>
@@ -441,7 +426,7 @@ export default async function Home() {
           </div>
           <div className="relative overflow-hidden rounded-3xl bg-ink p-7 text-white">
             <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-mint/25 blur-3xl" />
-            <p className="relative flex items-center gap-2 text-sm font-semibold text-mint-400"><Sparkles className="h-4 w-4" />입찰파트너</p>
+            <p className="relative text-sm font-semibold text-mint-400">입찰파트너</p>
             <ul className="relative mt-5 space-y-4">
               {COMPARE.map(([k, , b]) => (
                 <li key={k} className="flex gap-3">
@@ -461,8 +446,7 @@ export default async function Home() {
           <div className="pointer-events-none absolute left-1/2 top-0 h-72 w-[680px] -translate-x-1/2 rounded-full bg-mint/20 blur-[120px]" />
           <div className="container-x relative">
             <div className="text-center">
-              <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-mint/15 text-mint-300 ring-1 ring-mint/30"><BadgeCheck className="h-7 w-7" /></span>
-              <h2 className="h-section mt-5">공공 데이터 그대로,<br />판단 근거는 투명하게.</h2>
+              <h2 className="h-section">공공 데이터 그대로,<br />판단 근거는 투명하게.</h2>
               <div className="mt-8 flex flex-wrap justify-center gap-2">
                 {["공공데이터포털 공식 API", "영업일 3회 갱신", "17개 시·도 판정", "점수 근거 공개"].map((t) => (
                   <span key={t} className="glass rounded-full px-4 py-2 text-sm font-semibold text-mint-200">{t}</span>
@@ -470,10 +454,9 @@ export default async function Home() {
               </div>
             </div>
             <div className="mt-14 grid gap-px overflow-hidden rounded-3xl bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
-              {TRUST.map(({ Icon, t, d }) => (
+              {TRUST.map(({ t, d }) => (
                 <div key={t} className="bg-ink-900 p-7">
-                  <Icon className="h-6 w-6 text-mint-400" />
-                  <p className="mt-4 text-lg font-bold">{t}</p>
+                  <p className="text-lg font-bold">{t}</p>
                   <p className="mt-2 text-sm leading-relaxed text-ink-300">{d}</p>
                 </div>
               ))}
@@ -506,8 +489,7 @@ export default async function Home() {
               <div className="flex flex-wrap gap-1.5">
                 {p.tags.map((t) => <span key={t} className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold text-ink-500">{t}</span>)}
               </div>
-              <span className="mt-5 grid h-11 w-11 place-items-center rounded-2xl bg-mint-50 text-mint-600"><Users className="h-5 w-5" /></span>
-              <p className="mt-4 text-lg font-bold">{p.t}</p>
+              <p className="mt-5 text-lg font-bold">{p.t}</p>
               <p className="mt-2 flex-1 leading-relaxed text-ink-500">{p.d}</p>
               <p className="mt-6 border-t border-ink-100 pt-4 text-sm text-ink-400">추천 요금제 <b className="text-ink">{p.plan}</b></p>
             </div>
@@ -543,7 +525,7 @@ export default async function Home() {
             </div>
           ))}
         </div>
-        <p className="mt-6 text-center"><Link href="/pricing" className="inline-flex items-center gap-1 font-semibold text-mint-600">요금제 기능 자세히 비교 <ArrowRight className="h-4 w-4" /></Link></p>
+        <p className="mt-6 text-center"><Link href="/pricing" className="font-semibold text-mint-600">요금제 기능 자세히 비교</Link></p>
       </section>
 
       {/* FAQ */}
@@ -576,7 +558,7 @@ export default async function Home() {
               <h2 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl sm:leading-[1.15]">입찰 업무,<br />오늘부터 맡겨 보세요.</h2>
               <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 1영업일 안에 담당 매니저가 연락드립니다.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link href="/apply" className="btn-mint px-7 text-base">무료 진단 신청 <ArrowRight className="h-4 w-4" /></Link>
+                <Link href="/apply" className="btn-mint px-7 text-base">무료 진단 신청</Link>
                 <Link href="/pricing" className="btn-glass px-7 text-base">요금제 보기</Link>
               </div>
               <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-300">

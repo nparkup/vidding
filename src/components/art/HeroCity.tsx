@@ -1,4 +1,4 @@
-import { Box, Cyl, Flat, Person, Sparkle, Tree, iso, rnd, windows, type Faces } from "./iso";
+import { Box, Cyl, Flat, Person, Tree, iso, rnd, windows, type Faces } from "./iso";
 
 /** 메인 히어로: 아침 7시에 깨어나는 공공기관 거리 (아이소메트릭) */
 
@@ -172,10 +172,6 @@ export function HeroCity({ className = "" }: { className?: string }) {
       <Box x={158} y={260} z={8} w={16} d={12} h={6} c={{ top: "#F3F5F9", left: "#4D586F", right: "#98A1B4" }} />
 
       <Tree x={292} y={292} s={0.8} />
-
-      <Sparkle cx={iso(150, 210, 40)[0]} cy={iso(150, 210, 40)[1]} r={7} fill="#86EBC8" />
-      <Sparkle cx={iso(60, 200, 80)[0]} cy={iso(60, 200, 80)[1]} r={5} fill="#FFE2A8" />
-      <Sparkle cx={iso(240, 120, 120)[0]} cy={iso(240, 120, 120)[1]} r={6} fill="#ffffff" />
     </svg>
   );
 }

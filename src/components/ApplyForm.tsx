@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BidRow } from "./BidRow";
+import { LicensePicker } from "./LicensePicker";
 import { rank, type MatchResult } from "@/lib/analysis";
 import { won } from "@/lib/format";
-import { LICENSES, REGIONS, type Bid, type License, type Region } from "@/lib/types";
+import { REGIONS, type License, type Region } from "@/lib/types";
+import { loadBids } from "@/lib/useBids";
 
 const SIZES = [
   ["0-100000000", "1억 이하"],
@@ -19,12 +21,18 @@ const SIZES = [
  * - 서버 배포: action(서버 액션)으로 접수 저장
  * - 정적 배포(GitHub Pages): 브라우저에서 바로 추천 공고를 계산하고, 신청 내용은 메일 앱으로 전송
  */
-export function ApplyForm({ action, error, plan, bids = [], email = "" }: { action?: (f: FormData) => void; error?: boolean; plan?: string; bids?: Bid[]; email?: string }) {
+export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: FormData) => void; error?: boolean; plan?: string; email?: string }) {
   const [result, setResult] = useState<{ company: string; ok: MatchResult[]; excluded: number; qs: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  // 정적 배포: 진단에 쓸 공고를 미리 받아 둔다
+  useEffect(() => { if (!action) loadBids().catch(() => {}); }, [action]);
 
-  function onStatic(e: React.FormEvent<HTMLFormElement>) {
+  async function onStatic(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    setBusy(true);
+    const bids = await loadBids().catch(() => []);
+    setBusy(false);
     const s = (k: string) => String(f.get(k) ?? "").trim();
     const licenses = f.getAll("licenses").map(String) as License[];
     const regions = f.getAll("regions").map(String) as Region[];
@@ -65,21 +73,14 @@ export function ApplyForm({ action, error, plan, bids = [], email = "" }: { acti
           {error && <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">회사명, 이메일, 연락처는 꼭 입력해 주세요.</p>}
           {plan && <input type="hidden" name="message" value={`관심 요금제: ${plan}`} />}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div><label className="label" htmlFor="company">회사명 *</label><input id="company" name="company" required className="input" placeholder="(주)입찰클린" /></div>
+            <div><label className="label" htmlFor="company">회사명 *</label><input id="company" name="company" required className="input" placeholder="(주)입찰파트너" /></div>
             <div><label className="label" htmlFor="contactName">담당자</label><input id="contactName" name="contactName" className="input" placeholder="홍길동 대표" /></div>
             <div><label className="label" htmlFor="email">이메일 *</label><input id="email" name="email" type="email" required className="input" placeholder="공고를 받을 이메일" /></div>
             <div><label className="label" htmlFor="phone">연락처 *</label><input id="phone" name="phone" required className="input" placeholder="010-0000-0000" /></div>
           </div>
           <fieldset>
-            <legend className="label">보유 면허·업종</legend>
-            <div className="flex flex-wrap gap-2">
-              {LICENSES.map((l) => (
-                <label key={l} className="cursor-pointer">
-                  <input type="checkbox" name="licenses" value={l} className="peer sr-only" />
-                  <span className="inline-block rounded-full border border-ink-100 bg-white px-3 py-1.5 text-sm text-ink-500 transition peer-checked:border-ink peer-checked:bg-ink peer-checked:text-white peer-focus-visible:ring-4 peer-focus-visible:ring-mint-100">{l}</span>
-                </label>
-              ))}
-            </div>
+            <legend className="label">보유 면허·업종 (투찰가능업종)</legend>
+            <LicensePicker name="licenses" />
           </fieldset>
           <fieldset>
             <legend className="label">영업 가능 지역</legend>
@@ -93,7 +94,7 @@ export function ApplyForm({ action, error, plan, bids = [], email = "" }: { acti
             </div>
           </fieldset>
           <fieldset>
-            <legend className="label">수행 가능한 용역 규모 (연간)</legend>
+            <legend className="label">수행 가능한 사업 규모 (건당)</legend>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {SIZES.map(([v, l], i) => (
                 <label key={v} className="cursor-pointer">
@@ -107,7 +108,7 @@ export function ApplyForm({ action, error, plan, bids = [], email = "" }: { acti
             <div><label className="label" htmlFor="message">문의 내용</label><textarea id="message" name="message" rows={3} className="input" placeholder="주로 참여하고 싶은 공고, 어려운 점 등을 적어 주세요." /></div>
           )}
           <p className="text-xs text-ink-300">제출 시 상담 목적의 개인정보 수집·이용에 동의한 것으로 간주합니다.</p>
-          <button className="btn-mint w-full text-base">무료 진단 결과 보기</button>
+          <button className="btn-mint w-full text-base" disabled={busy}>{busy ? "공고 불러오는 중…" : "무료 진단 결과 보기"}</button>
           {!action && <p className="text-center text-xs text-ink-300">제출하면 메일 앱이 열려 신청 내용이 {email}로 전송됩니다.</p>}
         </form>
   );

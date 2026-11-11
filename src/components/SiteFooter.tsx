@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <Logo />
           <p className="mt-4 max-w-xs text-sm leading-relaxed">
-            청소·시설관리 업체의 입찰 담당자가 되어 드립니다. 공고 탐색부터 서류 준비까지, 매일 아침 정리해서 전달합니다.
+            중소기업의 입찰 담당자가 되어 드립니다. 공고 탐색부터 서류 준비까지, 매일 아침 정리해서 전달합니다.
           </p>
         </div>
         <div>

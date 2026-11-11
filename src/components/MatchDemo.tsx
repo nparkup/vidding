@@ -4,10 +4,15 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { rank } from "@/lib/analysis";
 import { dday, won } from "@/lib/format";
-import type { Bid, License, Region } from "@/lib/types";
+import type { License, Region } from "@/lib/types";
+import { useBids } from "@/lib/useBids";
 import { GradeBadge } from "./Badges";
 
-const DEMO_LICENSES: License[] = ["건물위생관리업", "소독업", "시설경비업", "기계설비유지관리업", "소방시설관리업", "저수조청소업"];
+/** 업종별로 많이 쓰는 면허 (전체 목록은 공고 검색·진단 신청에서 선택) */
+const DEMO_LICENSES: License[] = [
+  "건물위생관리업", "시설경비업", "소독업", "전기공사업", "정보통신공사업", "기계설비·가스공사업",
+  "실내건축공사업", "건축공사업", "소프트웨어사업자", "엔지니어링사업", "학술·연구용역", "식품판매업", "의료기기판매업",
+];
 const DEMO_REGIONS: Region[] = ["서울", "경기", "인천", "대전", "충남", "부산", "대구", "광주", "강원"];
 const SIZES = [
   { label: "1억 이하", min: 0, max: 100_000_000 },
@@ -16,7 +21,8 @@ const SIZES = [
   { label: "규모 무관", min: 0, max: 10_000_000_000 },
 ];
 
-export function MatchDemo({ bids }: { bids: Bid[] }) {
+export function MatchDemo() {
+  const bids = useBids().bids ?? [];
   const [lic, setLic] = useState<License[]>(["건물위생관리업", "소독업"]);
   const [rg, setRg] = useState<Region[]>(["경기", "서울", "인천"]);
   const [size, setSize] = useState(1);
@@ -26,6 +32,7 @@ export function MatchDemo({ bids }: { bids: Bid[] }) {
     [bids, lic, rg, size],
   );
   const eligible = results.filter((r) => r.eligible);
+  const openToAll = eligible.filter((r) => r.bid.licenses.length === 0 && !r.bid.licenseRaw).length;
   const toggle = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
   const qs = new URLSearchParams({ lic: lic.join(","), rg: rg.join(","), min: String(SIZES[size].min), max: String(SIZES[size].max) });
 
@@ -70,18 +77,23 @@ export function MatchDemo({ bids }: { bids: Bid[] }) {
         <div className="bg-paper/60 p-5 sm:p-6">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-sm text-ink-500">이번 주 참가 가능한 공고</p>
+              <p className="text-sm text-ink-500">지금 참가 가능한 공고{bids.length === 0 && " (불러오는 중…)"}</p>
               <p className="text-4xl font-extrabold tabular-nums">
-                {eligible.length}
-                <span className="ml-1 text-lg font-bold text-ink-300">/ {results.length}건</span>
+                {eligible.length.toLocaleString()}
+                <span className="ml-1 text-lg font-bold text-ink-300">/ {results.length.toLocaleString()}건</span>
               </p>
             </div>
             <p className="text-right text-xs text-ink-500">
               면허·지역·규모가 안 맞는
               <br />
-              <b className="text-coral">{results.length - eligible.length}건</b>은 자동 제외
+              <b className="text-coral">{(results.length - eligible.length).toLocaleString()}건</b>은 자동 제외
             </p>
           </div>
+          {eligible.length > 0 && (
+            <p className="mt-1 text-xs text-ink-400">
+              보유 면허로 참가 <b className="text-ink-700">{(eligible.length - openToAll).toLocaleString()}건</b> · 업종 제한 없는 공고 {openToAll.toLocaleString()}건
+            </p>
+          )}
           <ul className="mt-4 space-y-2">
             {eligible.slice(0, 3).map((r) => (
               <li key={r.bid.id} className="rounded-xl border border-ink-100 bg-white p-3">

@@ -22,7 +22,9 @@ export default async function Dashboard() {
   const digests = active.map((c) => buildDigest(c, bids));
   const totalRecs = digests.reduce((s, d) => s + d.recommended.length, 0);
   const draftReports = (await listReports()).filter((r) => r.status === "초안").length;
-  const maxCat = Math.max(1, ...CATEGORIES.map((c) => open.filter((b) => b.category === c).length));
+  const catCounts = CATEGORIES.map((c) => ({ c, n: open.filter((b) => b.category === c).length })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n);
+  const topCats = catCounts.slice(0, 12);
+  const maxCat = Math.max(1, ...topCats.map((x) => x.n));
 
   return (
     <>
@@ -66,13 +68,12 @@ export default async function Dashboard() {
         </section>
 
         <section className="card p-5">
-          <h2 className="font-bold">업종별 진행 중 공고</h2>
+          <h2 className="font-bold">업종별 진행 중 공고 <span className="text-sm font-normal text-ink-300">상위 {topCats.length}개 · 전체 {open.length.toLocaleString()}건</span></h2>
           <ul className="mt-4 space-y-3">
-            {CATEGORIES.map((c) => {
-              const n = open.filter((b) => b.category === c).length;
+            {topCats.map(({ c, n }) => {
               return (
-                <li key={c} className="grid grid-cols-[72px_1fr_28px] items-center gap-3 text-sm">
-                  <span>{c}</span>
+                <li key={c} className="grid grid-cols-[124px_1fr_40px] items-center gap-3 text-sm">
+                  <Link href={`/admin/bids?cat=${encodeURIComponent(c)}`} className="truncate hover:text-mint-600">{c}</Link>
                   <span className="h-2.5 overflow-hidden rounded-full bg-ink-100"><span className="block h-full rounded-full bg-mint" style={{ width: `${(n / maxCat) * 100}%` }} /></span>
                   <span className="text-right font-semibold tabular-nums">{n}</span>
                 </li>

@@ -1,6 +1,6 @@
 import "server-only";
-import type { Bid, ContractMethod, License, Region, ServiceCategory } from "../types";
-import { LICENSES } from "../types";
+import type { Bid, BizType, ContractMethod, Region, ServiceCategory } from "../types";
+import { splitLicenses } from "../licenses";
 import { CATEGORY_KEYWORDS, NARA_BASE, STD_BID_API } from "./endpoints";
 
 /**
@@ -102,11 +102,6 @@ function mapMethod(s?: string): ContractMethod {
   return "적격심사";
 }
 
-function mapLicenses(s?: string): License[] {
-  const names = (s ?? "").split(",");
-  return LICENSES.filter((l) => names.some((n) => n.replace(/\s/g, "").includes(l)));
-}
-
 /** 공고명이 IT·교육·임차 등 다른 업종인데 키워드만 겹치는 경우를 거른다 */
 const EXCLUDE = [
   "시스템", "솔루션", "플랫폼", "소프트웨어", "홈페이지", "전산", "네트워크", "클라우드", "데이터", "펌웨어", "레이더", "정보통신",
@@ -119,7 +114,8 @@ const EXCLUDE = [
 const FACILITY_LICENSE_HINT = ["건물위생", "소독", "시설경비", "경비업", "기계설비", "소방시설", "전기공사", "저수조", "조경", "근로자파견", "청소"];
 const STRONG = ["청소", "미화", "경비", "방역", "소독", "해충방제", "시설관리", "시설물 관리", "시설물관리"];
 
-export function classify(rawTitle: string, licenseText = ""): ServiceCategory | null {
+/** 청소·시설관리 계열 용역인지 판별 (아니면 null) */
+export function classifyFacility(rawTitle: string, licenseText = ""): ServiceCategory | null {
   // '청소년'의 '청소'를 청소 용역으로 오인하지 않도록 제거
   const title = rawTitle.replace(/청소년/g, "");
   if (EXCLUDE.some((k) => title.includes(k))) return null;
@@ -138,6 +134,74 @@ export function classify(rawTitle: string, licenseText = ""): ServiceCategory | 
   return cat;
 }
 
+
+/* ---------- 전 업종 분류 ---------- */
+type Rule = [ServiceCategory, RegExp];
+/** 투찰가능업종 → 업종 (먼저 나오는 업종이 대표) */
+const LICENSE_RULES: Rule[] = [
+  ["IT·소프트웨어", /소프트웨어|컴퓨터관련/],
+  ["설계·감리·엔지니어링", /엔지니어링|감리|건축사|건설사업관리|측량|안전진단|기술사사무소|환경영향평가|문화재|매장유산/],
+  ["연구·조사·컨설팅", /학술|연구용역|경영컨설팅/],
+  ["폐기물·환경", /폐기물|석면|재활용|하수|분뇨|오수/],
+  ["행사·홍보·교육", /행사|방송|영상|비디오|광고|인쇄|출판|공연|디자인/],
+  ["운송·여행·임차", /여행|운송|화물|여객|시설대여|자동차대여|이사/],
+  ["조경·산림", /조경|산림|숲|나무병원|식물보호/],
+  ["소방·기계설비공사", /소방시설공사|기계설비|가스공사|냉동냉장|보일러/],
+  ["전기·통신공사", /전기공사|정보통신공사|전기|통신/],
+  ["건축·토목공사", /공사업|건설업|해체|철거/],
+  ["의료·의약품", /의료기기|의약품|약국|의료/],
+  ["식자재·급식", /식품|급식|농산물|축산물|수산물|양곡/],
+];
+/** 공고명 → 업종 */
+const TITLE_RULES: Rule[] = [
+  ["IT·소프트웨어", /시스템|소프트웨어|S\/W|SW|전산|정보화|홈페이지|플랫폼|클라우드|데이터|네트워크|디지털|AI|앱|서버|보안관제|웹/],
+  ["설계·감리·엔지니어링", /설계|감리|건설사업관리|측량|안전진단|안전점검|정밀점검|내진|타당성|환경영향|지질|시굴|발굴/],
+  ["연구·조사·컨설팅", /연구|조사|컨설팅|수립|계획|분석|평가|진단|검사|자문|기본구상/],
+  ["폐기물·환경", /폐기물|폐자재|수거|재활용|석면|수질|대기|토양|하수|분뇨|준설|쓰레기/],
+  ["행사·홍보·교육", /행사|축제|홍보|교육|캠프|프로그램|체험|공연|전시|유튜브|영상|광고|디자인|인쇄|제작|SNS|콘텐츠/],
+  ["운송·여행·임차", /여행|수학여행|임차|리스|운송|운반|이전|이사|통학|차량|버스|셔틀/],
+  ["조경·산림", /조경|숲가꾸기|가로수|산림|사방|방제|가지치기|벌채|녹지|재선충|수목/],
+  ["소방·기계설비공사", /소방|기계설비|냉난방|환기|공조|배관|보일러|승강기|가스/],
+  ["전기·통신공사", /전기|통신|CCTV|가로등|조명|태양광|변압|수배전/],
+  ["의료·의약품", /의약품|의료|진료재료|주사|inj|mg|제세동|백신|치료/i],
+  ["식자재·급식", /식재료|식자재|급식|부식|우유|쌀|간식|도시락/],
+  ["컴퓨터·전산장비", /노트북|컴퓨터|PC|서버|모니터|태블릿|프린터|복합기|스토리지|네트워크 장비|전산장비/i],
+];
+
+const CATS_BY_BIZ: Record<"용역" | "공사" | "물품", ServiceCategory[]> = {
+  용역: ["IT·소프트웨어", "설계·감리·엔지니어링", "연구·조사·컨설팅", "폐기물·환경", "행사·홍보·교육", "운송·여행·임차"],
+  공사: ["전기·통신공사", "소방·기계설비공사", "조경·산림", "건축·토목공사"],
+  물품: ["의료·의약품", "식자재·급식", "컴퓨터·전산장비"],
+};
+const FALLBACK: Record<"용역" | "공사" | "물품", ServiceCategory> = { 용역: "기타 용역", 공사: "건축·토목공사", 물품: "기타 물품" };
+
+export function mapBizType(s?: string): BizType {
+  if (s === "공사" || s === "물품" || s === "외자") return s;
+  return "용역";
+}
+
+/**
+ * 모든 공고를 업종으로 분류한다.
+ * 용역은 청소·시설관리 판별을 먼저 하고, 나머지는 투찰가능업종 → 공고명 키워드 순으로 본다.
+ */
+export function classify(rawTitle: string, licenseText = "", biz: BizType = "용역"): ServiceCategory {
+  const kind = biz === "외자" ? "물품" : biz;
+  if (kind === "용역") {
+    const f = classifyFacility(rawTitle, licenseText);
+    if (f) return f;
+  }
+  if (kind === "물품" && /관급/.test(rawTitle)) return "관급자재";
+  const allowed = CATS_BY_BIZ[kind];
+  for (const lic of splitLicenses(licenseText)) {
+    const hit = LICENSE_RULES.find(([c, re]) => allowed.includes(c) && re.test(lic));
+    if (hit) return hit[0];
+  }
+  // '청소년'의 청소, '창조경제'의 조경처럼 다른 단어 속 키워드는 지운다
+  const title = rawTitle.replace(/청소년|창조경제/g, "");
+  const t = TITLE_RULES.find(([c, re]) => allowed.includes(c) && re.test(title));
+  return t ? t[0] : FALLBACK[kind];
+}
+
 function periodMonths(title: string): number {
   const m = title.match(/(20\d{2}|\d{2})\s*[~∼\-]\s*[‘’']?(20\d{2}|\d{2})/);
   if (m) {
@@ -148,10 +212,10 @@ function periodMonths(title: string): number {
 }
 
 export function mapStdItem(it: Item): Bid | null {
-  if (it.bsnsDivNm && it.bsnsDivNm !== "용역") return null;
   const title = (it.bidNtceNm ?? "").trim();
-  const category = classify(title, it.bidprcPsblIndstrytyNm);
-  if (!category) return null;
+  if (!title) return null;
+  const bizType = mapBizType(it.bsnsDivNm);
+  const category = classify(title, it.bidprcPsblIndstrytyNm, bizType);
   const closeAt = toIso(it.bidClseDate, it.bidClseTm) ?? toIso(it.opengDate, it.opengTm);
   if (!closeAt) return null;
   const regions = mapRegions(it.prtcptPsblRgnNm);
@@ -166,12 +230,13 @@ export function mapStdItem(it: Item): Bid | null {
     bidNtceOrd: ord,
     title,
     category,
+    bizType,
     agency: it.ntceInsttNm ?? "",
     demandAgency: it.dmndInsttNm || it.ntceInsttNm || "",
     region: regions[0] ?? "전국",
     regions: regions.length ? regions : undefined,
-    licenses: mapLicenses(it.bidprcPsblIndstrytyNm),
-    licenseRaw: [...new Set((it.bidprcPsblIndstrytyNm ?? "").split(",").map((x) => x.trim()).filter(Boolean))].join(", ") || undefined,
+    licenses: splitLicenses(it.bidprcPsblIndstrytyNm),
+    licenseRaw: splitLicenses(it.bidprcPsblIndstrytyNm).join(", ") || undefined,
     baseAmount: amount,
     contractMethod: method,
     lowerLimitRate: rate,
@@ -199,22 +264,21 @@ async function fetchStdDay(day: string): Promise<Item[]> {
 }
 
 /**
- * 최근 N일 동안 게시된 용역 공고 중 청소·시설관리 공고만 추린다.
+ * 최근 N일 동안 게시된 모든 업종(용역·공사·물품·외자) 공고를 업종별로 분류해 가져온다.
  * 마감이 지난 공고는 제외한다.
  */
-export async function fetchFacilityBids(days = 3): Promise<Bid[]> {
+export async function fetchAllBids(days = 3): Promise<Bid[]> {
   const now = new Date();
   const dayList = Array.from({ length: days }, (_, i) => ymd(new Date(now.getTime() - i * 86400000)));
-  const seen = new Map<string, Bid>();
+  const seen = new Map<string, Bid>(); // bidNtceNo → 최신 차수
   for (const day of dayList) {
     for (const it of await fetchStdDay(day)) {
       const b = mapStdItem(it);
       if (!b || new Date(b.closeAt).getTime() <= now.getTime()) continue;
       // 정정공고(차수 증가)는 최신 차수만 유지
-      const prev = [...seen.values()].find((x) => x.bidNtceNo === b.bidNtceNo);
+      const prev = seen.get(b.bidNtceNo);
       if (prev && prev.bidNtceOrd >= b.bidNtceOrd) continue;
-      if (prev) seen.delete(prev.id);
-      seen.set(b.id, b);
+      seen.set(b.bidNtceNo, b);
     }
   }
   return [...seen.values()].sort((a, b) => +new Date(a.closeAt) - +new Date(b.closeAt));

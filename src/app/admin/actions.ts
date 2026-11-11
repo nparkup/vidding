@@ -8,7 +8,8 @@ import {
   addReport, getClient, getInquiry, setInquiryStatus, syncBids, toggleWatch, updateSettings, upsertClient,
 } from "@/lib/store";
 import { runDailyDigest, sendDigestTo, sendWeeklyReport } from "@/lib/jobs";
-import { LICENSES, REGIONS, CATEGORIES, type ClientProfile, type Inquiry, type License, type Region, type ServiceCategory, type PlanId } from "@/lib/types";
+import { normalizeLicense } from "@/lib/licenses";
+import { REGIONS, CATEGORIES, type ClientProfile, type Inquiry, type License, type Region, type ServiceCategory, type PlanId } from "@/lib/types";
 
 async function guard() {
   const c = await cookies();
@@ -50,7 +51,7 @@ function parseClient(form: FormData, base?: ClientProfile): ClientProfile {
     contactName: s("contactName"),
     email: s("email"),
     phone: s("phone"),
-    licenses: form.getAll("licenses").map(String).filter((l): l is License => (LICENSES as readonly string[]).includes(l)),
+    licenses: [...new Set(form.getAll("licenses").map((l) => normalizeLicense(String(l))).filter((l) => l && l.length <= 60))].slice(0, 40) as License[],
     regions: form.getAll("regions").map(String).filter((r): r is Region => (REGIONS as string[]).includes(r)),
     categories: form.getAll("categories").map(String).filter((c): c is ServiceCategory => (CATEGORIES as string[]).includes(c)),
     minAmount: Number(s("minAmount")) * 10000 || 0,

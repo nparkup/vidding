@@ -1,6 +1,7 @@
 import { saveClient } from "@/app/admin/actions";
 import { PLANS } from "@/lib/plans";
-import { CATEGORIES, LICENSES, REGIONS, type ClientProfile } from "@/lib/types";
+import { CATEGORIES, CATEGORY_GROUPS, REGIONS, type ClientProfile } from "@/lib/types";
+import { LicensePicker } from "./LicensePicker";
 
 type Init = Partial<ClientProfile> & { fromInquiry?: string };
 
@@ -29,9 +30,19 @@ export function ClientForm({ init = {} }: { init?: Init }) {
         <div><label className="label">수신 이메일</label><input name="email" type="email" required defaultValue={init.email} className="input" /></div>
         <div><label className="label">연락처</label><input name="phone" defaultValue={init.phone} className="input" /></div>
       </div>
-      <div><p className="label">보유 면허</p><Chips name="licenses" options={LICENSES} selected={init.licenses ?? []} /></div>
+      <div><p className="label">보유 면허 (투찰가능업종)</p><LicensePicker name="licenses" defaultSelected={init.licenses ?? []} /></div>
       <div><p className="label">영업 지역</p><Chips name="regions" options={REGIONS} selected={init.regions ?? []} tone="mint" /></div>
-      <div><p className="label">관심 업종</p><Chips name="categories" options={CATEGORIES} selected={init.categories ?? [...CATEGORIES]} /></div>
+      <div>
+        <p className="label">관심 업종 <span className="font-normal text-ink-300">(선택한 업종만 메일에 포함, 모두 해제하면 전 업종)</span></p>
+        <div className="space-y-2">
+          {Object.entries(CATEGORY_GROUPS).map(([g, cs]) => (
+            <div key={g} className="flex flex-col gap-1.5 sm:flex-row sm:items-start">
+              <span className="w-10 shrink-0 pt-1.5 text-xs font-bold text-ink-400">{g}</span>
+              <Chips name="categories" options={cs} selected={init.categories ?? [...CATEGORIES]} />
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div><label className="label">최소 규모 (만원)</label><input name="minAmount" type="number" defaultValue={init.minAmount ? init.minAmount / 10000 : 0} className="input" /></div>
         <div><label className="label">최대 규모 (만원)</label><input name="maxAmount" type="number" defaultValue={init.maxAmount ? init.maxAmount / 10000 : 50000} className="input" /></div>

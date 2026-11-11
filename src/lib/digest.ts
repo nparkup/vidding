@@ -1,5 +1,5 @@
 import { rank, type MatchResult } from "./analysis";
-import type { Bid, ClientProfile } from "./types";
+import { FACILITY_CATEGORIES, type Bid, type ClientProfile } from "./types";
 
 export interface Digest {
   client: ClientProfile;
@@ -11,7 +11,10 @@ export interface Digest {
 
 /** 영업일 아침 발송되는 맞춤 공고 요약 */
 export function buildDigest(client: ClientProfile, bids: Bid[], now = new Date()): Digest {
-  const ranked = rank(bids.filter((b) => client.categories.length === 0 || client.categories.includes(b.category) || b.category === "통합관리"), client, now);
+  // 관심 업종이 없으면 전 업종. 청소·시설관리 계열을 고른 고객에게는 통합관리 공고도 함께 보낸다
+  const facility = client.categories.some((c) => FACILITY_CATEGORIES.includes(c));
+  const wanted = (b: Bid) => client.categories.length === 0 || client.categories.includes(b.category) || (facility && b.category === "통합관리");
+  const ranked = rank(bids.filter(wanted), client, now);
   const eligible = ranked.filter((r) => r.eligible);
   const dayAgo = now.getTime() - 36 * 3600 * 1000;
   return {

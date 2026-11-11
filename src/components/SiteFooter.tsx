@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <Logo />
           <p className="mt-4 max-w-xs text-sm leading-relaxed">
-            중소기업의 입찰 담당자가 되어 드립니다. 공고 탐색부터 서류 준비까지, 매일 아침 정리해서 전달합니다.
+            입찰 특화 알고리즘과 전담 매니저가 귀사의 입찰 담당자가 되어 드립니다. 공고 채점부터 서류 준비까지, 매일 아침 정리해서 전달합니다.
           </p>
         </div>
         <div>
@@ -30,13 +30,13 @@ export function SiteFooter() {
           <p className="text-sm font-bold text-ink">고객센터</p>
           <ul className="mt-4 space-y-2.5 text-sm">
             <li>평일 09:00 – 18:00</li>
-            <li>hello@ipchalpartner.kr</li>
+            <li>hello@ipchalmatelab.kr</li>
           </ul>
         </div>
       </div>
       <div className="border-t border-ink-100">
         <div className="container-x flex flex-col gap-2 py-6 pb-24 text-xs text-ink-400 sm:flex-row sm:justify-between md:pb-6">
-          <p>© {new Date().getFullYear()} 입찰파트너(가칭). 공고 데이터 출처: 조달청 나라장터(공공데이터포털).</p>
+          <p>© {new Date().getFullYear()} 입찰메이트랩. 공고 데이터 출처: 조달청 나라장터(공공데이터포털).</p>
           <p>본 서비스의 분석은 참고용이며 최종 입찰 판단과 책임은 이용자에게 있습니다.</p>
         </div>
       </div>

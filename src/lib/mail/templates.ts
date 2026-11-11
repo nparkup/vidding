@@ -22,7 +22,7 @@ function shell(title: string, body: string) {
 <body style="margin:0;background:${C.paper};font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:${C.ink}">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.paper};padding:24px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid ${C.line};border-radius:16px;overflow:hidden">
-<tr><td style="background:${C.ink};padding:20px 24px;color:#fff;font-size:18px;font-weight:800">입찰파트너</td></tr>
+<tr><td style="background:${C.ink};padding:20px 24px;color:#fff;font-size:18px;font-weight:800">입찰메이트랩</td></tr>
 <tr><td style="padding:24px">${body}</td></tr>
 <tr><td style="padding:16px 24px;border-top:1px solid ${C.line};font-size:12px;color:${C.sub};line-height:1.6">
 본 메일의 분석은 참고용이며 최종 판단은 공고문 원문으로 확인해 주세요. 공고 데이터 출처: 조달청 나라장터(공공데이터포털).<br>수신 조건 변경은 담당 매니저에게 회신해 주세요.</td></tr>
@@ -40,7 +40,7 @@ function bidRow(r: MatchResult, i: number, qs: string) {
 
 export function dailyDigestMail(d: Digest) {
   const qs = profileQs(d.client);
-  const subject = `[입찰파트너] ${date(new Date().toISOString())} ${d.client.company} 맞춤 공고 ${d.recommended.length}건`;
+  const subject = `[입찰메이트랩] ${date(new Date().toISOString())} ${d.client.company} 맞춤 공고 ${d.recommended.length}건`;
   const stat = (n: number, label: string, color: string, bg: string) =>
     `<td width="33%" style="padding:4px"><div style="background:${bg};border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:${color}">${n}</div><div style="font-size:12px;color:${C.sub}">${label}</div></div></td>`;
   const body = `
@@ -61,7 +61,7 @@ export function weeklyReportMail(client: ClientProfile, bids: Bid[], weekLabel: 
   const qs = profileQs(client);
   const ok = rank(bids, client).filter((r) => r.eligible);
   const top = ok.slice(0, 5);
-  const subject = `[입찰파트너] ${weekLabel} 주간 분석보고서 · ${client.company}`;
+  const subject = `[입찰메이트랩] ${weekLabel} 주간 분석보고서 · ${client.company}`;
   const body = `
 <p style="margin:0;font-size:13px;color:${C.mint};font-weight:700">주간 분석보고서 · ${esc(weekLabel)}</p>
 <h1 style="margin:4px 0 16px;font-size:20px">${esc(client.company)}</h1>

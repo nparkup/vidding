@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-paper text-ink font-sans; word-break: keep-all; }
+  ::selection { @apply bg-mint-100; }
+}
+
+@layer components {
+  .container-x { @apply mx-auto w-full max-w-6xl px-4 sm:px-6; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold transition; }
+  .btn-primary { @apply btn bg-ink text-white hover:bg-ink-700; }
+  .btn-mint { @apply btn bg-mint text-white hover:bg-mint-600; }
+  .btn-ghost { @apply btn border border-ink-100 bg-white text-ink hover:border-ink-300; }
+  .btn-sm { @apply px-3 py-2 text-sm rounded-lg; }
+  .card { @apply rounded-2xl border border-ink-100 bg-white shadow-card; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full border border-ink-100 bg-white px-2.5 py-1 text-xs font-medium text-ink-500; }
+  .eyebrow { @apply text-sm font-semibold tracking-wide text-mint-600; }
+  .h-section { @apply text-3xl font-bold tracking-tight sm:text-4xl; }
+  .input { @apply w-full rounded-xl border border-ink-100 bg-white px-3.5 py-2.5 text-[15px] outline-none transition focus:border-mint focus:ring-4 focus:ring-mint-100; }
+  .label { @apply mb-1.5 block text-sm font-semibold text-ink-700; }
+  .table-x { @apply w-full text-left text-sm; }
+  .table-x th { @apply border-b border-ink-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-300; }
+  .table-x td { @apply border-b border-ink-100/70 px-4 py-3 align-middle; }
+}

@@ -1,4 +1,6 @@
 import type { Bid, ClientProfile, ContractMethod, License, Region } from "./types";
+import { FACILITY_CATEGORIES } from "./types";
+import { hasAnyLicense } from "./licenses";
 
 /** 매칭에 필요한 최소 조건 (공개 사이트 미리보기와 고객 프로필 공용) */
 export interface MatchCriteria {
@@ -30,6 +32,16 @@ export interface MatchResult {
   daysLeft: number;
 }
 
+/** 업종이 많으면 앞의 3개만 보여준다 */
+function short(list: string[], sep = ", "): string {
+  return list.length > 3 ? `${list.slice(0, 3).join(sep)} 외 ${list.length - 3}개` : list.join(sep);
+}
+
+const isFacility = (bid: Bid) => FACILITY_CATEGORIES.includes(bid.category);
+const bizOf = (bid: Bid) => bid.bizType ?? "용역";
+/** 업무 구분별 실적 명칭 */
+const perfWord = (bid: Bid) => (bizOf(bid) === "공사" ? "시공" : bizOf(bid) === "용역" ? "용역 수행" : "납품");
+
 export function daysLeft(iso: string, now = new Date()): number {
   return Math.ceil((new Date(iso).getTime() - now.getTime()) / 86400000);
 }
@@ -45,15 +57,17 @@ export function evaluate(bid: Bid, c: MatchCriteria, now = new Date()): MatchRes
   const factors: Factor[] = [];
   const left = daysLeft(bid.closeAt, now);
 
-  const licenseOk = bid.licenses.length === 0 ? !bid.licenseRaw : bid.licenses.some((l) => c.licenses.includes(l));
+  const licenseOk = bid.licenses.length === 0 ? !bid.licenseRaw : hasAnyLicense(c.licenses, bid.licenses);
+  // 업종 제한이 없는 공고는 누구나 참가할 수 있지만, 보유 면허와 직접 맞는 공고를 더 위에 둔다
+  const openToAll = bid.licenses.length === 0 && !bid.licenseRaw;
   factors.push({
     label: "면허 요건",
-    score: licenseOk ? 30 : 0,
+    score: licenseOk ? (openToAll ? 22 : 30) : 0,
     max: 30,
     ok: licenseOk,
     note: licenseOk
-      ? `보유 면허로 참가 가능 (${bid.licenses.join(", ") || "제한 없음"})`
-      : `필요 면허 미보유: ${bid.licenses.join(" 또는 ") || bid.licenseRaw}`,
+      ? openToAll ? "업종 제한 없음 (누구나 참가 가능)" : `보유 면허로 참가 가능 (${short(bid.licenses)})`
+      : `필요 면허 미보유: ${short(bid.licenses, " 또는 ") || bid.licenseRaw}`,
   });
   if (!licenseOk) blockers.push("면허 요건 미충족");
 
@@ -70,7 +84,7 @@ export function evaluate(bid: Bid, c: MatchCriteria, now = new Date()): MatchRes
   const amountOk = bid.baseAmount >= c.minAmount && bid.baseAmount <= c.maxAmount;
   const amountNear = !amountOk && bid.baseAmount <= c.maxAmount * 1.5 && bid.jointContract;
   factors.push({
-    label: "용역 규모",
+    label: "사업 규모",
     score: amountOk ? 15 : amountNear ? 8 : 0,
     max: 15,
     ok: amountOk || amountNear,
@@ -149,17 +163,20 @@ export function documentChecklist(bid: Bid): { group: string; items: { name: str
     { name: "나라장터 경쟁입찰참가자격 등록", note: "입찰 마감 전일까지 등록·변경 완료", required: true },
     { name: "공동인증서(범용/조달청용)", note: "전자입찰용, 유효기간 확인", required: true },
     { name: "사업자등록증", required: true },
-    ...bid.licenses.map((l) => ({ name: `${l} 등록증(신고증)`, note: "공고상 업종코드와 일치 여부 확인", required: true })),
+    ...(bid.licenses.length <= 1
+      ? bid.licenses.map((l) => ({ name: `${l} 등록증(신고증)`, note: "공고상 업종코드와 일치 여부 확인", required: true }))
+      : [{ name: "투찰가능업종 등록증(신고증) 중 1개", note: `다음 중 하나 보유: ${bid.licenses.join(", ")}`, required: true }]),
   ];
   if (bid.smallBizOnly) common.push({ name: "중소기업(소상공인) 확인서", note: "중소기업현황정보시스템 발급, 유효기간 확인", required: true });
 
   const byMethod: Record<ContractMethod, { name: string; note?: string; required: boolean }[]> = {
     "적격심사": [
       { name: "적격심사 신청서", required: true },
-      { name: "용역 수행실적 증명서", note: "최근 3년(또는 5년) 유사용역, 발주기관 발급", required: true },
+      { name: `${perfWord(bid)}실적 증명서`, note: `최근 3년(또는 5년) 유사 ${bizOf(bid) === "공사" ? "공사" : bizOf(bid) === "용역" ? "용역" : "물품"}, 발주기관 발급`, required: true },
       { name: "신용평가등급 확인서", note: "공고일 이전 평가, 유효기간 내", required: true },
       { name: "기술인력 보유현황 및 재직증명", required: false },
-      { name: "노무비 지급 확약서·근로조건 이행계획서", note: "청소·경비 용역 필수 (용역근로자 보호지침)", required: true },
+      ...(isFacility(bid) ? [{ name: "노무비 지급 확약서·근로조건 이행계획서", note: "청소·경비 용역 필수 (용역근로자 보호지침)", required: true }] : []),
+      ...(bizOf(bid) === "공사" ? [{ name: "건설업 등록증·건설공제조합 출자증권", note: "시공능력평가액 확인", required: true }] : []),
       { name: "고용개선·신인도 가점 증빙", note: "여성/장애인기업, 고용우수기업 등", required: false },
     ],
     "협상에 의한 계약": [
@@ -182,8 +199,8 @@ export function documentChecklist(bid: Bid): { group: string; items: { name: str
 
   const after = [
     { name: "계약보증금 (보증보험증권)", note: "낙찰 후 10일 이내", required: true },
-    { name: "산출내역서·인력배치계획", required: true },
-    { name: "4대보험 가입증명", required: true },
+    { name: bizOf(bid) === "물품" || bizOf(bid) === "외자" ? "납품계획서·규격서" : bizOf(bid) === "공사" ? "산출내역서·공정표·현장대리인 지정" : "산출내역서·인력배치계획", required: true },
+    { name: "4대보험 가입증명", required: bizOf(bid) !== "물품" },
   ];
 
   return [

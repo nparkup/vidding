@@ -3,7 +3,7 @@ import type { AppSettings, Bid, ClientProfile, Inquiry, MailLog, WeeklyReport } 
 import { adapter } from "./db";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
-import { fetchFacilityBids, hasServiceKey } from "./nara/client";
+import { fetchAllBids, hasServiceKey } from "./nara/client";
 
 /**
  * 데이터 저장소.
@@ -88,7 +88,7 @@ async function doSync(): Promise<BidCache> {
     return g.__ipchalBids;
   }
   try {
-    const items = await fetchFacilityBids(3);
+    const items = await fetchAllBids(3);
     g.__ipchalBids = { items, syncedAt: new Date().toISOString(), source: "g2b" };
   } catch (e) {
     // API 실패 시 목업으로 서비스 유지 (오류는 관리자 화면에 표시)

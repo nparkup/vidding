@@ -4,14 +4,23 @@ import { DdayBadge } from "@/components/Badges";
 import { daysLeft, evaluate } from "@/lib/analysis";
 import { dateTime, won } from "@/lib/format";
 import { getBids, getSyncInfo, listClients } from "@/lib/store";
-import { CATEGORIES } from "@/lib/types";
+import { BIZ_TYPES, CATEGORY_GROUPS } from "@/lib/types";
 import { runSync } from "../../actions";
 
 export const metadata = { title: "공고 수집·선별" };
 
-export default async function AdminBids({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
-  const { cat } = await searchParams;
-  const bids = (await getBids()).filter((b) => !cat || b.category === cat);
+const PER_PAGE = 100;
+
+export default async function AdminBids({ searchParams }: { searchParams: Promise<{ cat?: string; biz?: string; q?: string; page?: string }> }) {
+  const { cat = "", biz = "", q = "", page } = await searchParams;
+  const all = (await getBids())
+    .filter((b) => !cat || b.category === cat)
+    .filter((b) => !biz || (b.bizType ?? "용역") === biz)
+    .filter((b) => !q || `${b.title} ${b.demandAgency} ${b.agency} ${b.bidNtceNo}`.includes(q));
+  const pages = Math.max(1, Math.ceil(all.length / PER_PAGE));
+  const cur = Math.min(pages, Math.max(1, Number(page) || 1));
+  const bids = all.slice((cur - 1) * PER_PAGE, cur * PER_PAGE);
+  const qs = (p: number) => `/admin/bids?${new URLSearchParams({ ...(cat && { cat }), ...(biz && { biz }), ...(q && { q }), page: String(p) })}`;
   const clients = (await listClients()).filter((c) => c.status !== "일시중지");
   const sync = getSyncInfo();
 
@@ -21,16 +30,25 @@ export default async function AdminBids({ searchParams }: { searchParams: Promis
         <form action={runSync}><button className="btn-primary btn-sm">지금 수집</button></form>
       </PageHead>
 
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        <Link href="/admin/bids" className={`chip ${!cat ? "border-ink bg-ink text-white" : ""}`}>전체</Link>
-        {CATEGORIES.map((c) => (
-          <Link key={c} href={`/admin/bids?cat=${encodeURIComponent(c)}`} className={`chip ${cat === c ? "border-ink bg-ink text-white" : ""}`}>{c}</Link>
-        ))}
-      </div>
+      <form className="card mb-4 grid gap-2 p-3 sm:grid-cols-[1fr_auto_auto_auto]">
+        <input name="q" defaultValue={q} placeholder="공고명·기관·공고번호" className="input" />
+        <select name="biz" defaultValue={biz} className="input sm:w-32">
+          <option value="">전체 구분</option>
+          {BIZ_TYPES.map((b) => <option key={b}>{b}</option>)}
+        </select>
+        <select name="cat" defaultValue={cat} className="input sm:w-44">
+          <option value="">전체 업종</option>
+          {Object.entries(CATEGORY_GROUPS).map(([g, cs]) => (
+            <optgroup key={g} label={g}>{cs.map((c) => <option key={c}>{c}</option>)}</optgroup>
+          ))}
+        </select>
+        <button className="btn-primary btn-sm">검색</button>
+      </form>
+      <p className="mb-2 text-sm text-ink-500">{all.length.toLocaleString()}건 · {cur}/{pages} 페이지</p>
 
       <div className="card overflow-x-auto">
         <table className="table-x min-w-[960px]">
-          <thead><tr><th>마감</th><th>공고</th><th>업종</th><th>지역</th><th>면허</th><th>기초금액</th><th>계약방법</th><th>매칭 고객사</th></tr></thead>
+          <thead><tr><th>마감</th><th>공고</th><th>구분·업종</th><th>지역</th><th>면허</th><th>기초금액</th><th>계약방법</th><th>매칭 고객사</th></tr></thead>
           <tbody>
             {bids.map((b) => {
               const matched = clients.filter((c) => evaluate(b, c).eligible);
@@ -41,9 +59,9 @@ export default async function AdminBids({ searchParams }: { searchParams: Promis
                     <Link href={`/bids/${b.id}`} target="_blank" className="block truncate font-semibold hover:text-mint-600">{b.title}</Link>
                     <p className="truncate text-xs text-ink-300">{b.bidNtceNo} · {b.demandAgency}</p>
                   </td>
-                  <td className="text-xs">{b.category}</td>
+                  <td className="text-xs"><span className="text-ink-300">{b.bizType ?? "용역"}</span><br />{b.category}</td>
                   <td className="text-xs">{b.region}</td>
-                  <td className="max-w-[160px] text-xs text-ink-500">{b.licenseRaw || b.licenses.join(", ") || "-"}</td>
+                  <td className="max-w-[160px] text-xs text-ink-500"><span className="line-clamp-2">{b.licenseRaw || b.licenses.join(", ") || "-"}</span></td>
                   <td className="whitespace-nowrap tabular-nums">{won(b.baseAmount)}</td>
                   <td className="text-xs">{b.contractMethod}</td>
                   <td>
@@ -59,6 +77,13 @@ export default async function AdminBids({ searchParams }: { searchParams: Promis
           </tbody>
         </table>
       </div>
+      {pages > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+          {cur > 1 && <Link href={qs(cur - 1)} className="btn-ghost btn-sm">이전</Link>}
+          <span className="tabular-nums text-ink-500">{cur} / {pages}</span>
+          {cur < pages && <Link href={qs(cur + 1)} className="btn-ghost btn-sm">다음</Link>}
+        </div>
+      )}
     </>
   );
 }

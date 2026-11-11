@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { HeroCity } from "@/components/art/HeroCity";
-import { CleaningArt, FacilityArt, PestArt, SecurityArt } from "@/components/art/Industry";
+import { CleaningArt, SecurityArt } from "@/components/art/Industry";
 import { DeskArt } from "@/components/art/Desk";
 import { BidRow } from "@/components/BidRow";
 import { GradeBadge, ScoreBar } from "@/components/Badges";
@@ -28,20 +28,19 @@ import { dday, won } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getBids } from "@/lib/store";
-import type { ServiceCategory } from "@/lib/types";
+import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
 
 export const revalidate = 600;
 
-const INDUSTRIES: { cat: ServiceCategory; t: string; d: string; Art: typeof CleaningArt }[] = [
-  { cat: "청소", t: "청소·미화", d: "청사·학교·병원 환경미화, 건물위생관리", Art: CleaningArt },
-  { cat: "시설관리", t: "시설·설비 관리", d: "기계설비·소방·전기 유지관리, 저수조", Art: FacilityArt },
-  { cat: "경비", t: "경비·주차", d: "시설경비, 주차관리, 안내·보안 용역", Art: SecurityArt },
-  { cat: "방역·소독", t: "방역·소독", d: "소독, 해충 방제, 감염병 예방 방역", Art: PestArt },
-];
+const BIZ_INFO: Record<keyof typeof CATEGORY_GROUPS, { d: string; tone: string }> = {
+  용역: { d: "청소·시설관리, IT, 설계·감리, 연구, 행사, 폐기물 처리 등", tone: "from-mint-50" },
+  공사: { d: "건축·토목, 전기·통신, 소방·기계설비, 조경·산림 공사", tone: "from-sky-100" },
+  물품: { d: "의료·의약품, 급식 식자재, 전산장비, 관급자재 등 구매", tone: "from-amber-100" },
+};
 
 const COMPARE = [
   ["공고 탐색", "직접 키워드 검색, 수백 건 확인", "조건에 맞는 공고만 매일 배달"],
-  ["업종 범위", "공사·물품·용역 전 업종", "청소·시설관리·경비·방역 전문"],
+  ["업종 범위", "전 업종 공고를 한 목록에 나열", "전 업종 수집 후 귀사 면허에 맞는 공고만"],
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 자동 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 체크리스트 제공"],
   ["입찰 판단", "투찰가 분석 위주", "가능성 점수 + 준비 기간 + 경쟁 강도"],
@@ -58,9 +57,9 @@ const TRUST = [
 ];
 
 const PERSONAS = [
-  { tags: ["청소·미화", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "아침 메일 한 통으로 오늘 볼 공고만 확인하고, 관심 공고만 골라 서류 준비를 맡기세요.", plan: "베이직" },
-  { tags: ["시설관리", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 매니저가 마감 전 서류를 한 번 더 봅니다.", plan: "프로" },
-  { tags: ["통합관리", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", plan: "파트너" },
+  { tags: ["청소·시설관리", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "아침 메일 한 통으로 오늘 볼 공고만 확인하고, 관심 공고만 골라 서류 준비를 맡기세요.", plan: "베이직" },
+  { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 매니저가 마감 전 서류를 한 번 더 봅니다.", plan: "프로" },
+  { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", plan: "파트너" },
 ];
 
 const FAQ = [
@@ -85,7 +84,7 @@ export default async function Home() {
   const okAt = (n: number) => evals.filter((e) => e.factors.slice(0, n).every((f) => f.ok)).length;
   const eligible = rank(bids, client).filter((r) => r.eligible);
   const funnel = [
-    ["오늘 수집한 용역 공고", bids.length],
+    ["오늘 수집한 전 업종 공고", bids.length],
     ["보유 면허로 참가 가능", okAt(1)],
     ["영업 지역 참가 가능", okAt(2)],
     ["규모까지 맞는 최종 추천", eligible.length],
@@ -93,7 +92,19 @@ export default async function Home() {
   const cut = bids.length ? Math.round((1 - eligible.length / bids.length) * 100) : 0;
 
   const agencies = [...new Set(bids.map((b) => b.demandAgency))].slice(0, 24);
-  const catCount = (c: ServiceCategory) => bids.filter((b) => b.category === c || (c === "시설관리" && b.category === "통합관리")).length;
+  // 업무 구분·업종별 공고 수 (외자는 물품에 포함)
+  const bizOf = (b: (typeof bids)[number]): keyof typeof CATEGORY_GROUPS => {
+    const t: BizType = b.bizType ?? "용역";
+    return t === "외자" ? "물품" : t;
+  };
+  const byBiz = (Object.keys(CATEGORY_GROUPS) as (keyof typeof CATEGORY_GROUPS)[]).map((biz) => {
+    const list = bids.filter((b) => bizOf(b) === biz);
+    const cats = (CATEGORY_GROUPS[biz] as readonly string[])
+      .map((c) => ({ c, n: list.filter((b) => b.category === c).length }))
+      .filter((x) => x.n > 0)
+      .sort((a, b) => b.n - a.n);
+    return { biz, n: list.length, cats };
+  });
 
   const FEATURES = [
     {
@@ -126,7 +137,7 @@ export default async function Home() {
       label: "면허·지역·규모 1차 선별",
       title: "참가할 수 없는 공고는 처음부터 보여드리지 않습니다",
       points: [<>보유 <b>면허</b>가 맞지 않는 공고를 먼저 제외합니다</>, <>공고문의 <b>지역제한</b>을 읽어 참가 가능 지역만 남깁니다</>, <>수행 가능한 <b>용역 규모</b>를 벗어난 공고를 거릅니다</>],
-      use: ["시설관리 업체", "전국 공고를 매일 훑던 시간을 줄이고, 남은 몇 건만 꼼꼼히 검토합니다."],
+      use: ["전기공사 업체", "하루 2천 건 넘는 전국 공고를 훑던 시간을 줄이고, 남은 몇 건만 꼼꼼히 검토합니다."],
       visual: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
           <p className="text-xs font-semibold text-ink-400">예시 고객사 조건으로 오늘 공고를 거른 결과</p>
@@ -206,8 +217,8 @@ export default async function Home() {
   const TABS = [
     {
       label: "공고 검색",
-      title: "청소·시설관리 용역 공고만 모아 검색합니다",
-      desc: "업종·지역·마감 임박으로 거르고, 내 조건을 넣으면 공고마다 참가 가능 여부와 점수가 바로 붙습니다.",
+      title: "용역·공사·물품 전 업종 공고를 업종별로 나눠 검색합니다",
+      desc: "업무 구분·업종·지역·마감 임박으로 거르고, 내 조건을 넣으면 공고마다 참가 가능 여부와 점수가 바로 붙습니다.",
       href: "/bids",
       cta: "공고 검색 열기",
       preview: <div className="space-y-2">{eligible.slice(0, 3).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} />)}</div>,
@@ -274,7 +285,7 @@ export default async function Home() {
         <SecurityArt className="pointer-events-none absolute right-[2%] top-36 hidden w-52 rotate-6 animate-float opacity-90 xl:block 2xl:right-[8%]" />
         <div className="container-x relative pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
-            <Sparkles className="h-3.5 w-3.5" /> 청소·시설관리 업체를 위한 공공입찰 대행 파트너
+            <Sparkles className="h-3.5 w-3.5" /> 모든 업종 중소기업을 위한 공공입찰 대행 파트너
           </p>
           <h1 className="mx-auto mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.15] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
             공고는 저희가 찾고,
@@ -319,8 +330,8 @@ export default async function Home() {
       <section className="container-x pt-20">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
           {[
+            ["전 업종 수집", "오늘 확인한 공고", bids.length.toLocaleString(), "건"],
             ["1차 선별", "검토할 공고", `${cut}%`, "감소"],
-            ["공고 요약", "공고당 정리 항목", "8", "개"],
             ["제출서류", "체크리스트 항목", String(docCount), "개"],
             ["메일 발송", "영업일 아침", "07:00", ""],
           ].map(([tag, k, v, u]) => (
@@ -371,25 +382,29 @@ export default async function Home() {
       <section className="container-x pt-28">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="eyebrow">전문 업종</p>
-            <h2 className="h-section mt-3">네 가지 업종만,<br className="sm:hidden" /> 깊게 봅니다.</h2>
+            <p className="eyebrow">전 업종</p>
+            <h2 className="h-section mt-3">용역·공사·물품,<br className="sm:hidden" /> 모든 업종을 봅니다.</h2>
           </div>
-          <p className="max-w-sm text-ink-500">공사·물품까지 다 보여주는 포털과 달리, 청소·시설관리 업체가 실제로 참가하는 용역 공고만 다룹니다.</p>
+          <p className="max-w-sm text-ink-500">나라장터의 모든 공고를 받아 업종별로 나누고, 귀사가 가진 면허로 참가할 수 있는 공고만 골라 드립니다.</p>
         </div>
-        <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {INDUSTRIES.map(({ cat, t, d, Art }) => (
-            <Link key={cat} href={`/bids?cat=${encodeURIComponent(cat)}`} className="group card overflow-hidden p-0 transition hover:-translate-y-1 hover:shadow-lift">
-              <div className="bg-gradient-to-b from-paper to-white px-2 pt-2 sm:px-4 sm:pt-4">
-                <Art className="w-full transition duration-500 group-hover:scale-[1.04]" />
+        <div className="mt-10 grid gap-4 lg:grid-cols-3">
+          {byBiz.map(({ biz, n, cats }) => (
+            <div key={biz} className={`card overflow-hidden bg-gradient-to-b ${BIZ_INFO[biz].tone} to-white to-40% p-5 sm:p-6`}>
+              <div className="flex items-baseline justify-between">
+                <Link href={`/bids?biz=${encodeURIComponent(biz)}`} className="text-2xl font-extrabold hover:text-mint-600">{biz}</Link>
+                <span className="text-sm font-bold text-ink-500">공고 <span className="tabular-nums text-ink">{n.toLocaleString()}</span>건</span>
               </div>
-              <div className="p-4 pt-1 sm:p-5 sm:pt-2">
-                <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="font-bold sm:text-lg">{t}</p>
-                  <span className="rounded-full bg-mint-50 px-2.5 py-1 text-xs font-bold text-mint-600">공고 {catCount(cat)}건</span>
-                </div>
-                <p className="mt-1.5 text-xs text-ink-500 sm:text-sm">{d}</p>
-              </div>
-            </Link>
+              <p className="mt-1.5 text-sm text-ink-500">{BIZ_INFO[biz].d}</p>
+              <ul className="mt-5 flex flex-wrap gap-1.5">
+                {cats.map(({ c, n: cn }) => (
+                  <li key={c}>
+                    <Link href={`/bids?cat=${encodeURIComponent(c)}`} className="inline-flex items-center gap-1.5 rounded-full border border-ink-100 bg-white px-3 py-1.5 text-sm text-ink-700 transition hover:border-mint hover:text-mint-600">
+                      {c}<span className="text-xs font-bold tabular-nums text-ink-300">{cn.toLocaleString()}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
         </div>
       </section>
@@ -474,7 +489,7 @@ export default async function Home() {
           <p className="lead mx-auto mt-4 max-w-xl">면허와 지역, 규모를 골라 보세요. 매일 하는 1차 선별을 실제 공고로 그대로 체험할 수 있습니다.</p>
         </div>
         <div className="mx-auto mt-10 max-w-5xl">
-          <MatchDemo bids={bids} />
+          <MatchDemo />
         </div>
       </section>
 

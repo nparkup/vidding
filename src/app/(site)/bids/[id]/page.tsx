@@ -46,7 +46,7 @@ export default async function BidDetail({ params }: Props) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <DdayBadge days={daysLeft(bid.closeAt)} />
-            <span className="chip">{bid.category}</span>
+            <span className="chip">{bid.bizType ?? "용역"} · {bid.category}</span>
             <span className="chip">{bid.contractMethod}</span>
             <span className="chip">공고번호 {bid.bidNtceNo}-{bid.bidNtceOrd}</span>
           </div>
@@ -67,7 +67,8 @@ export default async function BidDetail({ params }: Props) {
             <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
               {[
                 ["기초금액", won(bid.baseAmount)],
-                ["용역 기간", `${bid.periodMonths}개월`],
+                ["업무 구분", bid.bizType ?? "용역"],
+                ...((bid.bizType ?? "용역") === "용역" ? [["용역 기간", `${bid.periodMonths}개월`]] : []),
                 ["참가 지역", bid.region === "전국" ? "제한 없음" : `${(bid.regions ?? [bid.region]).join("·")} 제한`],
                 ["필요 면허", bid.licenseRaw || bid.licenses.join(", ") || "제한 없음"],
                 ["낙찰하한율", bid.lowerLimitRate ? `${bid.lowerLimitRate}%` : "해당 없음"],

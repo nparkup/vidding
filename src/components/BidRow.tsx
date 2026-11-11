@@ -15,7 +15,7 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <DdayBadge days={left} />
-          <span className="chip">{bid.category}</span>
+          <span className="chip">{bid.bizType && bid.bizType !== "용역" ? `${bid.bizType} · ` : ""}{bid.category}</span>
           <span className="chip">{bid.region === "전국" ? "전국" : `${bid.region} 제한`}</span>
           <span className="chip">{bid.contractMethod}</span>
           {match && <GradeBadge grade={match.grade} score={match.score} />}
@@ -28,7 +28,7 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
       </div>
       <div className="flex items-end justify-between gap-6 sm:flex-col sm:items-end sm:gap-1">
         <p className="text-lg font-bold tabular-nums">{won(bid.baseAmount)}</p>
-        <p className="text-xs text-ink-300">마감 {shortDate(bid.closeAt)} · {bid.periodMonths}개월</p>
+        <p className="text-xs text-ink-300">마감 {shortDate(bid.closeAt)}{(bid.bizType ?? "용역") === "용역" && ` · ${bid.periodMonths}개월`}</p>
       </div>
     </Link>
   );

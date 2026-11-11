@@ -6,15 +6,13 @@
 import type { Metadata } from "next";
 import { ApplyForm } from "@/components/ApplyForm";
 import { ApplyLayout } from "@/components/ApplyLayout";
-import { getBids } from "@/lib/store";
 
 export const metadata: Metadata = { title: "무료 진단 신청" };
 
-export default async function Apply() {
-  const bids = await getBids();
+export default function Apply() {
   return (
     <ApplyLayout>
-      <ApplyForm bids={bids} email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@ipchalpartner.kr"} />
+      <ApplyForm email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@ipchalpartner.kr"} />
     </ApplyLayout>
   );
 }

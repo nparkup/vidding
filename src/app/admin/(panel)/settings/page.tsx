@@ -32,7 +32,10 @@ export default async function Settings() {
               <li key={a.key} className="rounded-xl border border-ink-100 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold">{a.name}</p>
-                  <span className={`chip ${a.required ? "border-ink bg-ink text-white" : ""}`}>{a.required ? "필수" : "권장"}</span>
+                  <span className="flex gap-1">
+                    <span className={`chip ${a.approved ? "border-mint-100 bg-mint-50 text-mint-600" : "border-coral-100 bg-coral-100 text-coral"}`}>{a.approved ? "승인됨" : "활용신청 필요"}</span>
+                    <span className={`chip ${a.required ? "border-ink bg-ink text-white" : ""}`}>{a.required ? "필수" : "권장"}</span>
+                  </span>
                 </div>
                 <p className="mt-1 text-sm text-ink-500">{a.usage}</p>
                 <p className="mt-2 break-all font-mono text-xs text-ink-300">{a.path} · {Object.values(a.operations).join(", ")}</p>

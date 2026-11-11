@@ -6,7 +6,7 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
   const { client, recommended, closingSoon, newToday, excluded } = digest;
   const today = date(new Date().toISOString());
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
+    <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-lift">
       <div className="flex items-center gap-2 border-b border-ink-100 bg-paper px-4 py-2.5 text-xs text-ink-500">
         <span className="h-2.5 w-2.5 rounded-full bg-coral/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-amber/70" />

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
+
+export const viewport = { themeColor: "#0B1426" };
 
 export const metadata: Metadata = {
   title: { default: "입찰파트너 | 청소·시설관리 공공입찰 분석 대행", template: "%s | 입찰파트너" },
@@ -10,12 +13,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
-        />
-      </head>
       <body>{children}</body>
     </html>
   );

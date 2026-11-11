@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight, Menu } from "lucide-react";
 import { Logo } from "./Logo";
 
 const NAV = [
@@ -10,27 +11,27 @@ const NAV = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-100/70 bg-paper/85 backdrop-blur">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
       <div className="container-x flex h-16 items-center justify-between">
         <Logo />
-        <nav className="hidden items-center gap-8 text-[15px] font-medium text-ink-500 md:flex">
+        <nav className="hidden items-center gap-1 rounded-full border border-ink-100 bg-white/70 p-1 text-[15px] font-medium text-ink-500 md:flex">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="hover:text-ink">
+            <Link key={n.href} href={n.href} className="rounded-full px-4 py-1.5 transition hover:bg-paper hover:text-ink">
               {n.label}
             </Link>
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Link href="/apply" className="btn-mint btn-sm sm:px-4">
-            무료 진단 받기
+          <Link href="/apply" className="btn-primary btn-sm sm:px-4">
+            무료 진단 받기 <ArrowRight className="hidden h-4 w-4 sm:block" />
           </Link>
           <details className="relative md:hidden">
-            <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-lg border border-ink-100 bg-white" aria-label="메뉴">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full border border-ink-100 bg-white" aria-label="메뉴">
+              <Menu className="h-5 w-5" />
             </summary>
-            <div className="card absolute right-0 mt-2 w-48 p-2">
+            <div className="card absolute right-0 mt-2 w-52 p-2">
               {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="block rounded-lg px-3 py-2 text-sm hover:bg-paper">
+                <Link key={n.href} href={n.href} className="block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-paper">
                   {n.label}
                 </Link>
               ))}

@@ -12,12 +12,13 @@ export default async function BidsPage() {
   const sync = getSyncInfo();
   return (
     <div className="container-x py-10 sm:py-14">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow">청소·시설관리 용역 공고</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">공고 검색</h1>
+          <h1 className="mt-2 text-4xl font-extrabold tracking-[-0.04em]">공고 검색</h1>
         </div>
-        <p className="text-xs text-ink-300">
+        <p className="inline-flex items-center gap-2 self-start rounded-full border border-ink-100 bg-white px-3 py-1.5 text-xs text-ink-500 sm:self-auto">
+          <span className={`h-2 w-2 rounded-full ${sync.source === "g2b" ? "bg-mint" : "bg-amber"}`} />
           {sync.source === "g2b" ? "나라장터 연동" : "데모 데이터"} · 갱신 {dateTime(sync.syncedAt)}
         </p>
       </div>

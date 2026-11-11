@@ -9,6 +9,7 @@ import {
   Gavel,
   Lock,
   MapPinned,
+  Plus,
   RefreshCw,
   Sparkles,
   Users,
@@ -542,7 +543,7 @@ export default async function Home() {
             </div>
           ))}
         </div>
-        <p className="mt-6 text-center"><Link href="/pricing" className="font-semibold text-mint-600">요금제 기능 자세히 비교 →</Link></p>
+        <p className="mt-6 text-center"><Link href="/pricing" className="inline-flex items-center gap-1 font-semibold text-mint-600">요금제 기능 자세히 비교 <ArrowRight className="h-4 w-4" /></Link></p>
       </section>
 
       {/* FAQ */}
@@ -557,7 +558,7 @@ export default async function Home() {
             <details key={f.q} className="group rounded-2xl bg-paper px-6 py-5 open:bg-white open:shadow-card open:ring-1 open:ring-ink-100" open={i === 0}>
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
                 {f.q}
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-ink-400 transition group-open:rotate-45 group-open:bg-mint group-open:text-white">＋</span>
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-ink-400 transition group-open:rotate-45 group-open:bg-mint group-open:text-white"><Plus className="h-4 w-4" /></span>
               </summary>
               <p className="mt-3 leading-relaxed text-ink-500">{f.a}</p>
             </details>

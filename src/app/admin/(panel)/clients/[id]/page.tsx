@@ -1,3 +1,4 @@
+import { Star } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHead, Status } from "@/components/AdminUI";
@@ -61,7 +62,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                       <tr key={r.bid.id}>
                         <td className="w-10">
                           <form action={toggleWatchAction.bind(null, c.id, r.bid.id)}>
-                            <button className={`text-lg ${on ? "text-amber" : "text-ink-100 hover:text-ink-300"}`} aria-label="관심 공고 표시">★</button>
+                            <button className={`text-lg ${on ? "text-amber" : "text-ink-100 hover:text-ink-300"}`} aria-label="관심 공고 표시"><Star className="h-5 w-5" fill={on ? "currentColor" : "none"} /></button>
                           </form>
                         </td>
                         <td>
@@ -82,7 +83,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
           <section className="card p-5">
             <h2 className="font-bold">관심 공고 서류 준비 현황</h2>
             {watched.length === 0 ? (
-              <p className="mt-3 text-sm text-ink-500">관심 공고가 없습니다. 위 목록에서 ★을 눌러 추가하세요.</p>
+              <p className="mt-3 text-sm text-ink-500">관심 공고가 없습니다. 위 목록에서 별 아이콘을 눌러 추가하세요.</p>
             ) : (
               <ul className="mt-3 divide-y divide-ink-100">
                 {watched.map((r) => {

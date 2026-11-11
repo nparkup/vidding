@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BadgePercent, Building2, Check } from "lucide-react";
+import { ArrowRight, BadgePercent, Building2, Check } from "lucide-react";
 import { PageHero } from "@/components/PageHero";
 import { PLANS } from "@/lib/plans";
 
@@ -71,7 +71,7 @@ export default function Pricing() {
         <div className="card p-7">
           <span className="grid h-11 w-11 place-items-center rounded-2xl bg-sky-100 text-sky"><Building2 className="h-5 w-5" /></span>
           <p className="mt-4 text-lg font-bold">여러 사업장·면허 운영 중이신가요?</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink-500">법인 여러 개나 지사별 조건을 따로 관리해야 한다면 맞춤 견적을 안내해 드립니다. <Link href="/apply" className="font-semibold text-mint-600">문의하기 →</Link></p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-500">법인 여러 개나 지사별 조건을 따로 관리해야 한다면 맞춤 견적을 안내해 드립니다. <Link href="/apply" className="inline-flex items-center gap-0.5 font-semibold text-mint-600">문의하기 <ArrowRight className="h-3.5 w-3.5" /></Link></p>
         </div>
       </div>
     </div>

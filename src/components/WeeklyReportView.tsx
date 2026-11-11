@@ -93,11 +93,11 @@ export function WeeklyReportView({ client, bids, weekLabel, note }: { client: Cl
           <h3 className="font-bold">다음 주 준비 사항</h3>
           <ul className="mt-3 space-y-2 text-sm leading-relaxed">
             {top.filter((r) => r.bid.briefingAt).map((r) => (
-              <li key={r.bid.id} className="flex gap-2"><span className="text-mint">●</span>「{r.bid.title}」 현장설명회 일정 확인</li>
+              <li key={r.bid.id} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-mint" />「{r.bid.title}」 현장설명회 일정 확인</li>
             ))}
-            {top.some((r) => r.bid.smallBizOnly) && <li className="flex gap-2"><span className="text-mint">●</span>중소기업 확인서 유효기간 점검</li>}
-            {top.some((r) => r.bid.contractMethod === "적격심사") && <li className="flex gap-2"><span className="text-mint">●</span>신용평가등급 확인서·용역 실적증명서 최신본 준비</li>}
-            {top.some((r) => r.bid.contractMethod === "협상에 의한 계약") && <li className="flex gap-2"><span className="text-mint">●</span>협상계약 공고 제안서 목차 초안 작성 (최소 5영업일 소요)</li>}
+            {top.some((r) => r.bid.smallBizOnly) && <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-mint" />중소기업 확인서 유효기간 점검</li>}
+            {top.some((r) => r.bid.contractMethod === "적격심사") && <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-mint" />신용평가등급 확인서·용역 실적증명서 최신본 준비</li>}
+            {top.some((r) => r.bid.contractMethod === "협상에 의한 계약") && <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-mint" />협상계약 공고 제안서 목차 초안 작성 (최소 5영업일 소요)</li>}
           </ul>
         </section>
       </div>

@@ -7,6 +7,7 @@ import { BidRow } from "@/components/BidRow";
 import { GradeBadge, ScoreBar } from "@/components/Badges";
 import { FeatureTabs } from "@/components/home/FeatureTabs";
 import { ProductMockup } from "@/components/home/ProductMockup";
+import { AnalysisEngine } from "@/components/home/AnalysisEngine";
 import { MatchDemo } from "@/components/MatchDemo";
 import { documentChecklist, evaluate, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
@@ -27,9 +28,9 @@ const BIZ_INFO: Record<keyof typeof CATEGORY_GROUPS, { d: string; tone: string }
 const COMPARE = [
   ["공고 탐색", "직접 키워드 검색, 수백 건 확인", "조건에 맞는 공고만 매일 배달"],
   ["업종 범위", "전 업종 공고를 한 목록에 나열", "전 업종 수집 후 귀사 면허에 맞는 공고만"],
-  ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 자동 판정"],
+  ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 체크리스트 제공"],
-  ["입찰 판단", "투찰가 분석 위주", "가능성 점수 + 준비 기간 + 경쟁 강도"],
+  ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 채점과 S·A·B·C 등급"],
   ["담당 인력", "고객사 직원이 직접", "입찰파트너 전담 매니저"],
 ];
 
@@ -37,7 +38,7 @@ const TRUST = [
   { t: "공공데이터 원본 그대로", d: "조달청 나라장터가 공공데이터포털로 공개하는 공고 데이터를 가공 없이 받아 씁니다." },
   { t: "영업일 하루 세 번 갱신", d: "아침·점심·저녁에 새 공고를 다시 받아 정정 공고와 마감 변경을 놓치지 않습니다." },
   { t: "17개 시·도 지역제한 판정", d: "공고문의 참가 가능 지역을 읽어 귀사 소재지로 참가할 수 있는지 먼저 가립니다." },
-  { t: "점수 근거 공개", d: "가능성 점수는 면허·지역·규모·경쟁·실적·기간 항목별로 왜 그 점수인지 함께 보여 드립니다." },
+  { t: "가중치와 점수 근거 공개", d: "면허 30·지역 20·규모 15·경쟁 15·실적 10·기간 10점. 가중치와 항목별 점수, 그 근거를 모두 보여 드립니다." },
   { t: "투찰은 귀사가 직접", d: "법령상 투찰은 대리할 수 없습니다. 저희는 판단과 준비를 돕고, 결정과 투찰은 귀사가 합니다." },
   { t: "필요한 정보만 받습니다", d: "회사명, 면허, 지역, 규모, 연락처만으로 시작합니다. 공동인증서나 비밀번호는 받지 않습니다." },
 ];
@@ -51,7 +52,7 @@ const PERSONAS = [
 const FAQ = [
   { q: "프로그램을 설치하거나 매일 접속해야 하나요?", a: "아닙니다. 조건만 한 번 등록하시면 영업일마다 이메일로 받아 보시면 됩니다. 필요할 때만 웹에서 공고 분석을 열어보시면 됩니다." },
   { q: "공고 데이터는 어디서 오나요?", a: "조달청 나라장터가 공공데이터포털로 공개하는 입찰공고·낙찰·사전규격 정보를 매일 수집해 분석합니다." },
-  { q: "입찰 가능성 점수는 어떻게 계산하나요?", a: "면허·지역·규모 적합 여부를 먼저 판정한 뒤, 과거 유사 공고의 참여업체 수, 귀사 실적 대비 규모, 남은 준비 기간을 반영해 100점 만점으로 산출합니다." },
+  { q: "입찰 가능성 점수는 어떻게 계산하나요?", a: "입찰 특화 알고리즘이 6개 항목을 가중 채점합니다. 면허 요건 30점, 참가 지역 20점, 사업 규모 15점은 필수 조건으로 먼저 판정하고, 하나라도 맞지 않으면 39점 이하로 제한해 제외합니다. 통과한 공고는 유사 공고 평균 참여업체 수로 본 경쟁 강도 15점, 기초금액 대비 실적 10점, 남은 준비 기간 10점을 더해 100점 만점으로 산출하고, 85점 이상 S, 72점 이상 A, 58점 이상 B, 그 아래는 C 등급을 붙입니다." },
   { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰파트너는 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
 
@@ -145,8 +146,8 @@ export default async function Home() {
     },
     {
       label: "공고 분석 · 가능성 점수",
-      title: "들어갈지 말지, 항목별 점수로 먼저 보여드립니다",
-      points: [<>면허·지역·규모 적합 여부를 먼저 <b>판정</b>합니다</>, <>유사 공고 <b>경쟁 강도</b>와 실적 대비 규모를 반영합니다</>, <>남은 <b>준비 기간</b>까지 고려해 100점 만점으로 매깁니다</>],
+      title: "들어갈지 말지, 알고리즘이 항목별로 채점해 드립니다",
+      points: [<><b>면허 30·지역 20·규모 15점</b>, 3개 필수 조건을 먼저 판정합니다</>, <>유사 공고 평균 참여업체 수로 <b>경쟁 강도 15점</b>을 계산합니다</>, <><b>실적 10점·준비 기간 10점</b>까지 더해 100점 만점과 등급을 매깁니다</>],
       use: ["입찰 담당자가 없는 업체", "점수와 근거를 보고 대표가 바로 참가 여부를 정합니다. 따로 회의할 필요가 없습니다."],
       visual: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
@@ -164,7 +165,7 @@ export default async function Home() {
             {featuredEval.factors.map((f) => (
               <li key={f.label}>
                 <div className="mb-1 flex justify-between gap-3 text-xs">
-                  <span className="font-semibold">{f.label}</span>
+                  <span className="font-semibold">{f.label} <span className="font-normal tabular-nums text-ink-300">{f.score}/{f.max}</span></span>
                   <span className="truncate text-ink-400">{f.note}</span>
                 </div>
                 <ScoreBar value={f.score} max={f.max} />
@@ -271,15 +272,15 @@ export default async function Home() {
         <SecurityArt className="pointer-events-none absolute right-[2%] top-36 hidden w-52 rotate-6 animate-float opacity-90 xl:block 2xl:right-[8%]" />
         <div className="container-x relative pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
-            모든 업종 중소기업을 위한 공공입찰 대행 파트너
+            입찰 특화 분석 알고리즘 기반 공공입찰 대행
           </p>
           <h1 className="mx-auto mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.15] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
-            공고는 저희가 찾고,
+            공고마다 정밀하게 채점하고,
             <br />
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님이.</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
-            면허·지역·규모에 맞는 나라장터 공고를 매일 골라 참가조건, 제출서류, 입찰 가능성까지 정리해 아침마다 보내 드립니다.
+            입찰 특화 알고리즘이 나라장터 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해, 점수와 근거를 매일 아침 보내 드립니다.
           </p>
           <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/apply" className="btn-mint px-7 text-base">2주 무료로 시작하기</Link>
@@ -317,8 +318,8 @@ export default async function Home() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
           {[
             ["전 업종 수집", "오늘 확인한 공고", bids.length.toLocaleString(), "건"],
+            ["알고리즘 판정", "공고당 채점 항목", "6", "개"],
             ["1차 선별", "검토할 공고", `${cut}%`, "감소"],
-            ["제출서류", "체크리스트 항목", String(docCount), "개"],
             ["메일 발송", "영업일 아침", "07:00", ""],
           ].map(([tag, k, v, u]) => (
             <div key={tag} className="rounded-3xl bg-paper p-5 sm:p-7">
@@ -332,6 +333,9 @@ export default async function Home() {
         </div>
         <p className="mt-3 text-right text-xs text-ink-300">예시 고객사 조건과 오늘 수집한 공고 기준</p>
       </section>
+
+      {/* 분석 엔진 */}
+      <AnalysisEngine bid={featured} ev={featuredEval} total={bids.length} />
 
       {/* 핵심 기능 — 번갈아 배치 */}
       <section className="container-x pt-28">
@@ -448,7 +452,7 @@ export default async function Home() {
             <div className="text-center">
               <h2 className="h-section">공공 데이터 그대로,<br />판단 근거는 투명하게.</h2>
               <div className="mt-8 flex flex-wrap justify-center gap-2">
-                {["공공데이터포털 공식 API", "영업일 3회 갱신", "17개 시·도 판정", "점수 근거 공개"].map((t) => (
+                {["공공데이터포털 공식 API", "영업일 3회 갱신", "17개 시·도 판정", "가중치·근거 공개"].map((t) => (
                   <span key={t} className="glass rounded-full px-4 py-2 text-sm font-semibold text-mint-200">{t}</span>
                 ))}
               </div>

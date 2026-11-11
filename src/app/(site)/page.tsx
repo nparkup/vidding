@@ -8,6 +8,7 @@ import { GradeBadge, ScoreBar } from "@/components/Badges";
 import { FeatureTabs } from "@/components/home/FeatureTabs";
 import { ProductMockup } from "@/components/home/ProductMockup";
 import { AnalysisEngine } from "@/components/home/AnalysisEngine";
+import { AgencyMark, AGENCY_KINDS } from "@/components/home/AgencyMark";
 import { MatchDemo } from "@/components/MatchDemo";
 import { documentChecklist, evaluate, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
@@ -305,11 +306,15 @@ export default async function Home() {
         <div className="relative mt-5 overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
           <div className="flex w-max animate-marquee gap-3">
             {[...agencies, ...agencies].map((a, i) => (
-              <span key={i} className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-ink-100 bg-white px-4 py-2 text-sm font-medium text-ink-500">
-                {a}
-              </span>
+              <AgencyMark key={i} name={a} />
             ))}
           </div>
+        </div>
+        <div className="container-x mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] text-ink-400">
+          {AGENCY_KINDS.map((k) => (
+            <span key={k.label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: k.fill }} />{k.label}</span>
+          ))}
+          <span className="basis-full text-center text-ink-300 sm:basis-auto">기관 표기는 입찰메이트랩이 만든 유형 표시이며 실제 기관 CI가 아닙니다. 고객사나 제휴 기관을 뜻하지 않습니다.</span>
         </div>
       </section>
 

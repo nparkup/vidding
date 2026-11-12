@@ -31,9 +31,11 @@ export const NARA_APIS = [
     path: "/ad/BidPublicInfoService",
     required: false,
     approved: false,
-    usage: "(보조, 2026-11-11 기준 이 인증키로 \"등록되지 않은 서비스키\" 응답) 용역 공고 목록·참가가능지역·면허제한·기초금액 수집 (매일 선별의 원천 데이터)",
+    usage: "(2026-11-12 기준 이 인증키로 \"등록되지 않은 서비스키\" 응답) 공고 첨부파일(공고서·규격서 ntceSpecDocUrl1~10) 목록 · 평가점수 예측의 원문 확보에 필요",
     operations: {
       serviceList: "getBidPblancListInfoServc",
+      constructionList: "getBidPblancListInfoCnstwk",
+      goodsList: "getBidPblancListInfoThng",
       region: "getBidPblancListInfoPrtcptPsblRgn",
       license: "getBidPblancListInfoLicenseLimit",
       baseAmount: "getBidPblancListInfoServcBsisAmount",
@@ -74,6 +76,19 @@ export const NARA_APIS = [
     usage: "발주기관별 기존 계약 이력으로 재발주 시기 예측·현 수행업체 파악",
     operations: {
       serviceList: "getCntrctInfoListServc",
+    },
+  },
+  {
+    key: "usrInfo",
+    name: "조달청_나라장터 사용자정보서비스",
+    datasetId: "15129466",
+    path: "/ao/UsrInfoService02",
+    required: false,
+    approved: true,
+    usage: "사업자등록번호로 조달업체 기본정보(개업일·종업원 수·소재지)와 등록 업종 조회 · 평가점수 예측의 기업 정보",
+    operations: {
+      corpBasic: "getPrcrmntCorpBasicInfo02",
+      corpIndustry: "getPrcrmntCorpIndstrytyInfo02",
     },
   },
 ] as const;

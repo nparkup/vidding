@@ -2,7 +2,7 @@ import { Star } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHead, Status } from "@/components/AdminUI";
-import { GradeBadge } from "@/components/Badges";
+import { ScoreMeter } from "@/components/Badges";
 import { EmailPreview } from "@/components/EmailPreview";
 import { documentChecklist, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
@@ -71,7 +71,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                         </td>
                         <td className="tabular-nums">{won(r.bid.baseAmount)}</td>
                         <td className="text-xs">{dday(r.daysLeft)}</td>
-                        <td><GradeBadge grade={r.grade} score={r.score} /></td>
+                        <td><ScoreMeter grade={r.grade} score={r.score} /></td>
                       </tr>
                     );
                   })}

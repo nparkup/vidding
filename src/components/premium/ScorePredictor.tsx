@@ -207,6 +207,8 @@ export function ScorePredictor() {
   const isNego = active.method === "협상에 의한 계약" || active.method === "종합심사";
 
   return (
+    <div className="space-y-6">
+    {/* 입력과 결과: 결과 패널의 sticky 범위를 이 두 칸으로 한정해 아래 평가표를 덮지 않게 한다 */}
     <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
       <div className="min-w-0 space-y-6">
         {/* 1. 공고 */}
@@ -394,9 +396,10 @@ export function ScorePredictor() {
           예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 실제 점수는 발주기관의 세부 평가기준, 서류 인정 범위, 정성평가 위원 판단에 따라 달라집니다.
         </p>
       </aside>
+    </div>
 
     {/* 평가표 (전체 폭) */}
-    <section className="card min-w-0 p-6 lg:col-span-2">
+    <section className="card min-w-0 p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">

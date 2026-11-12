@@ -14,8 +14,8 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
         <span className="ml-2 truncate">받은편지함 · 오전 7:00</span>
       </div>
       <div className="p-5 sm:p-6">
-        <p className="text-xs text-ink-300">보낸사람 입찰메이트랩 &lt;daily@ipchalmatelab.kr&gt;</p>
-        <p className="mt-1 font-bold">[입찰메이트랩] {today} {client.company} 맞춤 공고 {recommended.length}건</p>
+        <p className="text-xs text-ink-300">보낸사람 입찰메이트LAB &lt;daily@ipchalmatelab.kr&gt;</p>
+        <p className="mt-1 font-bold">[입찰메이트LAB] {today} {client.company} 맞춤 공고 {recommended.length}건</p>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl bg-mint-50 p-3">
             <p className="text-xl font-extrabold text-mint-600">{newToday}</p>

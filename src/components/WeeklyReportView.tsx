@@ -18,7 +18,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note }: { client: Cl
   return (
     <article className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-card">
       <header className="bg-ink p-6 text-white sm:p-8">
-        <p className="text-sm text-mint">입찰메이트랩 주간 분석보고서 · {weekLabel}</p>
+        <p className="text-sm text-mint">입찰메이트LAB 주간 분석보고서 · {weekLabel}</p>
         <h2 className="mt-2 text-2xl font-extrabold sm:text-3xl">{client.company}</h2>
         <p className="mt-1 text-sm text-ink-300">면허 {client.licenses.join(", ")} · 지역 {client.regions.join(", ")} · 규모 {won(client.minAmount)}~{won(client.maxAmount)}</p>
         <div className="mt-6 grid grid-cols-3 gap-3">

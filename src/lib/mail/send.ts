@@ -20,7 +20,7 @@ export async function sendMail(to: string, subject: string, html: string, text: 
       secure: port === 465,
       auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
     });
-    await t.sendMail({ from: process.env.MAIL_FROM || "입찰메이트랩 <no-reply@example.com>", to, subject, html, text });
+    await t.sendMail({ from: process.env.MAIL_FROM || "입찰메이트LAB <no-reply@example.com>", to, subject, html, text });
     return { status: "발송" };
   } catch (e) {
     return { status: "실패", error: (e as Error).message.slice(0, 300) };

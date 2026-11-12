@@ -1,10 +1,21 @@
+"use client";
+
+import { useState } from "react";
 import type { Digest } from "@/lib/digest";
 import type { MatchResult } from "@/lib/analysis";
 import { dday, won } from "@/lib/format";
 import { GradeBadge, ScoreBar } from "../Badges";
 
-/** 히어로 아래 큰 제품 화면 미리보기 (실제 공고 데이터로 채움) */
-export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResult }) {
+export interface MockupCase {
+  label: string;
+  digest: Digest;
+  top?: MatchResult;
+}
+
+/** 히어로 아래 큰 제품 화면 미리보기. 업종이 다른 예시 고객사를 탭으로 바꿔 본다 (실제 공고 데이터로 채움) */
+export function ProductMockup({ cases }: { cases: MockupCase[] }) {
+  const [k, setK] = useState(0);
+  const { digest, top } = cases[k];
   const menu = [
     { t: "오늘의 공고", on: true, n: digest.recommended.length },
     { t: "관심 공고" },
@@ -20,8 +31,23 @@ export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResu
         <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
         <span className="h-3 w-3 rounded-full bg-[#28C840]" />
         <span className="mx-auto hidden w-1/2 truncate rounded-lg bg-white px-3 py-1 text-center text-xs text-ink-400 ring-1 ring-ink-100 sm:block">
-          입찰메이트랩 · {digest.client.company} 전용 공고함
+          입찰메이트LAB · {digest.client.company} 전용 공고함
         </span>
+      </div>
+
+      <div role="tablist" aria-label="예시 고객사 업종" className="flex gap-1.5 overflow-x-auto border-b border-ink-100 px-4 py-2.5">
+        <span className="hidden shrink-0 self-center pr-1 text-[11px] font-semibold text-ink-300 sm:block">예시 고객사</span>
+        {cases.map((c, n) => (
+          <button
+            key={c.label}
+            role="tab"
+            aria-selected={n === k}
+            onClick={() => setK(n)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${n === k ? "bg-ink text-white" : "bg-paper text-ink-500 hover:text-ink"}`}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
 
       <div className="grid md:grid-cols-[200px_1fr] lg:grid-cols-[200px_1fr_280px]">
@@ -38,7 +64,7 @@ export function ProductMockup({ digest, top }: { digest: Digest; top?: MatchResu
           </ul>
           <div className="mt-6 rounded-2xl bg-ink p-3 text-white">
             <p className="text-[11px] text-ink-300">담당 매니저</p>
-            <p className="mt-0.5 text-sm font-semibold">입찰메이트랩 매니저</p>
+            <p className="mt-0.5 text-sm font-semibold">입찰메이트LAB 매니저</p>
             <p className="mt-2 text-[11px] leading-relaxed text-ink-200">관심 공고 서류를 마감 전 함께 확인해 드려요.</p>
           </div>
         </aside>

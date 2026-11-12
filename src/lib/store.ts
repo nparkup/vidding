@@ -1,5 +1,5 @@
 import "server-only";
-import type { AppSettings, Bid, ClientProfile, Inquiry, MailLog, WeeklyReport } from "./types";
+import type { AppSettings, Bid, BidAttachment, ClientProfile, Inquiry, MailLog, WeeklyReport } from "./types";
 import { adapter } from "./db";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
@@ -37,7 +37,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -69,6 +69,11 @@ export async function getBids(): Promise<Bid[]> {
     else void syncBids().catch(() => {});
   }
   return bidCache().items;
+}
+
+/** 공고별 첨부파일 목록 (정적 빌드에서 미리 받아 둔 것). 서버 배포에서는 /api/premium/attachments 로 공고마다 조회 */
+export async function getAttachments(): Promise<Record<string, BidAttachment[]>> {
+  return fileBids()?.attachments ?? {};
 }
 
 export async function getBid(id: string): Promise<Bid | undefined> {

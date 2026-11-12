@@ -9,10 +9,24 @@ import {
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
 import { won } from "@/lib/format";
-import type { Bid } from "@/lib/types";
+import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
+
+/** 정적 배포: 빌드 때 받아 둔 첨부파일 목록 전체를 한 번만 받는다 */
+let attachCache: Promise<Record<string, BidAttachment[]>> | null = null;
+async function loadAttachments(bid: Bid): Promise<BidAttachment[]> {
+  if (STATIC) {
+    attachCache ??= fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/attachments-data.json`)
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => { attachCache = null; return {}; });
+    return (await attachCache)[bid.id] ?? [];
+  }
+  const qs = new URLSearchParams({ no: bid.bidNtceNo, ord: bid.bidNtceOrd, biz: bid.bizType ?? "용역" });
+  const r = await fetch(`/api/premium/attachments?${qs}`);
+  return r.ok ? r.json() : [];
+}
 
 const KIND_LABEL: Record<ItemKind, string> = {
   performance: "실적",
@@ -96,6 +110,15 @@ export function ScorePredictor() {
 
   // 공고가 바뀌면 원문 평가표와 첨부를 비운다
   useEffect(() => { setSheet(null); setDocs([]); setDocMsg(""); textsRef.current = []; }, [bid?.id]);
+
+  const [files, setFiles] = useState<BidAttachment[] | null>(null);
+  useEffect(() => {
+    if (!bid) return;
+    let alive = true;
+    setFiles(null);
+    loadAttachments(bid).then((f) => alive && setFiles(f)).catch(() => alive && setFiles([]));
+    return () => { alive = false; };
+  }, [bid]);
 
   const result = useMemo(() => (active && bid ? predict(active, bid, co) : null), [active, bid, co]);
 
@@ -229,6 +252,22 @@ export function ScorePredictor() {
             <a href={bid.detailUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-mint-600">나라장터 원문에서 첨부 내려받기</a>
             {busy && <span className="text-sm text-ink-300">읽는 중…</span>}
           </div>
+          {files && files.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-ink-100 p-4">
+              <p className="text-sm font-semibold">이 공고의 첨부파일 {files.length}건</p>
+              <p className="mt-0.5 text-xs text-ink-500">나라장터에서 내려받은 뒤 위 파일 선택으로 넣어 주세요. 평가기준은 보통 제안요청서·과업지시서·적격심사 기준에 있습니다.</p>
+              <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                {files.map((f) => (
+                  <li key={f.url}>
+                    <a href={f.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-lg bg-paper px-3 py-2 text-sm hover:bg-ink-100/60">
+                      <span className="truncate">{f.name}</span>
+                      <span className="shrink-0 text-xs text-ink-300">{f.kind}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {docs.length > 0 && (
             <ul className="mt-3 space-y-1 text-sm">
               {docs.map((d, i) => (

@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import { buildMockBids } from "../src/lib/mock/bids";
 import { fetchAllBids, hasServiceKey } from "../src/lib/nara/client";
+import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -19,7 +20,15 @@ async function main() {
   }
   const items = await fetchAllBids(3);
   if (items.length === 0) throw new Error("수집된 공고가 0건입니다");
-  writeFileSync(out, JSON.stringify({ items, syncedAt, source: "g2b" }));
+  // 첨부파일(평가점수 예측용)은 입찰공고정보서비스 승인이 필요하다. 실패해도 공고 배포는 계속한다
+  let attachments = {};
+  try {
+    attachments = await fetchAttachmentsBulk(new Set(items.map((b) => b.id)));
+    console.log(`첨부파일 목록 ${Object.keys(attachments).length}건`);
+  } catch (e) {
+    console.warn("첨부파일 목록 수집 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

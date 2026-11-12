@@ -467,7 +467,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   let passLabel: string | undefined;
   let gap: number | undefined;
   if (sheet.pass?.kind === "total") {
-    passed = total >= sheet.pass.score;
+    passed = total >= sheet.pass.score - 1e-6;
     gap = round1(total - sheet.pass.score);
     passLabel = `종합평점 ${sheet.pass.score}점 이상`;
   } else if (sheet.pass?.kind === "techRatio") {
@@ -484,8 +484,11 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
     const nonPrice = total - (items.find((i) => i.id === priceItem.id)?.score ?? 0);
     const ok: number[] = [];
     const floor = bid.lowerLimitRate ?? 0;
-    for (let r = Math.max(80, floor); r <= 100.0001; r += 0.05) {
-      if (nonPrice + qualPrice(priceItem.max, r, priceItem.basis) >= sheet.pass.score) ok.push(r);
+    const start = Math.max(80, floor);
+    const rates = Array.from({ length: Math.floor((100 - start) / 0.01) + 1 }, (_, n) => Math.round((start + n * 0.01) * 1000) / 1000);
+    if (start <= 88) rates.push(88);
+    for (const r of rates.sort((x, y) => x - y)) {
+      if (nonPrice + qualPrice(priceItem.max, r, priceItem.basis) >= sheet.pass.score - 1e-6) ok.push(r);
     }
     if (ok.length) rateWindow = { low: Math.round(ok[0] * 100) / 100, high: Math.round(ok[ok.length - 1] * 100) / 100 };
   }
@@ -500,7 +503,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
     else if (l.kind === "years") tips.push(`업력 항목에서 ${l.lost}점이 빠집니다.`);
   }
   if (sheet.pass?.kind === "total" && rateWindow) tips.push(`통과 가능한 투찰률은 예정가격의 ${rateWindow.low}% ~ ${rateWindow.high}% 입니다.${bid.lowerLimitRate ? ` 낙찰하한율 ${bid.lowerLimitRate}%보다 낮게 쓰면 탈락합니다.` : ""}`);
-  if (sheet.pass?.kind === "total" && !rateWindow && priceItem) tips.push("가격 만점을 받아도 통과 점수에 못 미칩니다. 실적·신용 항목을 먼저 보완해야 합니다.");
+  if (sheet.pass?.kind === "total" && !rateWindow && priceItem && !passed) tips.push("가격 만점을 받아도 통과 점수에 못 미칩니다. 실적·신용 항목을 먼저 보완해야 합니다.");
 
   return { sheet, items, total, max, techScore, techMax, passed, passLabel, gap, rateWindow, tips };
 }

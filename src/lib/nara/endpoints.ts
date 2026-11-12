@@ -31,7 +31,7 @@ export const NARA_APIS = [
     path: "/ad/BidPublicInfoService",
     required: false,
     approved: false,
-    usage: "(2026-11-12 기준 이 인증키로 \"등록되지 않은 서비스키\" 응답) 공고 첨부파일(공고서·규격서 ntceSpecDocUrl1~10) 목록 · 평가점수 예측의 원문 확보에 필요",
+    usage: "(2026-11-12 활용신청 완료, 같은 날 13:30 UTC 기준 키 반영 대기) 공고 첨부파일(공고서·규격서 ntceSpecDocUrl1~10) 목록 · 평가점수 예측의 원문 확보에 필요",
     operations: {
       serviceList: "getBidPblancListInfoServc",
       constructionList: "getBidPblancListInfoCnstwk",

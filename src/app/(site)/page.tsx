@@ -329,7 +329,7 @@ export default async function Home() {
           {AGENCY_KINDS.map((k) => (
             <span key={k.label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: k.fill }} />{k.label}</span>
           ))}
-          <span className="basis-full text-center text-ink-300 sm:basis-auto">기관 표기는 입찰메이트LAB이 만든 유형 표시이며 실제 기관 CI가 아닙니다. 고객사나 제휴 기관을 뜻하지 않습니다.</span>
+          <span className="basis-full text-center text-ink-300 sm:basis-auto">공식 CI는 사용 승인을 받은 기관만 표시하고, 나머지는 입찰메이트LAB이 만든 유형 표시입니다. 고객사나 제휴 기관을 뜻하지 않습니다.</span>
         </div>
       </section>
 

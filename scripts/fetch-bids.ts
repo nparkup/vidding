@@ -8,6 +8,7 @@ import { dirname } from "path";
 import { buildMockBids } from "../src/lib/mock/bids";
 import { fetchAllBids, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
+import { extractSheetsForBids } from "../src/lib/nara/docExtract";
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -28,7 +29,16 @@ async function main() {
   } catch (e) {
     console.warn("첨부파일 목록 수집 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, syncedAt, source: "g2b" }));
+  // 첨부를 내려받아 평가표를 미리 추출 (평가점수 예측이 공고 선택만으로 원문 배점을 쓰도록). 실패해도 배포는 계속
+  let sheets = {};
+  try {
+    const r = await extractSheetsForBids(items, attachments);
+    sheets = r.sheets;
+    console.log(`평가표 추출: 대상 ${r.stats.bids}건, 파일 ${r.stats.files}개(실패 ${r.stats.downloadFailed}), 추출 ${r.stats.found}건${r.stats.timedOut ? ", 시간 한도로 일부만 처리" : ""}`);
+  } catch (e) {
+    console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

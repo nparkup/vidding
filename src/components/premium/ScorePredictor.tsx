@@ -252,50 +252,11 @@ export function ScorePredictor() {
           {docMsg && <p className="mt-3 rounded-xl bg-mint-50 px-3 py-2 text-sm text-mint-700">{docMsg}</p>}
         </section>
 
-        {/* 평가표 */}
-        <section className="card p-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-lg font-bold">{active.title}</h3>
-            <div className="flex items-center gap-2">
-              <span className="chip">{active.source === "extracted" ? `원문 추출 · 신뢰도 ${active.confidence}` : "표준 평가표"}</span>
-              {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => { setSheet(null); setDocs([]); textsRef.current = []; setDocMsg(""); }}>표준으로 되돌리기</button>}
-            </div>
-          </div>
-          <div className="mt-4 overflow-x-auto">
-            <table className="table-x min-w-[520px]">
-              <thead><tr><th>평가항목</th><th>유형</th><th className="text-right">배점</th><th /></tr></thead>
-              <tbody>
-                {active.items.map((i) => (
-                  <tr key={i.id}>
-                    <td>
-                      <p className="font-semibold">{i.label}</p>
-                      <p className="text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
-                    </td>
-                    <td>
-                      <select className="rounded-lg border border-ink-100 bg-white px-2 py-1 text-xs" value={i.kind} onChange={(e) => editItem(i.id, { kind: e.target.value as ItemKind })}>
-                        {(Object.keys(KIND_LABEL) as ItemKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
-                      </select>
-                    </td>
-                    <td className="text-right">
-                      <input type="number" step="0.5" min={0} className="w-16 rounded-lg border border-ink-100 px-2 py-1 text-right text-sm tabular-nums" value={i.max} onChange={(e) => editItem(i.id, { max: Number(e.target.value) || 0 })} />
-                    </td>
-                    <td className="text-right"><button type="button" className="text-xs text-ink-300 hover:text-coral" onClick={() => removeItem(i.id)}>삭제</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <AddItem onAdd={(label, max) => active && setSheet({ ...active, items: [...active.items, { id: `u${Date.now()}`, label, max, kind: kindOf(label), group: "추가 항목" }] })} />
-          <ul className="mt-4 space-y-1 text-xs leading-relaxed text-ink-500">
-            {active.notes.map((n) => <li key={n}>{n}</li>)}
-          </ul>
-        </section>
-
         {/* 3. 기업 정보 */}
         <section className="card p-6">
           <Step n={3} title="기업 정보와 신용평가 서류" />
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+          <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
+            <div className="sm:col-span-3">
               <span className="label">사업자등록번호 (나라장터 조달업체 조회)</span>
               <div className="flex gap-2">
                 <input className="input" inputMode="numeric" placeholder="000-00-00000" value={bizno} onChange={(e) => setBizno(e.target.value)} />
@@ -309,11 +270,13 @@ export function ScorePredictor() {
             </div>
             <Num label="업력 (년)" value={co.years} onChange={(v) => set("years", v)} />
             <Num label="종업원 수 (명)" value={co.employees} onChange={(v) => set("employees", v)} />
-            <Num label="공고 분야 기술인력 (명)" value={co.techStaff} onChange={(v) => set("techStaff", v)} />
+            <Num label="분야 기술인력 (명)" value={co.techStaff} onChange={(v) => set("techStaff", v)} />
             <div>
-              <span className="label">최근 3년 유사 실적 (억원)</span>
+              <span className="label">3년 유사 실적 (억원)</span>
               <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); set("pastPerformance", Math.round((Number(e.target.value) || 0) * 1e8)); }} />
             </div>
+            <Num label="신인도 가점 (건)" value={co.bonusCount} onChange={(v) => set("bonusCount", v)} />
+            <Num label="제재·벌점 (최근 2년)" value={co.penaltyCount} onChange={(v) => set("penaltyCount", v)} />
             <div className="sm:col-span-2">
               <span className="label">신용평가등급</span>
               <div className="flex flex-wrap items-center gap-2">
@@ -325,12 +288,10 @@ export function ScorePredictor() {
                   <input type="file" accept=".pdf,.hwpx,.docx,.txt" className="sr-only" onChange={(e) => { onCreditFile(e.target.files); e.target.value = ""; }} />
                 </label>
               </div>
-              <p className="mt-1 text-xs text-ink-500">{creditMsg || "신용평가등급은 나라장터 공개 API로 제공되지 않아, 신용평가기관 확인서에서 읽거나 직접 선택합니다."}</p>
+              <p className="mt-1 text-xs text-ink-500">{creditMsg || "나라장터 API에는 등급이 없어 확인서에서 읽거나 직접 고릅니다."}</p>
             </div>
-            <Num label="신인도 가점 항목 (건)" value={co.bonusCount} onChange={(v) => set("bonusCount", v)} hint="여성·장애인·사회적기업, 고용우수, 품질 인증 등" />
-            <Num label="최근 2년 제재·벌점 (건)" value={co.penaltyCount} onChange={(v) => set("penaltyCount", v)} />
-            <div className="sm:col-span-2">
-              <span className="label">제안서·정성평가 준비 수준</span>
+            <div>
+              <span className="label">제안서 준비 수준</span>
               <div className="flex gap-2">
                 {(["상", "중", "하"] as Level[]).map((l) => (
                   <button key={l} type="button" onClick={() => set("proposal", l)} className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${co.proposal === l ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500"}`}>{l}</button>
@@ -397,6 +358,36 @@ export function ScorePredictor() {
           예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 실제 점수는 발주기관의 세부 평가기준, 서류 인정 범위, 정성평가 위원 판단에 따라 달라집니다.
         </p>
       </aside>
+
+    {/* 평가표 (전체 폭) */}
+    <section className="card p-6 lg:col-span-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-lg font-bold">{active.title}</h3>
+          <div className="flex items-center gap-2">
+            <span className="chip">{active.source === "extracted" ? `원문 추출 · 신뢰도 ${active.confidence}` : "표준 평가표"}</span>
+            {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => { setSheet(null); setDocs([]); textsRef.current = []; setDocMsg(""); }}>표준으로 되돌리기</button>}
+          </div>
+        </div>
+        <ul className="mt-4 grid gap-2 md:grid-cols-2">
+          {active.items.map((i) => (
+            <li key={i.id} className="flex items-center gap-3 rounded-2xl border border-ink-100 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{i.label}</p>
+                <p className="truncate text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
+              </div>
+              <select aria-label="항목 유형" className="shrink-0 rounded-lg border border-ink-100 bg-white px-2 py-1 text-xs" value={i.kind} onChange={(e) => editItem(i.id, { kind: e.target.value as ItemKind })}>
+                {(Object.keys(KIND_LABEL) as ItemKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+              </select>
+              <input aria-label="배점" type="number" step="0.5" min={0} className="w-16 shrink-0 rounded-lg border border-ink-100 px-2 py-1 text-right text-sm tabular-nums" value={i.max} onChange={(e) => editItem(i.id, { max: Number(e.target.value) || 0 })} />
+              <button type="button" className="shrink-0 text-xs text-ink-300 hover:text-coral" onClick={() => removeItem(i.id)}>삭제</button>
+            </li>
+          ))}
+        </ul>
+        <AddItem onAdd={(label, max) => active && setSheet({ ...active, items: [...active.items, { id: `u${Date.now()}`, label, max, kind: kindOf(label), group: "추가 항목" }] })} />
+        <ul className="mt-4 space-y-1 text-xs leading-relaxed text-ink-500">
+          {active.notes.map((n) => <li key={n}>{n}</li>)}
+        </ul>
+      </section>
     </div>
   );
 }
@@ -422,7 +413,7 @@ function Num({ label, value, onChange, hint }: { label: string; value: number; o
 
 function Range({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
-    <div className="sm:col-span-2">
+    <div className="sm:col-span-3">
       <div className="flex justify-between"><span className="label">{label}</span><span className="text-sm font-bold tabular-nums">{value.toFixed(2)}%</span></div>
       <input type="range" min={80} max={100} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#12B886]" />
     </div>

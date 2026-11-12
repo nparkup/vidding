@@ -30,7 +30,7 @@ export default function PremiumPage() {
         </div>
       </PageHero>
 
-      <section className="container-x pt-16">
+      <section className="container-x pt-12">
         <ol className="grid gap-4 md:grid-cols-4">
           {FLOW.map((f, i) => (
             <li key={f.t} className="card p-6">
@@ -42,7 +42,7 @@ export default function PremiumPage() {
         </ol>
       </section>
 
-      <section id="predict" className="container-x scroll-mt-20 pt-16">
+      <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">평가점수 예측</p>
         <h2 className="h-section mt-3">공고 하나로 직접 계산해 보세요</h2>
         <p className="lead mt-3 max-w-3xl">공고를 고르고 첨부파일을 넣은 뒤 기업 정보를 입력하면, 오른쪽에 항목별 예상 점수가 바로 계산됩니다.</p>
@@ -53,7 +53,7 @@ export default function PremiumPage() {
         </div>
       </section>
 
-      <section className="container-x pt-16">
+      <section className="container-x pt-12">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="card p-7">
             <p className="text-lg font-bold">읽는 서류</p>

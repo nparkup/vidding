@@ -34,7 +34,6 @@ const COMPARE = [
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 체크리스트 제공"],
   ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 채점과 S·A·B·C 등급"],
-  ["담당 인력", "고객사 직원이 직접", "입찰메이트LAB 전담 매니저"],
 ];
 
 const TRUST = [
@@ -437,31 +436,74 @@ export default async function Home() {
           <p className="eyebrow">왜 입찰메이트LAB인가요</p>
           <h2 className="h-section mt-3">입찰정보 사이트는 많은데,<br />왜 여전히 힘들까요?</h2>
         </div>
-        <div className="mt-12 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-3xl border border-ink-100 p-7">
-            <p className="text-sm font-semibold text-ink-400">일반 입찰정보 포털</p>
-            <ul className="mt-5 space-y-4">
-              {COMPARE.map(([k, a]) => (
-                <li key={k} className="flex gap-3">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-400"><X className="h-3 w-3" /></span>
-                  <div><p className="text-xs font-semibold text-ink-400">{k}</p><p className="text-ink-500">{a}</p></div>
-                </li>
-              ))}
-            </ul>
+        {/* 데스크톱: 항목별 한 줄 비교 표, 입찰메이트LAB 열을 강조 */}
+        <div className="relative mt-14 hidden lg:block">
+          <div className="pointer-events-none absolute -bottom-6 -top-6 right-0 w-[44%] rounded-[32px] bg-ink shadow-glow ring-2 ring-mint">
+            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-mint/25 blur-3xl" />
           </div>
-          <div className="relative overflow-hidden rounded-3xl bg-ink p-7 text-white">
-            <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-mint/25 blur-3xl" />
-            <p className="relative text-sm font-semibold text-mint-400">입찰메이트LAB</p>
-            <ul className="relative mt-5 space-y-4">
-              {COMPARE.map(([k, , b]) => (
-                <li key={k} className="flex gap-3">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-mint text-white"><Check className="h-3 w-3" strokeWidth={3} /></span>
-                  <div><p className="text-xs font-semibold text-ink-300">{k}</p><p className="font-semibold">{b}</p></div>
-                </li>
-              ))}
-            </ul>
+          <div className="relative grid grid-cols-[150px_1fr_44%]">
+            <div />
+            <div className="px-6 pb-5">
+              <p className="text-sm font-semibold text-ink-400">일반 입찰정보 포털</p>
+              <p className="mt-1 text-xs text-ink-300">사람이 직접 찾고 판단</p>
+            </div>
+            <div className="px-8 pb-5">
+              <p className="text-lg font-extrabold text-mint-300">입찰메이트LAB</p>
+              <p className="mt-1 text-xs text-ink-300">입찰 특화 알고리즘이 판정·채점</p>
+            </div>
+            {COMPARE.map(([k, a, b]) => (
+              <div key={k} className="contents">
+                <div className="flex items-center border-t border-ink-100 py-5 pr-4 text-sm font-bold text-ink-700">{k}</div>
+                <div className="flex items-center gap-3 border-t border-ink-100 px-6 py-5 text-[15px] text-ink-400">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-400"><X className="h-3.5 w-3.5" /></span>
+                  {a}
+                </div>
+                <div className="flex items-center gap-3 border-t border-white/10 px-8 py-5 text-lg font-bold text-white">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-mint text-white"><Check className="h-4 w-4" strokeWidth={3} /></span>
+                  {b}
+                </div>
+              </div>
+            ))}
+            <div className="flex items-center border-t-2 border-ink-200 py-6 pr-4 text-sm font-bold text-ink-700">오늘 검토할 공고</div>
+            <div className="border-t-2 border-ink-200 px-6 py-6">
+              <p className="text-4xl font-extrabold tabular-nums text-ink-300">{bids.length.toLocaleString()}<span className="ml-1 text-base font-bold">건</span></p>
+              <p className="mt-1 text-xs text-ink-400">수집된 공고 전체를 직접 확인</p>
+            </div>
+            <div className="border-t border-white/15 px-8 py-6">
+              <p className="text-5xl font-extrabold tabular-nums text-mint">{eligible.length.toLocaleString()}<span className="ml-1 text-lg font-bold text-mint-300">건</span><span className="ml-3 rounded-lg bg-mint px-2 py-1 align-middle text-sm font-extrabold text-white">{cut}% 감소</span></p>
+              <p className="mt-1 text-xs text-ink-300">면허·지역·규모 판정을 통과한 공고만</p>
+            </div>
           </div>
         </div>
+
+        {/* 모바일·태블릿: 항목별 카드 */}
+        <div className="mt-10 space-y-3 lg:hidden">
+          {COMPARE.map(([k, a, b]) => (
+            <div key={k} className="overflow-hidden rounded-2xl border border-ink-100">
+              <p className="px-4 pt-3 text-xs font-bold text-ink-500">{k}</p>
+              <p className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-ink-400">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink-100"><X className="h-3 w-3" /></span>
+                <span><span className="mr-1.5 text-[11px] font-semibold">일반 포털</span>{a}</span>
+              </p>
+              <p className="flex items-center gap-2.5 bg-ink px-4 py-3.5 font-bold text-white">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-mint"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span>
+                <span><span className="mr-1.5 text-[11px] font-semibold text-mint-300">입찰메이트LAB</span>{b}</span>
+              </p>
+            </div>
+          ))}
+          <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-ink-100">
+            <div className="p-4">
+              <p className="text-[11px] font-semibold text-ink-400">일반 포털 · 오늘 검토할 공고</p>
+              <p className="mt-1 text-3xl font-extrabold tabular-nums text-ink-300">{bids.length.toLocaleString()}<span className="text-sm">건</span></p>
+            </div>
+            <div className="bg-ink p-4">
+              <p className="text-[11px] font-semibold text-mint-300">입찰메이트LAB</p>
+              <p className="mt-1 text-3xl font-extrabold tabular-nums text-mint">{eligible.length.toLocaleString()}<span className="text-sm text-mint-300">건</span></p>
+              <p className="text-xs font-bold text-white">{cut}% 감소</p>
+            </div>
+          </div>
+        </div>
+        <p className="mt-10 text-right text-xs text-ink-300">오늘 검토할 공고 수는 예시 고객사 조건과 오늘 수집한 공고 기준</p>
       </section>
 
       {/* 신뢰 */}

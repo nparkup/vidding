@@ -44,7 +44,30 @@ export interface EvalItem {
   max: number;        // 배점 (감점 항목은 0)
   kind: ItemKind;
   basis?: string;     // 원문 문구 또는 산식 설명
+  /** 공고 세부기준의 점수 구간 (예: 실적 100% 이상 15점, 80% 이상 13점) */
+  bands?: ScoreBand[];
+  /** 이 항목에서 인정하는 서류·실적 범위 (원문 문장) */
+  recognition?: string[];
+  /** 정성 항목의 평가 요소 (원문 문장) */
+  criteria?: string[];
 }
+
+/**
+ * 점수 구간. unit 이 grade 면 CREDIT_GRADES 순번으로 best(높은 등급) ~ worst(낮은 등급) 범위,
+ * 그 밖에는 min 이상(값 기준: 실적은 기초금액 대비 %, 인력은 명, 업력은 년)이면 points.
+ */
+export interface ScoreBand {
+  unit: "%" | "grade" | "명" | "년" | "건";
+  min: number;
+  best?: number;
+  worst?: number;
+  points: number;
+  /** 원문 조건 (화면 표시용) */
+  cond: string;
+}
+
+/** 정성평가 등급 (예: 탁월 100%, 우수 90%, 보통 80%) */
+export interface ScaleLevel { label: string; ratio: number }
 
 export interface EvalSheet {
   method: ContractMethod | "종합심사";
@@ -56,6 +79,12 @@ export interface EvalSheet {
   /** 추출 신뢰도 (배점 합계가 100에 가까운지 등) */
   confidence: "높음" | "보통" | "낮음";
   notes: string[];
+  /** 정성평가 등급표 */
+  scale?: ScaleLevel[];
+  /** 평가위원 점수 처리 방식 (예: 최고·최저 점수를 뺀 산술평균) */
+  panelRule?: string;
+  /** 공고 전체에 걸친 서류 인정 기준 (기준일, 발급 기관, 공동수급 지분 등) */
+  recognition?: string[];
 }
 
 const KIND_RULES: [ItemKind, RegExp][] = [
@@ -201,6 +230,88 @@ export function detectMethod(text: string): EvalSheet["method"] | undefined {
   return undefined;
 }
 
+/* ---------- 세부기준: 점수 구간 · 서류 인정 범위 · 정성 등급 ---------- */
+
+const GRADE_TOKEN = /(?<![A-Za-z])(AAA|AA[+\-0]?|A[+\-0]?|BBB[+\-0]?|BB[+\-0]?|B[+\-0]?|CCC[+\-0]?|CC|C|D)(?![A-Za-z])/g;
+const COND_RE = /(\d{1,3}(?:\.\d+)?)\s*(%|배|명|년|건)\s*(이상|초과|미만|이하)?/g;
+const BAND_POINT_RE = /(\d{1,2}(?:\.\d{1,2})?)\s*점|\s(\d{1,2}(?:\.\d{1,2})?)\s*$/g;
+
+function gradeIndex(tok: string): number {
+  const t = ["AAA", "CC", "C", "D"].includes(tok) ? tok : /[+\-0]$/.test(tok) ? tok : `${tok}0`;
+  return (CREDIT_GRADES as readonly string[]).indexOf(t);
+}
+
+/** 한 줄에서 "조건 … N점" 묶음을 읽는다. 조건이 없는 묶음이 있으면 구간 줄로 보지 않는다 */
+export function parseBands(line: string): ScoreBand[] {
+  const out: ScoreBand[] = [];
+  let start = 0;
+  for (const m of line.matchAll(BAND_POINT_RE)) {
+    const seg = line.slice(start, m.index);
+    start = (m.index ?? 0) + m[0].length;
+    const points = Number(m[1] ?? m[2]);
+    const cond = seg.replace(/^[\s:：,·\-–~※]+|[\s:：,·~]+$/g, "").trim();
+    const all = [...seg.matchAll(COND_RE)];
+    const pct = all.filter((c) => c[2] === "%" || c[2] === "배");
+    const conds = pct.length ? pct : all;
+    if (conds.length) {
+      const unit = conds[0][2] === "배" ? "%" : (conds[0][2] as ScoreBand["unit"]);
+      const val = (c: RegExpMatchArray) => Number(c[1]) * (c[2] === "배" ? 100 : 1);
+      const lower = conds.find((c) => c[3] === "이상" || c[3] === "초과" || !c[3]);
+      out.push({ unit, min: lower ? val(lower) : 0, points, cond }); // "20% 미만" 처럼 상한만 있으면 가장 낮은 구간
+      continue;
+    }
+    const grades = [...seg.matchAll(GRADE_TOKEN)].map((g) => gradeIndex(g[1])).filter((i) => i >= 0);
+    if (!grades.length || !/등급|이상|이하|~|∼|,|AAA|BBB|[ABC][+\-0]/.test(seg)) return [];
+    let best = Math.min(...grades), worst = Math.max(...grades);
+    if (grades.length === 1 && /이상/.test(seg)) best = 0;
+    if (grades.length === 1 && /이하|미만/.test(seg)) worst = CREDIT_GRADES.length - 1;
+    out.push({ unit: "grade", min: 0, best, worst, points, cond });
+  }
+  return out;
+}
+
+/** 줄 맨 앞이 조건으로 시작하면(항목 이름이 없으면) 바로 앞 항목의 구간 줄이다 */
+function isBandLine(line: string, max = Infinity, kind?: ItemKind): boolean {
+  const bands = parseBands(line);
+  if (!bands.length || bands.some((b) => b.points > max + 0.001)) return false;
+  const first = line.search(/\d{1,3}(?:\.\d+)?\s*(%|배|명|년|건)|(?<![A-Za-z])(AAA|AA|A|BBB|BB|B|CCC)[+\-0]?(?![A-Za-z])/);
+  const rawPrefix = first > 0 ? line.slice(0, first) : "";
+  const prefix = rawPrefix
+    .replace(/[가나다라마바사아자차카타파하]\s*[.)]/g, "")
+    .replace(/(추정\s*가격|기초\s*금액|예정\s*가격|사업\s*금액|계약\s*금액|금액|대비|비율|등급|신용\s*평가|구간|평점|의|이|가)/g, "")
+    .replace(/[\s\-·○◦•▪:：()\d.~∼]/g, "");
+  // 글머리표로 시작하고 앞 항목과 같은 종류(또는 종류 없음)의 말만 붙어 있으면 구간 줄로 본다
+  const pk = kindOf(rawPrefix);
+  return prefix.length <= 1 || (/^[\-·○◦•▪※]/.test(line) && (pk === "other" || pk === kind));
+}
+
+const RECOG_RE = /(인정(?!보)|제외|합산|이내|기준일|마감일|증빙|발급|지분|공동\s*수급|확인서|증명서|유효\s*기간|준공|완료된|계약\s*금액)/;
+
+/** 정성평가 등급표: "탁월(100%) 우수(90%) 보통(80%)" 처럼 한 줄에 3개 이상 등급 */
+export function parseScale(text: string): ScaleLevel[] | undefined {
+  const re = /(매우\s*우수|탁월|우수|양호|보통|미흡|매우\s*미흡|불량|[수우미양가]|[ABCDE](?=\s*등급|\s*[(:：]))\s*(?:등급)?\s*[(:：]?\s*(?:배점\s*[x×*]\s*)?(\d{2,3}(?:\.\d)?)\s*%/g;
+  for (const line of text.split(/\r?\n/)) {
+    const ms = [...line.matchAll(re)];
+    if (ms.length < 3) continue;
+    const levels = ms.map((m) => ({ label: m[1].replace(/\s/g, ""), ratio: Number(m[2]) / 100 })).filter((l) => l.ratio > 0 && l.ratio <= 1);
+    const uniq = new Set(levels.map((l) => l.label));
+    const desc = levels.every((l, i) => i === 0 || l.ratio < levels[i - 1].ratio);
+    if (levels.length >= 3 && uniq.size === levels.length && desc) return levels;
+  }
+  return undefined;
+}
+
+function parsePanelRule(text: string): string | undefined {
+  const line = text.split(/\r?\n/).find((l) => /최고\s*(?:점수|점)?.{0,6}최저\s*(?:점수|점)?/.test(l) && /(제외|평균)/.test(l))
+    ?? text.split(/\r?\n/).find((l) => /평가\s*위원.{0,20}(산술\s*)?평균/.test(l));
+  return line ? line.replace(/\s+/g, " ").trim().slice(0, 100) : undefined;
+}
+
+/** 평가표 전체에 걸린 문장(등급표·위원 점수 처리·통과 기준)은 항목 세부기준에서 뺀다 */
+const SHEET_LEVEL_RE = /(최고\s*점|최저\s*점|산술\s*평균|협상\s*적격|낙찰자|배점\s*한도|탁월|평가\s*등급)/;
+
+const tidy = (l: string) => l.replace(/^[\s\-·○◦•▪※*]+/, "").replace(/\s+/g, " ").trim().slice(0, 90);
+
 /**
  * 공고문·규격서·평가기준서 텍스트에서 평가항목과 배점을 뽑는다.
  * - "평가항목 … 15점" 형태의 줄, 배점표의 "항목  15" 형태(배점 머리글 이후)를 모두 읽는다.
@@ -213,6 +324,9 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
   const seen = new Set<string>();
   let inTable = false;
   let lastLabel = "";
+  let cur = -1; // 지금 읽는 줄 번호
+  const lineOf = new Map<EvalItem, number>();
+  const inline = new Map<EvalItem, ScoreBand[]>();
 
   const push = (rawLabel: string, max: number, basis: string) => {
     let label = cleanLabel(rawLabel).replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
@@ -225,10 +339,15 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     const key = label.replace(/\s/g, "");
     if (seen.has(key)) return;
     seen.add(key);
-    found.push(item(label, max, kindOf(label), basis.slice(0, 80), group));
+    const it = item(label, max, kindOf(label), basis.slice(0, 80), group);
+    lineOf.set(it, cur);
+    found.push(it);
   };
 
   for (const line of lines) {
+    cur++;
+    // 앞 항목의 점수 구간 줄("80% 이상 13점", "A0 이상 15점")은 새 항목으로 만들지 않는다
+    if (found.length && isBandLine(line, found[found.length - 1].max, found[found.length - 1].kind)) { lastLabel = ""; continue; }
     if (/배\s*점/.test(line) && /(평가\s*항목|평가\s*요소|구\s*분|심사\s*항목)/.test(line)) { inTable = true; continue; }
     if (SKIP_RE.test(line) && /\d/.test(line)) { lastLabel = ""; continue; }
 
@@ -242,6 +361,17 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
       continue;
     }
     if (pts.length > 1) {
+      // "실적 15점  100% 이상 15점" 처럼 항목 줄에 첫 구간이 붙어 온 경우
+      const first = pts[0];
+      const rest = line.slice((first.index ?? 0) + first[0].length);
+      const head = line.slice(0, first.index).trim();
+      if (head && isBandLine(rest.trim(), Number(first[1]), kindOf(head))) {
+        const before = found.length;
+        push(head, Number(first[1]), line);
+        if (found.length > before) inline.set(found[found.length - 1], parseBands(rest.trim()));
+        lastLabel = "";
+        continue;
+      }
       // "실적 15점 신용 15점" 처럼 한 줄에 여러 항목
       let start = 0;
       for (const m of pts) {
@@ -276,6 +406,35 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
 
   if (found.length < 2) return undefined;
 
+  // 항목 사이 줄(최대 14줄)을 그 항목의 세부기준으로 읽는다: 점수 구간, 서류 인정 범위, 평가 요소
+  const used = new Set<number>();
+  found.forEach((it, n) => {
+    const from = lineOf.get(it);
+    if (from === undefined || it.kind === "price") return;
+    const next = found.slice(n + 1).map((f) => lineOf.get(f)).find((v): v is number => v !== undefined) ?? lines.length;
+    const to = Math.min(next, from + 15);
+    const bands: ScoreBand[] = [...(inline.get(it) ?? [])];
+    const recognition: string[] = [];
+    const criteria: string[] = [];
+    for (let k = from + 1; k < to; k++) {
+      const l = lines[k];
+      if (/배\s*점/.test(l) && /(평가\s*항목|구\s*분)/.test(l)) break;
+      if (isBandLine(l, it.max, it.kind)) { bands.push(...parseBands(l)); used.add(k); continue; }
+      if (/\d\s*점/.test(l)) continue;
+      const t = tidy(l);
+      if (t.length < 4 || SHEET_LEVEL_RE.test(t)) continue;
+      if (RECOG_RE.test(t)) { if (recognition.length < 4) recognition.push(t); used.add(k); }
+      else if ((it.kind === "qualitative" || it.kind === "other") && t.length >= 6 && criteria.length < 5 && !SKIP_RE.test(t)) { criteria.push(t); used.add(k); }
+    }
+    // 구간 최고점이 배점과 맞을 때만 이 항목의 구간으로 쓴다 (다른 표의 숫자를 잘못 붙이는 것을 막는다)
+    const top = bands.length ? Math.max(...bands.map((b) => b.points)) : 0;
+    if (bands.length >= 2 && Math.abs(top - it.max) < 0.01 && bands.every((b) => b.points <= it.max + 0.001)) it.bands = bands;
+    if (recognition.length) it.recognition = recognition;
+    if (criteria.length) it.criteria = criteria;
+  });
+  const recognitionAll = [...new Set(lines.filter((l, k) => !used.has(k) && !SHEET_LEVEL_RE.test(l) && /(실적|서류|증명|확인서|등급)/.test(l) && /(인정(?!보)|제외|기준일|마감일|발급|유효\s*기간|합산|지분)/.test(l)).map(tidy))]
+    .filter((l) => l.length >= 8).slice(0, 6);
+
   const method = detectMethod(text) ?? fallback?.method ?? "적격심사";
   const sum = found.reduce((s, i) => s + i.max, 0);
   const declaredTotal = (() => {
@@ -286,6 +445,8 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
   const confidence: EvalSheet["confidence"] = near100 ? "높음" : sum >= 60 && sum <= 130 ? "보통" : "낮음";
 
   const notes: string[] = [`원문에서 평가항목 ${found.length}개, 배점 합계 ${round1(sum)}점을 찾았습니다.`];
+  const detailed = found.filter((i) => i.bands || i.recognition || i.criteria).length;
+  if (detailed) notes.push(`세부기준(점수 구간·인정 범위·평가 요소)을 ${detailed}개 항목에서 읽어 함께 적용했습니다.`);
   if (!near100) notes.push("배점 합계가 100점과 달라 일부 항목이 빠졌거나 세부항목이 겹쳤을 수 있습니다. 항목을 확인해 주세요.");
   if (!found.some((i) => i.kind === "price") && method !== "종합심사") {
     const priceMax = Math.max(0, 100 - sum);
@@ -310,6 +471,9 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     source: "extracted",
     confidence,
     notes,
+    scale: parseScale(text),
+    panelRule: parsePanelRule(text),
+    recognition: recognitionAll.length ? recognitionAll : undefined,
   };
 }
 
@@ -404,11 +568,54 @@ function qualPrice(max: number, rate: number, basis?: string): number {
   return Math.max(2, max - k * Math.abs(88 - rate));
 }
 
+/** 공고의 점수 구간으로 채점한다. 값에 맞는 구간이 없으면(최저 구간 미만) 0점 */
+function scoreByBands(bands: ScoreBand[], value: number): { points: number; band?: ScoreBand } {
+  if (bands[0].unit === "grade") {
+    const hit = bands.find((b) => value >= (b.best ?? 0) && value <= (b.worst ?? 99));
+    if (hit) return { points: hit.points, band: hit };
+    const bestBand = [...bands].sort((a, b) => (a.best ?? 0) - (b.best ?? 0))[0];
+    if (value < (bestBand.best ?? 0)) return { points: bestBand.points, band: bestBand };
+    return { points: 0 };
+  }
+  const hit = [...bands].sort((a, b) => b.min - a.min).find((b) => value >= b.min);
+  return hit ? { points: hit.points, band: hit } : { points: 0 };
+}
+
+/** 회사 값을 구간 단위에 맞춰 꺼낸다. 맞는 값이 없으면 undefined (기본 규칙으로 계산) */
+function bandValue(it: EvalItem, c: CompanyInput, amt: number): number | undefined {
+  const unit = it.bands?.[0]?.unit;
+  if (!unit) return undefined;
+  if (unit === "grade") return it.kind === "credit" ? CREDIT_GRADES.indexOf(c.creditGrade) : undefined;
+  if (unit === "%") return it.kind === "performance" && amt > 0 ? (c.pastPerformance / amt) * 100 : undefined;
+  if (unit === "명") return it.kind === "staff" ? c.techStaff : undefined;
+  if (unit === "년") return it.kind === "years" ? c.years : undefined;
+  return undefined;
+}
+
+/** 제안 준비 수준을 공고의 정성 등급에 대응시킨다: 5단계 이상이면 상=2등급, 중=3등급, 하=4등급 */
+function scaleLevel(scale: ScaleLevel[], lv: Level): ScaleLevel {
+  const off = scale.length >= 5 ? 1 : 0;
+  const idx = { 상: 0, 중: 1, 하: 2 }[lv] + off;
+  return scale[Math.min(idx, scale.length - 1)];
+}
+
 export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLimitRate">, c: CompanyInput): Prediction {
   const amt = bid.baseAmount;
   const items: PredictedItem[] = sheet.items.map((it) => {
     let ratio = 0;
     let reason = "";
+    const bv = it.bands?.length ? bandValue(it, c, amt) : undefined;
+    if (bv !== undefined && it.bands && it.max > 0) {
+      const { points, band } = scoreByBands(it.bands, bv);
+      const s = Math.min(it.max, points);
+      const what = it.kind === "credit" ? `신용평가등급 ${c.creditGrade}` : it.kind === "performance" ? `유사 실적 ${Math.round(bv)}% (기초금액 대비)` : it.kind === "staff" ? `기술인력 ${c.techStaff}명` : `업력 ${c.years}년`;
+      return { ...it, score: round1(s), ratio: s / it.max, reason: `${what} → 공고 구간 ${band ? `'${band.cond}' ${band.points}점` : "최저 구간 미만"}`, lost: round1(it.max - s) };
+    }
+    if ((it.kind === "qualitative" || it.kind === "other") && sheet.scale?.length) {
+      const lv = scaleLevel(sheet.scale, c.proposal);
+      const s = it.max * lv.ratio;
+      return { ...it, score: round1(s), ratio: lv.ratio, reason: `공고 등급 '${lv.label}(${Math.round(lv.ratio * 100)}%)' 적용, 제안 준비 '${c.proposal}' 기준 예상`, lost: round1(it.max - s) };
+    }
     switch (it.kind) {
       case "performance": {
         ratio = performanceRatio(c.pastPerformance, amt);
@@ -497,7 +704,9 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   const tips: string[] = [];
   const losers = [...items].filter((i) => i.kind !== "price" && i.lost > 0).sort((a, b) => b.lost - a.lost).slice(0, 3);
   for (const l of losers) {
-    if (l.kind === "performance") tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공동수급으로 실적을 합산하면 만점에 가까워질 수 있습니다.`);
+    const up = l.bands && l.bands[0].unit === "%" ? [...l.bands].sort((a, b) => a.min - b.min).find((b) => b.points > l.score && b.min > 0) : undefined;
+    if (l.kind === "performance" && up) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공고 구간상 유사 실적이 기초금액의 ${up.min}%(${Math.round((amt * up.min) / 100 / 1e6).toLocaleString()}백만 원) 이상이면 ${up.points}점입니다. 공동수급 지분 합산도 검토하세요.`);
+    else if (l.kind === "performance") tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공동수급으로 실적을 합산하면 만점에 가까워질 수 있습니다.`);
     else if (l.kind === "credit") tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공고일 전 신용평가 재평가 일정을 확인하세요.`);
     else if (l.kind === "staff") tips.push(`기술인력이 부족해 ${l.lost}점이 빠집니다. 투입 예정 인력의 자격증·재직증명을 미리 준비하세요.`);
     else if (l.kind === "qualitative") tips.push(`정성평가 '${l.label}'에서 ${l.lost}점 차이가 납니다. 발주기관 과업지시서 요구사항을 목차에 1:1로 대응시키세요.`);

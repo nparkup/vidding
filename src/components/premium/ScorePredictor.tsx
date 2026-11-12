@@ -293,7 +293,9 @@ export function ScorePredictor() {
           </section>
         )}
         <p className="mt-4 text-xs leading-relaxed text-ink-300">
-          예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 실제 점수는 발주기관의 세부 평가기준, 서류 인정 범위, 정성평가 위원 판단에 따라 달라집니다.
+          {active.source === "extracted" && active.items.some((i) => i.bands || i.recognition || i.criteria) || active.scale
+            ? "점수 구간·서류 인정 범위·정성 등급은 공고 첨부에서 읽은 기준을 적용했습니다. 정성평가는 위원이 제안서와 발표를 보고 매기므로, 제안 준비 수준으로 고른 등급은 예상치입니다. 실제로 인정되는 서류는 제출 전 공고 원문으로 확인하세요."
+            : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 표준 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
         </p>
       </aside>
     </div>
@@ -309,19 +311,23 @@ export function ScorePredictor() {
         </div>
         <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
           {active.items.map((i) => (
-            <li key={i.id} className="flex min-w-0 items-center gap-2 rounded-2xl border border-ink-100 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{i.label}</p>
-                <p className="truncate text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
+            <li key={i.id} className="min-w-0 rounded-2xl border border-ink-100 px-4 py-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="min-w-[10rem] flex-1">
+                  <p className="text-sm font-semibold">{i.label}</p>
+                  <p className="truncate text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
+                </div>
+                <select aria-label="항목 유형" className="shrink-0 rounded-lg border border-ink-100 bg-white px-2 py-1 text-xs" value={i.kind} onChange={(e) => editItem(i.id, { kind: e.target.value as ItemKind })}>
+                  {(Object.keys(KIND_LABEL) as ItemKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+                </select>
+                <input aria-label="배점" type="number" step="0.5" min={0} className="w-16 shrink-0 rounded-lg border border-ink-100 px-2 py-1 text-right text-sm tabular-nums" value={i.max} onChange={(e) => editItem(i.id, { max: Number(e.target.value) || 0 })} />
+                <button type="button" className="shrink-0 text-xs text-ink-300 hover:text-coral" onClick={() => removeItem(i.id)}>삭제</button>
               </div>
-              <select aria-label="항목 유형" className="shrink-0 rounded-lg border border-ink-100 bg-white px-2 py-1 text-xs" value={i.kind} onChange={(e) => editItem(i.id, { kind: e.target.value as ItemKind })}>
-                {(Object.keys(KIND_LABEL) as ItemKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
-              </select>
-              <input aria-label="배점" type="number" step="0.5" min={0} className="w-16 shrink-0 rounded-lg border border-ink-100 px-2 py-1 text-right text-sm tabular-nums" value={i.max} onChange={(e) => editItem(i.id, { max: Number(e.target.value) || 0 })} />
-              <button type="button" className="shrink-0 text-xs text-ink-300 hover:text-coral" onClick={() => removeItem(i.id)}>삭제</button>
+              <ItemDetail item={i} />
             </li>
           ))}
         </ul>
+        <SheetDetail sheet={active} />
         <AddItem onAdd={(label, max) => active && setSheet({ ...active, items: [...active.items, { id: `u${Date.now()}`, label, max, kind: kindOf(label), group: "추가 항목" }] })} />
         <ul className="mt-4 space-y-1 text-xs leading-relaxed text-ink-500">
           {active.notes.map((n) => <li key={n}>{n}</li>)}
@@ -371,5 +377,46 @@ function AddItem({ onAdd }: { onAdd: (label: string, max: number) => void }) {
       <input className="input w-24 py-2 text-sm" placeholder="배점" inputMode="decimal" value={max} onChange={(e) => setMax(e.target.value)} />
       <button className="btn-ghost btn-sm shrink-0">추가</button>
     </form>
+  );
+}
+
+/** 항목별 세부기준: 공고의 점수 구간, 인정 범위, 평가 요소 */
+function ItemDetail({ item }: { item: EvalItem }) {
+  if (!item.bands && !item.recognition && !item.criteria) return null;
+  return (
+    <div className="mt-2 space-y-1.5 border-t border-ink-100 pt-2 text-xs leading-relaxed">
+      {item.bands && (
+        <div className="flex flex-wrap gap-1">
+          {item.bands.map((b) => (
+            <span key={b.cond + b.points} className="rounded-md bg-ink-50 px-1.5 py-0.5 tabular-nums text-ink-500">{b.cond} <b className="text-ink">{b.points}</b></span>
+          ))}
+        </div>
+      )}
+      {item.recognition?.map((r) => <p key={r} className="text-ink-500"><span className="font-semibold text-ink">인정 범위</span> {r}</p>)}
+      {item.criteria && <p className="text-ink-500"><span className="font-semibold text-ink">평가 요소</span> {item.criteria.join(" / ")}</p>}
+    </div>
+  );
+}
+
+/** 평가표 전체 기준: 정성 등급표, 위원 점수 처리, 서류 인정 기준 */
+function SheetDetail({ sheet }: { sheet: EvalSheet }) {
+  if (!sheet.scale && !sheet.panelRule && !sheet.recognition) return null;
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+      {(sheet.scale || sheet.panelRule) && (
+        <div className="rounded-2xl bg-ink-50 px-4 py-3 text-xs leading-relaxed">
+          <p className="text-sm font-semibold">정성평가 방식</p>
+          {sheet.scale && <p className="mt-1 tabular-nums text-ink-500">등급 {sheet.scale.map((l) => `${l.label} ${Math.round(l.ratio * 100)}%`).join(" · ")}</p>}
+          {sheet.panelRule && <p className="mt-1 text-ink-500">{sheet.panelRule}</p>}
+          <p className="mt-1 text-ink-300">제안 준비 수준 상·중·하를 이 등급에 대응시켜 계산합니다. 위원별 실제 판단은 알 수 없어 예상치입니다.</p>
+        </div>
+      )}
+      {sheet.recognition && (
+        <div className="rounded-2xl bg-ink-50 px-4 py-3 text-xs leading-relaxed">
+          <p className="text-sm font-semibold">서류 인정 기준</p>
+          <ul className="mt-1 space-y-0.5 text-ink-500">{sheet.recognition.map((r) => <li key={r}>{r}</li>)}</ul>
+        </div>
+      )}
+    </div>
   );
 }

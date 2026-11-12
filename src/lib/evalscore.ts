@@ -260,12 +260,13 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     lastLabel = kindOf(line) !== "other" && line.length <= 40 ? line : "";
   }
 
-  // 소계 머리글 처리: 바로 뒤 항목들의 배점 합과 같으면 머리글로 보고 하위 항목의 그룹 이름으로 쓴다
+  // 소계 머리글 처리: "정량평가"처럼 분야 이름이고 바로 뒤 2개 이상 항목의 배점 합과 같으면 머리글로 보고 하위 항목의 그룹 이름으로 쓴다
   for (let i = 0; i < found.length; i++) {
     let acc = 0;
     let j = i + 1;
     while (j < found.length && acc + found[j].max <= found[i].max + 0.001) { acc += found[j].max; j++; }
-    if (j > i + 1 && Math.abs(acc - found[i].max) < 0.01) {
+    const groupLike = /(정량|정성|계량|비계량|기술\s*능력|평가\s*분야|부문|분야)/.test(found[i].label) && !["performance", "credit", "price", "staff", "years"].includes(found[i].kind);
+    if (groupLike && j > i + 2 && Math.abs(acc - found[i].max) < 0.01) {
       const group = found[i].label.replace(/\s*\(.*$/, "");
       for (let k = i + 1; k < j; k++) found[k].group = group;
       found.splice(i, 1);

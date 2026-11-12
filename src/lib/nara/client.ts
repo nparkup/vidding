@@ -30,7 +30,7 @@ const kst = (d: Date) => new Date(d.getTime() + 9 * 3600 * 1000);
 const p2 = (n: number) => String(n).padStart(2, "0");
 const ymd = (d: Date) => { const k = kst(d); return `${k.getUTCFullYear()}${p2(k.getUTCMonth() + 1)}${p2(k.getUTCDate())}`; };
 
-async function call(path: string, op: string, params: Record<string, string>): Promise<{ items: Item[]; total: number }> {
+export async function call(path: string, op: string, params: Record<string, string>): Promise<{ items: Item[]; total: number }> {
   const key = process.env.DATA_GO_KR_SERVICE_KEY;
   if (!key) throw new Error("DATA_GO_KR_SERVICE_KEY 가 설정되지 않았습니다.");
   const qs = new URLSearchParams({ serviceKey: key, type: "json", pageNo: "1", numOfRows: "100", ...params });

@@ -142,6 +142,15 @@ export default async function BidDetail({ params }: Props) {
             </p>
           </section>
 
+          <section className="card p-6">
+            <p className="text-xs font-semibold text-mint-600">프리미엄</p>
+            <h2 className="mt-1 text-lg font-bold">평가점수 예측</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-500">
+              이 공고의 첨부파일에서 평가항목과 배점을 읽고, 귀사의 실적·신용등급·인력으로 {bid.contractMethod === "협상에 의한 계약" ? "기술점수와 협상적격 여부" : bid.contractMethod === "적격심사" ? "적격심사 예상 점수와 통과 가능한 투찰률" : "예상 점수"}를 계산합니다.
+            </p>
+            <Link href={`/premium?bid=${encodeURIComponent(bid.id)}#predict`} className="btn-primary mt-4 w-full">이 공고 점수 예측하기</Link>
+          </section>
+
           <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-6 text-white shadow-glow">
             <p className="font-bold">이 공고, 함께 준비할까요?</p>
             <p className="mt-2 text-sm opacity-90">프로 요금제부터 담당 매니저가 서류 누락 여부를 마감 전 한 번 더 확인해 드립니다.</p>

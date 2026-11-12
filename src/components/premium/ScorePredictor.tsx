@@ -360,7 +360,7 @@ export function ScorePredictor() {
       </aside>
 
     {/* 평가표 (전체 폭) */}
-    <section className="card p-6 lg:col-span-2">
+    <section className="card min-w-0 p-6 lg:col-span-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">
@@ -368,9 +368,9 @@ export function ScorePredictor() {
             {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => { setSheet(null); setDocs([]); textsRef.current = []; setDocMsg(""); }}>표준으로 되돌리기</button>}
           </div>
         </div>
-        <ul className="mt-4 grid gap-2 md:grid-cols-2">
+        <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
           {active.items.map((i) => (
-            <li key={i.id} className="flex items-center gap-3 rounded-2xl border border-ink-100 px-4 py-3">
+            <li key={i.id} className="flex min-w-0 items-center gap-2 rounded-2xl border border-ink-100 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{i.label}</p>
                 <p className="truncate text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>

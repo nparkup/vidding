@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Check, Plus, X } from "lucide-react";
 import { HeroCity } from "@/components/art/HeroCity";
-import { CleaningArt, SecurityArt } from "@/components/art/Industry";
+import { ConstructionArt, ITArt, SupplyArt } from "@/components/art/Sectors";
 import { DeskArt } from "@/components/art/Desk";
 import { BidRow } from "@/components/BidRow";
 import { GradeBadge, ScoreBar } from "@/components/Badges";
 import { FeatureTabs } from "@/components/home/FeatureTabs";
 import { ProductMockup } from "@/components/home/ProductMockup";
 import { AnalysisEngine } from "@/components/home/AnalysisEngine";
+import { AgencyMark, AGENCY_KINDS } from "@/components/home/AgencyMark";
 import { MatchDemo } from "@/components/MatchDemo";
 import { documentChecklist, evaluate, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
@@ -25,13 +26,15 @@ const BIZ_INFO: Record<keyof typeof CATEGORY_GROUPS, { d: string; tone: string }
   물품: { d: "의료·의약품, 급식 식자재, 전산장비, 관급자재 등 구매", tone: "from-amber-100" },
 };
 
+const BIZ_ART = { 용역: ITArt, 공사: ConstructionArt, 물품: SupplyArt } as const;
+
 const COMPARE = [
   ["공고 탐색", "직접 키워드 검색, 수백 건 확인", "조건에 맞는 공고만 매일 배달"],
   ["업종 범위", "전 업종 공고를 한 목록에 나열", "전 업종 수집 후 귀사 면허에 맞는 공고만"],
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 체크리스트 제공"],
   ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 채점과 S·A·B·C 등급"],
-  ["담당 인력", "고객사 직원이 직접", "입찰메이트랩 전담 매니저"],
+  ["담당 인력", "고객사 직원이 직접", "입찰메이트LAB 전담 매니저"],
 ];
 
 const TRUST = [
@@ -53,23 +56,36 @@ const FAQ = [
   { q: "프로그램을 설치하거나 매일 접속해야 하나요?", a: "아닙니다. 조건만 한 번 등록하시면 영업일마다 이메일로 받아 보시면 됩니다. 필요할 때만 웹에서 공고 분석을 열어보시면 됩니다." },
   { q: "공고 데이터는 어디서 오나요?", a: "조달청 나라장터가 공공데이터포털로 공개하는 입찰공고·낙찰·사전규격 정보를 매일 수집해 분석합니다." },
   { q: "입찰 가능성 점수는 어떻게 계산하나요?", a: "입찰 특화 알고리즘이 6개 항목을 가중 채점합니다. 면허 요건 30점, 참가 지역 20점, 사업 규모 15점은 필수 조건으로 먼저 판정하고, 하나라도 맞지 않으면 39점 이하로 제한해 제외합니다. 통과한 공고는 유사 공고 평균 참여업체 수로 본 경쟁 강도 15점, 기초금액 대비 실적 10점, 남은 준비 기간 10점을 더해 100점 만점으로 산출하고, 85점 이상 S, 72점 이상 A, 58점 이상 B, 그 아래는 C 등급을 붙입니다." },
-  { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트랩은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
+  { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트LAB은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
 
 export default async function Home() {
   const bids = await getBids();
+  // 업종이 다른 예시 고객사들: [0] 전기·통신공사, [1] IT 용역, [2] 의료 물품, [3] 시설관리 용역, [4] 건축공사
   const client = SEED_CLIENTS[0];
   const digest = buildDigest(client, bids);
-  const top = digest.recommended[0];
-  const featured = top?.bid ?? bids[0];
-  const featuredEval = evaluate(featured, client);
+  const cases = [
+    { label: "전기·통신공사", c: SEED_CLIENTS[0] },
+    { label: "IT·소프트웨어 용역", c: SEED_CLIENTS[1] },
+    { label: "의료 물품 납품", c: SEED_CLIENTS[2] },
+    { label: "시설관리 용역", c: SEED_CLIENTS[3] },
+  ].map(({ label, c }) => {
+    const d = buildDigest(c, bids);
+    return { label, digest: d, top: d.recommended[0] };
+  });
+  // 분석 예시 공고는 IT 용역 고객사 기준
+  const itClient = SEED_CLIENTS[1];
+  const featured = cases[1].top?.bid ?? digest.recommended[0]?.bid ?? bids[0];
+  const featuredEval = evaluate(featured, itClient);
   const docs = documentChecklist(featured);
   const docCount = docs.reduce((s, g) => s + g.items.length, 0);
 
   // 1차 선별 단계별 남는 공고 수 (예시 고객사 기준)
-  const evals = bids.map((b) => evaluate(b, client));
+  const buildClient = SEED_CLIENTS[4];
+  const evals = bids.map((b) => evaluate(b, buildClient));
   const okAt = (n: number) => evals.filter((e) => e.factors.slice(0, n).every((f) => f.ok)).length;
-  const eligible = rank(bids, client).filter((r) => r.eligible);
+  const eligible = rank(bids, buildClient).filter((r) => r.eligible);
+  const clientEligible = rank(bids, client).filter((r) => r.eligible);
   const funnel = [
     ["오늘 수집한 전 업종 공고", bids.length],
     ["보유 면허로 참가 가능", okAt(1)],
@@ -98,14 +114,14 @@ export default async function Home() {
       label: "매일 아침 맞춤 메일",
       title: "나라장터에 접속하지 않아도, 오늘 볼 공고가 먼저 도착합니다",
       points: [<><b>영업일 오전 7시</b>, 귀사 조건에 맞는 신규 공고만 골라 보냅니다</>, <>공고마다 <b>가능성 등급·규모·마감일</b>을 한 줄로 요약합니다</>, <><b>3일 내 마감</b> 공고는 따로 모아 경고합니다</>],
-      use: ["경기권 미화 업체", "출근길에 메일만 확인하고, 관심 공고 두 건만 표시해 매니저에게 서류 준비를 넘깁니다."],
+      use: ["수도권 전기·통신공사 업체", "출근길에 메일만 확인하고, 관심 공고 두 건만 표시해 매니저에게 서류 준비를 넘깁니다."],
       visual: (
         <div className="rounded-2xl bg-white p-4 shadow-lift sm:p-5">
           <div className="flex items-center justify-between text-xs text-ink-400">
             <span>받은편지함 · 오전 7:00</span>
             <span className="rounded-full bg-mint-50 px-2 py-0.5 font-bold text-mint-600">새 메일</span>
           </div>
-          <p className="mt-2 text-sm font-bold">[입찰메이트랩] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
+          <p className="mt-2 text-sm font-bold">[입찰메이트LAB] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
           <ul className="mt-3 divide-y divide-ink-100">
             {digest.recommended.slice(0, 4).map((r) => (
               <li key={r.bid.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -124,7 +140,7 @@ export default async function Home() {
       label: "면허·지역·규모 1차 선별",
       title: "참가할 수 없는 공고는 처음부터 보여드리지 않습니다",
       points: [<>보유 <b>면허</b>가 맞지 않는 공고를 먼저 제외합니다</>, <>공고문의 <b>지역제한</b>을 읽어 참가 가능 지역만 남깁니다</>, <>수행 가능한 <b>용역 규모</b>를 벗어난 공고를 거릅니다</>],
-      use: ["전기공사 업체", "하루 2천 건 넘는 전국 공고를 훑던 시간을 줄이고, 남은 몇 건만 꼼꼼히 검토합니다."],
+      use: ["실내건축 공사 업체", "하루 2천 건 넘는 전국 공고를 훑던 시간을 줄이고, 남은 몇 건만 꼼꼼히 검토합니다."],
       visual: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
           <p className="text-xs font-semibold text-ink-400">예시 고객사 조건으로 오늘 공고를 거른 결과</p>
@@ -148,7 +164,7 @@ export default async function Home() {
       label: "공고 분석 · 가능성 점수",
       title: "들어갈지 말지, 알고리즘이 항목별로 채점해 드립니다",
       points: [<><b>면허 30·지역 20·규모 15점</b>, 3개 필수 조건을 먼저 판정합니다</>, <>유사 공고 평균 참여업체 수로 <b>경쟁 강도 15점</b>을 계산합니다</>, <><b>실적 10점·준비 기간 10점</b>까지 더해 100점 만점과 등급을 매깁니다</>],
-      use: ["입찰 담당자가 없는 업체", "점수와 근거를 보고 대표가 바로 참가 여부를 정합니다. 따로 회의할 필요가 없습니다."],
+      use: ["입찰 담당자가 없는 소프트웨어 업체", "점수와 근거를 보고 대표가 바로 참가 여부를 정합니다. 따로 회의할 필요가 없습니다."],
       visual: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
           <div className="flex items-start justify-between gap-4">
@@ -179,7 +195,7 @@ export default async function Home() {
       label: "제출서류 체크리스트",
       title: "계약방법에 맞는 제출서류를 빠짐없이 정리합니다",
       points: [<>적격심사·협상계약 등 <b>계약방법별</b> 서류를 나눠 드립니다</>, <>서류마다 <b>발급처와 유효기간</b> 주의사항을 붙입니다</>, <>프로 요금제부터 매니저가 <b>마감 전 누락 여부</b>를 확인합니다</>],
-      use: ["처음 적격심사에 참가하는 업체", "체크리스트대로 서류를 모으고, 빠진 항목만 매니저에게 물어봅니다."],
+      use: ["처음 공공 입찰에 참가하는 업체", "체크리스트대로 서류를 모으고, 빠진 항목만 매니저에게 물어봅니다."],
       visual: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
           <div className="flex items-center justify-between">
@@ -208,7 +224,7 @@ export default async function Home() {
       desc: "업무 구분·업종·지역·마감 임박으로 거르고, 내 조건을 넣으면 공고마다 참가 가능 여부와 점수가 바로 붙습니다.",
       href: "/bids",
       cta: "공고 검색 열기",
-      preview: <div className="space-y-2">{eligible.slice(0, 3).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} />)}</div>,
+      preview: <div className="space-y-2">{clientEligible.slice(0, 3).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} />)}</div>,
     },
     {
       label: "공고 분석",
@@ -222,7 +238,7 @@ export default async function Home() {
           <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {[
               ["기초금액", won(featured.baseAmount)],
-              ["용역 기간", `${featured.periodMonths}개월`],
+              ["계약 기간", `${featured.periodMonths}개월`],
               ["참가 지역", featured.region === "전국" ? "제한 없음" : `${featured.region} 제한`],
               ["필요 면허", featured.licenses.join(", ") || "제한 없음"],
               ["낙찰하한율", featured.lowerLimitRate ? `${featured.lowerLimitRate}%` : "해당 없음"],
@@ -249,7 +265,7 @@ export default async function Home() {
             <p className="text-xs text-mint-300">주간 분석보고서 · 이번 주</p>
             <p className="mt-1 text-lg font-bold">{client.company}</p>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              {[["참가 가능", `${eligible.length}건`], ["총 규모", won(eligible.reduce((s, r) => s + r.bid.baseAmount, 0))], ["A등급 이상", `${eligible.filter((r) => r.grade === "S" || r.grade === "A").length}건`]].map(([k, v]) => (
+              {[["참가 가능", `${clientEligible.length}건`], ["총 규모", won(clientEligible.reduce((s, r) => s + r.bid.baseAmount, 0))], ["A등급 이상", `${clientEligible.filter((r) => r.grade === "S" || r.grade === "A").length}건`]].map(([k, v]) => (
                 <div key={k} className="rounded-xl bg-white/5 p-2.5"><p className="text-[11px] text-ink-300">{k}</p><p className="mt-0.5 font-bold">{v}</p></div>
               ))}
             </div>
@@ -268,8 +284,8 @@ export default async function Home() {
       <section className="relative overflow-hidden">
         <div className="bg-grid-light mask-fade pointer-events-none absolute inset-x-0 top-0 h-[640px]" />
         <div className="pointer-events-none absolute left-1/2 top-[-200px] h-[560px] w-[960px] -translate-x-1/2 rounded-full bg-gradient-to-r from-mint-100 via-white to-sky-100 opacity-90 blur-3xl" />
-        <CleaningArt className="pointer-events-none absolute left-[2%] top-24 hidden w-56 -rotate-6 animate-float-slow opacity-90 xl:block 2xl:left-[8%]" />
-        <SecurityArt className="pointer-events-none absolute right-[2%] top-36 hidden w-52 rotate-6 animate-float opacity-90 xl:block 2xl:right-[8%]" />
+        <ConstructionArt className="pointer-events-none absolute left-[2%] top-20 hidden w-56 -rotate-6 animate-float-slow opacity-90 xl:block 2xl:left-[8%]" />
+        <SupplyArt className="pointer-events-none absolute right-[2%] top-32 hidden w-52 rotate-6 animate-float opacity-90 xl:block 2xl:right-[8%]" />
         <div className="container-x relative pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
             입찰 특화 분석 알고리즘 기반 공공입찰 대행
@@ -294,7 +310,7 @@ export default async function Home() {
 
           <div className="relative mx-auto mt-14 max-w-5xl sm:mt-16">
             <div className="pointer-events-none absolute -inset-x-10 -bottom-10 top-10 rounded-[48px] bg-gradient-to-b from-mint/20 to-sky/10 blur-3xl" />
-            <div className="relative"><ProductMockup digest={digest} top={top} /></div>
+            <div className="relative"><ProductMockup cases={cases} /></div>
           </div>
         </div>
       </section>
@@ -305,11 +321,15 @@ export default async function Home() {
         <div className="relative mt-5 overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
           <div className="flex w-max animate-marquee gap-3">
             {[...agencies, ...agencies].map((a, i) => (
-              <span key={i} className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-ink-100 bg-white px-4 py-2 text-sm font-medium text-ink-500">
-                {a}
-              </span>
+              <AgencyMark key={i} name={a} />
             ))}
           </div>
+        </div>
+        <div className="container-x mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] text-ink-400">
+          {AGENCY_KINDS.map((k) => (
+            <span key={k.label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: k.fill }} />{k.label}</span>
+          ))}
+          <span className="basis-full text-center text-ink-300 sm:basis-auto">기관 표기는 입찰메이트LAB이 만든 유형 표시이며 실제 기관 CI가 아닙니다. 고객사나 제휴 기관을 뜻하지 않습니다.</span>
         </div>
       </section>
 
@@ -380,6 +400,7 @@ export default async function Home() {
         <div className="mt-10 grid gap-4 lg:grid-cols-3">
           {byBiz.map(({ biz, n, cats }) => (
             <div key={biz} className={`card overflow-hidden bg-gradient-to-b ${BIZ_INFO[biz].tone} to-white to-40% p-5 sm:p-6`}>
+              {(() => { const Art = BIZ_ART[biz]; return <Art className="mx-auto -mt-2 mb-3 h-36 w-auto" />; })()}
               <div className="flex items-baseline justify-between">
                 <Link href={`/bids?biz=${encodeURIComponent(biz)}`} className="text-2xl font-extrabold hover:text-mint-600">{biz}</Link>
                 <span className="text-sm font-bold text-ink-500">공고 <span className="tabular-nums text-ink">{n.toLocaleString()}</span>건</span>
@@ -413,7 +434,7 @@ export default async function Home() {
       {/* 비교 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">왜 입찰메이트랩인가요</p>
+          <p className="eyebrow">왜 입찰메이트LAB인가요</p>
           <h2 className="h-section mt-3">입찰정보 사이트는 많은데,<br />왜 여전히 힘들까요?</h2>
         </div>
         <div className="mt-12 grid gap-4 lg:grid-cols-2">
@@ -430,7 +451,7 @@ export default async function Home() {
           </div>
           <div className="relative overflow-hidden rounded-3xl bg-ink p-7 text-white">
             <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-mint/25 blur-3xl" />
-            <p className="relative text-sm font-semibold text-mint-400">입찰메이트랩</p>
+            <p className="relative text-sm font-semibold text-mint-400">입찰메이트LAB</p>
             <ul className="relative mt-5 space-y-4">
               {COMPARE.map(([k, , b]) => (
                 <li key={k} className="flex gap-3">

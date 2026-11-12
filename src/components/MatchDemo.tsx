@@ -11,7 +11,7 @@ import { GradeBadge } from "./Badges";
 /** 업종별로 많이 쓰는 면허 (전체 목록은 공고 검색·진단 신청에서 선택) */
 const DEMO_LICENSES: License[] = [
   "건물위생관리업", "시설경비업", "소독업", "전기공사업", "정보통신공사업", "기계설비·가스공사업",
-  "실내건축공사업", "건축공사업", "소프트웨어사업자", "엔지니어링사업", "학술·연구용역", "식품판매업", "의료기기판매업",
+  "실내건축공사업", "건축공사업", "소프트웨어사업자", "건설엔지니어링업", "학술·연구용역", "식품판매업", "의료기기판매업",
 ];
 const DEMO_REGIONS: Region[] = ["서울", "경기", "인천", "대전", "충남", "부산", "대구", "광주", "강원"];
 const SIZES = [
@@ -23,7 +23,7 @@ const SIZES = [
 
 export function MatchDemo() {
   const bids = useBids().bids ?? [];
-  const [lic, setLic] = useState<License[]>(["건물위생관리업", "소독업"]);
+  const [lic, setLic] = useState<License[]>(["전기공사업", "정보통신공사업"]);
   const [rg, setRg] = useState<Region[]>(["경기", "서울", "인천"]);
   const [size, setSize] = useState(1);
 

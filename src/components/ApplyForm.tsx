@@ -47,7 +47,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
       `보유 면허: ${licenses.join(", ") || "-"}`, `영업 지역: ${regions.join(", ") || "-"}`, `수행 규모: ${won(minAmount)} ~ ${won(maxAmount)}`,
       `문의: ${s("message")}`, "", `(사이트 진단 결과: 참가 가능 공고 ${ok.length}건)`,
     ];
-    if (email) window.location.href = `mailto:${email}?subject=${encodeURIComponent(`[입찰메이트랩 무료진단] ${s("company")}`)}&body=${encodeURIComponent(lines.join("\n"))}`;
+    if (email) window.location.href = `mailto:${email}?subject=${encodeURIComponent(`[입찰메이트LAB 무료진단] ${s("company")}`)}&body=${encodeURIComponent(lines.join("\n"))}`;
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 

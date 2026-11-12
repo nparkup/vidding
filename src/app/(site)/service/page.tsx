@@ -26,7 +26,7 @@ export default async function ServicePage() {
       <PageHero
         eyebrow="서비스 소개"
         title={<>앱을 파는 게 아니라,<br />입찰 업무를 대신합니다.</>}
-        lead="입찰메이트랩은 검색 도구가 아닙니다. 고객사가 공고를 찾고 검토하는 시간을 통째로 가져와, 결정에 필요한 정보만 정리해 드리는 대행 서비스입니다."
+        lead="입찰메이트LAB은 검색 도구가 아닙니다. 고객사가 공고를 찾고 검토하는 시간을 통째로 가져와, 결정에 필요한 정보만 정리해 드리는 대행 서비스입니다."
         art={<DeskArt className="w-full" />}
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">

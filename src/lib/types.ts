@@ -71,6 +71,13 @@ export interface Bid {
   stats?: { avgBidders: number; avgWinRate: number };
 }
 
+/** 공고 첨부파일 (공고서·규격서). 파일은 나라장터에서 내려받는다 */
+export interface BidAttachment {
+  name: string;
+  url: string;
+  kind: "공고서" | "규격서·기타";
+}
+
 export interface ClientProfile {
   id: string;
   company: string;

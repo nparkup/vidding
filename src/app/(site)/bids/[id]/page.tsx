@@ -7,7 +7,7 @@ import { ProfileScore } from "@/components/ProfileScore";
 import { Checklist } from "@/components/Checklist";
 import { bidPriceGuide, daysLeft, documentChecklist, keyPoints } from "@/lib/analysis";
 import { dateTime, won, wonFull } from "@/lib/format";
-import { getBid, getBids } from "@/lib/store";
+import { getAttachments, getBid, getBids } from "@/lib/store";
 
 export const revalidate = 600;
 
@@ -30,6 +30,7 @@ export default async function BidDetail({ params }: Props) {
   const guide = bidPriceGuide(bid);
   const points = keyPoints(bid);
   const docs = documentChecklist(bid);
+  const files = (await getAttachments())[bid.id] ?? [];
 
   const timeline = [
     { label: "공고 게시", at: bid.postedAt },
@@ -106,6 +107,25 @@ export default async function BidDetail({ params }: Props) {
               ))}
             </ol>
           </section>
+
+          {files.length > 0 && (
+            <section className="card p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">첨부파일</h2>
+                <span className="chip">{files.length}건 · 나라장터</span>
+              </div>
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                {files.map((f) => (
+                  <li key={f.url}>
+                    <a href={f.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-paper px-3 py-2.5 text-sm hover:bg-ink-100/60">
+                      <span className="truncate font-medium">{f.name}</span>
+                      <span className="shrink-0 text-xs text-ink-300">{f.kind}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* 체크리스트 */}
           <section className="card p-6">

@@ -13,7 +13,6 @@ const ROWS: [string, boolean | string, boolean | string, boolean | string][] = [
   ["제출서류 체크리스트", "월 3건", "무제한", "무제한"],
   ["입찰 가능성 점수·투찰 가이드", false, true, true],
   ["주간 분석보고서", false, true, true],
-  ["전담 매니저 상담", false, true, true],
   ["협상계약 제안서 가이드", false, false, true],
   ["평가점수 예측 (적격심사·협상계약)", false, false, true],
   ["사전규격 선제 알림", false, false, true],

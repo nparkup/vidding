@@ -4,12 +4,13 @@ import type { Bid } from "@/lib/types";
 import { daysLeft } from "@/lib/analysis";
 import { shortDate, won } from "@/lib/format";
 import { DdayBadge, GradeBadge } from "./Badges";
+import { bidHref } from "@/lib/links";
 
 export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; href?: string }) {
   const left = match?.daysLeft ?? daysLeft(bid.closeAt);
   return (
     <Link
-      href={href ?? `/bids/${bid.id}`}
+      href={href ?? bidHref(bid.id)}
       className="group grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 transition hover:border-mint hover:shadow-card sm:grid-cols-[1fr_auto] sm:items-center sm:p-5"
     >
       <div className="min-w-0">

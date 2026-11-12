@@ -9,6 +9,7 @@ import { rank, type MatchResult } from "@/lib/analysis";
 import { won } from "@/lib/format";
 import { REGIONS, type License, type Region } from "@/lib/types";
 import { loadBids } from "@/lib/useBids";
+import { bidHref } from "@/lib/links";
 
 const SIZES = [
   ["0-100000000", "1억 이하"],
@@ -63,7 +64,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
             <div className="rounded-2xl bg-paper p-4"><p className="text-3xl font-extrabold text-ink-500">{result.excluded}</p><p className="text-sm text-ink-500">조건 불일치 제외</p></div>
           </div>
         </div>
-        {result.ok.slice(0, 5).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={`/bids/${m.bid.id}?${result.qs}`} />)}
+        {result.ok.slice(0, 5).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={bidHref(m.bid.id, result.qs)} />)}
         <Link href={`/bids?${result.qs}&ok=1`} className="btn-primary w-full">전체 추천 공고 보기</Link>
       </div>
     );

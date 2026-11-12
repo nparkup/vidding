@@ -17,6 +17,7 @@ import { PLANS } from "@/lib/plans";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getBids } from "@/lib/store";
 import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
+import { bidHref } from "@/lib/links";
 
 export const revalidate = 600;
 
@@ -230,7 +231,7 @@ export default async function Home() {
       label: "공고 분석",
       title: "공고 하나를 한 장으로 정리합니다",
       desc: "기초금액, 참가 지역, 필요 면허, 낙찰하한율, 공동도급, 일정, 투찰 금액 가이드까지 공고문을 열지 않고 확인합니다.",
-      href: `/bids/${featured.id}`,
+      href: bidHref(featured.id),
       cta: "분석 예시 보기",
       preview: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">

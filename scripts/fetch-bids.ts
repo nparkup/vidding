@@ -18,7 +18,7 @@ async function main() {
     console.log("서비스키 없음: 목업 공고 저장");
     return;
   }
-  const items = await fetchAllBids(3);
+  const items = await fetchAllBids();
   if (items.length === 0) throw new Error("수집된 공고가 0건입니다");
   // 첨부파일(평가점수 예측용)은 입찰공고정보서비스 승인이 필요하다. 실패해도 공고 배포는 계속한다
   let attachments = {};

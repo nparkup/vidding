@@ -11,19 +11,9 @@ import {
 import { won } from "@/lib/format";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
+import { loadAttachments } from "@/lib/attachments";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
-
-/** 정적 배포는 빌드 때 공고별로 만들어 둔 파일을, 서버 배포는 나라장터를 바로 조회한다 */
-async function loadAttachments(bid: Bid): Promise<BidAttachment[]> {
-  if (STATIC) {
-    const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/attachments/${encodeURIComponent(bid.id)}.json`);
-    return r.ok ? r.json() : [];
-  }
-  const qs = new URLSearchParams({ no: bid.bidNtceNo, ord: bid.bidNtceOrd, biz: bid.bizType ?? "용역" });
-  const r = await fetch(`/api/premium/attachments?${qs}`);
-  return r.ok ? r.json() : [];
-}
 
 const KIND_LABEL: Record<ItemKind, string> = {
   performance: "실적",

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BidRow } from "@/components/BidRow";
 import { rank } from "@/lib/analysis";
 import { getBids, getInquiry } from "@/lib/store";
+import { bidHref } from "@/lib/links";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function Done({ searchParams }: { searchParams: Promise<{ i
         <>
           <h2 className="mt-12 text-xl font-bold">미리 보는 추천 공고</h2>
           <div className="mt-4 space-y-3">
-            {ok.slice(0, 5).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={`/bids/${m.bid.id}?${qs}`} />)}
+            {ok.slice(0, 5).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={bidHref(m.bid.id, qs.toString())} />)}
           </div>
           <div className="mt-6 text-center"><Link href={`/bids?${qs}&ok=1`} className="btn-primary">전체 추천 공고 보기</Link></div>
         </>

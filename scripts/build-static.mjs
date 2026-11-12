@@ -28,6 +28,8 @@ for (const p of [
   "src/app/(site)/apply/done",
   "src/components/ClientForm.tsx",
   "src/lib/jobs.ts",
+  // 공고 상세는 /bids/view 한 페이지가 브라우저에서 그린다 (공고마다 페이지를 만들면 1GB를 넘는다)
+  "src/app/(site)/bids/[id]",
 ]) rmSync(join(work, p), { recursive: true, force: true });
 cpSync(join(work, "src/static/apply-page.tsx"), join(work, "src/app/(site)/apply/page.tsx"));
 

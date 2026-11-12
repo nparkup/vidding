@@ -105,7 +105,7 @@ async function doSync(): Promise<BidCache> {
     return g.__ipchalBids;
   }
   try {
-    const items = await fetchAllBids(3);
+    const items = await fetchAllBids();
     g.__ipchalBids = { items, syncedAt: new Date().toISOString(), source: "g2b" };
   } catch (e) {
     // API 실패 시 목업으로 서비스 유지 (오류는 관리자 화면에 표시)

@@ -8,8 +8,23 @@ import { LicensePicker } from "./LicensePicker";
 import { daysLeft, rank } from "@/lib/analysis";
 import { BIZ_TYPES, CATEGORY_GROUPS, REGIONS, type Bid, type License, type Region } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
+import { bidHref } from "@/lib/links";
 
 const PAGE = 50;
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+
+/**
+ * 검색어 매칭: 띄어쓰기로 나눈 단어가 모두 들어 있으면 일치 (순서·띄어쓰기 무관).
+ * 공고명·발주기관·수요기관·공고번호(R26BK01234567, 차수 포함 R26BK01234567-000)를 함께 본다.
+ */
+export function matchesQuery(q: string): (b: Bid) => boolean {
+  const words = q.split(/\s+/).map(norm).filter(Boolean);
+  return (b) => {
+    const hay = norm(`${b.title} ${b.demandAgency} ${b.agency} ${b.bidNtceNo ?? ""} ${b.id}`);
+    return words.every((w) => hay.includes(w));
+  };
+}
 
 /** 공고 검색 (필터·내 조건 점수 계산은 모두 브라우저에서 처리: 서버/정적 배포 공용) */
 export function BidsExplorer() {
@@ -47,7 +62,7 @@ function Explorer({ bids }: { bids: Bid[] }) {
 
   const { list, matches } = useMemo(() => {
     let l = bids.filter((b) => daysLeft(b.closeAt) > 0);
-    if (q) l = l.filter((b) => `${b.title} ${b.demandAgency} ${b.agency}`.includes(q));
+    if (q) l = l.filter(matchesQuery(q));
     if (biz) l = l.filter((b) => (b.bizType ?? "용역") === biz);
     if (cat) l = l.filter((b) => b.category === cat);
     if (region) l = l.filter((b) => b.region === "전국" || (b.regions ?? [b.region]).includes(region as Region));
@@ -71,7 +86,7 @@ function Explorer({ bids }: { bids: Bid[] }) {
           go({ q: String(f.get("q") ?? ""), biz: String(f.get("biz") ?? ""), cat: String(f.get("cat") ?? ""), region: String(f.get("region") ?? ""), urgent: f.get("urgent") ? "1" : "" });
         }}
       >
-        <input name="q" defaultValue={q} placeholder="공고명, 발주기관 검색 (예: 청사, 유지보수, 급식)" className="input sm:col-span-2 lg:col-span-1" />
+        <input name="q" defaultValue={q} placeholder="공고명, 발주기관, 공고번호 검색 (예: 청사 유지보수, R26BK01234567)" className="input sm:col-span-2 lg:col-span-1" />
         <select name="biz" defaultValue={biz} className="input lg:w-28" aria-label="업무 구분">
           <option value="">용역·공사·물품</option>
           {BIZ_TYPES.map((b) => <option key={b}>{b}</option>)}
@@ -111,7 +126,7 @@ function Explorer({ bids }: { bids: Bid[] }) {
       </p>
       <div className="mt-3 space-y-3">
         {shown
-          ? shown.slice(0, limit).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={`/bids/${m.bid.id}?${profileQs}`} />)
+          ? shown.slice(0, limit).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={bidHref(m.bid.id, profileQs)} />)
           : list.slice(0, limit).map((b) => <BidRow key={b.id} bid={b} />)}
         {(shown ?? list).length === 0 && <div className="card p-10 text-center text-ink-500">검색 조건에 맞는 공고가 없습니다.</div>}
       </div>

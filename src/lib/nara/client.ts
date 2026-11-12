@@ -252,10 +252,13 @@ export function mapStdItem(it: Item): Bid | null {
   };
 }
 
+/** 표준서비스는 한 번에 999건까지 준다 (1000 이상을 넣으면 10건으로 되돌아간다) */
+const ROWS = 999;
+
 async function fetchStdDay(day: string): Promise<Item[]> {
-  const params = { bidNtceBgnDt: `${day}0000`, bidNtceEndDt: `${day}2359`, numOfRows: "300" };
+  const params = { bidNtceBgnDt: `${day}0000`, bidNtceEndDt: `${day}2359`, numOfRows: String(ROWS) };
   const first = await call(STD_BID_API.path, STD_BID_API.operations.bidList, { ...params, pageNo: "1" });
-  const pages = Math.min(Math.ceil(first.total / 300), 15);
+  const pages = Math.ceil(first.total / ROWS);
   const rest: Item[] = [];
   for (let p = 2; p <= pages; p++) {
     rest.push(...(await call(STD_BID_API.path, STD_BID_API.operations.bidList, { ...params, pageNo: String(p) })).items);
@@ -263,23 +266,52 @@ async function fetchStdDay(day: string): Promise<Item[]> {
   return [...first.items, ...rest];
 }
 
-/**
- * 최근 N일 동안 게시된 모든 업종(용역·공사·물품·외자) 공고를 업종별로 분류해 가져온다.
- * 마감이 지난 공고는 제외한다.
- */
-export async function fetchAllBids(days = 3): Promise<Bid[]> {
-  const now = new Date();
-  const dayList = Array.from({ length: days }, (_, i) => ymd(new Date(now.getTime() - i * 86400000)));
-  const seen = new Map<string, Bid>(); // bidNtceNo → 최신 차수
-  for (const day of dayList) {
-    for (const it of await fetchStdDay(day)) {
-      const b = mapStdItem(it);
-      if (!b || new Date(b.closeAt).getTime() <= now.getTime()) continue;
-      // 정정공고(차수 증가)는 최신 차수만 유지
-      const prev = seen.get(b.bidNtceNo);
-      if (prev && prev.bidNtceOrd >= b.bidNtceOrd) continue;
-      seen.set(b.bidNtceNo, b);
+/** 동시에 n개씩 실행 (공공데이터포털 과부하를 피하려고 너무 크게 잡지 않는다) */
+export async function mapLimit<T, R>(list: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(list.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(n, list.length) }, async () => {
+    while (next < list.length) {
+      const i = next++;
+      out[i] = await fn(list[i]);
     }
+  }));
+  return out;
+}
+
+/** 최근 N일 날짜(YYYYMMDD, KST) 목록 */
+export function recentDays(days: number, now = new Date()): string[] {
+  return Array.from({ length: days }, (_, i) => ymd(new Date(now.getTime() - i * 86400000)));
+}
+
+/**
+ * 수집 기간(게시일 기준). 나라장터 공고는 게시 후 1~4주 뒤에 마감되는 경우가 많아
+ * 최근 며칠치만 받으면 아직 마감 전인 공고 대부분이 빠진다.
+ * 2026-11-12 실측: 마감 전 공고 12,315건 중 게시 3일 이내 3,832건, 3~13일 6,773건, 14~29일 1,437건, 30일 이상 273건.
+ */
+export const COLLECT_DAYS = 60;
+
+/**
+ * 최근 N일 동안 게시된 모든 업종(용역·공사·물품·외자) 공고 중 아직 마감 전인 공고를 업종별로 분류해 가져온다.
+ * 정정·재입찰 공고는 최신 차수만 남기고, 최신 차수가 취소공고면 목록에서 뺀다.
+ */
+export async function fetchAllBids(days = COLLECT_DAYS): Promise<Bid[]> {
+  const now = new Date();
+  const perDay = await mapLimit(recentDays(days, now), 4, fetchStdDay);
+  const latest = new Map<string, Item>(); // bidNtceNo → 최신 차수 원본
+  for (const it of perDay.flat()) {
+    const no = it.bidNtceNo;
+    if (!no) continue;
+    const prev = latest.get(no);
+    if (prev && (prev.bidNtceOrd ?? "000") >= (it.bidNtceOrd ?? "000")) continue;
+    latest.set(no, it);
   }
-  return [...seen.values()].sort((a, b) => +new Date(a.closeAt) - +new Date(b.closeAt));
+  const out: Bid[] = [];
+  for (const it of latest.values()) {
+    if (it.bidNtceSttusNm?.includes("취소")) continue;
+    const b = mapStdItem(it);
+    if (!b || new Date(b.closeAt).getTime() <= now.getTime()) continue;
+    out.push(b);
+  }
+  return out.sort((a, b) => +new Date(a.closeAt) - +new Date(b.closeAt));
 }

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ITArt } from "@/components/art/Sectors";
+import { LegacyBidRedirect } from "@/components/LegacyBidRedirect";
 
 export default function NotFound() {
   return (
     <div className="container-x py-20 text-center">
+      <LegacyBidRedirect />
       <ITArt className="mx-auto w-full max-w-xs" />
       <p className="mt-6 text-sm font-bold text-mint-600">404</p>
       <p className="mt-2 text-3xl font-extrabold tracking-tight">페이지를 찾을 수 없습니다.</p>

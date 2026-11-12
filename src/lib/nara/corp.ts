@@ -1,5 +1,5 @@
 import "server-only";
-import { call } from "./client";
+import { call, COLLECT_DAYS, mapLimit, recentDays } from "./client";
 import type { BidAttachment } from "../types";
 import { NARA_APIS } from "./endpoints";
 
@@ -86,27 +86,24 @@ export async function bidAttachments(bidNtceNo: string, bidNtceOrd = "000", bizT
 
 /**
  * 최근 N일 공고의 첨부파일 목록을 한꺼번에 받는다 (정적 빌드용).
- * 용역·공사·물품 목록을 날짜별로 조회해 "공고번호-차수" → 첨부파일로 묶는다.
+ * 용역·공사·물품 목록을 날짜별로 조회해 "공고번호-차수" → 첨부파일로 묶는다. 기간은 공고 수집 기간과 같다.
  */
-export async function fetchAttachmentsBulk(ids: Set<string>, days = 3): Promise<Record<string, Attachment[]>> {
+export async function fetchAttachmentsBulk(ids: Set<string>, days = COLLECT_DAYS): Promise<Record<string, Attachment[]>> {
   const ops = BID.operations as Record<string, string>;
   const out: Record<string, Attachment[]> = {};
-  const now = new Date();
-  for (let d = 0; d < days; d++) {
-    const day = kstStamp(new Date(now.getTime() - d * 86400e3)).slice(0, 8);
-    for (const op of [ops.serviceList, ops.constructionList, ops.goodsList]) {
-      const params = { inqryDiv: "1", inqryBgnDt: `${day}0000`, inqryEndDt: `${day}2359`, numOfRows: "500" };
-      const first = await call(BID.path, op, { ...params, pageNo: "1" });
-      const pages = Math.min(Math.ceil(first.total / 500), 20);
-      const items = [...first.items];
-      for (let p = 2; p <= pages; p++) items.push(...(await call(BID.path, op, { ...params, pageNo: String(p) })).items);
-      for (const it of items) {
-        const id = `${it.bidNtceNo}-${it.bidNtceOrd ?? "000"}`;
-        if (!ids.has(id)) continue;
-        const files = attachmentsOf(it);
-        if (files.length) out[id] = files;
-      }
+  const jobs = recentDays(days).flatMap((day) => [ops.serviceList, ops.constructionList, ops.goodsList].map((op) => ({ day, op })));
+  await mapLimit(jobs, 4, async ({ day, op }) => {
+    const params = { inqryDiv: "1", inqryBgnDt: `${day}0000`, inqryEndDt: `${day}2359`, numOfRows: "999" };
+    const first = await call(BID.path, op, { ...params, pageNo: "1" });
+    const pages = Math.ceil(first.total / 999);
+    const items = [...first.items];
+    for (let p = 2; p <= pages; p++) items.push(...(await call(BID.path, op, { ...params, pageNo: String(p) })).items);
+    for (const it of items) {
+      const id = `${it.bidNtceNo}-${it.bidNtceOrd ?? "000"}`;
+      if (!ids.has(id)) continue;
+      const files = attachmentsOf(it);
+      if (files.length) out[id] = files;
     }
-  }
+  });
   return out;
 }

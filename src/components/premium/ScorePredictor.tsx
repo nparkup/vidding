@@ -158,41 +158,41 @@ export function ScorePredictor() {
               </ul>
             )}
           </div>
-        </section>
-
-        {/* 2. 첨부파일 */}
-        <section className="card p-6">
-          <Step n={2} title="공고 첨부파일에서 평가기준 추출" />
-          {!docs ? (
-            <p className="mt-4 text-sm text-ink-300">첨부파일 확인 중…</p>
-          ) : (
-            <>
-              <p className={`mt-4 rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
-                {docs.sheet
-                  ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
-                  : docs.files.length
-                    ? `이 공고의 첨부에서 평가 배점표를 찾지 못해 ${bid.contractMethod} 표준 평가표로 계산합니다.`
-                    : `등록된 첨부파일이 없어 ${bid.contractMethod} 표준 평가표로 계산합니다.`}
-              </p>
-              {docs.files.length > 0 && (
-                <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
-                  {docs.files.map((f) => (
-                    <li key={f.url}>
-                      <a href={f.url} target="_blank" rel="noreferrer" className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm hover:bg-ink-100/60 ${f.name === docs.sheetFile ? "bg-mint-50 font-semibold" : "bg-paper"}`}>
-                        <span className="truncate">{f.name}</span>
-                        <span className="shrink-0 text-xs text-ink-300">{f.name === docs.sheetFile ? "평가표 출처" : f.kind}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+          {/* 고른 공고의 첨부파일을 자동으로 확인해 평가표를 적용한다 (첨부가 없으면 표시하지 않는다) */}
+          {(!docs || docs.sheet || docs.files.length > 0) && (
+          <div className="mt-4 border-t border-ink-100 pt-4">
+            {!docs ? (
+              <p className="text-sm text-ink-300">첨부파일 확인 중…</p>
+            ) : (
+              <>
+                {(docs.sheet || docs.files.length > 0) && (
+                  <p className={`rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
+                    {docs.sheet
+                      ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
+                      : `이 공고의 첨부에서 평가 배점표를 찾지 못해 ${bid.contractMethod} 표준 평가표로 계산합니다.`}
+                  </p>
+                )}
+                {docs.files.length > 0 && (
+                  <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                    {docs.files.map((f) => (
+                      <li key={f.url}>
+                        <a href={f.url} target="_blank" rel="noreferrer" className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm hover:bg-ink-100/60 ${f.name === docs.sheetFile ? "bg-mint-50 font-semibold" : "bg-paper"}`}>
+                          <span className="truncate">{f.name}</span>
+                          <span className="shrink-0 text-xs text-ink-300">{f.name === docs.sheetFile ? "평가표 출처" : f.kind}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
           )}
         </section>
 
-        {/* 3. 기업 정보 */}
+        {/* 2. 기업 정보 */}
         <section className="card p-6">
-          <Step n={3} title="기업 정보와 신용평가 서류" />
+          <Step n={2} title="기업 정보와 신용평가 서류" />
           <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
             <div className="sm:col-span-3">
               <span className="label">사업자등록번호 (나라장터 조달업체 조회)</span>

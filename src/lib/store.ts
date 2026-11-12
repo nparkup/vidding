@@ -72,8 +72,11 @@ export async function getBids(): Promise<Bid[]> {
 }
 
 /** 공고별 첨부파일 목록 (정적 빌드에서 미리 받아 둔 것). 서버 배포에서는 /api/premium/attachments 로 공고마다 조회 */
+let attachMemo: Record<string, BidAttachment[]> | null = null;
 export async function getAttachments(): Promise<Record<string, BidAttachment[]>> {
-  return fileBids()?.attachments ?? {};
+  if (!process.env.BIDS_FILE) return {};
+  attachMemo ??= fileBids()?.attachments ?? {};
+  return attachMemo;
 }
 
 export async function getBid(id: string): Promise<Bid | undefined> {

@@ -14,14 +14,11 @@ import { useBids } from "@/lib/useBids";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 
-/** 정적 배포: 빌드 때 받아 둔 첨부파일 목록 전체를 한 번만 받는다 */
-let attachCache: Promise<Record<string, BidAttachment[]>> | null = null;
+/** 정적 배포는 빌드 때 공고별로 만들어 둔 파일을, 서버 배포는 나라장터를 바로 조회한다 */
 async function loadAttachments(bid: Bid): Promise<BidAttachment[]> {
   if (STATIC) {
-    attachCache ??= fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/attachments-data.json`)
-      .then((r) => (r.ok ? r.json() : {}))
-      .catch(() => { attachCache = null; return {}; });
-    return (await attachCache)[bid.id] ?? [];
+    const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/attachments/${encodeURIComponent(bid.id)}.json`);
+    return r.ok ? r.json() : [];
   }
   const qs = new URLSearchParams({ no: bid.bidNtceNo, ord: bid.bidNtceOrd, biz: bid.bizType ?? "용역" });
   const r = await fetch(`/api/premium/attachments?${qs}`);

@@ -64,12 +64,14 @@ export type Attachment = BidAttachment;
 type Item = Record<string, string | undefined>;
 
 function attachmentsOf(it: Item): Attachment[] {
+  // stdNtceDocUrl 은 대개 첨부 중 하나(공고문)를 가리킨다: 같은 파일이면 그 파일을 공고서로 표시한다
+  const std = it.stdNtceDocUrl;
   const files: Attachment[] = [];
-  if (it.stdNtceDocUrl) files.push({ name: "표준 공고서", url: it.stdNtceDocUrl, kind: "공고서" });
   for (let n = 1; n <= 10; n++) {
     const url = it[`ntceSpecDocUrl${n}`];
-    if (url) files.push({ name: it[`ntceSpecFileNm${n}`] || `첨부파일 ${n}`, url, kind: "규격서·기타" });
+    if (url) files.push({ name: it[`ntceSpecFileNm${n}`] || `첨부파일 ${n}`, url, kind: url === std ? "공고서" : "규격서·기타" });
   }
+  if (std && !files.some((f) => f.url === std)) files.unshift({ name: "표준 공고서", url: std, kind: "공고서" });
   return files;
 }
 

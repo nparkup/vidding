@@ -8,7 +8,10 @@ const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 export async function loadAttachments(bid: Bid): Promise<BidAttachment[]> {
   if (STATIC) {
     const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/attachments/${encodeURIComponent(bid.id)}.json`);
-    return r.ok ? r.json() : [];
+    if (!r.ok) return [];
+    // 공고별 파일은 { files, sheet } 형태 (예전 배포는 배열)
+    const j = await r.json();
+    return Array.isArray(j) ? j : j.files ?? [];
   }
   const qs = new URLSearchParams({ no: bid.bidNtceNo, ord: bid.bidNtceOrd, biz: bid.bizType ?? "용역" });
   const r = await fetch(`/api/premium/attachments?${qs}`);

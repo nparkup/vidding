@@ -1,7 +1,7 @@
-import { getAttachments } from "@/lib/store";
+import { getAttachments, getExtractedSheets } from "@/lib/store";
 
 /**
- * 공고 한 건의 첨부파일 목록: /attachments/{공고번호-차수}.json
+ * 공고 한 건의 첨부파일 목록과, 빌드 때 첨부에서 추출한 평가표: /attachments/{공고번호-차수}.json
  * 정적 배포에서 평가점수 예측 화면이 고른 공고의 파일만 받도록 공고별로 나눠 만든다.
  */
 export const dynamic = "force-static";
@@ -16,5 +16,6 @@ export async function generateStaticParams() {
 
 export async function GET(_req: Request, { params }: { params: Promise<{ file: string }> }) {
   const id = (await params).file.replace(/\.json$/, "");
-  return Response.json((await getAttachments())[id] ?? []);
+  const extracted = (await getExtractedSheets())[id];
+  return Response.json({ files: (await getAttachments())[id] ?? [], sheet: extracted?.sheet, sheetFile: extracted?.file });
 }

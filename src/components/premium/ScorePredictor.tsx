@@ -1,19 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScoreBar } from "@/components/Badges";
 import { readDocument, UnsupportedDocError } from "@/lib/docText";
 import {
-  CREDIT_GRADES, DEFAULT_COMPANY, extractSheet, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
+  CREDIT_GRADES, DEFAULT_COMPANY, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
 import { won } from "@/lib/format";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
-import { loadAttachments } from "@/lib/attachments";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
+
+interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string }
+
+/** 정적 배포는 빌드 때 공고별로 만들어 둔 파일(첨부 목록 + 첨부에서 추출한 평가표)을, 서버 배포는 나라장터 첨부 목록을 바로 조회한다 */
+async function loadBidDocs(bid: Bid): Promise<BidDocs> {
+  const url = STATIC
+    ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/attachments/${encodeURIComponent(bid.id)}.json`
+    : `/api/premium/attachments?${new URLSearchParams({ no: bid.bidNtceNo, ord: bid.bidNtceOrd, biz: bid.bizType ?? "용역" })}`;
+  const r = await fetch(url);
+  if (!r.ok) return { files: [] };
+  const j = await r.json();
+  return Array.isArray(j) ? { files: j } : j;
+}
 
 const KIND_LABEL: Record<ItemKind, string> = {
   performance: "실적",
@@ -26,48 +38,6 @@ const KIND_LABEL: Record<ItemKind, string> = {
   other: "기타",
 };
 
-/** 공고문이 없을 때 추출 기능을 바로 시험해 볼 수 있는 예시 (업종별) */
-const SAMPLES: { label: string; text: string }[] = [
-  {
-    label: "정보시스템 구축 (협상계약)",
-    text: `제안서 평가 기준 (협상에 의한 계약)
-평가항목 배점
-정량평가 (20점)
-유사 사업 수행실적 10점
-경영상태(신용평가등급) 5점
-참여 기술인력 보유 3점
-신인도 2점
-정성평가 (60점)
-사업 이해도 및 추진전략 10점
-시스템 구축 방법론 20점
-품질·보안 관리 방안 15점
-교육 및 유지보수 계획 10점
-발표 및 질의응답 5점
-가격평가 20점
-합계 100점
-기술능력평가 점수가 기술능력평가분야 배점한도의 85% 이상인 자를 협상적격자로 선정`,
-  },
-  {
-    label: "청사 시설관리 용역 (적격심사)",
-    text: `용역 적격심사 세부기준
-심사항목 배점
-용역 수행실적 15점
-경영상태(신용평가등급) 15점
-신인도 가점 2점
-입찰가격 70 − 4 × |88/100 − 입찰가격/예정가격| × 100 70점
-종합평점 85점 이상인 자를 낙찰자로 결정`,
-  },
-  {
-    label: "도로 포장 공사 (적격심사)",
-    text: `공사 적격심사 기준
-시공경험 평가 15점
-경영상태 평가 15점
-입찰가격 평가 70점
-신인도 감점 0점
-종합평점 92점 이상이면 낙찰자로 결정`,
-  },
-];
-
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
 export function ScorePredictor() {
@@ -76,16 +46,11 @@ export function ScorePredictor() {
   const [bidId, setBidId] = useState<string | null>(sp.get("bid"));
   const [query, setQuery] = useState("");
   const [sheet, setSheet] = useState<EvalSheet | null>(null);
-  const [docs, setDocs] = useState<{ name: string; chars: number; pages?: number }[]>([]);
-  const [docMsg, setDocMsg] = useState<string>("");
-  const [paste, setPaste] = useState("");
-  const [busy, setBusy] = useState(false);
   const [co, setCo] = useState<CompanyInput>(DEFAULT_COMPANY);
   const [perfEok, setPerfEok] = useState("");
   const [creditMsg, setCreditMsg] = useState("");
   const [bizno, setBizno] = useState("");
   const [corpMsg, setCorpMsg] = useState("");
-  const textsRef = useRef<string[]>([]);
 
   const bid: Bid | undefined = useMemo(() => {
     if (!bids) return undefined;
@@ -95,15 +60,16 @@ export function ScorePredictor() {
   const template = useMemo(() => (bid ? templateSheet(bid) : null), [bid]);
   const active = sheet ?? template;
 
-  // 공고가 바뀌면 원문 평가표와 첨부를 비운다
-  useEffect(() => { setSheet(null); setDocs([]); setDocMsg(""); textsRef.current = []; }, [bid?.id]);
-
-  const [files, setFiles] = useState<BidAttachment[] | null>(null);
+  // 공고를 고르면 첨부 목록과, 첨부에서 미리 추출해 둔 평가표를 불러온다 (없으면 표준 평가표)
+  const [docs, setDocs] = useState<BidDocs | null>(null);
   useEffect(() => {
     if (!bid) return;
     let alive = true;
-    setFiles(null);
-    loadAttachments(bid).then((f) => alive && setFiles(f)).catch(() => alive && setFiles([]));
+    setDocs(null);
+    setSheet(null);
+    loadBidDocs(bid)
+      .then((d) => { if (!alive) return; setDocs(d); if (d.sheet) setSheet(d.sheet); })
+      .catch(() => alive && setDocs({ files: [] }));
     return () => { alive = false; };
   }, [bid]);
 
@@ -116,38 +82,6 @@ export function ScorePredictor() {
   }, [bids, query]);
 
   const set = <K extends keyof CompanyInput>(k: K, v: CompanyInput[K]) => setCo((c) => ({ ...c, [k]: v }));
-
-  function runExtract(texts: string[]) {
-    const joined = texts.join("\n");
-    const ex = extractSheet(joined, template ?? undefined);
-    if (ex) {
-      setSheet(ex);
-      setDocMsg(ex.notes[0]);
-    } else {
-      setSheet(null);
-      setDocMsg("평가항목과 배점을 찾지 못해 표준 평가표로 계산합니다. 평가기준이 담긴 첨부(제안요청서, 적격심사 세부기준 등)를 넣어 주세요.");
-    }
-  }
-
-  async function onFiles(files: FileList | null) {
-    if (!files?.length) return;
-    setBusy(true);
-    const got: { name: string; chars: number; pages?: number }[] = [];
-    const errs: string[] = [];
-    for (const f of Array.from(files)) {
-      try {
-        const d = await readDocument(f);
-        textsRef.current.push(d.text);
-        got.push({ name: d.name, chars: d.text.length, pages: d.pages });
-      } catch (e) {
-        errs.push(`${f.name}: ${e instanceof UnsupportedDocError ? e.message : "파일을 읽지 못했습니다."}`);
-      }
-    }
-    setDocs((d) => [...d, ...got]);
-    if (textsRef.current.length) runExtract(textsRef.current);
-    if (errs.length) setDocMsg(errs.join(" "));
-    setBusy(false);
-  }
 
   async function onCreditFile(files: FileList | null) {
     const f = files?.[0];
@@ -197,6 +131,8 @@ export function ScorePredictor() {
   const isNego = active.method === "협상에 의한 계약" || active.method === "종합심사";
 
   return (
+    <div className="space-y-6">
+    {/* 입력과 결과: 결과 패널의 sticky 범위를 이 두 칸으로 한정해 아래 평가표를 덮지 않게 한다 */}
     <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
       <div className="min-w-0 space-y-6">
         {/* 1. 공고 */}
@@ -227,55 +163,31 @@ export function ScorePredictor() {
         {/* 2. 첨부파일 */}
         <section className="card p-6">
           <Step n={2} title="공고 첨부파일에서 평가기준 추출" />
-          <p className="mt-2 text-sm leading-relaxed text-ink-500">
-            나라장터 공고의 공고서·규격서·제안요청서를 넣으면 평가항목과 배점, 통과 기준을 읽어 평가표를 만듭니다.
-            파일은 이 브라우저 안에서만 읽고 어디에도 전송하지 않습니다.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <label className="btn-ghost btn-sm cursor-pointer">
-              파일 선택 (PDF·HWPX·DOCX·TXT)
-              <input type="file" multiple accept=".pdf,.hwpx,.docx,.txt,.hwp" className="sr-only" onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
-            </label>
-            <a href={bid.detailUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-mint-600">나라장터 원문에서 첨부 내려받기</a>
-            {busy && <span className="text-sm text-ink-300">읽는 중…</span>}
-          </div>
-          {files && files.length > 0 && (
-            <div className="mt-4 rounded-2xl border border-ink-100 p-4">
-              <p className="text-sm font-semibold">이 공고의 첨부파일 {files.length}건</p>
-              <p className="mt-0.5 text-xs text-ink-500">나라장터에서 내려받은 뒤 위 파일 선택으로 넣어 주세요. 평가기준은 보통 제안요청서·과업지시서·적격심사 기준에 있습니다.</p>
-              <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
-                {files.map((f) => (
-                  <li key={f.url}>
-                    <a href={f.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-lg bg-paper px-3 py-2 text-sm hover:bg-ink-100/60">
-                      <span className="truncate">{f.name}</span>
-                      <span className="shrink-0 text-xs text-ink-300">{f.kind}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {!docs ? (
+            <p className="mt-4 text-sm text-ink-300">첨부파일 확인 중…</p>
+          ) : (
+            <>
+              <p className={`mt-4 rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
+                {docs.sheet
+                  ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
+                  : docs.files.length
+                    ? `이 공고의 첨부에서 평가 배점표를 찾지 못해 ${bid.contractMethod} 표준 평가표로 계산합니다.`
+                    : `등록된 첨부파일이 없어 ${bid.contractMethod} 표준 평가표로 계산합니다.`}
+              </p>
+              {docs.files.length > 0 && (
+                <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                  {docs.files.map((f) => (
+                    <li key={f.url}>
+                      <a href={f.url} target="_blank" rel="noreferrer" className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm hover:bg-ink-100/60 ${f.name === docs.sheetFile ? "bg-mint-50 font-semibold" : "bg-paper"}`}>
+                        <span className="truncate">{f.name}</span>
+                        <span className="shrink-0 text-xs text-ink-300">{f.name === docs.sheetFile ? "평가표 출처" : f.kind}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
-          {docs.length > 0 && (
-            <ul className="mt-3 space-y-1 text-sm">
-              {docs.map((d, i) => (
-                <li key={i} className="flex justify-between rounded-lg bg-paper px-3 py-2">
-                  <span className="truncate">{d.name}</span>
-                  <span className="shrink-0 text-ink-300 tabular-nums">{d.pages ? `${d.pages}쪽 · ` : ""}{d.chars.toLocaleString()}자</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <details className="mt-4">
-            <summary className="cursor-pointer text-sm font-semibold text-ink-700">본문 붙여 넣기 · 예시로 해보기</summary>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {SAMPLES.map((s) => (
-                <button key={s.label} type="button" className="chip hover:border-ink-300" onClick={() => setPaste(s.text)}>{s.label}</button>
-              ))}
-            </div>
-            <textarea className="input mt-3 min-h-[150px] font-mono text-xs" placeholder="평가기준 부분을 복사해 붙여 넣으세요" value={paste} onChange={(e) => setPaste(e.target.value)} />
-            <button type="button" className="btn-primary btn-sm mt-2" disabled={!paste.trim()} onClick={() => { textsRef.current = [...textsRef.current, paste]; runExtract(textsRef.current); }}>평가표 추출</button>
-          </details>
-          {docMsg && <p className="mt-3 rounded-xl bg-mint-50 px-3 py-2 text-sm text-mint-700">{docMsg}</p>}
         </section>
 
         {/* 3. 기업 정보 */}
@@ -381,34 +293,41 @@ export function ScorePredictor() {
           </section>
         )}
         <p className="mt-4 text-xs leading-relaxed text-ink-300">
-          예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 실제 점수는 발주기관의 세부 평가기준, 서류 인정 범위, 정성평가 위원 판단에 따라 달라집니다.
+          {active.source === "extracted" && active.items.some((i) => i.bands || i.recognition || i.criteria) || active.scale
+            ? "점수 구간·서류 인정 범위·정성 등급은 공고 첨부에서 읽은 기준을 적용했습니다. 정성평가는 위원이 제안서와 발표를 보고 매기므로, 제안 준비 수준으로 고른 등급은 예상치입니다. 실제로 인정되는 서류는 제출 전 공고 원문으로 확인하세요."
+            : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 표준 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
         </p>
       </aside>
+    </div>
 
     {/* 평가표 (전체 폭) */}
-    <section className="card min-w-0 p-6 lg:col-span-2">
+    <section className="card min-w-0 p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">
             <span className="chip">{active.source === "extracted" ? `원문 추출 · 신뢰도 ${active.confidence}` : "표준 평가표"}</span>
-            {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => { setSheet(null); setDocs([]); textsRef.current = []; setDocMsg(""); }}>표준으로 되돌리기</button>}
+            {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => setSheet(null)}>표준으로 되돌리기</button>}
           </div>
         </div>
         <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
           {active.items.map((i) => (
-            <li key={i.id} className="flex min-w-0 items-center gap-2 rounded-2xl border border-ink-100 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{i.label}</p>
-                <p className="truncate text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
+            <li key={i.id} className="min-w-0 rounded-2xl border border-ink-100 px-4 py-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="min-w-[10rem] flex-1">
+                  <p className="text-sm font-semibold">{i.label}</p>
+                  <p className="truncate text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
+                </div>
+                <select aria-label="항목 유형" className="shrink-0 rounded-lg border border-ink-100 bg-white px-2 py-1 text-xs" value={i.kind} onChange={(e) => editItem(i.id, { kind: e.target.value as ItemKind })}>
+                  {(Object.keys(KIND_LABEL) as ItemKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+                </select>
+                <input aria-label="배점" type="number" step="0.5" min={0} className="w-16 shrink-0 rounded-lg border border-ink-100 px-2 py-1 text-right text-sm tabular-nums" value={i.max} onChange={(e) => editItem(i.id, { max: Number(e.target.value) || 0 })} />
+                <button type="button" className="shrink-0 text-xs text-ink-300 hover:text-coral" onClick={() => removeItem(i.id)}>삭제</button>
               </div>
-              <select aria-label="항목 유형" className="shrink-0 rounded-lg border border-ink-100 bg-white px-2 py-1 text-xs" value={i.kind} onChange={(e) => editItem(i.id, { kind: e.target.value as ItemKind })}>
-                {(Object.keys(KIND_LABEL) as ItemKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
-              </select>
-              <input aria-label="배점" type="number" step="0.5" min={0} className="w-16 shrink-0 rounded-lg border border-ink-100 px-2 py-1 text-right text-sm tabular-nums" value={i.max} onChange={(e) => editItem(i.id, { max: Number(e.target.value) || 0 })} />
-              <button type="button" className="shrink-0 text-xs text-ink-300 hover:text-coral" onClick={() => removeItem(i.id)}>삭제</button>
+              <ItemDetail item={i} />
             </li>
           ))}
         </ul>
+        <SheetDetail sheet={active} />
         <AddItem onAdd={(label, max) => active && setSheet({ ...active, items: [...active.items, { id: `u${Date.now()}`, label, max, kind: kindOf(label), group: "추가 항목" }] })} />
         <ul className="mt-4 space-y-1 text-xs leading-relaxed text-ink-500">
           {active.notes.map((n) => <li key={n}>{n}</li>)}
@@ -458,5 +377,46 @@ function AddItem({ onAdd }: { onAdd: (label: string, max: number) => void }) {
       <input className="input w-24 py-2 text-sm" placeholder="배점" inputMode="decimal" value={max} onChange={(e) => setMax(e.target.value)} />
       <button className="btn-ghost btn-sm shrink-0">추가</button>
     </form>
+  );
+}
+
+/** 항목별 세부기준: 공고의 점수 구간, 인정 범위, 평가 요소 */
+function ItemDetail({ item }: { item: EvalItem }) {
+  if (!item.bands && !item.recognition && !item.criteria) return null;
+  return (
+    <div className="mt-2 space-y-1.5 border-t border-ink-100 pt-2 text-xs leading-relaxed">
+      {item.bands && (
+        <div className="flex flex-wrap gap-1">
+          {item.bands.map((b) => (
+            <span key={b.cond + b.points} className="rounded-md bg-ink-50 px-1.5 py-0.5 tabular-nums text-ink-500">{b.cond} <b className="text-ink">{b.points}</b></span>
+          ))}
+        </div>
+      )}
+      {item.recognition?.map((r) => <p key={r} className="text-ink-500"><span className="font-semibold text-ink">인정 범위</span> {r}</p>)}
+      {item.criteria && <p className="text-ink-500"><span className="font-semibold text-ink">평가 요소</span> {item.criteria.join(" / ")}</p>}
+    </div>
+  );
+}
+
+/** 평가표 전체 기준: 정성 등급표, 위원 점수 처리, 서류 인정 기준 */
+function SheetDetail({ sheet }: { sheet: EvalSheet }) {
+  if (!sheet.scale && !sheet.panelRule && !sheet.recognition) return null;
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+      {(sheet.scale || sheet.panelRule) && (
+        <div className="rounded-2xl bg-ink-50 px-4 py-3 text-xs leading-relaxed">
+          <p className="text-sm font-semibold">정성평가 방식</p>
+          {sheet.scale && <p className="mt-1 tabular-nums text-ink-500">등급 {sheet.scale.map((l) => `${l.label} ${Math.round(l.ratio * 100)}%`).join(" · ")}</p>}
+          {sheet.panelRule && <p className="mt-1 text-ink-500">{sheet.panelRule}</p>}
+          <p className="mt-1 text-ink-300">제안 준비 수준 상·중·하를 이 등급에 대응시켜 계산합니다. 위원별 실제 판단은 알 수 없어 예상치입니다.</p>
+        </div>
+      )}
+      {sheet.recognition && (
+        <div className="rounded-2xl bg-ink-50 px-4 py-3 text-xs leading-relaxed">
+          <p className="text-sm font-semibold">서류 인정 기준</p>
+          <ul className="mt-1 space-y-0.5 text-ink-500">{sheet.recognition.map((r) => <li key={r}>{r}</li>)}</ul>
+        </div>
+      )}
+    </div>
   );
 }

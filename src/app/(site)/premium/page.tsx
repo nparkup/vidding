@@ -21,7 +21,7 @@ export default function PremiumPage() {
     <>
       <PageHero
         eyebrow="프리미엄 · 평가점수 예측"
-        title={<>공고문을 넣으면,<br />우리 회사 점수가 나옵니다.</>}
+        title={<>공고를 고르면,<br />우리 회사 점수가 나옵니다.</>}
         lead="입찰공고에 첨부된 공고서·규격서에서 평가기준과 배점을 추출하고, 나라장터에 등록된 기업 정보와 신용평가 서류를 결합해 이 공고에서 받을 예상 점수와 통과 여부를 계산합니다."
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -45,7 +45,7 @@ export default function PremiumPage() {
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">평가점수 예측</p>
         <h2 className="h-section mt-3">공고 하나로 직접 계산해 보세요</h2>
-        <p className="lead mt-3 max-w-3xl">공고를 고르고 첨부파일을 넣은 뒤 기업 정보를 입력하면, 오른쪽에 항목별 예상 점수가 바로 계산됩니다.</p>
+        <p className="lead mt-3 max-w-3xl">공고를 고르면 그 공고의 첨부파일에서 읽어 둔 평가표가 바로 적용됩니다. 기업 정보를 입력하면 오른쪽에 항목별 예상 점수가 계산됩니다.</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
             <ScorePredictor />
@@ -57,7 +57,7 @@ export default function PremiumPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <div className="card p-7">
             <p className="text-lg font-bold">읽는 서류</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">입찰공고서, 과업지시서·규격서, 제안요청서, 적격심사 세부기준, 신용평가등급확인서, 실적증명서. PDF·HWPX·DOCX를 읽고, 구형 HWP는 PDF로 저장해 넣습니다.</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-500">나라장터에 올라온 입찰공고서, 과업지시서·규격서, 제안요청서, 적격심사 세부기준을 하루 세 번 수집해 PDF·HWPX에서 평가표를 읽습니다. 신용평가등급확인서는 고객이 올려 등급을 읽습니다.</p>
           </div>
           <div className="card p-7">
             <p className="text-lg font-bold">평가 구조</p>

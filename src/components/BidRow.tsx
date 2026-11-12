@@ -3,7 +3,7 @@ import type { MatchResult } from "@/lib/analysis";
 import type { Bid } from "@/lib/types";
 import { daysLeft } from "@/lib/analysis";
 import { shortDate, won } from "@/lib/format";
-import { DdayBadge, GradeBadge } from "./Badges";
+import { DdayBadge, ScoreMeter } from "./Badges";
 import { bidHref } from "@/lib/links";
 
 export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; href?: string }) {
@@ -19,7 +19,6 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
           <span className="chip">{bid.bizType && bid.bizType !== "용역" ? `${bid.bizType} · ` : ""}{bid.category}</span>
           <span className="chip">{bid.region === "전국" ? "전국" : `${bid.region} 제한`}</span>
           <span className="chip">{bid.contractMethod}</span>
-          {match && <GradeBadge grade={match.grade} score={match.score} />}
         </div>
         <p className="mt-2 truncate text-[16px] font-semibold group-hover:text-mint-600">{bid.title}</p>
         <p className="mt-1 line-clamp-1 text-sm text-ink-500">
@@ -27,9 +26,12 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
         </p>
         {match && !match.eligible && <p className="mt-1 text-xs font-medium text-coral">{match.blockers.join(" · ")}</p>}
       </div>
-      <div className="flex items-end justify-between gap-6 sm:flex-col sm:items-end sm:gap-1">
-        <p className="text-lg font-bold tabular-nums">{won(bid.baseAmount)}</p>
-        <p className="text-xs text-ink-300">마감 {shortDate(bid.closeAt)}{(bid.bizType ?? "용역") === "용역" && ` · ${bid.periodMonths}개월`}</p>
+      <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-5">
+        <div className="sm:text-right">
+          <p className="text-lg font-bold tabular-nums">{won(bid.baseAmount)}</p>
+          <p className="text-xs text-ink-300">마감 {shortDate(bid.closeAt)}{(bid.bizType ?? "용역") === "용역" && ` · ${bid.periodMonths}개월`}</p>
+        </div>
+        {match && <ScoreMeter grade={match.grade} score={match.score} />}
       </div>
     </Link>
   );

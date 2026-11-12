@@ -1,7 +1,7 @@
 import type { Bid, ClientProfile } from "@/lib/types";
 import { rank } from "@/lib/analysis";
 import { dday, shortDate, won } from "@/lib/format";
-import { GradeBadge } from "./Badges";
+import { ScoreMeter } from "./Badges";
 
 /** 주 1회 주요 공고 분석보고서 */
 export function WeeklyReportView({ client, bids, weekLabel, note }: { client: ClientProfile; bids: Bid[]; weekLabel: string; note?: string }) {
@@ -37,7 +37,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note }: { client: Cl
 
       <div className="space-y-8 p-6 sm:p-8">
         {note && (
-          <section className="rounded-2xl border-l-4 border-mint bg-mint-50 p-4">
+          <section className="rounded-none border-l-4 border-mint bg-mint-50 p-4">
             <p className="text-xs font-bold text-mint-600">담당 매니저 코멘트</p>
             <p className="mt-1 leading-relaxed">{note}</p>
           </section>
@@ -47,7 +47,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note }: { client: Cl
           <h3 className="font-bold">이번 주 꼭 볼 공고 TOP {top.length}</h3>
           <div className="mt-3 overflow-x-auto">
             <table className="table-x min-w-[600px]">
-              <thead><tr><th>#</th><th>공고명</th><th>규모</th><th>마감</th><th>가능성</th></tr></thead>
+              <thead><tr><th>#</th><th>공고명</th><th>규모</th><th>마감</th><th>입찰 가능성</th></tr></thead>
               <tbody>
                 {top.map((r, i) => (
                   <tr key={r.bid.id}>
@@ -58,7 +58,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note }: { client: Cl
                     </td>
                     <td className="tabular-nums">{won(r.bid.baseAmount)}</td>
                     <td className="whitespace-nowrap">{shortDate(r.bid.closeAt)} <span className="text-xs text-ink-300">{dday(r.daysLeft)}</span></td>
-                    <td><GradeBadge grade={r.grade} score={r.score} /></td>
+                    <td><ScoreMeter grade={r.grade} score={r.score} /></td>
                   </tr>
                 ))}
               </tbody>

@@ -161,13 +161,12 @@ export function ScorePredictor() {
           {/* 고른 공고의 첨부파일을 자동으로 확인해 평가표를 적용한다 (첨부가 없으면 표시하지 않는다) */}
           {(!docs || docs.sheet || docs.files.length > 0) && (
           <div className="mt-4 border-t border-ink-100 pt-4">
-            <p className="text-sm font-semibold">첨부파일 자동 확인</p>
             {!docs ? (
-              <p className="mt-2 text-sm text-ink-300">첨부파일 확인 중…</p>
+              <p className="text-sm text-ink-300">첨부파일 확인 중…</p>
             ) : (
               <>
                 {(docs.sheet || docs.files.length > 0) && (
-                  <p className={`mt-2 rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
+                  <p className={`rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
                     {docs.sheet
                       ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
                       : `이 공고의 첨부에서 평가 배점표를 찾지 못해 ${bid.contractMethod} 표준 평가표로 계산합니다.`}

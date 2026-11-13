@@ -2,7 +2,10 @@ import "server-only";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { call } from "./client";
-import { BANDS, bandOf, statKey, type AwardStats, type RateStat, type StatBiz, type StatMethod } from "../rivalRate";
+import { BANDS, bandOf, statKey, type AwardStats, type PriorMatch, type RateStat, type StatBiz, type StatMethod } from "../rivalRate";
+import type { Bid } from "../types";
+
+export type PriorTarget = Pick<Bid, "id" | "title" | "demandAgency" | "bizType">;
 
 /**
  * 전년도 낙찰률 통계 (평가점수 예측의 '예상 최저 경쟁 투찰률' 기본값).
@@ -10,6 +13,9 @@ import { BANDS, bandOf, statKey, type AwardStats, type RateStat, type StatBiz, t
  * - 낙찰률: 낙찰정보서비스 getScsbidListSttus{Servc,Cnstwk,Thng} (공고 1건당 1행, 조회 기간 최대 7일) → 공고번호·낙찰률
  * - 계약방법·추정가격: 입찰공고정보서비스 getBidPblancListInfo{Servc,Cnstwk,Thng}02 (하루치 한 번) → 공고번호로 붙인다
  *   낙찰 응답에는 계약방법이 없어 공고 목록과 맞춰야 적격심사·협상계약을 나눌 수 있다.
+ * - 지금 공고마다 같은 수요기관의 전년도 유사 공고(이름이 비슷한 공고)를 찾아 그 낙찰률을 따로 둔다.
+ *   검색 API는 한 번에 7일까지만 조회돼 공고 하나의 전년도 공고를 찾는 데도 약 52회가 들어,
+ *   공고마다 따로 찾지 않고 한 번 받아 둔 1년치 공고 목록에서 찾는다.
  * - 전년도 자료는 바뀌지 않으므로 받은 날·주는 캐시 폴더에 두고 다시 받지 않는다(GitHub Actions 캐시로 빌드 간 유지).
  *   빌드 한 번에 부르는 횟수를 제한해 하루 호출 한도를 넘지 않게 하고, 며칠에 걸쳐 1년치를 채운다.
  */
@@ -50,7 +56,7 @@ async function allPages(path: string, op: string, params: Record<string, string>
   return { items, calls: Math.max(1, Math.ceil(first.total / ROWS)) };
 }
 
-export async function buildAwardStats(cacheDir: string, opts: { maxCalls?: number; maxMs?: number; now?: Date } = {}): Promise<{ stats: AwardStats; fetched: number; stopped?: string }> {
+export async function buildAwardStats(cacheDir: string, opts: { maxCalls?: number; maxMs?: number; now?: Date; targets?: PriorTarget[] } = {}): Promise<{ stats: AwardStats; fetched: number; stopped?: string }> {
   const now = opts.now ?? new Date(Date.now() + 9 * 3600e3);
   const year = now.getUTCFullYear() - 1;
   const dir = join(cacheDir, String(year));
@@ -73,7 +79,7 @@ export async function buildAwardStats(cacheDir: string, opts: { maxCalls?: numbe
     file: `notice-${op}-${day}.json`,
     run: async () => {
       const r = await allPages("/ad/BidPublicInfoService02", `getBidPblancListInfo${op}02`, { inqryDiv: "1", inqryBgnDt: `${day}0000`, inqryEndDt: `${day}2359` });
-      const rows = r.items.map((i) => { const m = methodOf(i.sucsfbidMthdNm); return [i.bidNtceNo, m === "협상에 의한 계약" ? "N" : m === "적격심사" ? "Q" : "", Number(i.presmptPrce) || 0]; });
+      const rows = r.items.map((i) => { const m = methodOf(i.sucsfbidMthdNm); return [i.bidNtceNo, m === "협상에 의한 계약" ? "N" : m === "적격심사" ? "Q" : "", Number(i.presmptPrce) || 0, i.dminsttNm ?? "", i.bidNtceNm ?? ""]; });
       return { data: rows.filter((x) => x[1]), calls: r.calls };
     },
   });
@@ -105,24 +111,26 @@ export async function buildAwardStats(cacheDir: string, opts: { maxCalls?: numbe
     }
   }));
 
-  return { stats: aggregate(dir, year), fetched, stopped };
+  return { stats: aggregate(dir, year, opts.targets), fetched, stopped };
 }
 
 /** 캐시 폴더의 공고·낙찰 자료를 공고번호로 맞춰 업무·계약방법·금액대별 낙찰률 통계를 만든다 */
-export function aggregate(dir: string, year: number): AwardStats {
+export function aggregate(dir: string, year: number, targets: PriorTarget[] = []): AwardStats {
   const files = existsSync(dir) ? readdirSync(dir) : [];
   const groups = new Map<string, number[]>();
   const add = (k: string, r: number) => { const a = groups.get(k) ?? []; a.push(r); groups.set(k, a); };
   const cover: { weeks: number; days: number }[] = [];
+  const prior: Record<string, PriorMatch[]> = {};
 
   for (const [biz, op] of Object.entries(OPS) as [StatBiz, string][]) {
-    const notices = new Map<string, { m: StatMethod; p: number }>();
+    const notices = new Map<string, { m: StatMethod; p: number; org: string; title: string }>();
     for (const f of files.filter((f) => f.startsWith(`notice-${op}-`))) {
-      for (const [no, m, p] of JSON.parse(readFileSync(join(dir, f), "utf8")) as [string, string, number][]) {
-        notices.set(no, { m: m === "N" ? "협상에 의한 계약" : "적격심사", p });
+      for (const [no, m, p, org = "", title = ""] of JSON.parse(readFileSync(join(dir, f), "utf8")) as [string, string, number, string?, string?][]) {
+        notices.set(no, { m: m === "N" ? "협상에 의한 계약" : "적격심사", p, org, title });
       }
     }
     const seen = new Set<string>();
+    const awardedByOrg = new Map<string, { no: string; title: string; rate: number; method: StatMethod; key: string }[]>();
     const awardFiles = files.filter((f) => f.startsWith(`award-${op}-`));
     cover.push({ weeks: awardFiles.length, days: files.filter((f) => f.startsWith(`notice-${op}-`)).length });
     for (const f of awardFiles) {
@@ -132,7 +140,26 @@ export function aggregate(dir: string, year: number): AwardStats {
         seen.add(no);
         add(statKey(biz, n.m, bandOf(n.p)), rate);
         add(statKey(biz, n.m, "*"), rate);
+        if (n.org) {
+          const a = awardedByOrg.get(n.org) ?? [];
+          a.push({ no, title: n.title, rate, method: n.m, key: titleKey(n.title) });
+          awardedByOrg.set(n.org, a);
+        }
       }
+    }
+    // 지금 공고와 수요기관이 같고 공고명이 비슷한 전년도 낙찰 공고
+    for (const t of targets) {
+      if ((t.bizType === "공사" || t.bizType === "물품" ? t.bizType : "용역") !== biz) continue;
+      const pool = awardedByOrg.get(t.demandAgency);
+      if (!pool) continue;
+      const key = titleKey(t.title);
+      const hits = pool
+        .map((a) => ({ a, s: similarity(key, a.key) }))
+        .filter((x) => x.s >= SIMILAR)
+        .sort((x, y) => y.s - x.s)
+        .slice(0, 3)
+        .map(({ a, s }) => ({ no: a.no, title: a.title, rate: a.rate, method: a.method, similarity: Math.round(s * 100) / 100 }));
+      if (hits.length) prior[t.id] = hits;
     }
   }
 
@@ -151,7 +178,30 @@ export function aggregate(dir: string, year: number): AwardStats {
       totalWeeks: weeksOf(year).length,
       noticeDays: Math.min(...cover.map((c) => c.days)),
       totalNoticeDays: noticeDays(year).length,
-    }, strata, builtAt: new Date().toISOString() };
+    }, strata, prior, builtAt: new Date().toISOString() };
 }
+
+/** 공고명 비교용: 연도·차수·괄호 기호·공백을 빼서 해마다 반복되는 같은 사업이 같은 이름이 되게 한다 */
+export function titleKey(title: string) {
+  return title
+    .replace(/(19|20)\d{2}\s*(년도|년)?/g, "")
+    .replace(/\d{2}\s*(년도|년)/g, "")
+    .replace(/제?\d+\s*(차|회|분기)/g, "")
+    .replace(/[\s()\[\]{}<>「」『』【】〔〕·,.\-_/'"‘’“”]/g, "");
+}
+
+/** 공고명 유사도: 두 글자 묶음(bigram)의 Dice 계수, 0~1 */
+export function similarity(a: string, b: string) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const grams = (s: string) => { const m = new Map<string, number>(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) ?? 0) + 1); } return m; };
+  const ga = grams(a), gb = grams(b);
+  let common = 0;
+  for (const [g, c] of ga) common += Math.min(c, gb.get(g) ?? 0);
+  return (2 * common) / (Math.max(1, a.length - 1) + Math.max(1, b.length - 1));
+}
+
+/** 이 이상 비슷해야 같은 사업의 전년도 공고로 본다 */
+const SIMILAR = 0.6;
 
 export const BAND_LABELS = Object.fromEntries(BANDS.map((b) => [b.key, b.label]));

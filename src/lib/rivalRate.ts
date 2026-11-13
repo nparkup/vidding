@@ -20,7 +20,17 @@ export interface AwardStats {
   coverage: { weeks: number; totalWeeks: number; noticeDays: number; totalNoticeDays: number };
   /** 업무|계약방법|금액대 → 통계. 금액대가 '*' 이면 금액대 구분 없이 합친 값 */
   strata: Record<string, RateStat>;
+  /** 지금 공고 id → 같은 수요기관의 전년도 유사 공고 낙찰 (유사도 높은 순, 최대 3건) */
+  prior?: Record<string, PriorMatch[]>;
   builtAt: string;
+}
+
+export interface PriorMatch {
+  no: string;
+  title: string;
+  rate: number;
+  method: StatMethod;
+  similarity: number;
 }
 
 export type StatBiz = "용역" | "공사" | "물품";
@@ -47,12 +57,19 @@ export interface RivalEstimate {
   /** 화면 표시용: 어떤 공고들의 평균인지 */
   scope: string;
   year: number;
+  /** 같은 수요기관의 전년도 유사 공고에서 왔으면 그 공고들 */
+  prior?: PriorMatch[];
 }
 
-/** 같은 업무·계약방법·금액대 → 표본이 모자라면 금액대 구분 없이 → 그래도 모자라면 undefined (기본값 사용) */
-export function estimateRival(stats: AwardStats | null | undefined, bid: Pick<Bid, "bizType" | "contractMethod" | "baseAmount">): RivalEstimate | undefined {
+/** 같은 수요기관의 전년도 유사 공고 → 같은 업무·계약방법·금액대 → 표본이 모자라면 금액대 구분 없이 → 그래도 모자라면 undefined (기본값 사용) */
+export function estimateRival(stats: AwardStats | null | undefined, bid: Pick<Bid, "id" | "bizType" | "contractMethod" | "baseAmount">): RivalEstimate | undefined {
   if (!stats) return undefined;
   if (bid.contractMethod !== "적격심사" && bid.contractMethod !== "협상에 의한 계약") return undefined;
+  const prior = stats.prior?.[bid.id];
+  if (prior?.length) {
+    const rate = Math.round((prior.reduce((a, p) => a + p.rate, 0) / prior.length) * 1000) / 1000;
+    return { rate, n: prior.length, scope: "같은 수요기관의 유사 공고", year: stats.year, prior };
+  }
   const biz = (bid.bizType === "공사" || bid.bizType === "물품" ? bid.bizType : "용역") as StatBiz;
   const method = bid.contractMethod as StatMethod;
   const band = BANDS.find((b) => b.key === bandOf(bid.baseAmount))!;

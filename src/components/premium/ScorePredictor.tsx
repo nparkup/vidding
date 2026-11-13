@@ -12,7 +12,7 @@ import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
-import { estimateRival, MIN_SAMPLES, type AwardStats } from "@/lib/rivalRate";
+import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from "@/lib/rivalRate";
 import { sheetPerfYears } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
@@ -324,7 +324,7 @@ export function ScorePredictor() {
               label="투찰률 (예정가격 대비)"
               value={co.bidRate}
               onChange={(v) => set("bidRate", v)}
-              hint={!isNego && rivalEst ? `참고: ${rivalEst.year}년 ${rivalEst.scope} 낙찰 ${rivalEst.n.toLocaleString()}건의 평균 낙찰률은 ${rivalEst.rate.toFixed(2)}%입니다.` : undefined}
+              hint={!isNego && rivalEst ? `참고: ${rivalBasis(rivalEst)}입니다.` : undefined}
             />
             {isNego && (
               <Range
@@ -332,8 +332,8 @@ export function ScorePredictor() {
                 value={co.rivalRate}
                 onChange={(v) => set("rivalRate", v)}
                 hint={rivalEst
-                  ? `기본값 = ${rivalEst.year}년 ${rivalEst.scope} 낙찰 ${rivalEst.n.toLocaleString()}건의 평균 낙찰률 ${rivalEst.rate.toFixed(2)}%${awardStats && awardStats.coverage.weeks < awardStats.coverage.totalWeeks ? ` (연간 ${awardStats.coverage.totalWeeks}주 중 ${awardStats.coverage.weeks}주 자료)` : ""}. 슬라이더로 바꿀 수 있습니다.`
-                  : `전년도 같은 조건 낙찰 표본이 ${MIN_SAMPLES}건 미만이라 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`}
+                  ? `기본값 = ${rivalBasis(rivalEst)}${!rivalEst.prior && awardStats && awardStats.coverage.weeks < awardStats.coverage.totalWeeks ? ` (연간 ${awardStats.coverage.totalWeeks}주 중 ${awardStats.coverage.weeks}주 자료)` : ""}. 슬라이더로 바꿀 수 있습니다.`
+                  : `전년도 같은 수요기관의 유사 공고가 없고 같은 조건 낙찰 표본도 ${MIN_SAMPLES}건 미만이라 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`}
               />
             )}
           </div>
@@ -552,6 +552,17 @@ function Num({ label, value, onChange, hint }: { label: string; value: number; o
       {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
     </div>
   );
+}
+
+/** 예상 투찰률 근거 문구: 전년도 유사 공고면 그 공고명, 아니면 같은 조건 평균 */
+function rivalBasis(e: RivalEstimate) {
+  if (e.prior?.length) {
+    const first = `「${e.prior[0].title}」`;
+    return e.prior.length === 1
+      ? `${e.year}년 같은 수요기관의 유사 공고 ${first} 낙찰률 ${e.rate.toFixed(2)}%`
+      : `${e.year}년 같은 수요기관의 유사 공고 ${e.prior.length}건(${first} 외) 평균 낙찰률 ${e.rate.toFixed(2)}%`;
+  }
+  return `${e.year}년 ${e.scope} 낙찰 ${e.n.toLocaleString()}건의 평균 낙찰률 ${e.rate.toFixed(2)}%`;
 }
 
 function Range({ label, value, onChange, hint }: { label: string; value: number; onChange: (v: number) => void; hint?: string }) {

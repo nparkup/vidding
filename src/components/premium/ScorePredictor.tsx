@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ScoreBar } from "@/components/Badges";
 import { readDocument, UnsupportedDocError } from "@/lib/docText";
@@ -12,10 +12,14 @@ import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
+import { sheetPerfYears } from "@/lib/perfLookup";
+import { PerfLookup, type PerfSummary } from "./PerfLookup";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 /** 정적 사이트는 Cloudflare 중계 서버(worker/corp-lookup)로, 서버 배포는 자체 API로 조회한다. 정적 사이트에 중계 주소가 없으면 조회를 끈다 */
 const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium/corp";
+/** 유사 실적(나라장터 낙찰 이력) 조회: 정적 사이트는 같은 중계 서버, 서버 배포는 자체 API */
+const PERF_API = STATIC ? CORP_API : "/api/premium/perf";
 
 interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string }
 
@@ -56,6 +60,11 @@ export function ScorePredictor() {
   const [corpMsg, setCorpMsg] = useState("");
   const [corp, setCorp] = useState<CorpLookup | null>(null);
   const [corpLoading, setCorpLoading] = useState(false);
+  /** 사업자번호 조회가 끝난 번호: 이때만 낙찰 이력을 조회한다 */
+  const [perfBizno, setPerfBizno] = useState("");
+  const [autoPerf, setAutoPerf] = useState<PerfSummary>({ amount: 0, count: 0 });
+  const [manualPerf, setManualPerf] = useState(0);
+  const onPerf = useCallback((s: PerfSummary) => setAutoPerf((p) => (p.amount === s.amount && p.count === s.count ? p : s)), []);
 
   const bid: Bid | undefined = useMemo(() => {
     if (!bids) return undefined;
@@ -79,7 +88,16 @@ export function ScorePredictor() {
     return () => { alive = false; };
   }, [bid]);
 
-  const result = useMemo(() => (active && bid ? predict(active, bid, co) : null), [active, bid, co]);
+  // 실적 = 나라장터에서 찾은 유사 낙찰(추정) + 직접 입력(수의계약·민간·하도급 등)
+  const coEff = useMemo<CompanyInput>(() => ({
+    ...co,
+    pastPerformance: autoPerf.amount + manualPerf,
+    perfSource: autoPerf.count ? `나라장터 낙찰 ${autoPerf.count}건 추정${manualPerf ? " + 직접 입력" : ""}` : undefined,
+  }), [co, autoPerf, manualPerf]);
+  const result = useMemo(() => (active && bid ? predict(active, bid, coEff) : null), [active, bid, coEff]);
+  const sheetYears = useMemo(() => active
+    ? sheetPerfYears(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]).concat(active.recognition ?? []))
+    : undefined, [active]);
 
   const matches = useMemo(() => {
     if (!bids || !query.trim()) return [];
@@ -108,6 +126,8 @@ export function ScorePredictor() {
     if (!validBizno(no)) { setCorpMsg("올바른 사업자등록번호가 아닙니다. 숫자를 다시 확인해 주세요."); return; }
     setCorpLoading(true);
     setCorp(null);
+    setPerfBizno("");
+    setAutoPerf({ amount: 0, count: 0 });
     setCorpMsg("국세청·나라장터·금융위원회 정보를 조회하는 중…");
     try {
       const r = await fetch(`${CORP_API}?bizno=${no}`);
@@ -115,6 +135,7 @@ export function ScorePredictor() {
       if (!r.ok) throw new Error(j.error);
       const c = j as CorpLookup;
       setCorp(c);
+      if (PERF_API && (c.corpName || c.nts?.registered)) setPerfBizno(c.bizno);
       setCo((prev) => ({
         ...prev,
         corpName: c.corpName ?? prev.corpName,
@@ -234,7 +255,7 @@ export function ScorePredictor() {
         <section className="card p-6">
           <Step n={2} title="기업 정보와 신용평가 서류" />
           <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
-            <div className="sm:col-span-3">
+            <div className="min-w-0 sm:col-span-3">
               <span className="label">사업자등록번호</span>
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); lookup(); }}>
                 <input className="input" inputMode="numeric" placeholder="000-00-00000" value={bizno} onChange={(e) => setBizno(e.target.value)} />
@@ -246,13 +267,15 @@ export function ScorePredictor() {
                   : "공개 미리보기에서는 직접 입력합니다. 이용 고객은 담당 매니저가 사업자번호로 기업 정보를 조회해 채워 드립니다.")}
               </p>
               {corp && <CorpPanel corp={corp} />}
+              {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetYears={sheetYears} onChange={onPerf} />}
             </div>
             <Num label="업력 (년)" value={co.years} onChange={(v) => set("years", v)} />
             <Num label="종업원 수 (명)" value={co.employees} onChange={(v) => set("employees", v)} />
             <Num label="분야 기술인력 (명)" value={co.techStaff} onChange={(v) => set("techStaff", v)} />
             <div>
-              <span className="label">3년 유사 실적 (억원)</span>
-              <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); set("pastPerformance", Math.round((Number(e.target.value) || 0) * 1e8)); }} />
+              <span className="label">{perfBizno ? "직접 추가 실적 (억원)" : "3년 유사 실적 (억원)"}</span>
+              <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); setManualPerf(Math.round((Number(e.target.value) || 0) * 1e8)); }} />
+              {perfBizno && <p className="mt-1 text-xs text-ink-500">수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
             </div>
             <Num label="신인도 가점 (건)" value={co.bonusCount} onChange={(v) => set("bonusCount", v)} />
             <Num label="제재·벌점 (최근 2년)" value={co.penaltyCount} onChange={(v) => set("penaltyCount", v)} />

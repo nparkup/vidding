@@ -492,6 +492,8 @@ export interface CompanyInput {
   creditGrade: CreditGrade;
   /** 최근 3년 유사 실적 합계(원) */
   pastPerformance: number;
+  /** 실적 중 나라장터 낙찰 이력에서 자동으로 찾은 금액이 있으면 그 설명 (예: "나라장터 낙찰 4건 추정") */
+  perfSource?: string;
   /** 신인도 가점 항목 수 (여성·장애인·사회적기업, 고용우수, 인증 등) */
   bonusCount: number;
   /** 최근 2년 제재·벌점 건수 */
@@ -608,7 +610,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
     if (bv !== undefined && it.bands && it.max > 0) {
       const { points, band } = scoreByBands(it.bands, bv);
       const s = Math.min(it.max, points);
-      const what = it.kind === "credit" ? `신용평가등급 ${c.creditGrade}` : it.kind === "performance" ? `유사 실적 ${Math.round(bv)}% (기초금액 대비)` : it.kind === "staff" ? `기술인력 ${c.techStaff}명` : `업력 ${c.years}년`;
+      const what = it.kind === "credit" ? `신용평가등급 ${c.creditGrade}` : it.kind === "performance" ? `유사 실적 ${Math.round(bv)}% (기초금액 대비${c.perfSource ? `, ${c.perfSource}` : ""})` : it.kind === "staff" ? `기술인력 ${c.techStaff}명` : `업력 ${c.years}년`;
       return { ...it, score: round1(s), ratio: s / it.max, reason: `${what} → 공고 구간 ${band ? `'${band.cond}' ${band.points}점` : "최저 구간 미만"}`, lost: round1(it.max - s) };
     }
     if ((it.kind === "qualitative" || it.kind === "other") && sheet.scale?.length) {
@@ -620,7 +622,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
       case "performance": {
         ratio = performanceRatio(c.pastPerformance, amt);
         reason = c.pastPerformance
-          ? `유사 실적 ${Math.round((c.pastPerformance / amt) * 100)}% (기초금액 대비)`
+          ? `유사 실적 ${Math.round((c.pastPerformance / amt) * 100)}% (기초금액 대비${c.perfSource ? `, ${c.perfSource}` : ""})`
           : "유사 실적 미입력: 0점으로 계산";
         break;
       }

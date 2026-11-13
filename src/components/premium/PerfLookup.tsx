@@ -7,6 +7,7 @@ import {
   type NtceClass, type PerfChunk, type PerfWin, type SimLevel,
 } from "@/lib/perfLookup";
 import type { Bid } from "@/lib/types";
+import { LoadingBar } from "./LoadingBar";
 
 /** 분류를 조회할 낙찰 건 수 상한. 넘는 건은 공고명 키워드로만 판정한다 */
 const MAX_CLASSIFY = 60;
@@ -143,14 +144,10 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
       </div>
 
       {(phase === "wins" || phase === "classes") && (
-        <div className="mt-3">
-          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
-            <div className="h-full rounded-full bg-mint transition-all" style={{ width: `${phase === "classes" ? 100 : total ? Math.round((done / total) * 100) : 0}%` }} />
-          </div>
-          <p className="mt-1.5 text-xs text-ink-500">
-            {phase === "wins" ? `낙찰 이력 조회 중 ${done}/${total}구간 (7일 단위로 나눠 조회합니다)` : "낙찰 건의 세부품명·중분류를 확인하는 중"}
-          </p>
-        </div>
+        <LoadingBar
+          value={phase === "wins" && total ? (done / total) * 90 : undefined}
+          label={phase === "wins" ? `낙찰 이력 조회 중 ${done}/${total}구간` : "낙찰 건의 세부품명·중분류를 확인하는 중"}
+        />
       )}
 
       {phase === "error" && (

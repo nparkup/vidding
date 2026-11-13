@@ -8,12 +8,14 @@ on:
     paths:
       - "worker/corp-lookup/**"
       - "src/lib/corpLookup.ts"
+      - "src/lib/perfLookup.ts"
       - ".github/workflows/corp-worker.yml"
   # PR에서는 배포하지 않고 Cloudflare 토큰·계정 ID가 맞는지만 확인한다
   pull_request:
     paths:
       - "worker/corp-lookup/**"
       - "src/lib/corpLookup.ts"
+      - "src/lib/perfLookup.ts"
       - ".github/workflows/corp-worker.yml"
   workflow_dispatch:
 

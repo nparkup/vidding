@@ -9,6 +9,12 @@ on:
       - "worker/corp-lookup/**"
       - "src/lib/corpLookup.ts"
       - ".github/workflows/corp-worker.yml"
+  # PR에서는 배포하지 않고 Cloudflare 토큰·계정 ID가 맞는지만 확인한다
+  pull_request:
+    paths:
+      - "worker/corp-lookup/**"
+      - "src/lib/corpLookup.ts"
+      - ".github/workflows/corp-worker.yml"
   workflow_dispatch:
 
 permissions:
@@ -27,19 +33,33 @@ jobs:
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 가 없어 배포를 건너뜁니다."
             echo "skip=1" >> "$GITHUB_OUTPUT"
+            if [ "${{ github.event_name }}" = "pull_request" ]; then exit 1; fi
           fi
+      - name: 토큰·계정 확인
+        if: steps.check.outputs.skip != '1'
+        run: |
+          v=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify)
+          echo "토큰: $(echo "$v" | jq -r 'if .success then "유효 (" + .result.status + ")" else "오류 " + (.errors|tostring) end')"
+          echo "$v" | jq -e '.success and .result.status == "active"' > /dev/null
+          s=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")
+          echo "workers.dev: $(echo "$s" | jq -r 'if .success then (.result.subdomain // "없음") + ".workers.dev" else "오류 " + (.errors|tostring) end')"
+          echo "$s" | jq -e '.success and (.result.subdomain // "") != ""' > /dev/null
+          if [ -z "$DATA_GO_KR_SERVICE_KEY" ]; then echo "DATA_GO_KR_SERVICE_KEY 없음"; exit 1; fi
+          echo "DATA_GO_KR_SERVICE_KEY: 있음"
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
       - uses: actions/checkout@v4
-        if: steps.check.outputs.skip != '1'
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
       - uses: actions/setup-node@v4
-        if: steps.check.outputs.skip != '1'
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         with:
           node-version: 20
       - name: Worker 배포
-        if: steps.check.outputs.skip != '1'
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup
         run: npx --yes wrangler@3 deploy
       - name: 서비스키를 Worker 비밀값으로 저장
-        if: steps.check.outputs.skip != '1'
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}

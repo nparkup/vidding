@@ -1,0 +1,8 @@
+# 기업 정보 중계 서버. 배포: .github/workflows/corp-worker.yml (또는 이 폴더에서 npx wrangler deploy)
+name = "bidmate-corp-lookup"
+main = "index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGINS = "https://nparkup.github.io,http://localhost:3000"

@@ -38,7 +38,11 @@ jobs:
       - name: 토큰·계정 확인
         if: steps.check.outputs.skip != '1'
         run: |
+          # 사용자 토큰과 계정 토큰은 확인 주소가 다르다: 둘 중 하나가 통과하면 된다
           v=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify)
+          if ! echo "$v" | jq -e '.success' > /dev/null; then
+            v=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify")
+          fi
           echo "토큰: $(echo "$v" | jq -r 'if .success then "유효 (" + .result.status + ")" else "오류 " + (.errors|tostring) end')"
           echo "$v" | jq -e '.success and .result.status == "active"' > /dev/null
           s=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")

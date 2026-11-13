@@ -22,7 +22,7 @@ const LEVEL_STYLE: Record<SimLevel, string> = {
 };
 
 /**
- * 사업자번호를 조회하면 그때만 나라장터 낙찰 이력(최근 3년, 공고 업무구분 하나)을 7일 단위로 나눠 동시에 가져오고,
+ * 사업자번호를 조회하면 그때만 나라장터 낙찰 이력(최근 PERF_YEARS년, 공고 업무구분 하나)을 7일 단위로 나눠 동시에 가져오고,
  * 선택 공고와 세부품명 → 중분류 → 공고명 키워드 순으로 비교해 유사 실적을 고른다. 사용자가 행마다 인정 여부를 바꿀 수 있다.
  */
 export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
@@ -179,7 +179,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
             </>
           )}
           <ul className="mt-3 space-y-0.5 text-xs text-ink-300">
-            {sheetYears && sheetYears > PERF_YEARS && <li>평가표는 최근 {sheetYears}년 실적을 인정하지만, 자동 조회는 최근 {PERF_YEARS}년까지만 합니다. 그 이전 실적은 직접 입력해 주세요.</li>}
+            {(sheetYears ?? 3) > PERF_YEARS && <li>{sheetYears ? `평가표는 최근 ${sheetYears}년 실적을 인정하지만, ` : ""}자동 조회는 최근 {PERF_YEARS}년까지만 합니다. 그 이전 실적은 직접 추가 실적에 입력해 주세요.</li>}
             <li>낙찰금액 기준 추정치입니다. 변경계약·공동수급 지분은 반영되지 않으니 실적증명서로 확인해 주세요.</li>
             {failed > 0 && <li className="text-coral">일부 기간({failed}주)을 불러오지 못해 실제보다 적게 잡혔을 수 있습니다.</li>}
           </ul>

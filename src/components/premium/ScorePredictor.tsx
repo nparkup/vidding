@@ -275,7 +275,7 @@ export function ScorePredictor() {
             <div>
               <span className="label">{perfBizno ? "직접 추가 실적 (억원)" : "3년 유사 실적 (억원)"}</span>
               <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); setManualPerf(Math.round((Number(e.target.value) || 0) * 1e8)); }} />
-              {perfBizno && <p className="mt-1 text-xs text-ink-500">수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
+              {perfBizno && <p className="mt-1 text-xs text-ink-500">1년보다 이전 실적과 수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
             </div>
             <Num label="신인도 가점 (건)" value={co.bonusCount} onChange={(v) => set("bonusCount", v)} />
             <Num label="제재·벌점 (최근 2년)" value={co.penaltyCount} onChange={(v) => set("penaltyCount", v)} />

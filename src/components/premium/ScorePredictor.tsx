@@ -14,6 +14,7 @@ import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 import { sheetPerfYears } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
+import { LoadingBar } from "./LoadingBar";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 /** 정적 사이트는 Cloudflare 중계 서버(worker/corp-lookup)로, 서버 배포는 자체 API로 조회한다. 정적 사이트에 중계 주소가 없으면 조회를 끈다 */
@@ -261,11 +262,11 @@ export function ScorePredictor() {
                 <input className="input" inputMode="numeric" placeholder="000-00-00000" value={bizno} onChange={(e) => setBizno(e.target.value)} />
                 <button className="btn-primary btn-sm shrink-0" disabled={!CORP_API || corpLoading || normalizeBizno(bizno).length !== 10}>{corpLoading ? "조회 중" : "조회"}</button>
               </form>
-              <p className="mt-1 text-xs text-ink-500">
+              {corpLoading ? <LoadingBar label="국세청·나라장터·금융위원회 기업 정보를 조회하는 중" /> : <p className="mt-1 text-xs text-ink-500">
                 {corpMsg || (CORP_API
                   ? "국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업기본정보·재무정보를 한 번에 조회합니다."
                   : "공개 미리보기에서는 직접 입력합니다. 이용 고객은 담당 매니저가 사업자번호로 기업 정보를 조회해 채워 드립니다.")}
-              </p>
+              </p>}
               {corp && <CorpPanel corp={corp} />}
               {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetYears={sheetYears} onChange={onPerf} />}
             </div>
@@ -275,7 +276,7 @@ export function ScorePredictor() {
             <div>
               <span className="label">{perfBizno ? "직접 추가 실적 (억원)" : "3년 유사 실적 (억원)"}</span>
               <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); setManualPerf(Math.round((Number(e.target.value) || 0) * 1e8)); }} />
-              {perfBizno && <p className="mt-1 text-xs text-ink-500">수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
+              {perfBizno && <p className="mt-1 text-xs text-ink-500">1년보다 이전 실적과 수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
             </div>
             <Num label="신인도 가점 (건)" value={co.bonusCount} onChange={(v) => set("bonusCount", v)} />
             <Num label="제재·벌점 (최근 2년)" value={co.penaltyCount} onChange={(v) => set("penaltyCount", v)} />

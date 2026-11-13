@@ -3,12 +3,13 @@
  * 서버(Next API)와 Cloudflare Worker(worker/corp-lookup)가 같이 쓴다. 서비스키는 호출하는 쪽이 넘긴다.
  *
  * - 조달청_나라장터 낙찰정보서비스 getScsbidListSttus{Servc,Cnstwk,Thng}PPSSrch 는 bizno 조건을 받지만
- *   한 번에 7일까지만 조회된다 (8일 이상은 오류 07). 그래서 최근 3년을 7일 단위로 나눠 동시에 부른다.
+ *   한 번에 7일까지만 조회된다 (8일 이상은 오류 07). 그래서 최근 1년을 7일 단위로 나눠 동시에 부른다.
  * - 낙찰 응답에는 분류코드가 없어, 공고번호로 입찰공고정보서비스를 다시 불러 세부품명번호·중분류를 얻는다.
  * - 수의계약·민간·하도급 실적은 여기서 잡히지 않는다. 낙찰금액 기준이라 최종 계약금액·공동수급 지분과 다를 수 있다.
  */
 
-export const PERF_YEARS = 3;
+/** 자동 조회 기간(년). 3년이면 업체 하나에 약 157회라 개발계정 하루 한도를 금방 써서 1년(약 53회)으로 줄였다 */
+export const PERF_YEARS = 1;
 /** 브라우저가 중계 서버에 한 번에 맡기는 주 수. 재시도 포함 외부 호출이 Cloudflare 무료 한도(요청당 50회) 안에 들게 한다 */
 export const CHUNK_WEEKS = 15;
 /** 분류 조회 한 번에 맡기는 공고 수 */
@@ -58,7 +59,7 @@ export interface Window { from: string; to: string }
 const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
 const kstToday = () => new Date(Date.now() + 9 * 3600e3);
 
-/** 오늘(KST)부터 거꾸로 years년(최대 3년)을 7일 단위로 나눈다. since(YYYY-MM-DD, 조달업체 등록일 등) 이전 주는 뺀다 */
+/** 오늘(KST)부터 거꾸로 years년(최대 PERF_YEARS년)을 7일 단위로 나눈다. since(YYYY-MM-DD, 조달업체 등록일 등) 이전 주는 뺀다 */
 export function perfWindows(since?: string, years = PERF_YEARS, today = kstToday()): Window[] {
   const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
   const start = new Date(end);

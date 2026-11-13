@@ -9,10 +9,13 @@ import {
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
 import { won } from "@/lib/format";
+import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
+/** 정적 사이트는 Cloudflare 중계 서버(worker/corp-lookup)로, 서버 배포는 자체 API로 조회한다. 정적 사이트에 중계 주소가 없으면 조회를 끈다 */
+const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium/corp";
 
 interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string }
 
@@ -51,6 +54,8 @@ export function ScorePredictor() {
   const [creditMsg, setCreditMsg] = useState("");
   const [bizno, setBizno] = useState("");
   const [corpMsg, setCorpMsg] = useState("");
+  const [corp, setCorp] = useState<CorpLookup | null>(null);
+  const [corpLoading, setCorpLoading] = useState(false);
 
   const bid: Bid | undefined = useMemo(() => {
     if (!bids) return undefined;
@@ -98,21 +103,32 @@ export function ScorePredictor() {
   }
 
   async function lookup() {
-    setCorpMsg("나라장터 조회 중…");
+    const no = normalizeBizno(bizno);
+    if (!validBizno(no)) { setCorpMsg("올바른 사업자등록번호가 아닙니다. 숫자를 다시 확인해 주세요."); return; }
+    setCorpLoading(true);
+    setCorp(null);
+    setCorpMsg("국세청·나라장터·금융위원회 정보를 조회하는 중…");
     try {
-      const r = await fetch(`/api/premium/corp?bizno=${encodeURIComponent(bizno)}`);
+      const r = await fetch(`${CORP_API}?bizno=${no}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error);
-      setCo((c) => ({
-        ...c,
-        corpName: j.corpName,
-        bizno: j.bizno,
-        years: j.openedAt ? yearsSince(j.openedAt) : c.years,
-        employees: j.employees ?? c.employees,
+      const c = j as CorpLookup;
+      setCorp(c);
+      setCo((prev) => ({
+        ...prev,
+        corpName: c.corpName ?? prev.corpName,
+        bizno: c.bizno,
+        years: c.openedAt ? yearsSince(c.openedAt) : prev.years,
+        employees: c.employees ?? prev.employees,
       }));
-      setCorpMsg(`${j.corpName} · 개업 ${j.openedAt ?? "-"} · 종업원 ${j.employees ?? "-"}명${j.industries?.length ? ` · 등록 업종 ${j.industries.map((i: { name: string }) => i.name).join(", ")}` : ""}`);
+      const filled = [c.openedAt && "업력", c.employees !== undefined && "종업원 수"].filter(Boolean);
+      setCorpMsg(c.corpName || c.nts?.registered
+        ? filled.length ? `${filled.join("·")}를 조회 결과로 채웠습니다.` : "조회 결과에 업력·종업원 수가 없어 직접 입력해 주세요."
+        : "조회된 기업 정보가 없습니다. 번호를 확인하거나 직접 입력해 주세요.");
     } catch (e) {
       setCorpMsg((e as Error).message || "조회에 실패했습니다.");
+    } finally {
+      setCorpLoading(false);
     }
   }
 
@@ -195,16 +211,17 @@ export function ScorePredictor() {
           <Step n={2} title="기업 정보와 신용평가 서류" />
           <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
             <div className="sm:col-span-3">
-              <span className="label">사업자등록번호 (나라장터 조달업체 조회)</span>
-              <div className="flex gap-2">
+              <span className="label">사업자등록번호</span>
+              <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); lookup(); }}>
                 <input className="input" inputMode="numeric" placeholder="000-00-00000" value={bizno} onChange={(e) => setBizno(e.target.value)} />
-                <button type="button" className="btn-primary btn-sm shrink-0" disabled={STATIC || bizno.replace(/\D/g, "").length !== 10} onClick={lookup}>불러오기</button>
-              </div>
+                <button className="btn-primary btn-sm shrink-0" disabled={!CORP_API || corpLoading || normalizeBizno(bizno).length !== 10}>{corpLoading ? "조회 중" : "조회"}</button>
+              </form>
               <p className="mt-1 text-xs text-ink-500">
-                {corpMsg || (STATIC
-                  ? "공개 미리보기에서는 직접 입력합니다. 이용 고객은 담당 매니저가 나라장터 등록 정보(개업일·종업원 수·등록 업종)를 불러와 채워 드립니다."
-                  : "나라장터 사용자정보서비스에서 개업일·종업원 수·등록 업종을 가져옵니다.")}
+                {corpMsg || (CORP_API
+                  ? "국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업기본정보·재무정보를 한 번에 조회합니다."
+                  : "공개 미리보기에서는 직접 입력합니다. 이용 고객은 담당 매니저가 사업자번호로 기업 정보를 조회해 채워 드립니다.")}
               </p>
+              {corp && <CorpPanel corp={corp} />}
             </div>
             <Num label="업력 (년)" value={co.years} onChange={(v) => set("years", v)} />
             <Num label="종업원 수 (명)" value={co.employees} onChange={(v) => set("employees", v)} />
@@ -226,7 +243,7 @@ export function ScorePredictor() {
                   <input type="file" accept=".pdf,.hwpx,.docx,.txt" className="sr-only" onChange={(e) => { onCreditFile(e.target.files); e.target.value = ""; }} />
                 </label>
               </div>
-              <p className="mt-1 text-xs text-ink-500">{creditMsg || "나라장터 API에는 등급이 없어 확인서에서 읽거나 직접 고릅니다."}</p>
+              <p className="mt-1 text-xs text-ink-500">{creditMsg || "신용평가등급은 공공데이터로 제공되지 않아 확인서에서 읽거나 직접 고릅니다."}</p>
             </div>
             <div>
               <span className="label">제안서 준비 수준</span>
@@ -333,6 +350,100 @@ export function ScorePredictor() {
           {active.notes.map((n) => <li key={n}>{n}</li>)}
         </ul>
       </section>
+    </div>
+  );
+}
+
+/** 재무 금액: 1조 이상은 조 단위로 줄여 표 폭을 지킨다 */
+const fmtWon = (n?: number): string => {
+  if (n === undefined) return "-";
+  if (n < 0) return `-${fmtWon(-n)}`;
+  if (n >= 1e12) return `${(n / 1e12).toFixed(1).replace(/\.0$/, "")}조원`;
+  return won(n);
+};
+/** 영문 네트워크 오류는 그대로 보이지 않는다 */
+const friendly = (e: string) => (/[가-힣]/.test(e) ? e : "잠시 후 다시 시도해 주세요");
+
+/** 사업자번호 조회 결과: 출처별로 나눠 보여 준다 */
+function CorpPanel({ corp }: { corp: CorpLookup }) {
+  const { nts, nara, fsc, finance, errors } = corp;
+  const ntsTone = !nts ? "" : !nts.registered || nts.state === "폐업자" ? "text-coral" : nts.state === "휴업자" ? "text-amber" : "text-mint-600";
+  return (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-ink-100 text-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 bg-ink-50 px-4 py-3">
+        <p className="font-bold">{corp.corpName ?? "상호 정보 없음"}</p>
+        <p className="text-xs tabular-nums text-ink-500">
+          {corp.bizno.replace(/(\d{3})(\d{2})(\d{5})/, "$1-$2-$3")}{corp.ceoName ? ` · 대표 ${corp.ceoName}` : ""}
+        </p>
+      </div>
+      <dl className="divide-y divide-ink-100">
+        <Row title="사업자 상태" source="국세청" error={errors.nts}>
+          {nts && <><span className={`font-semibold ${ntsTone}`}>{nts.registered ? nts.state || "확인 불가" : "미등록"}</span>{nts.registered && nts.taxType ? ` · ${nts.taxType}` : ""}{nts.closedAt ? ` · 폐업일 ${nts.closedAt}` : ""}{!nts.registered ? ` · ${nts.taxType}` : ""}</>}
+        </Row>
+        <Row title="조달업체 등록" source="나라장터" error={errors.nara} empty="나라장터 조달업체로 등록되어 있지 않습니다.">
+          {nara && (
+            <>
+              <p>개업 {nara.openedAt ?? "-"} · 종업원 {nara.employees?.toLocaleString("ko-KR") ?? "-"}명{nara.manufacturer ? ` · ${nara.manufacturer}` : ""}{nara.registeredAt ? ` · 등록 ${nara.registeredAt}` : ""}</p>
+              {nara.bizDivisions.length > 0 && <p className="text-ink-500">참여 분야 {nara.bizDivisions.join(", ")}</p>}
+              {nara.address && <p className="text-ink-500">{nara.address}</p>}
+              {nara.industries.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {nara.industries.map((i) => (
+                    <span key={i.code + i.name} className={`rounded-md px-1.5 py-0.5 text-xs ${i.representative ? "bg-ink text-white" : "bg-ink-50 text-ink-500"}`}>{i.name}</span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </Row>
+        <Row title="기업 기본정보" source="금융위원회" error={errors.fsc} empty="법인 공시 정보가 없습니다. 개인사업자나 비공시 법인은 조회되지 않습니다.">
+          {fsc && (
+            <>
+              <p>설립 {fsc.establishedAt ?? "-"}{fsc.employees ? ` · 종업원 ${fsc.employees.toLocaleString("ko-KR")}명` : ""}{fsc.smallBusiness !== undefined ? ` · ${fsc.smallBusiness ? "중소기업" : "중소기업 아님"}` : ""}{fsc.market ? ` · ${fsc.market}` : ""}</p>
+              <p className="text-ink-500">법인등록번호 {fsc.crno.replace(/(\d{6})(\d{7})/, "$1-$2")}{fsc.auditOpinion ? ` · 감사의견 ${fsc.auditOpinion}` : ""}{fsc.auditor ? ` (${fsc.auditor})` : ""}{fsc.mainBank ? ` · 주거래은행 ${fsc.mainBank}` : ""}</p>
+            </>
+          )}
+        </Row>
+        {fsc && (
+          <Row title="재무 요약" source="금융위원회" error={errors.finance} empty="공시된 재무제표가 없습니다. 외부감사 대상이 아니면 재무제표 서류로 확인합니다.">
+            {finance.length > 0 && (
+              <div className="-mx-1 overflow-x-auto">
+                <table className="w-full text-right text-[11px] tabular-nums sm:text-xs">
+                  <thead className="text-ink-300">
+                    <tr><th className="px-1 py-1 text-left font-medium">연도</th><th className="px-1 font-medium">매출</th><th className="px-1 font-medium">영업이익</th><th className="px-1 font-medium">순이익</th><th className="px-1 font-medium">부채비율</th></tr>
+                  </thead>
+                  <tbody>
+                    {finance.map((f) => (
+                      <tr key={f.year} className="border-t border-ink-100">
+                        <td className="whitespace-nowrap px-1 py-1 text-left">{f.year} <span className="text-ink-300">{f.basis}</span></td>
+                        <td className="px-1">{fmtWon(f.sales)}</td>
+                        <td className={`px-1 ${(f.operatingProfit ?? 0) < 0 ? "text-coral" : ""}`}>{fmtWon(f.operatingProfit)}</td>
+                        <td className={`px-1 ${(f.netIncome ?? 0) < 0 ? "text-coral" : ""}`}>{fmtWon(f.netIncome)}</td>
+                        <td className="px-1 font-semibold">{f.debtRatio !== undefined ? `${f.debtRatio}%` : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Row>
+        )}
+      </dl>
+    </div>
+  );
+}
+
+function Row({ title, source, error, empty, children }: { title: string; source: string; error?: string; empty?: string; children?: React.ReactNode }) {
+  const has = !!children && !(Array.isArray(children) && children.every((c) => !c));
+  return (
+    <div className="grid gap-1 px-4 py-3 sm:grid-cols-[7.5rem_1fr]">
+      <dt>
+        <p className="font-semibold">{title}</p>
+        <p className="text-xs text-ink-300">{source}</p>
+      </dt>
+      <dd className="min-w-0 leading-relaxed">
+        {has ? children : <p className="text-ink-500">{error ? `조회하지 못했습니다. ${friendly(error)}` : empty ?? "정보 없음"}</p>}
+      </dd>
     </div>
   );
 }

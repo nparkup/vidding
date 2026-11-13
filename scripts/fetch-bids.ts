@@ -9,6 +9,7 @@ import { buildMockBids } from "../src/lib/mock/bids";
 import { fetchAllBids, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids } from "../src/lib/nara/docExtract";
+import { buildAwardStats } from "../src/lib/nara/awardStats";
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -38,7 +39,19 @@ async function main() {
   } catch (e) {
     console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, syncedAt, source: "g2b" }));
+  // 전년도 낙찰률 통계 (예상 최저 경쟁 투찰률 기본값). 받은 자료는 AWARD_CACHE_DIR 에 쌓여 다음 빌드가 이어 받는다. 실패해도 배포는 계속
+  let awardStats;
+  try {
+    const r = await buildAwardStats(process.env.AWARD_CACHE_DIR ?? ".cache/award", {
+      targets: items.filter((b) => b.contractMethod === "적격심사" || b.contractMethod === "협상에 의한 계약"),
+    });
+    awardStats = r.stats;
+    const c = r.stats.coverage;
+    console.log(`전년도(${r.stats.year}) 낙찰률: 이번 호출 ${r.fetched}회, 낙찰 ${c.weeks}/${c.totalWeeks}주, 공고 ${c.noticeDays}/${c.totalNoticeDays}일 확보, 전년도 유사 공고 찾은 공고 ${Object.keys(r.stats.prior ?? {}).length}건${r.stopped ? ` (중단: ${r.stopped})` : ""}`);
+  } catch (e) {
+    console.warn("전년도 낙찰률 통계 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, awardStats, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

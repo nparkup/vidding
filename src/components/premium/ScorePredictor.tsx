@@ -12,6 +12,7 @@ import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
+import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from "@/lib/rivalRate";
 import { sheetPerfYears } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
@@ -33,6 +34,12 @@ async function loadBidDocs(bid: Bid): Promise<BidDocs> {
   if (!r.ok) return { files: [] };
   const j = await r.json();
   return Array.isArray(j) ? { files: j } : j;
+}
+
+/** 전년도 낙찰률 통계: 정적 배포는 빌드 때 만든 파일, 서버 배포는 같은 경로의 라우트 */
+async function loadAwardStats(): Promise<AwardStats | null> {
+  const r = await fetch(`${STATIC ? process.env.NEXT_PUBLIC_BASE_PATH ?? "" : ""}/award-stats.json`);
+  return r.ok ? r.json() : null;
 }
 
 const KIND_LABEL: Record<ItemKind, string> = {
@@ -88,6 +95,18 @@ export function ScorePredictor() {
       .catch(() => alive && setDocs({ files: [] }));
     return () => { alive = false; };
   }, [bid]);
+
+  // 전년도 낙찰률 통계: 고른 공고와 같은 업무·계약방법·금액대의 평균을 예상 최저 경쟁 투찰률 기본값으로 쓴다
+  const [awardStats, setAwardStats] = useState<AwardStats | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadAwardStats().then((s) => alive && setAwardStats(s)).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+  const rivalEst = useMemo(() => (bid ? estimateRival(awardStats, bid) : undefined), [awardStats, bid]);
+  useEffect(() => {
+    setCo((c) => ({ ...c, rivalRate: rivalEst ? Math.min(100, Math.max(80, Math.round(rivalEst.rate * 100) / 100)) : DEFAULT_COMPANY.rivalRate }));
+  }, [rivalEst]);
 
   // 실적 = 나라장터에서 찾은 유사 낙찰(추정) + 직접 입력(수의계약·민간·하도급 등)
   const coEff = useMemo<CompanyInput>(() => ({
@@ -301,8 +320,22 @@ export function ScorePredictor() {
                 ))}
               </div>
             </div>
-            <Range label="투찰률 (예정가격 대비)" value={co.bidRate} onChange={(v) => set("bidRate", v)} />
-            {isNego && <Range label="예상 최저 경쟁 투찰률" value={co.rivalRate} onChange={(v) => set("rivalRate", v)} />}
+            <Range
+              label="투찰률 (예정가격 대비)"
+              value={co.bidRate}
+              onChange={(v) => set("bidRate", v)}
+              hint={!isNego && rivalEst ? `참고: ${rivalBasis(rivalEst)}입니다.` : undefined}
+            />
+            {isNego && (
+              <Range
+                label="예상 최저 경쟁 투찰률"
+                value={co.rivalRate}
+                onChange={(v) => set("rivalRate", v)}
+                hint={rivalEst
+                  ? `기본값 = ${rivalBasis(rivalEst)}${!rivalEst.prior && awardStats && awardStats.coverage.weeks < awardStats.coverage.totalWeeks ? ` (연간 ${awardStats.coverage.totalWeeks}주 중 ${awardStats.coverage.weeks}주 자료)` : ""}. 슬라이더로 바꿀 수 있습니다.`
+                  : `전년도 같은 수요기관의 유사 공고가 없고 같은 조건 낙찰 표본도 ${MIN_SAMPLES}건 미만이라 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`}
+              />
+            )}
           </div>
         </section>
       </div>
@@ -521,11 +554,23 @@ function Num({ label, value, onChange, hint }: { label: string; value: number; o
   );
 }
 
-function Range({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+/** 예상 투찰률 근거 문구: 전년도 유사 공고면 그 공고명, 아니면 같은 조건 평균 */
+function rivalBasis(e: RivalEstimate) {
+  if (e.prior?.length) {
+    const first = `「${e.prior[0].title}」`;
+    return e.prior.length === 1
+      ? `${e.year}년 같은 수요기관의 유사 공고 ${first} 낙찰률 ${e.rate.toFixed(2)}%`
+      : `${e.year}년 같은 수요기관의 유사 공고 ${e.prior.length}건(${first} 외) 평균 낙찰률 ${e.rate.toFixed(2)}%`;
+  }
+  return `${e.year}년 ${e.scope} 낙찰 ${e.n.toLocaleString()}건의 평균 낙찰률 ${e.rate.toFixed(2)}%`;
+}
+
+function Range({ label, value, onChange, hint }: { label: string; value: number; onChange: (v: number) => void; hint?: string }) {
   return (
     <div className="sm:col-span-3">
       <div className="flex justify-between"><span className="label">{label}</span><span className="text-sm font-bold tabular-nums">{value.toFixed(2)}%</span></div>
       <input type="range" min={80} max={100} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#12B886]" />
+      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
     </div>
   );
 }

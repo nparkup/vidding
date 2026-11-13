@@ -29,10 +29,23 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # 전년도 낙찰률 자료는 바뀌지 않으므로 받은 만큼 캐시에 두고 다음 빌드가 이어 받는다
+      - name: 전년도 낙찰률 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/award
+          key: award-stats-${{ github.run_id }}
+          restore-keys: award-stats-
       - name: 나라장터 공고 수집
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: npx tsx --conditions=react-server scripts/fetch-bids.ts data/bids.json
+      - name: 전년도 낙찰률 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/award
+          key: award-stats-${{ github.run_id }}
       - name: 기업 정보 중계 서버 주소 확인
         id: corp
         env:

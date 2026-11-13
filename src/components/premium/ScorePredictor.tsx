@@ -54,7 +54,8 @@ export function ScorePredictor() {
 
   const bid: Bid | undefined = useMemo(() => {
     if (!bids) return undefined;
-    return bids.find((b) => b.id === bidId) ?? bids.find((b) => b.contractMethod === "적격심사") ?? bids[0];
+    // 미리 고르지 않는다: 사용자가 검색해서 고른 공고(또는 공고 상세에서 넘어온 공고)만 쓴다
+    return bidId ? bids.find((b) => b.id === bidId) : undefined;
   }, [bids, bidId]);
 
   const template = useMemo(() => (bid ? templateSheet(bid) : null), [bid]);
@@ -125,8 +126,45 @@ export function ScorePredictor() {
     setSheet({ ...active, items: active.items.filter((i) => i.id !== id) });
   }
 
+  const searchBox = (
+          <div className={`relative ${bid ? "mt-3" : "mt-4"}`}>
+            <input className="input" placeholder={bid ? "다른 공고 찾기: 공고명·기관명·공고번호" : "공고명·기관명·공고번호로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} />
+            {matches.length > 0 && (
+              <ul className="card absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto p-1">
+                {matches.map((m) => (
+                  <li key={m.id}>
+                    <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
+                      <span className="block truncate font-semibold">{m.title}</span>
+                      <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+  );
+
   if (error) return <p className="card p-6 text-sm text-coral">공고 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
-  if (!bids || !bid || !active || !result) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
+  if (!bids) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
+
+  // 공고를 고르기 전: 검색만 보이고, 결과 자리에는 안내만 둔다
+  if (!bid || !active || !result) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <section className="card min-w-0 p-6">
+          <Step n={1} title="공고 선택" />
+          <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요. 고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다.</p>
+          {searchBox}
+        </section>
+        <aside className="card grid min-h-[12rem] min-w-0 place-items-center p-6 text-center">
+          <div>
+            <p className="font-bold">예상 평가점수</p>
+            <p className="mt-2 text-sm text-ink-500">공고를 고르면 기업 정보 입력란과 항목별 예상 점수가 나옵니다.</p>
+          </div>
+        </aside>
+      </div>
+    );
+  }
 
   const isNego = active.method === "협상에 의한 계약" || active.method === "종합심사";
 
@@ -143,21 +181,7 @@ export function ScorePredictor() {
             <p className="mt-1 font-bold leading-snug">{bid.title}</p>
             <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
           </div>
-          <div className="relative mt-3">
-            <input className="input" placeholder="다른 공고 찾기: 공고명·기관명·공고번호" value={query} onChange={(e) => setQuery(e.target.value)} />
-            {matches.length > 0 && (
-              <ul className="card absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto p-1">
-                {matches.map((m) => (
-                  <li key={m.id}>
-                    <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
-                      <span className="block truncate font-semibold">{m.title}</span>
-                      <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {searchBox}
           {/* 고른 공고의 첨부파일을 자동으로 확인해 평가표를 적용한다 (첨부가 없으면 표시하지 않는다) */}
           {(!docs || docs.sheet || docs.files.length > 0) && (
           <div className="mt-4 border-t border-ink-100 pt-4">

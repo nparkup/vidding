@@ -312,12 +312,18 @@ export function ScorePredictor() {
           <ul className="space-y-4 border-t border-white/10 p-6">
             {result.items.map((i) => (
               <li key={i.id}>
-                <div className="mb-1 flex justify-between gap-3 text-sm">
+                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
                   <span className="font-semibold">{i.label}</span>
-                  <span className="shrink-0 tabular-nums text-ink-300">{i.score}/{i.max}</span>
+                  <span className="tabular-nums text-xs text-ink-300">
+                    현재: <b className="text-sm text-white">{i.score}점</b>
+                    <span className="mx-1.5 text-white/30">|</span>
+                    공고 평가항목 기준: {i.max > 0 ? `총 ${i.max}점 만점` : "가·감점 항목"}
+                  </span>
                 </div>
                 {i.max > 0 && <ScoreBar value={Math.max(0, i.score)} max={i.max} />}
-                <p className="mt-1 text-xs text-ink-300">{i.reason}{i.max > 0 ? ` · ${pct(i.score, i.max)}%` : ""}</p>
+                <p className="mt-1 text-xs text-ink-300">
+                  {i.max > 0 && i.score >= i.max ? "만점 기준" : "산정 기준"}: {i.reason}{i.max > 0 ? ` ${pct(i.score, i.max)}%` : ""}
+                </p>
               </li>
             ))}
           </ul>

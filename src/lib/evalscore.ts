@@ -626,7 +626,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
       }
       case "credit":
         ratio = creditRatio(c.creditGrade, amt);
-        reason = `신용평가등급 ${c.creditGrade}${ratio === 1 ? ", 이 규모의 만점 등급" : ""}`;
+        reason = `신용평가등급 ${c.creditGrade}`;
         break;
       case "years":
         ratio = yearsRatio(c.years);

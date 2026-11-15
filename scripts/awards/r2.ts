@@ -23,10 +23,25 @@ const bucket = () => process.env.R2_BUCKET || BUCKET;
 const objectUrl = (key: string) =>
   `https://api.cloudflare.com/client/v4/accounts/${account()}/r2/buckets/${bucket()}/objects/${encodeURIComponent(key)}`;
 
+/**
+ * Cloudflare API는 토큰당 5분에 1,200회까지만 받는다(넘으면 429). 요청 시작 간격을 280ms 이상 두어 5분에 약 1,070회로 맞춘다.
+ * 2026-11-15: 샤드 1만 개를 동시에 12개씩 올리다가 429로 실패했다.
+ */
+const GAP_MS = 280;
+let nextSlot = 0;
+async function throttle() {
+  const now = Date.now();
+  const at = Math.max(now, nextSlot);
+  nextSlot = at + GAP_MS;
+  if (at > now) await new Promise((r) => setTimeout(r, at - now));
+}
+
 async function req(method: string, url: string, body?: Buffer, contentType?: string): Promise<Response> {
   let last: unknown;
-  for (let i = 0; i < 4; i++) {
-    if (i) await new Promise((r) => setTimeout(r, 1500 * i));
+  for (let i = 0; i < 6; i++) {
+    // 429 뒤에는 한도 창이 풀리도록 길게 쉰다
+    if (i) await new Promise((r) => setTimeout(r, (last as { rate?: boolean })?.rate ? 60_000 : 1500 * i));
+    await throttle();
     try {
       const r = await fetch(url, {
         method,
@@ -38,7 +53,8 @@ async function req(method: string, url: string, body?: Buffer, contentType?: str
       if (r.status === 401 || r.status === 403 || r.status === 400) {
         throw Object.assign(new Error(`R2 ${method} ${r.status}: ${(await r.text()).slice(0, 300)}`), { fatal: true });
       }
-      if (r.status >= 500 || r.status === 429) { last = new Error(`R2 ${method} ${r.status}`); continue; }
+      if (r.status === 429) { last = Object.assign(new Error(`R2 ${method} 429 (Cloudflare API 요청 한도)`), { rate: true }); continue; }
+      if (r.status >= 500) { last = new Error(`R2 ${method} ${r.status}`); continue; }
       return r;
     } catch (e) {
       if ((e as { fatal?: boolean }).fatal) throw e;

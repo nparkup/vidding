@@ -1,6 +1,6 @@
 /**
  * 낙찰 저장소(R2)에서 한 업체의 낙찰 건을 읽는다. Cloudflare Worker(worker/corp-lookup)가 R2 바인딩으로 부른다.
- * 조달청 API를 부르지 않으므로 호출 한도와 상관없이 3년치를 한 번에 돌려준다.
+ * 조달청 API를 부르지 않으므로 호출 한도와 상관없이 저장 기간(5년) 전체를 한 번에 돌려준다.
  */
 import { SHARD_COLS, firstLicense, shardOf, type AwardMeta, type ShardFile } from "./format";
 import type { NtceClass, PerfBiz, PerfWin } from "../perfLookup";
@@ -42,7 +42,8 @@ export async function readAwards(bucket: R2BucketLike | undefined, bizno: string
   if (no.length !== 10) throw new Error("올바른 사업자등록번호가 아닙니다.");
 
   const obj = await bucket.get(`shards/${shardOf(no)}.json.gz`);
-  if (!obj) return { ready: true, meta, wins: [] };
+  // 샤드가 없으면 저장소를 다시 만드는 중이다: 화면이 직접 조회로 가게 한다
+  if (!obj) return { ready: false, meta, wins: [] };
   const file = await gunzipJson<ShardFile>(obj);
   const c = Object.fromEntries(file.cols.map((k, i) => [k, i])) as Record<(typeof SHARD_COLS)[number], number>;
   const want = biz === "공사" || biz === "물품" || biz === "용역" ? (biz as PerfBiz) : undefined;

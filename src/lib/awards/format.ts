@@ -1,17 +1,21 @@
 /**
- * 나라장터 낙찰 3년치 저장소(Cloudflare R2 버킷 bidmate-awards)의 파일 형식.
+ * 나라장터 낙찰 5년치 저장소(Cloudflare R2 버킷 bidmate-awards)의 파일 형식.
  * 수집(scripts/awards/collect.ts), 중계 서버(worker/corp-lookup), 화면이 같이 쓴다. Node 전용 모듈은 쓰지 않는다.
  *
  * R2 안의 파일
  * - raw/{kind}/{op}/{YYYYMMDD}.json.gz : 한 주(월~일) 치 원자료에서 필요한 열만. kind = award(낙찰) · notice(공고) · rgn(참가가능지역) · lic(업종제한)
- * - shards/{000~999}.json.gz            : 낙찰 건을 공고 정보와 합친 행. 낙찰자 사업자번호 7~9번째 자리(일련번호 부분)로 나눠 크기를 고르게 했다
- * - stats/rates.json                     : 업무·계약방법·금액대·업종별 낙찰률 통계 (최근 1년, 3년)
+ * - shards/{0000~9999}.json.gz          : 낙찰 건을 공고 정보와 합친 행. 낙찰자 사업자번호 6~9번째 자리(일련번호 부분)로 나눠 크기를 고르게 했다.
+ *                                          파일 하나를 작게(약 200건) 해 중계 서버가 무료 CPU 한도(요청당 10ms) 안에서 읽게 한다
+ * - stats/rates.json                     : 업무·계약방법·금액대·업종별 낙찰률 통계 (최근 1년, 전체 기간)
  * - stats/agency.json.gz                 : 수요기관별 적격심사·협상계약 낙찰률 목록 (같은 기관의 과거 유사 공고 찾기용)
  * - stats/meta.json                      : 수집 범위·완료 여부·용량
  * - manifest.json                        : 수집 상태 (어떤 주를 언제 받았는지, 파일별 크기)
  */
 
-export const AWARD_YEARS = 3;
+/** 저장 기간(년). 2026-11-15 사용자 요청으로 3년 → 5년 */
+export const AWARD_YEARS = 5;
+/** 평가표에 실적 인정 기간이 없을 때 유사 실적으로 보는 기간(년) */
+export const PERF_DEFAULT_YEARS = 3;
 /** 공고는 낙찰보다 먼저 나오므로 낙찰 기간보다 이만큼 앞선 주부터 받는다 */
 export const NOTICE_LEAD_WEEKS = 13;
 export const BUCKET = "bidmate-awards";
@@ -35,8 +39,8 @@ export type ShardRow = [
 
 export interface ShardFile { v: 1; cols: readonly string[]; rows: ShardRow[] }
 
-/** 사업자번호 → 샤드 번호 (000~999). 앞 3자리(세무서)는 지역에 몰려 크기가 고르지 않아 일련번호 부분을 쓴다 */
-export const shardOf = (bizno: string) => bizno.replace(/\D/g, "").padStart(10, "0").slice(6, 9);
+/** 사업자번호 → 샤드 번호 (0000~9999). 앞 3자리(세무서)는 지역에 몰려 크기가 고르지 않아 일련번호 부분을 쓴다 */
+export const shardOf = (bizno: string) => bizno.replace(/\D/g, "").padStart(10, "0").slice(5, 9);
 
 export interface AwardMeta {
   builtAt: string;
@@ -46,7 +50,7 @@ export interface AwardMeta {
   /** 업무마다 받은 낙찰 주 수 / 받아야 할 주 수 (가장 적은 업무 기준) */
   weeks: number;
   totalWeeks: number;
-  /** 낙찰·공고·지역·업종 자료를 3년치 모두 받았는지 */
+  /** 낙찰·공고·지역·업종 자료를 저장 기간을 모두 받았는지 */
   complete: boolean;
   rows: number;
   /** R2에 올린 파일 크기 합 (바이트) */
@@ -79,7 +83,7 @@ export function weeksBetween(fromMonday: string, toMonday: string): string[] {
   return out;
 }
 
-/** 오늘(KST) 기준 낙찰 수집 첫 주: 3년 전 같은 날이 속한 주 */
+/** 오늘(KST) 기준 낙찰 수집 첫 주: AWARD_YEARS년 전 같은 날이 속한 주 */
 export function awardStartWeek(todayKst: Date, years = AWARD_YEARS): string {
   const d = new Date(todayKst);
   d.setUTCFullYear(d.getUTCFullYear() - years);

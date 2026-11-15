@@ -29,7 +29,7 @@ export async function awardStatsFromR2(targets: PriorTarget[]): Promise<AwardSta
   const r = JSON.parse(rates.toString()) as { windows: Record<string, { from: string; strata: Record<string, RateStat> }> };
   const agency = JSON.parse(gunzipSync(agencyGz).toString("utf8")) as Record<string, [string, string, number, "Q" | "N", string][]>;
 
-  // 지금 공고와 수요기관이 같고 공고명이 비슷한 과거 3년 낙찰 공고 (비슷한 순, 같으면 최근 순)
+  // 지금 공고와 수요기관이 같고 공고명이 비슷한 과거 낙찰 공고 (저장 기간 전체) (비슷한 순, 같으면 최근 순)
   const prior: Record<string, PriorMatch[]> = {};
   const keyMemo = new Map<string, string>();
   const keyOf = (t: string) => keyMemo.get(t) ?? (keyMemo.set(t, titleKey(t)), keyMemo.get(t)!);

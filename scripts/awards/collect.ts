@@ -1,14 +1,15 @@
 /**
- * 나라장터 낙찰 3년치를 모아 Cloudflare R2(bidmate-awards)에 저장한다. GitHub Actions(.github/workflows/awards.yml)가 실행한다.
+ * 나라장터 낙찰 5년치(AWARD_YEARS)를 모아 Cloudflare R2(bidmate-awards)에 저장한다. GitHub Actions(.github/workflows/awards.yml)가 실행한다.
  *
  *   npx tsx scripts/awards/collect.ts            수집 + 샤드·통계 다시 만들기
  *   npx tsx scripts/awards/collect.ts check      토큰의 R2 읽기·쓰기 권한만 확인
+ *   npx tsx scripts/awards/collect.ts raw        원자료만 받고 샤드·통계는 그대로 둔다 (배포 전 코드로 미리 채울 때)
  *
  * 1. 한 주(월~일) 단위로 받는다. 낙찰정보·입찰공고정보 API는 한 번에 7일까지만 조회된다(2026-11-10 공지).
  *    - 낙찰: 낙찰정보서비스 getScsbidListSttus{Servc,Cnstwk,Thng} (최종낙찰자 목록, 등록일 기준)
  *    - 공고: 입찰공고정보서비스 getBidPblancListInfo{op}02 (계약방법·추정가격·분류), PrtcptPsblRgn02(지역), LicenseLimit02(업종)
  *    최근 주부터 거꾸로 받고, 아직 끝나지 않은 최근 2주는 매번 다시 받는다. 끝난 주는 다시 받지 않는다.
- * 2. 실행 한 번에 MAX_MINUTES 분까지만 받고 멈춘다. 다음 실행이 이어 받는다(초기 3년치는 며칠에 나눠 채운다).
+ * 2. 실행 한 번에 MAX_MINUTES 분까지만 받고 멈춘다. 다음 실행이 이어 받는다(처음 채우는 기간은 며칠에 나눠 받는다).
  * 3. 받은 원자료를 공고번호로 합쳐 사업자번호별 샤드와 낙찰률 통계를 만들고, 바뀐 파일만 올린다.
  * 4. 용량 한도: R2 사용량이 승인 용량(R2_APPROVED_BYTES, 기본 5GB)의 90%에 닿거나, 예상 최종 용량이 승인 용량을 넘으면
  *    올리기 전에 멈추고 실패로 끝낸다(사용자 승인 후 R2_APPROVED_BYTES 를 올려야 이어진다).
@@ -27,7 +28,7 @@ import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 const NARA = "https://apis.data.go.kr/1230000";
 const ROWS = 999; // 1000 이상이면 10건만 온다
 const WORK = process.env.AWARDS_WORK_DIR || ".cache/awards";
-const MAX_MS = Number(process.env.MAX_MINUTES || 100) * 60_000;
+const MAX_MS = Math.min(300, Number(process.env.MAX_MINUTES || 100)) * 60_000;
 const APPROVED = Number(process.env.R2_APPROVED_BYTES || 5e9);
 const STOP_AT = APPROVED * 0.9;
 const CONCURRENCY = 3;
@@ -292,7 +293,7 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
   let uploaded = 0;
   const keys = [...shards.keys()].sort();
   let next = 0;
-  await Promise.all(Array.from({ length: 6 }, async () => {
+  await Promise.all(Array.from({ length: 12 }, async () => {
     while (next < keys.length) {
       const k = keys[next++];
       const list = shards.get(k)!.sort((a, b) => b[9].localeCompare(a[9]) || a[0].localeCompare(b[0]));
@@ -300,14 +301,18 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
       if (await put(`shards/${k}.json.gz`, gz(file))) uploaded++;
     }
   }));
-  console.log(`샤드 ${keys.length}개 중 ${uploaded}개 올림`);
+  // 샤드 나누는 방식이 바뀌어 더 쓰지 않는 샤드 파일은 지운다 (2026-11-15: 1,000개 → 10,000개)
+  const live = new Set(keys.map((k) => `shards/${k}.json.gz`));
+  const stale = Object.keys(manifest.files).filter((k) => k.startsWith("shards/") && !live.has(k));
+  for (const k of stale) { await r2Delete(k); delete manifest.files[k]; }
+  console.log(`샤드 ${keys.length}개 중 ${uploaded}개 올림${stale.length ? `, 안 쓰는 샤드 ${stale.length}개 지움` : ""}`);
 
   // 통계
   const all = [...shards.values()].flat();
   const today = iso(mondayOf(kstNow()).replace(/-/g, ""));
   const since1y = iso(addDays(today.replace(/-/g, ""), -365));
   const windows: Record<string, { from: string; strata: Record<string, RateStat> }> = {};
-  for (const [name, from] of [["1y", since1y], ["3y", "0000-00-00"]] as const) {
+  for (const [name, from] of [["1y", since1y], ["all", "0000-00-00"]] as const) {
     const groups = new Map<string, number[]>();
     const add = (k: string, v: number) => (groups.get(k) ?? groups.set(k, []).get(k)!).push(v);
     for (const r of all) {
@@ -396,6 +401,12 @@ async function main() {
     await saveManifest();
   }
 
+  if (process.argv[2] === "raw") {
+    console.log(`원자료만 받기: 샤드·통계는 다음 일반 실행에서 만든다. 원자료 ${Object.keys(manifest.raw).length}/${totalRaw}개, R2 ${fmtGB(usedBytes())}`);
+    if (stopped && /승인 용량/.test(stopped)) { console.error(`::error::${stopped}`); process.exit(2); }
+    return;
+  }
+
   let quota = stopped && /승인 용량/.test(stopped) ? stopped : undefined;
   let built = { rows: 0, shards: 0 };
   if (!quota) {
@@ -426,7 +437,7 @@ async function main() {
     manifest.blocked = { at: new Date().toISOString(), usedBytes: Math.max(usedBytes(), r2Measured), projectedBytes: projected, reason: quota };
   } else delete manifest.blocked;
   await saveManifest();
-  console.log(`완료 여부: ${complete ? "3년치 완료" : `낙찰 ${awardPerOp}/${awardWeeks.length}주`} · 끊김 없는 범위 ${from}~ · R2 ${fmtGB(usedBytes())}`);
+  console.log(`완료 여부: ${complete ? `${AWARD_YEARS}년치 완료` : `낙찰 ${awardPerOp}/${awardWeeks.length}주`} · 끊김 없는 범위 ${from}~ · R2 ${fmtGB(usedBytes())}`);
   if (quota) {
     console.error(`::error::${quota}. 업로드를 멈췄습니다. 사용자 승인 후 저장소 변수 R2_APPROVED_BYTES 를 올려 주세요.`);
     process.exit(2);

@@ -366,8 +366,8 @@ export default async function Home() {
         <div className="mt-16 space-y-20 sm:space-y-28">
           {FEATURES.map((f, i) => (
             <div key={f.label} className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-              <div className={`rounded-[32px] bg-gradient-to-br from-mint-50 via-paper to-sky-100/60 p-4 sm:p-8 ${i % 2 ? "lg:order-2" : ""}`}>{f.visual}</div>
-              <div>
+              <div className={`min-w-0 rounded-[32px] bg-gradient-to-br from-mint-50 via-paper to-sky-100/60 p-4 sm:p-8 ${i % 2 ? "lg:order-2" : ""}`}>{f.visual}</div>
+              <div className="min-w-0">
                 <p className="inline-flex rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700">{f.label}</p>
                 <h3 className="mt-4 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">{f.title}</h3>
                 <ul className="mt-6 space-y-3">

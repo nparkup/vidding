@@ -6,3 +6,8 @@ workers_dev = true
 
 [vars]
 ALLOWED_ORIGINS = "https://nparkup.github.io,http://localhost:3000"
+
+# 낙찰 3년치 저장소. scripts/awards/collect.ts (.github/workflows/awards.yml) 가 채운다
+[[r2_buckets]]
+binding = "AWARDS"
+bucket_name = "bidmate-awards"

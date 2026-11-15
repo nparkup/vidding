@@ -67,6 +67,8 @@ export interface Bid {
   briefingAt?: string;      // 현장설명회 ISO
   detailUrl: string;
   source: "mock" | "g2b";
+  /** 세부품명·중분류·주공종 (빌드 때 낙찰 저장소의 공고 원자료에서 붙인다. 유사 실적 비교 기준) */
+  cls?: { no?: string; nm?: string; mid?: string; lrg?: string; work?: string };
   /** 과거 유사 공고 기반 통계 (낙찰정보서비스 연동 시 계산) */
   stats?: { avgBidders: number; avgWinRate: number };
 }

@@ -1,0 +1,76 @@
+/**
+ * 낙찰 저장소(R2)에서 한 업체의 낙찰 건을 읽는다. Cloudflare Worker(worker/corp-lookup)가 R2 바인딩으로 부른다.
+ * 조달청 API를 부르지 않으므로 호출 한도와 상관없이 3년치를 한 번에 돌려준다.
+ */
+import { SHARD_COLS, firstLicense, shardOf, type AwardMeta, type ShardFile } from "./format";
+import type { NtceClass, PerfBiz, PerfWin } from "../perfLookup";
+
+/** Worker R2 바인딩 중 쓰는 부분만 */
+export interface R2BucketLike {
+  get(key: string): Promise<{ body: ReadableStream; arrayBuffer(): Promise<ArrayBuffer> } | null>;
+}
+
+export interface AwardWin extends PerfWin {
+  cls: NtceClass;
+  /** 낙찰률(%), 없으면 0 */
+  rate: number;
+  bidders: number;
+  method: string;
+  region: string;
+  lic: string;
+}
+
+export interface AwardLookup {
+  /** 저장소가 연결돼 있고 수집 기록이 있으면 true */
+  ready: boolean;
+  meta?: AwardMeta;
+  wins: AwardWin[];
+}
+
+async function gunzipJson<T>(obj: { body: ReadableStream }): Promise<T> {
+  const stream = obj.body.pipeThrough(new DecompressionStream("gzip"));
+  return JSON.parse(await new Response(stream).text()) as T;
+}
+
+export async function readAwards(bucket: R2BucketLike | undefined, bizno: string, biz: string): Promise<AwardLookup> {
+  if (!bucket) return { ready: false, wins: [] };
+  const metaObj = await bucket.get("stats/meta.json");
+  if (!metaObj) return { ready: false, wins: [] };
+  const meta = JSON.parse(new TextDecoder().decode(await metaObj.arrayBuffer())) as AwardMeta;
+  const no = bizno.replace(/\D/g, "");
+  if (!no) return { ready: true, meta, wins: [] };
+  if (no.length !== 10) throw new Error("올바른 사업자등록번호가 아닙니다.");
+
+  const obj = await bucket.get(`shards/${shardOf(no)}.json.gz`);
+  if (!obj) return { ready: true, meta, wins: [] };
+  const file = await gunzipJson<ShardFile>(obj);
+  const c = Object.fromEntries(file.cols.map((k, i) => [k, i])) as Record<(typeof SHARD_COLS)[number], number>;
+  const want = biz === "공사" || biz === "물품" || biz === "용역" ? (biz as PerfBiz) : undefined;
+  const wins: AwardWin[] = [];
+  for (const r of file.rows) {
+    if (r[c.bizno] !== no || (want && r[c.biz] !== want)) continue;
+    wins.push({
+      bidNtceNo: r[c.no] as string,
+      bidNtceOrd: r[c.ord] as string,
+      title: r[c.title] as string,
+      amount: r[c.amount] as number,
+      agency: r[c.agency] as string,
+      date: r[c.date] as string,
+      rate: r[c.rate] as number,
+      bidders: r[c.bidders] as number,
+      method: r[c.method] as string,
+      region: r[c.region] as string,
+      lic: r[c.lic] as string,
+      cls: {
+        bidNtceNo: r[c.no] as string,
+        clsfcNo: (r[c.clsNo] as string) || undefined,
+        clsfcNm: (r[c.clsNm] as string) || undefined,
+        midNm: (r[c.mid] as string) || undefined,
+        lrgNm: (r[c.lrg] as string) || undefined,
+        mainWork: (r[c.work] as string) || undefined,
+        lic: firstLicense(r[c.lic] as string) || undefined,
+      },
+    });
+  }
+  return { ready: true, meta, wins };
+}

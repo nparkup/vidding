@@ -48,6 +48,8 @@ export interface NtceClass {
   lrgNm?: string;
   /** 공사의 주공종 */
   mainWork?: string;
+  /** 첫 업종제한 업종명 (낙찰 저장소에서만 채워진다) */
+  lic?: string;
 }
 
 export interface PerfChunk { wins: PerfWin[]; failed: number; windows: number }
@@ -238,6 +240,8 @@ export function judgeSimilarity(target: { title: string; cls?: NtceClass }, win:
   if (a?.clsfcNo && b?.clsfcNo && a.clsfcNo === b.clsfcNo) return { level: "동일", why: `세부품명 '${b.clsfcNm ?? b.clsfcNo}' 일치` };
   if (a?.midNm && b?.midNm && a.midNm === b.midNm && (!a.lrgNm || !b.lrgNm || a.lrgNm === b.lrgNm)) return { level: "유사", why: `중분류 '${b.midNm}' 일치` };
   if (a?.mainWork && b?.mainWork && a.mainWork === b.mainWork) return { level: "유사", why: `주공종 '${b.mainWork}' 일치` };
+  // 공사는 분류가 비어 오는 경우가 많아 업종제한(예: 전기공사업)이 같으면 유사로 본다
+  if (a?.lic && b?.lic && a.lic === b.lic && !(a.midNm && b.midNm)) return { level: "유사", why: `업종 '${b.lic}' 일치` };
   // 물품 세부품명번호는 앞 6자리가 같으면 같은 품목군
   if (a?.clsfcNo && b?.clsfcNo && a.clsfcNo.length >= 8 && a.clsfcNo.slice(0, 6) === b.clsfcNo.slice(0, 6)) return { level: "유사", why: `같은 품목군 '${b.clsfcNm ?? b.clsfcNo}'` };
   const ta = titleTokens(target.title);

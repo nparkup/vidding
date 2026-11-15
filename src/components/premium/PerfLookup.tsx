@@ -7,6 +7,8 @@ import {
   type NtceClass, type PerfChunk, type PerfWin, type SimLevel,
 } from "@/lib/perfLookup";
 import type { Bid } from "@/lib/types";
+import { AWARD_YEARS, firstLicense, metaCovers } from "@/lib/awards/format";
+import type { AwardLookup } from "@/lib/awards/read";
 import { LoadingBar } from "./LoadingBar";
 
 /** 분류를 조회할 낙찰 건 수 상한. 넘는 건은 공고명 키워드로만 판정한다 */
@@ -22,8 +24,23 @@ const LEVEL_STYLE: Record<SimLevel, string> = {
   키워드: "bg-paper text-ink-500",
 };
 
+/** 오늘부터 years년 전 날짜 YYYY-MM-DD */
+const yearsAgo = (years: number) => {
+  const d = new Date(Date.now() + 9 * 3600e3);
+  d.setUTCFullYear(d.getUTCFullYear() - years);
+  return d.toISOString().slice(0, 10);
+};
+
+/** 빌드 때 붙인 공고 분류를 유사도 비교 형식으로 */
+const clsOfBid = (bid: Bid): NtceClass | undefined => {
+  const lic = firstLicense(bid.licenseRaw) || undefined;
+  if (!bid.cls && !lic) return undefined;
+  return { bidNtceNo: bid.bidNtceNo, clsfcNo: bid.cls?.no, clsfcNm: bid.cls?.nm, midNm: bid.cls?.mid, lrgNm: bid.cls?.lrg, mainWork: bid.cls?.work, lic };
+};
+
 /**
- * 사업자번호를 조회하면 그때만 나라장터 낙찰 이력(최근 PERF_YEARS년, 공고 업무구분 하나)을 7일 단위로 나눠 동시에 가져오고,
+ * 사업자번호를 조회하면 먼저 낙찰 저장소(R2, 최근 AWARD_YEARS년)에서 그 업체의 낙찰 건을 한 번에 읽는다. 조달청 API는 부르지 않는다.
+ * 저장소가 아직 그 기간을 다 채우지 못했으면 예전처럼 나라장터 낙찰 이력(최근 PERF_YEARS년, 공고 업무구분 하나)을 7일 단위로 나눠 동시에 가져오고,
  * 선택 공고와 세부품명 → 중분류 → 공고명 키워드 순으로 비교해 유사 실적을 고른다. 사용자가 행마다 인정 여부를 바꿀 수 있다.
  */
 export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
@@ -37,7 +54,9 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
   onChange: (s: PerfSummary) => void;
 }) {
   const biz = perfBizOf(bid.bizType);
-  const years = Math.min(PERF_YEARS, sheetYears ?? PERF_YEARS);
+  const [source, setSource] = useState<"r2" | "live">("r2");
+  const maxYears = source === "r2" ? AWARD_YEARS : PERF_YEARS;
+  const years = Math.min(maxYears, sheetYears ?? maxYears);
   const [done, setDone] = useState(0);
   const [total, setTotal] = useState(0);
   const [phase, setPhase] = useState<"wins" | "classes" | "done" | "error">("wins");
@@ -52,9 +71,8 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
     let alive = true;
     // 공고·번호가 바뀌거나 화면을 떠나면 남은 요청을 끊는다 (공공데이터포털 초당 요청제한을 아끼려고)
     const ac = new AbortController();
-    const groups = chunk(perfWindows(since, years), CHUNK_WEEKS);
     setDone(0);
-    setTotal(groups.length);
+    setTotal(0);
     setPhase("wins");
     setRows([]);
     setFailed(0);
@@ -63,6 +81,41 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
     setOn(new Set());
 
     (async () => {
+      // 1. 낙찰 저장소: 3년치를 한 번에 (분류까지 붙어 있다)
+      const r2Years = Math.min(AWARD_YEARS, sheetYears ?? AWARD_YEARS);
+      try {
+        const r = await fetch(`${api}?${new URLSearchParams({ awards: bizno, biz })}`, { signal: ac.signal });
+        const j = r.ok ? ((await r.json()) as AwardLookup) : undefined;
+        const from = yearsAgo(r2Years);
+        if (j?.ready && metaCovers(j.meta, from)) {
+          if (!alive) return;
+          let target = clsOfBid(bid);
+          if (!bid.cls) {
+            // 빌드 때 분류를 못 붙인 공고만 공고번호로 한 번 조회한다
+            try {
+              const c = await fetch(`${api}?${new URLSearchParams({ ntce: bid.bidNtceNo, biz })}`, { signal: ac.signal });
+              if (c.ok) target = { ...((await c.json()) as NtceClass[])[0], lic: target?.lic };
+            } catch { /* 공고명 키워드로 판정 */ }
+          }
+          if (!alive) return;
+          const t = { title: bid.title, cls: target };
+          setSource("r2");
+          setRows(j.wins
+            .filter((w) => w.date >= from && w.bidNtceNo !== bid.bidNtceNo)
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .map((w) => ({ ...w, ...judgeSimilarity(t, { title: w.title, cls: w.cls }) })));
+          setPhase("done");
+          return;
+        }
+      } catch {
+        if (ac.signal.aborted) return;
+      }
+      if (!alive) return;
+
+      // 2. 저장소가 아직 수집 중이면 조달청 낙찰정보를 7일 단위로 직접 조회 (최근 PERF_YEARS년)
+      setSource("live");
+      const groups = chunk(perfWindows(since, Math.min(PERF_YEARS, sheetYears ?? PERF_YEARS)), CHUNK_WEEKS);
+      setTotal(groups.length);
       let miss = 0;
       const chunks = await pool(groups, CHUNK_CONCURRENCY, async (g) => {
         if (ac.signal.aborted) return [] as PerfWin[];
@@ -116,7 +169,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
       setPhase("done");
     })();
     return () => { alive = false; ac.abort(); };
-  }, [api, bid.bidNtceNo, bid.title, biz, bizno, since, years, attempt]);
+  }, [api, bid, biz, bizno, since, sheetYears, attempt]);
 
   const keyOf = (r: Row) => `${r.bidNtceNo}-${r.bidNtceOrd}-${r.date}-${r.amount}`;
   const included = (r: Row) => (r.level ? !off.has(keyOf(r)) : on.has(keyOf(r)));
@@ -146,7 +199,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
       {(phase === "wins" || phase === "classes") && (
         <LoadingBar
           value={phase === "wins" && total ? (done / total) * 90 : undefined}
-          label={phase === "wins" ? `낙찰 이력 조회 중 ${done}/${total}구간` : "낙찰 건의 세부품명·중분류를 확인하는 중"}
+          label={phase === "wins" ? (total ? `낙찰 이력 조회 중 ${done}/${total}구간` : "낙찰 이력을 불러오는 중") : "낙찰 건의 세부품명·중분류를 확인하는 중"}
         />
       )}
 
@@ -176,7 +229,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
             </>
           )}
           <ul className="mt-3 space-y-0.5 text-xs text-ink-300">
-            {(sheetYears ?? 3) > PERF_YEARS && <li>{sheetYears ? `평가표는 최근 ${sheetYears}년 실적을 인정하지만, ` : ""}자동 조회는 최근 {PERF_YEARS}년까지만 합니다. 그 이전 실적은 직접 추가 실적에 입력해 주세요.</li>}
+            {(sheetYears ?? 3) > maxYears && <li>{sheetYears ? `평가표는 최근 ${sheetYears}년 실적을 인정하지만, ` : ""}자동 조회는 최근 {maxYears}년까지만 합니다. 그 이전 실적은 직접 추가 실적에 입력해 주세요.</li>}
             <li>낙찰금액 기준 추정치입니다. 변경계약·공동수급 지분은 반영되지 않으니 실적증명서로 확인해 주세요.</li>
             {failed > 0 && <li className="text-coral">일부 기간({failed}주)을 불러오지 못해 실제보다 적게 잡혔을 수 있습니다.</li>}
           </ul>

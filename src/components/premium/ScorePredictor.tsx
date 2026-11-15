@@ -295,7 +295,7 @@ export function ScorePredictor() {
             <div>
               <span className="label">{perfBizno ? "직접 추가 실적 (억원)" : "3년 유사 실적 (억원)"}</span>
               <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); setManualPerf(Math.round((Number(e.target.value) || 0) * 1e8)); }} />
-              {perfBizno && <p className="mt-1 text-xs text-ink-500">1년보다 이전 실적과 수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
+              {perfBizno && <p className="mt-1 text-xs text-ink-500">자동 조회 기간보다 이전 실적과 수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
             </div>
             <Num label="신인도 가점 (건)" value={co.bonusCount} onChange={(v) => set("bonusCount", v)} />
             <Num label="제재·벌점 (최근 2년)" value={co.penaltyCount} onChange={(v) => set("penaltyCount", v)} />
@@ -333,7 +333,7 @@ export function ScorePredictor() {
                 onChange={(v) => set("rivalRate", v)}
                 hint={rivalEst
                   ? `기본값 = ${rivalBasis(rivalEst)}${!rivalEst.prior && awardStats && awardStats.coverage.weeks < awardStats.coverage.totalWeeks ? ` (연간 ${awardStats.coverage.totalWeeks}주 중 ${awardStats.coverage.weeks}주 자료)` : ""}. 슬라이더로 바꿀 수 있습니다.`
-                  : `전년도 같은 수요기관의 유사 공고가 없고 같은 조건 낙찰 표본도 ${MIN_SAMPLES}건 미만이라 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`}
+                  : `같은 수요기관의 과거 유사 공고가 없고 같은 조건 낙찰 표본도 ${MIN_SAMPLES}건 미만이라 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`}
               />
             )}
           </div>
@@ -556,13 +556,14 @@ function Num({ label, value, onChange, hint }: { label: string; value: number; o
 
 /** 예상 투찰률 근거 문구: 전년도 유사 공고면 그 공고명, 아니면 같은 조건 평균 */
 function rivalBasis(e: RivalEstimate) {
+  const when = e.label ?? `${e.year}년`;
   if (e.prior?.length) {
     const first = `「${e.prior[0].title}」`;
     return e.prior.length === 1
-      ? `${e.year}년 같은 수요기관의 유사 공고 ${first} 낙찰률 ${e.rate.toFixed(2)}%`
-      : `${e.year}년 같은 수요기관의 유사 공고 ${e.prior.length}건(${first} 외) 평균 낙찰률 ${e.rate.toFixed(2)}%`;
+      ? `같은 수요기관의 과거 유사 공고 ${first} 낙찰률 ${e.rate.toFixed(2)}%`
+      : `같은 수요기관의 과거 유사 공고 ${e.prior.length}건(${first} 외) 평균 낙찰률 ${e.rate.toFixed(2)}%`;
   }
-  return `${e.year}년 ${e.scope} 낙찰 ${e.n.toLocaleString()}건의 평균 낙찰률 ${e.rate.toFixed(2)}%`;
+  return `${when} ${e.scope} 낙찰 ${e.n.toLocaleString()}건의 평균 낙찰률 ${e.rate.toFixed(2)}%`;
 }
 
 function Range({ label, value, onChange, hint }: { label: string; value: number; onChange: (v: number) => void; hint?: string }) {

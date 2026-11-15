@@ -14,8 +14,8 @@
 
 /** 저장 기간(년). 2026-11-15 사용자 요청으로 3년 → 5년 */
 export const AWARD_YEARS = 5;
-/** 나라장터 유사 실적 자동 조회 기간(년). 저장소는 5년치지만 유사 실적은 최근 3년만 본다 (2026-11-15 사용자 요청) */
-export const PERF_DEFAULT_YEARS = 3;
+/** 나라장터 유사 실적 자동 조회 기간(년). 저장 기간과 같은 최근 5년 (2026-11-15 사용자 요청). 평가표 기간이 더 짧으면 그 기간만 */
+export const PERF_DEFAULT_YEARS = 5;
 /** 공고는 낙찰보다 먼저 나오므로 낙찰 기간보다 이만큼 앞선 주부터 받는다 */
 export const NOTICE_LEAD_WEEKS = 13;
 export const BUCKET = "bidmate-awards";

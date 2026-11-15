@@ -55,7 +55,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
 }) {
   const biz = perfBizOf(bid.bizType);
   const [source, setSource] = useState<"r2" | "live">("r2");
-  // 저장소에서는 최근 3년까지 본다 (평가표가 더 짧으면 그 기간만). 직접 조회는 1년
+  // 저장소에서는 최근 5년까지 본다 (평가표가 더 짧으면 그 기간만). 직접 조회는 1년
   const maxYears = source === "r2" ? PERF_DEFAULT_YEARS : PERF_YEARS;
   const years = Math.min(maxYears, sheetYears ?? maxYears);
   const [done, setDone] = useState(0);
@@ -82,7 +82,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
     setOn(new Set());
 
     (async () => {
-      // 1. 낙찰 저장소: 최근 3년(평가표가 더 짧으면 그 기간)을 한 번에 (분류까지 붙어 있다)
+      // 1. 낙찰 저장소: 최근 5년(평가표가 더 짧으면 그 기간)을 한 번에 (분류까지 붙어 있다)
       const r2Years = Math.min(PERF_DEFAULT_YEARS, sheetYears ?? PERF_DEFAULT_YEARS);
       try {
         const r = await fetch(`${api}?${new URLSearchParams({ awards: bizno, biz })}`, { signal: ac.signal });
@@ -230,7 +230,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
             </>
           )}
           <ul className="mt-3 space-y-0.5 text-xs text-ink-300">
-            {(sheetYears ?? 3) > maxYears && <li>{sheetYears ? `평가표는 최근 ${sheetYears}년 실적을 인정하지만, ` : ""}자동 조회는 최근 {maxYears}년까지만 합니다. 그 이전 실적은 직접 추가 실적에 입력해 주세요.</li>}
+            {(sheetYears ?? PERF_DEFAULT_YEARS) > maxYears && <li>{sheetYears ? `평가표는 최근 ${sheetYears}년 실적을 인정하지만, ` : ""}자동 조회는 최근 {maxYears}년까지만 합니다. 그 이전 실적은 직접 추가 실적에 입력해 주세요.</li>}
             <li>낙찰금액 기준 추정치입니다. 변경계약·공동수급 지분은 반영되지 않으니 실적증명서로 확인해 주세요.</li>
             {failed > 0 && <li className="text-coral">일부 기간({failed}주)을 불러오지 못해 실제보다 적게 잡혔을 수 있습니다.</li>}
           </ul>

@@ -293,12 +293,19 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
   let uploaded = 0;
   const keys = [...shards.keys()].sort();
   let next = 0;
-  await Promise.all(Array.from({ length: 12 }, async () => {
+  // 올리는 속도는 r2.ts 가 Cloudflare API 한도에 맞춘다. 중간에 끊겨도 다음 실행이 이미 올린 샤드를 건너뛰게 상태를 자주 저장한다
+  let lastSave = Date.now();
+  await Promise.all(Array.from({ length: 6 }, async () => {
     while (next < keys.length) {
       const k = keys[next++];
       const list = shards.get(k)!.sort((a, b) => b[9].localeCompare(a[9]) || a[0].localeCompare(b[0]));
       const file: ShardFile = { v: 1, cols: SHARD_COLS, rows: list };
       if (await put(`shards/${k}.json.gz`, gz(file))) uploaded++;
+      if (Date.now() - lastSave > 3 * 60_000) {
+        lastSave = Date.now();
+        console.log(`  샤드 ${next}/${keys.length}개 확인, ${uploaded}개 올림`);
+        await saveManifest().catch(() => undefined);
+      }
     }
   }));
   // 샤드 나누는 방식이 바뀌어 더 쓰지 않는 샤드 파일은 지운다 (2026-11-15: 1,000개 → 10,000개)
@@ -413,6 +420,8 @@ async function main() {
     try {
       built = await build(awardWeeks, leadWeeks);
     } catch (e) {
+      // 올린 샤드까지는 상태에 남겨 다음 실행이 다시 올리지 않게 한다
+      await saveManifest().catch(() => undefined);
       if (!(e instanceof QuotaStop)) throw e;
       quota = e.message;
     }

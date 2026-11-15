@@ -9,6 +9,8 @@ import { buildMockBids } from "../src/lib/mock/bids";
 import { fetchAllBids, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids } from "../src/lib/nara/docExtract";
+import { buildAwardStats } from "../src/lib/nara/awardStats";
+import { awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -38,7 +40,36 @@ async function main() {
   } catch (e) {
     console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, syncedAt, source: "g2b" }));
+  // 예상 최저 경쟁 투찰률 통계. 낙찰 저장소(R2)에 최근 1년치가 있으면 그것을 쓰고(조달청 호출 없음),
+  // 아직 수집 중이면 예전처럼 전년도 낙찰을 조금씩 받아 GitHub Actions 캐시에 쌓는다. 실패해도 배포는 계속
+  let awardStats;
+  const targets = items.filter((b) => b.contractMethod === "적격심사" || b.contractMethod === "협상에 의한 계약");
+  try {
+    awardStats = await awardStatsFromR2(targets);
+    if (awardStats) console.log(`낙찰률 통계: 낙찰 저장소 최근 1년, 통계 ${Object.keys(awardStats.strata).length}개, 같은 수요기관 유사 공고 찾은 공고 ${Object.keys(awardStats.prior ?? {}).length}건`);
+  } catch (e) {
+    console.warn("낙찰 저장소 통계 읽기 실패:", e instanceof Error ? e.message : e);
+  }
+  if (!awardStats) {
+    try {
+      const r = await buildAwardStats(process.env.AWARD_CACHE_DIR ?? ".cache/award", { targets });
+      awardStats = r.stats;
+      const c = r.stats.coverage;
+      console.log(`전년도(${r.stats.year}) 낙찰률: 이번 호출 ${r.fetched}회, 낙찰 ${c.weeks}/${c.totalWeeks}주, 공고 ${c.noticeDays}/${c.totalNoticeDays}일 확보, 전년도 유사 공고 찾은 공고 ${Object.keys(r.stats.prior ?? {}).length}건${r.stopped ? ` (중단: ${r.stopped})` : ""}`);
+    } catch (e) {
+      console.warn("전년도 낙찰률 통계 건너뜀:", e instanceof Error ? e.message : e);
+    }
+  }
+  // 지금 공고의 세부품명·중분류 (유사 실적 비교 기준)
+  try {
+    const cls = await recentNoticeClasses();
+    let n = 0;
+    for (const b of items) { const c = cls.get(b.bidNtceNo); if (c) { b.cls = c; n++; } }
+    if (cls.size) console.log(`공고 분류: ${items.length}건 중 ${n}건에 세부품명·중분류를 붙임`);
+  } catch (e) {
+    console.warn("공고 분류 붙이기 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, awardStats, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

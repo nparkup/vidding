@@ -7,6 +7,8 @@ export async function GET(req: NextRequest) {
   const key = process.env.DATA_GO_KR_SERVICE_KEY;
   if (!key) return NextResponse.json({ error: "공공데이터포털 인증키가 설정되지 않았습니다." }, { status: 503 });
   const sp = req.nextUrl.searchParams;
+  // 낙찰 저장소(R2)는 Cloudflare 중계 서버에서만 읽는다. 서버 배포는 직접 조회로 간다
+  if (sp.has("awards")) return NextResponse.json({ ready: false, wins: [] });
   try {
     if (sp.has("ntce")) {
       return NextResponse.json(await fetchNtceClasses(key, perfBizOf(sp.get("biz") ?? ""), (sp.get("ntce") ?? "").split(",")));

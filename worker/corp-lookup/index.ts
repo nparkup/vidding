@@ -6,12 +6,19 @@
  * 유사 실적 조회 (src/lib/perfLookup.ts):
  * - GET /?perf=용역&bizno=..&from=YYYYMMDD&to=YYYYMMDD : 그 기간(최대 15주)의 낙찰 건. 지난 기간은 바뀌지 않아 30일 캐시한다
  * - GET /?ntce=공고번호,공고번호&biz=용역 : 공고번호별 세부품명·중분류 (30일 캐시)
+ *
+ * 낙찰 저장소 (R2 버킷 bidmate-awards, scripts/awards/collect.ts 가 매일 채운다):
+ * - GET /?awards=사업자번호&biz=용역 : 그 업체의 최근 3년 낙찰을 공고 분류와 함께. 조달청 API를 부르지 않는다 (6시간 캐시)
+ * - GET /?awardmeta=1 : 저장소 수집 범위·완료 여부
  */
 import { lookupCompany, normalizeBizno, validBizno } from "../../src/lib/corpLookup";
 import { fetchNtceClasses, fetchWins, perfBizOf } from "../../src/lib/perfLookup";
+import { readAwards, type R2BucketLike } from "../../src/lib/awards/read";
 
 interface Env {
   DATA_GO_KR_SERVICE_KEY: string;
+  /** 낙찰 저장소 (wrangler.toml r2_buckets). 없으면 ?awards 는 ready:false */
+  AWARDS?: R2BucketLike;
   /** 쉼표로 구분한 허용 Origin, 예: https://nparkup.github.io,http://localhost:3000 */
   ALLOWED_ORIGINS?: string;
 }
@@ -31,9 +38,17 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...cors, "Access-Control-Max-Age": "86400" } });
     if (req.method !== "GET") return json({ error: "GET만 지원합니다." }, 405);
     if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
+    const sp = new URL(req.url).searchParams;
+    if (sp.has("awards") || sp.has("awardmeta")) {
+      try {
+        const r = await readAwards(env.AWARDS, sp.get("awards") ?? "", sp.get("biz") ?? "");
+        return json(r, 200, { "Cache-Control": "public, max-age=3600" });
+      } catch (e) {
+        return json({ error: (e as Error).message, ready: false }, 400);
+      }
+    }
     if (!env.DATA_GO_KR_SERVICE_KEY) return json({ error: "중계 서버에 공공데이터포털 인증키가 없습니다." }, 503);
 
-    const sp = new URL(req.url).searchParams;
     const cache0 = (caches as unknown as { default: Cache }).default;
     /** make 가 돌려준 ttl(초)만큼 캐시한다. 0이면 캐시하지 않는다 (일부 실패한 결과가 남지 않게) */
     const cached = async (key: string, make: () => Promise<{ body: unknown; ttl: number }>) => {

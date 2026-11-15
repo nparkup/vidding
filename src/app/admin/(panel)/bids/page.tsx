@@ -47,24 +47,25 @@ export default async function AdminBids({ searchParams }: { searchParams: Promis
       <p className="mb-2 text-sm text-ink-500">{all.length.toLocaleString()}건 · {cur}/{pages} 페이지</p>
 
       <div className="card overflow-x-auto">
-        <table className="table-x min-w-[960px]">
-          <thead><tr><th>마감</th><th>공고</th><th>구분·업종</th><th>지역</th><th>면허</th><th>기초금액</th><th>계약방법</th><th>매칭 고객사</th></tr></thead>
+        <table className="table-x md:min-w-[960px]">
+          <thead><tr><th>마감</th><th>공고</th><th className="hidden md:table-cell">구분·업종</th><th className="hidden md:table-cell">지역</th><th className="hidden md:table-cell">면허</th><th className="hidden md:table-cell">기초금액</th><th className="hidden md:table-cell">계약방법</th><th className="hidden md:table-cell">매칭 고객사</th></tr></thead>
           <tbody>
             {bids.map((b) => {
               const matched = clients.filter((c) => evaluate(b, c).eligible);
               return (
                 <tr key={b.id} className={daysLeft(b.closeAt) <= 0 ? "opacity-40" : ""}>
                   <td><DdayBadge days={daysLeft(b.closeAt)} /></td>
-                  <td className="max-w-[280px]">
-                    <Link href={`/bids/${b.id}`} target="_blank" className="block truncate font-semibold hover:text-mint-600">{b.title}</Link>
-                    <p className="truncate text-xs text-ink-300">{b.bidNtceNo} · {b.demandAgency}</p>
+                  <td className="md:max-w-[280px]">
+                    <Link href={`/bids/${b.id}`} target="_blank" className="block font-semibold leading-snug hover:text-mint-600 md:truncate">{b.title}</Link>
+                    <p className="text-xs text-ink-300 md:truncate">{b.bidNtceNo} · {b.demandAgency}</p>
+                    <p className="mt-1 text-xs text-ink-500 md:hidden">{b.bizType ?? "용역"} · {b.category} · {b.region} · {won(b.baseAmount)} · 매칭 {matched.length}곳</p>
                   </td>
-                  <td className="text-xs"><span className="text-ink-300">{b.bizType ?? "용역"}</span><br />{b.category}</td>
-                  <td className="text-xs">{b.region}</td>
-                  <td className="max-w-[160px] text-xs text-ink-500"><span className="line-clamp-2">{b.licenseRaw || b.licenses.join(", ") || "-"}</span></td>
-                  <td className="whitespace-nowrap tabular-nums">{won(b.baseAmount)}</td>
-                  <td className="text-xs">{b.contractMethod}</td>
-                  <td>
+                  <td className="hidden text-xs md:table-cell"><span className="text-ink-300">{b.bizType ?? "용역"}</span><br />{b.category}</td>
+                  <td className="hidden text-xs md:table-cell">{b.region}</td>
+                  <td className="hidden max-w-[160px] text-xs text-ink-500 md:table-cell"><span className="line-clamp-2">{b.licenseRaw || b.licenses.join(", ") || "-"}</span></td>
+                  <td className="hidden whitespace-nowrap tabular-nums md:table-cell">{won(b.baseAmount)}</td>
+                  <td className="hidden text-xs md:table-cell">{b.contractMethod}</td>
+                  <td className="hidden md:table-cell">
                     {matched.length ? (
                       <div className="flex flex-wrap gap-1">
                         {matched.map((c) => <Link key={c.id} href={`/admin/clients/${c.id}`} className="chip border-mint-100 bg-mint-50 text-mint-600">{c.company}</Link>)}

@@ -49,17 +49,17 @@ export default async function Dashboard() {
             <span className="chip">영업일 {String(settings.sendHour).padStart(2, "0")}:00</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="table-x min-w-[560px]">
-              <thead><tr><th>고객사</th><th>요금제</th><th>추천</th><th>3일 내 마감</th><th>제외</th><th></th></tr></thead>
+            <table className="table-x sm:min-w-[560px]">
+              <thead><tr><th>고객사</th><th className="hidden sm:table-cell">요금제</th><th className="whitespace-nowrap">추천</th><th className="whitespace-nowrap">3일 내 마감</th><th className="hidden sm:table-cell">제외</th><th className="hidden sm:table-cell"></th></tr></thead>
               <tbody>
                 {digests.map((d) => (
                   <tr key={d.client.id}>
-                    <td><p className="font-semibold">{d.client.company}</p><p className="text-xs text-ink-300">{d.client.email}</p></td>
-                    <td><span className="chip">{planName(d.client.plan)}</span></td>
-                    <td className="font-bold tabular-nums">{d.recommended.length}건</td>
-                    <td className="tabular-nums text-coral">{d.closingSoon.length}건</td>
-                    <td className="tabular-nums text-ink-300">{d.excluded}건</td>
-                    <td className="text-right"><Link href={`/admin/clients/${d.client.id}`} className="text-sm font-semibold text-mint-600">미리보기</Link></td>
+                    <td><Link href={`/admin/clients/${d.client.id}`} className="block font-semibold hover:text-mint-600">{d.client.company}</Link><p className="break-all text-xs text-ink-300">{d.client.email}</p><p className="mt-0.5 text-xs text-ink-500 sm:hidden">{planName(d.client.plan)} · 제외 {d.excluded}건</p></td>
+                    <td className="hidden sm:table-cell"><span className="chip">{planName(d.client.plan)}</span></td>
+                    <td className="whitespace-nowrap font-bold tabular-nums">{d.recommended.length}건</td>
+                    <td className="whitespace-nowrap tabular-nums text-coral">{d.closingSoon.length}건</td>
+                    <td className="hidden sm:table-cell tabular-nums text-ink-300">{d.excluded}건</td>
+                    <td className="hidden sm:table-cell text-right"><Link href={`/admin/clients/${d.client.id}`} className="text-sm font-semibold text-mint-600">미리보기</Link></td>
                   </tr>
                 ))}
               </tbody>

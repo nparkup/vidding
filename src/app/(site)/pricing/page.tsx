@@ -51,11 +51,11 @@ export default function Pricing() {
 
       <h2 className="mt-20 text-2xl font-extrabold tracking-tight">기능 한눈에 비교</h2>
       <div className="card mt-6 overflow-x-auto">
-        <table className="table-x min-w-[640px]">
-          <thead><tr><th>기능</th>{PLANS.map((p) => <th key={p.id} className="text-center">{p.name}</th>)}</tr></thead>
+        <table className="table-x sm:min-w-[640px]">
+          <thead><tr><th>기능</th>{PLANS.map((p) => <th key={p.id} className="w-[19%] text-center sm:w-auto">{p.name}</th>)}</tr></thead>
           <tbody>
             {ROWS.map(([k, ...v]) => (
-              <tr key={k}><td className="font-medium">{k}</td>{v.map((x, i) => <td key={i} className="text-center">{cell(x)}</td>)}</tr>
+              <tr key={k}><td className="font-medium leading-snug">{k}</td>{v.map((x, i) => <td key={i} className="text-center">{cell(x)}</td>)}</tr>
             ))}
           </tbody>
         </table>

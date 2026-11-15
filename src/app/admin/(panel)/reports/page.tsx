@@ -32,14 +32,14 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
           <button className="btn-primary w-full">초안 생성</button>
         </form>
         <section className="card overflow-x-auto">
-          <table className="table-x min-w-[480px]">
-            <thead><tr><th>고객사</th><th>주차</th><th>작성일</th><th>상태</th></tr></thead>
+          <table className="table-x sm:min-w-[480px]">
+            <thead><tr><th>고객사</th><th>주차</th><th className="hidden sm:table-cell">작성일</th><th>상태</th></tr></thead>
             <tbody>
               {reports.map((r) => (
                 <tr key={r.id}>
                   <td><Link href={`/admin/reports/${r.id}`} className="font-semibold hover:text-mint-600">{all.find((c) => c.id === r.clientId)?.company ?? r.clientId}</Link></td>
-                  <td>{r.weekLabel}</td>
-                  <td className="text-xs text-ink-300">{shortDate(r.createdAt)}</td>
+                  <td className="whitespace-nowrap">{r.weekLabel}</td>
+                  <td className="hidden sm:table-cell text-xs text-ink-300">{shortDate(r.createdAt)}</td>
                   <td><Status value={r.status} /></td>
                 </tr>
               ))}

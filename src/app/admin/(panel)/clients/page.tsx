@@ -16,21 +16,21 @@ export default async function Clients() {
         <Link href="/admin/clients/new" className="btn-primary btn-sm">고객사 등록</Link>
       </PageHead>
       <div className="card overflow-x-auto">
-        <table className="table-x min-w-[860px]">
-          <thead><tr><th>고객사</th><th>면허</th><th>지역</th><th>규모</th><th>요금제</th><th>상태</th><th>참가 가능</th><th>가입</th></tr></thead>
+        <table className="table-x md:min-w-[860px]">
+          <thead><tr><th>고객사</th><th className="hidden md:table-cell">면허</th><th className="hidden md:table-cell">지역</th><th className="hidden md:table-cell">규모</th><th className="hidden md:table-cell">요금제</th><th>상태</th><th className="whitespace-nowrap">참가 가능</th><th className="hidden md:table-cell">가입</th></tr></thead>
           <tbody>
             {clients.map((c) => {
               const ok = rank(bids, c).filter((r) => r.eligible).length;
               return (
                 <tr key={c.id} className="hover:bg-paper/60">
-                  <td><Link href={`/admin/clients/${c.id}`} className="font-semibold hover:text-mint-600">{c.company}</Link><p className="text-xs text-ink-300">{c.contactName}</p></td>
-                  <td className="max-w-[200px] text-xs text-ink-500">{c.licenses.join(", ")}</td>
-                  <td className="text-xs text-ink-500">{c.regions.join(", ")}</td>
-                  <td className="whitespace-nowrap text-xs">{won(c.minAmount)} ~ {won(c.maxAmount)}</td>
-                  <td><span className="chip">{planName(c.plan)}</span></td>
+                  <td><Link href={`/admin/clients/${c.id}`} className="font-semibold hover:text-mint-600">{c.company}</Link><p className="text-xs text-ink-300">{c.contactName}</p><p className="mt-1 text-xs leading-relaxed text-ink-500 md:hidden">{planName(c.plan)} · {won(c.minAmount)} ~ {won(c.maxAmount)}<br />{c.regions.join(", ")}</p></td>
+                  <td className="hidden max-w-[200px] text-xs text-ink-500 md:table-cell">{c.licenses.join(", ")}</td>
+                  <td className="hidden text-xs text-ink-500 md:table-cell">{c.regions.join(", ")}</td>
+                  <td className="hidden whitespace-nowrap text-xs md:table-cell">{won(c.minAmount)} ~ {won(c.maxAmount)}</td>
+                  <td className="hidden md:table-cell"><span className="chip">{planName(c.plan)}</span></td>
                   <td><Status value={c.status} /></td>
                   <td className="font-bold tabular-nums text-mint-600">{ok}건</td>
-                  <td className="text-xs text-ink-300">{shortDate(c.joinedAt)}</td>
+                  <td className="hidden text-xs text-ink-300 md:table-cell">{shortDate(c.joinedAt)}</td>
                 </tr>
               );
             })}

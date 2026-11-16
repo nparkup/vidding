@@ -499,7 +499,7 @@ function EligibilityPanel({ result }: { result: Eligibility | null }) {
               <p className="font-semibold">{c.label}</p>
               <span className={`inline-block rounded-md px-1.5 py-0.5 text-xs font-semibold sm:mt-1 ${VERDICT_TONE[c.verdict]}`}>{c.verdict}</span>
             </div>
-            <p className="min-w-0 break-keep leading-relaxed text-ink-500">{c.detail}</p>
+            <DetailLines text={c.detail} className="min-w-0 break-keep leading-relaxed text-ink-500" />
           </li>
         ))}
       </ul>
@@ -507,6 +507,16 @@ function EligibilityPanel({ result }: { result: Eligibility | null }) {
         나라장터에 입력된 업종·지역 제한과 기업의 나라장터 등록 정보로 판정했습니다. 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 포함하지 않으니, 투찰 전 공고서의 참가자격을 함께 확인하세요.
       </p>
     </div>
+  );
+}
+
+/** 판정 사유를 문장마다 한 줄로 나눠 보여 준다 (필요 업종 / 등록 여부 / 마감 안내처럼) */
+function DetailLines({ text, className = "" }: { text: string; className?: string }) {
+  const lines = text.split(/(?<=[.])\s+(?=\S)/).filter(Boolean);
+  return (
+    <span className={`block space-y-0.5 ${className}`}>
+      {lines.map((l, n) => <span key={n} className="block">{l}</span>)}
+    </span>
   );
 }
 
@@ -556,7 +566,7 @@ function BlockedPanel({ result, corpName }: { result: Eligibility; corpName?: st
             <span className="font-bold tabular-nums text-coral">{n + 1}</span>
             <span className="min-w-0">
               <span className="block font-semibold">{c.label}</span>
-              <span className="mt-0.5 block break-keep leading-relaxed text-ink-500">{c.detail}</span>
+              <DetailLines text={c.detail} className="mt-0.5 break-keep leading-relaxed text-ink-500" />
             </span>
           </li>
         ))}
@@ -577,7 +587,7 @@ function ReviewNotice({ result }: { result: Eligibility }) {
     <section className="mb-4 rounded-2xl bg-amber-100 p-4 text-sm text-ink">
       <p className="font-bold">참가 가능 여부 확인 필요</p>
       <ul className="mt-2 space-y-1.5 leading-relaxed">
-        {review.map((c) => <li key={c.label} className="break-keep"><b>{c.label}</b>: {c.detail}</li>)}
+        {review.map((c) => <li key={c.label} className="break-keep"><b>{c.label}</b><DetailLines text={c.detail} className="mt-0.5" /></li>)}
       </ul>
       <p className="mt-2 text-xs text-ink-500">아래 점수는 참가할 수 있다고 보고 계산한 예상치입니다.</p>
     </section>

@@ -2,11 +2,12 @@ import "server-only";
 import { inflateRawSync } from "zlib";
 import type { Bid, BidAttachment } from "../types";
 import { extractSheet, templateSheet, type EvalSheet } from "../evalscore";
+import { hwpText } from "./hwpText";
 
 /**
  * 배포(빌드) 때 공고 첨부파일을 내려받아 평가표를 미리 추출한다.
  * 브라우저는 나라장터 파일을 직접 열 수 없어(CORS), 공고를 고르면 여기서 만든 평가표를 바로 쓴다.
- * - 읽는 형식: PDF(pdf.js), HWPX(압축 XML). 구형 HWP는 대개 PDF 변환본이 함께 올라와 그쪽을 읽는다.
+ * - 읽는 형식: PDF(pdf.js), HWPX(압축 XML), 구형 HWP(hwpText.ts). 같은 이름의 PDF·HWPX가 함께 있으면 HWP는 건너뛴다.
  * - 평가 구조가 있는 계약방법(적격심사·협상)만, 평가기준이 있을 법한 파일 순서로 공고당 최대 3개.
  * - 전체 시간·파일 수 한도를 두고, 넘으면 남은 공고는 표준 평가표로 둔다.
  */
@@ -17,12 +18,19 @@ export interface ExtractedSheet {
 }
 
 const LIKELY = /(평가|심사|제안요청|과업|공고문|입찰공고|규격)/;
-const READABLE = /\.(pdf|hwpx)$/i;
+const READABLE = /\.(pdf|hwpx|hwp)$/i;
 
 function rankFiles(files: BidAttachment[]): BidAttachment[] {
   const score = (f: BidAttachment) =>
     (/(평가|심사)/.test(f.name) ? 4 : 0) + (/제안요청/.test(f.name) ? 3 : 0) + (/과업|규격/.test(f.name) ? 2 : 0) + (LIKELY.test(f.name) ? 1 : 0);
-  return files.filter((f) => READABLE.test(f.name)).sort((a, b) => score(b) - score(a)).slice(0, 3);
+  const stem = (n: string) => n.replace(/\.[^.]+$/, "").replace(/\s+/g, "");
+  const readable = files.filter((f) => READABLE.test(f.name));
+  // 같은 문서의 PDF·HWPX 변환본이 있으면 HWP는 빼고, 점수가 같으면 HWP를 뒤로 둔다
+  const other = new Set(readable.filter((f) => !/\.hwp$/i.test(f.name)).map((f) => stem(f.name)));
+  return readable
+    .filter((f) => !/\.hwp$/i.test(f.name) || !other.has(stem(f.name)))
+    .sort((a, b) => score(b) - score(a) || Number(/\.hwp$/i.test(a.name)) - Number(/\.hwp$/i.test(b.name)))
+    .slice(0, 3);
 }
 
 async function download(url: string, timeoutMs: number): Promise<Buffer | null> {
@@ -97,7 +105,9 @@ export function hwpxText(buf: Buffer): string {
 const decode = (t: string) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 
 async function textOf(f: BidAttachment, buf: Buffer): Promise<string> {
-  return /\.pdf$/i.test(f.name) ? pdfText(buf) : hwpxText(buf);
+  if (/\.pdf$/i.test(f.name)) return pdfText(buf);
+  if (/\.hwp$/i.test(f.name)) return hwpText(buf).text;
+  return hwpxText(buf);
 }
 
 export async function extractSheetsForBids(

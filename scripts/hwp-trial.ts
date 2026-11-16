@@ -95,6 +95,8 @@ async function main() {
   const rows: Record<string, unknown>[] = [];
   const agg = { A: { ms: 0, n: 0, body: 0, preview: 0, none: 0, recall: [] as number[], sheetSame: 0, sheetPdf: 0, sheetHwp: 0, qual: 0 }, B: { recall: [] as number[], nonEmpty: 0 }, C: { ms: 0, n: 0, ok: 0, recall: [] as number[], sheetSame: 0, sheetHwp: 0 } };
   let downloadFailed = 0;
+  const details: string[] = [];
+  let samples = 0;
 
   async function run(kind: "pair" | "only", id: string, hwp: { name: string; url: string }, pdf?: { name: string; url: string }) {
     const hb = await download(hwp.url);
@@ -151,6 +153,21 @@ async function main() {
       }
     }
     rows.push(row);
+    // 평가표가 한쪽에서라도 '보통' 이상으로 잡히면 항목을 나란히 남긴다
+    const sp = ref ? sheetSig(ref) : undefined;
+    if ((sa && sa.conf !== "낮음") || (sp && sp.conf !== "낮음")) {
+      details.push(`${id} HWP(${sa?.conf ?? "-"}): ${sa?.items.join(", ") ?? "-"}\n${id} PDF(${sp?.conf ?? "-"}): ${sp?.items.join(", ") ?? "-"}`);
+      const around = (t: string) => { const ls = t.split("\n"); const i = ls.findIndex((l) => /배\s*점/.test(l)); return i < 0 ? "(배점 없음)" : ls.slice(i, i + 12).join(" | ").slice(0, 900); };
+      details.push(`${id} HWP 배점 주변: ${around(a.text)}`);
+      if (ref) details.push(`${id} PDF 배점 주변: ${around(ref)}`);
+    }
+    if (kind === "pair" && pb && samples < 2) {
+      samples++;
+      const words = (t: string) => new Set(t.match(/[가-힣A-Za-z0-9]{2,}/g) ?? []);
+      const ha = words(a.text);
+      const miss = [...words(ref)].filter((w) => !ha.has(w)).slice(0, 60);
+      details.push(`${id} PDF에만 있는 낱말 예: ${miss.join(" ")}`);
+    }
   }
 
   for (const p of pairs) await run("pair", p.id, p.hwp, p.pdf);
@@ -160,6 +177,8 @@ async function main() {
   const min = (a: number[]) => (a.length ? Math.round(Math.min(...a) * 1000) / 10 : null);
   console.log("\n===== HWP 시험 결과 (행별) =====");
   for (const r of rows) console.log(JSON.stringify(r));
+  console.log("\n===== 평가표 비교 =====");
+  for (const d of details) console.log(d);
   console.log("\n===== HWP 시험 요약 =====");
   console.log(JSON.stringify({
     공고수: bidsTotal, hwp공고서있는공고: bidsWithHwpNotice, hwp만있는공고: hwpOnlyBids,

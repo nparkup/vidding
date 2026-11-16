@@ -25,11 +25,13 @@ jobs:
       - name: LibreOffice + H2Orestart 설치 (시간 측정)
         run: |
           start=$(date +%s)
-          which soffice || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libreoffice-writer-nogui default-jre-headless libreoffice-java-common > /dev/null)
+          which soffice || true
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libreoffice-writer-nogui default-jre-headless libreoffice-java-common fonts-nanum > /dev/null
           url=$(curl -fsS https://api.github.com/repos/ebandal/H2Orestart/releases/latest | jq -r '.assets[] | select(.name | endswith(".oxt")) | .browser_download_url' | head -1)
           echo "H2Orestart: $url"
           curl -fsSL -o /tmp/H2Orestart.oxt "$url"
-          unopkg add --shared /tmp/H2Orestart.oxt || unopkg add /tmp/H2Orestart.oxt
+          unopkg add /tmp/H2Orestart.oxt
+          unopkg list | grep -i -A2 h2o || echo "H2Orestart 목록에 없음"
           echo "설치 시간: $(( $(date +%s) - start ))초"
       - name: 시험
         env:

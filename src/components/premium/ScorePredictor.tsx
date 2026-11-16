@@ -365,15 +365,20 @@ export function ScorePredictor() {
               <p className="text-sm text-ink-300">예상 평가점수</p>
               <div className="mt-2 flex items-end justify-between gap-3">
                 <p className="text-6xl font-extrabold tabular-nums tracking-tight">{result.total}<span className="text-xl text-ink-300">/{result.max}</span></p>
-                {result.passed !== undefined && (
+                {result.passed !== undefined ? (
                   <span className={`rounded-lg px-3 py-1.5 text-sm font-bold ${result.passed ? "bg-mint text-white" : "bg-coral text-white"}`}>
                     {result.passed ? "통과 예상" : "미달 예상"}
                   </span>
+                ) : result.pending > 0 && result.passLabel && (
+                  <span className="rounded-lg bg-amber px-3 py-1.5 text-sm font-bold text-ink">확인 필요</span>
                 )}
               </div>
+              {result.pending > 0 && (
+                <p className="mt-2 text-sm text-amber">확인 필요 항목 {result.pending}점 제외 · 그 항목까지 받으면 최대 {Math.round((result.total + result.pending) * 10) / 10}점</p>
+              )}
               {result.passLabel && (
                 <p className="mt-2 text-sm text-ink-300">
-                  기준 {result.passLabel} · {result.gap !== undefined && (result.gap >= 0 ? `${result.gap}점 여유` : `${Math.abs(result.gap)}점 부족`)}
+                  기준 {result.passLabel}{result.gap !== undefined && ` · ${result.gap >= 0 ? `${result.gap}점 여유` : `${Math.abs(result.gap)}점 부족`}`}
                 </p>
               )}
               {isNego && <p className="mt-1 text-sm text-ink-300">기술 {result.techScore}/{result.techMax} · 가격 {Math.round((result.total - result.techScore) * 10) / 10}</p>}
@@ -390,14 +395,14 @@ export function ScorePredictor() {
                   <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
                     <span className="font-semibold">{i.label}</span>
                     <span className="tabular-nums text-xs text-ink-300">
-                      현재: <b className="text-sm text-white">{i.score}점</b>
+                      현재: {i.unknown ? <b className="text-sm text-amber">확인 필요</b> : <b className="text-sm text-white">{i.score}점</b>}
                       <span className="mx-1.5 text-white/30">|</span>
                       공고 평가항목 기준: {i.max > 0 ? `총 ${i.max}점 만점` : "가·감점 항목"}
                     </span>
                   </div>
-                  {i.max > 0 && <ScoreBar value={Math.max(0, i.score)} max={i.max} />}
+                  {i.max > 0 && !i.unknown && <ScoreBar value={Math.max(0, i.score)} max={i.max} />}
                   <p className="mt-1 text-xs text-ink-300">
-                    {i.max > 0 && i.score >= i.max ? "만점 기준" : "산정 기준"}: {i.reason}{i.max > 0 ? ` ${pct(i.score, i.max)}%` : ""}
+                    {i.unknown ? `확인 필요: ${i.reason}` : <>{i.max > 0 && i.score >= i.max ? "만점 기준" : "산정 기준"}: {i.reason}{i.max > 0 ? ` ${pct(i.score, i.max)}%` : ""}</>}
                   </p>
                 </li>
               ))}
@@ -499,7 +504,7 @@ function EligibilityPanel({ result }: { result: Eligibility | null }) {
               <p className="font-semibold">{c.label}</p>
               <span className={`inline-block rounded-md px-1.5 py-0.5 text-xs font-semibold sm:mt-1 ${VERDICT_TONE[c.verdict]}`}>{c.verdict}</span>
             </div>
-            <p className="min-w-0 break-keep leading-relaxed text-ink-500">{c.detail}</p>
+            <DetailLines text={c.detail} className="min-w-0 break-keep leading-relaxed text-ink-500" />
           </li>
         ))}
       </ul>
@@ -507,6 +512,16 @@ function EligibilityPanel({ result }: { result: Eligibility | null }) {
         나라장터에 입력된 업종·지역 제한과 기업의 나라장터 등록 정보로 판정했습니다. 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 포함하지 않으니, 투찰 전 공고서의 참가자격을 함께 확인하세요.
       </p>
     </div>
+  );
+}
+
+/** 판정 사유를 문장마다 한 줄로 나눠 보여 준다 (필요 업종 / 등록 여부 / 마감 안내처럼) */
+function DetailLines({ text, className = "" }: { text: string; className?: string }) {
+  const lines = text.split(/(?<=[.])\s+(?=\S)/).filter(Boolean);
+  return (
+    <span className={`block space-y-0.5 ${className}`}>
+      {lines.map((l, n) => <span key={n} className="block">{l}</span>)}
+    </span>
   );
 }
 
@@ -556,7 +571,7 @@ function BlockedPanel({ result, corpName }: { result: Eligibility; corpName?: st
             <span className="font-bold tabular-nums text-coral">{n + 1}</span>
             <span className="min-w-0">
               <span className="block font-semibold">{c.label}</span>
-              <span className="mt-0.5 block break-keep leading-relaxed text-ink-500">{c.detail}</span>
+              <DetailLines text={c.detail} className="mt-0.5 break-keep leading-relaxed text-ink-500" />
             </span>
           </li>
         ))}
@@ -577,7 +592,7 @@ function ReviewNotice({ result }: { result: Eligibility }) {
     <section className="mb-4 rounded-2xl bg-amber-100 p-4 text-sm text-ink">
       <p className="font-bold">참가 가능 여부 확인 필요</p>
       <ul className="mt-2 space-y-1.5 leading-relaxed">
-        {review.map((c) => <li key={c.label} className="break-keep"><b>{c.label}</b>: {c.detail}</li>)}
+        {review.map((c) => <li key={c.label} className="break-keep"><b>{c.label}</b><DetailLines text={c.detail} className="mt-0.5" /></li>)}
       </ul>
       <p className="mt-2 text-xs text-ink-500">아래 점수는 참가할 수 있다고 보고 계산한 예상치입니다.</p>
     </section>

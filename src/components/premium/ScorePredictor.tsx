@@ -258,8 +258,8 @@ export function ScorePredictor() {
                   <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
                     {docs.files.map((f) => (
                       <li key={f.url} className="min-w-0">
-                        <a href={f.url} target="_blank" rel="noreferrer" className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm hover:bg-ink-100/60 ${f.name === docs.sheetFile ? "bg-mint-50 font-semibold" : "bg-paper"}`}>
-                          <span className="truncate">{f.name}</span>
+                        <a href={f.url} target="_blank" rel="noreferrer" className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm hover:bg-ink-100/60 ${f.name === docs.sheetFile ? "bg-mint-50 font-semibold" : "bg-paper"}`}>
+                          <span className="min-w-0 truncate">{f.name}</span>
                           <span className="shrink-0 text-xs text-ink-300">{f.name === docs.sheetFile ? "평가표 출처" : f.kind}</span>
                         </a>
                       </li>

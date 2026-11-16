@@ -1,0 +1,37 @@
+name: HWP 읽기 시험 (임시)
+
+# 구형 HWP 공고서를 읽는 방법을 실제 나라장터 첨부로 비교한다. 결과 확인 뒤 이 파일과 scripts/hwp-trial.ts 는 지운다.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/hwp-trial.yml"
+      - "scripts/hwp-trial.ts"
+      - "src/lib/nara/hwpText.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: LibreOffice + H2Orestart 설치 (시간 측정)
+        run: |
+          start=$(date +%s)
+          which soffice || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libreoffice-writer-nogui default-jre-headless libreoffice-java-common > /dev/null)
+          url=$(curl -fsS https://api.github.com/repos/ebandal/H2Orestart/releases/latest | jq -r '.assets[] | select(.name | endswith(".oxt")) | .browser_download_url' | head -1)
+          echo "H2Orestart: $url"
+          curl -fsSL -o /tmp/H2Orestart.oxt "$url"
+          unopkg add --shared /tmp/H2Orestart.oxt || unopkg add /tmp/H2Orestart.oxt
+          echo "설치 시간: $(( $(date +%s) - start ))초"
+      - name: 시험
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: npx tsx --conditions=react-server scripts/hwp-trial.ts

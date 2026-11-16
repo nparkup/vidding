@@ -32,7 +32,7 @@ async function download(url: string, timeoutMs: number): Promise<Buffer | null> 
   return buf.length > 0 && buf.length < 30_000_000 ? buf : null;
 }
 
-async function pdfText(buf: Buffer): Promise<string> {
+export async function pdfText(buf: Buffer): Promise<string> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), useSystemFonts: false, isEvalSupported: false }).promise;
   const out: string[] = [];

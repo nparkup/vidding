@@ -27,7 +27,7 @@ jobs:
           start=$(date +%s)
           which soffice || true
           sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libreoffice-writer-nogui default-jre-headless libreoffice-java-common fonts-nanum > /dev/null
-          url=$(curl -fsS https://api.github.com/repos/ebandal/H2Orestart/releases/latest | jq -r '.assets[] | select(.name | endswith(".oxt")) | .browser_download_url' | head -1)
+          url=https://github.com/ebandal/H2Orestart/releases/download/v0.8.0/H2Orestart.oxt
           echo "H2Orestart: $url"
           curl -fsSL -o /tmp/H2Orestart.oxt "$url"
           unopkg add /tmp/H2Orestart.oxt

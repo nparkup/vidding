@@ -18,6 +18,10 @@ export interface AwardWin extends PerfWin {
   method: string;
   region: string;
   lic: string;
+  /** 기초금액(원), 없으면 0 */
+  base: number;
+  /** 예정가격(원), 없으면 0 */
+  plnprc: number;
 }
 
 export interface AwardLookup {
@@ -62,6 +66,9 @@ export async function readAwards(bucket: R2BucketLike | undefined, bizno: string
       method: r[c.method] as string,
       region: r[c.region] as string,
       lic: r[c.lic] as string,
+      // 2026-11-17 이전에 만든 샤드에는 두 열이 없다
+      base: c.base === undefined ? 0 : (r[c.base] as number) || 0,
+      plnprc: c.plnprc === undefined ? 0 : (r[c.plnprc] as number) || 0,
       cls: {
         bidNtceNo: r[c.no] as string,
         clsfcNo: (r[c.clsNo] as string) || undefined,

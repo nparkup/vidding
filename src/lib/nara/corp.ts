@@ -40,7 +40,12 @@ export async function bidAttachments(bidNtceNo: string, bidNtceOrd = "000", bizT
  * 최근 N일 공고의 첨부파일 목록을 한꺼번에 받는다 (정적 빌드용).
  * 용역·공사·물품 목록을 날짜별로 조회해 "공고번호-차수" → 첨부파일로 묶는다. 기간은 공고 수집 기간과 같다.
  */
-export async function fetchAttachmentsBulk(ids: Set<string>, days = COLLECT_DAYS): Promise<Record<string, Attachment[]>> {
+export async function fetchAttachmentsBulk(
+  ids: Set<string>,
+  days = COLLECT_DAYS,
+  /** 목록 원본을 함께 쓰는 쪽(참가자격 수집)에 넘겨준다 */
+  onItem?: (id: string, it: Item, day: string) => void,
+): Promise<Record<string, Attachment[]>> {
   const ops = BID.operations as Record<string, string>;
   const out: Record<string, Attachment[]> = {};
   const jobs = recentDays(days).flatMap((day) => [ops.serviceList, ops.constructionList, ops.goodsList].map((op) => ({ day, op })));
@@ -53,6 +58,7 @@ export async function fetchAttachmentsBulk(ids: Set<string>, days = COLLECT_DAYS
     for (const it of items) {
       const id = `${it.bidNtceNo}-${it.bidNtceOrd ?? "000"}`;
       if (!ids.has(id)) continue;
+      onItem?.(id, it, day);
       const files = attachmentsOf(it);
       if (files.length) out[id] = files;
     }

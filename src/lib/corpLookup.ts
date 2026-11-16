@@ -30,10 +30,13 @@ export interface NaraCorp {
   openedAt?: string;
   employees?: number;
   address?: string;
+  /** 소재지 시·군·구 (예: 전북특별자치도 전주시 완산구). 참가지역 제한 판정에 쓴다 */
+  region?: string;
   bizDivisions: string[];
   manufacturer?: string;
   registeredAt?: string;
-  industries: { name: string; code: string; representative: boolean }[];
+  /** 나라장터 등록 업종. 오래된 업종은 이름 없이 코드만 오기도 한다 */
+  industries: { name: string; code: string; representative: boolean; expiresAt?: string }[];
 }
 
 export interface FscCorp {
@@ -154,11 +157,12 @@ async function naraCorp(key: string, no: string): Promise<NaraCorp | undefined> 
   try {
     const now = new Date();
     const r = itemsOf(await getJson(`${NARA}/getPrcrmntCorpIndstrytyInfo02?${qs(key, {
-      type: "json", pageNo: "1", numOfRows: "50", inqryDiv: "1", bizno: no,
+      type: "json", pageNo: "1", numOfRows: "100", inqryDiv: "1", bizno: no,
       inqryBgnDt: kstStamp(new Date(now.getTime() - 28 * 86400e3)), inqryEndDt: kstStamp(now),
     })}`));
-    industries = r.filter((i) => i.bizno === no && i.indstrytyNm)
-      .map((i) => ({ name: i.indstrytyNm!, code: i.indstrytyCd ?? "", representative: i.rprsntIndstrytyYn === "Y" }));
+    // 이름이 빈 업종(옛 업종 코드)도 참가자격 판정에 필요해 코드가 있으면 모두 남긴다
+    industries = r.filter((i) => i.bizno === no && (i.indstrytyNm || i.indstrytyCd))
+      .map((i) => ({ name: clean(i.indstrytyNm) ?? "", code: i.indstrytyCd ?? "", representative: i.rprsntIndstrytyYn === "Y", expiresAt: dateOf(i.vldPrdExprtDt) }));
   } catch {
     // 업종 조회 실패는 기본정보만으로 진행
   }
@@ -168,6 +172,7 @@ async function naraCorp(key: string, no: string): Promise<NaraCorp | undefined> 
     openedAt: dateOf(b.opbizDt),
     employees: num(b.emplyeNum),
     address: [b.adrs, b.dtlAdrs].filter(Boolean).join(" ").trim() || b.rgnNm,
+    region: clean(b.rgnNm),
     bizDivisions: (b.corpBsnsDivNm ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     manufacturer: clean(b.mnfctDivNm),
     registeredAt: dateOf(b.rgstDt),

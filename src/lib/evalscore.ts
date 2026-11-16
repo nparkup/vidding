@@ -525,6 +525,8 @@ export interface PredictedItem extends EvalItem {
   reason: string;
   /** 이 항목에서 잃은 점수 */
   lost: number;
+  /** 자료가 없어 점수를 정하지 못한 항목 (예: 기초금액이 없는 공고의 금액 비율 실적). score 는 0, 합계에서 빼고 따로 안내한다 */
+  unknown?: boolean;
 }
 
 export interface Prediction {
@@ -532,6 +534,8 @@ export interface Prediction {
   items: PredictedItem[];
   total: number;
   max: number;
+  /** 점수를 정하지 못한 항목들의 배점 합. total 은 이 점수를 뺀 값이다 */
+  pending: number;
   techScore: number;
   techMax: number;
   passed?: boolean;
@@ -620,6 +624,13 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
     }
     switch (it.kind) {
       case "performance": {
+        // 기초금액이 없는 공고(수수료·단가형 등)는 기초금액 대비 비율을 구할 수 없다. 점수를 지어내지 않고 확인 필요로 둔다
+        if (!(amt > 0)) {
+          return {
+            ...it, score: 0, ratio: 0, lost: 0, unknown: true,
+            reason: `기초금액이 없는 공고라 기초금액 대비 실적 비율로 계산할 수 없습니다${c.perfSource ? ` (인정 실적: ${c.perfSource})` : ""}. 공고서의 실적 평가 기준(건수·금액)을 확인하세요`,
+          };
+        }
         ratio = performanceRatio(c.pastPerformance, amt);
         reason = c.pastPerformance
           ? `유사 실적 ${Math.round((c.pastPerformance / amt) * 100)}% (기초금액 대비${c.perfSource ? `, ${c.perfSource}` : ""})`
@@ -669,28 +680,33 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
 
   const total = round1(items.reduce((s, i) => s + i.score, 0));
   const max = round1(items.reduce((s, i) => s + i.max, 0));
+  const pending = round1(items.filter((i) => i.unknown).reduce((s, i) => s + Math.max(0, i.max), 0));
   const tech = items.filter((i) => i.kind !== "price");
   const techScore = round1(tech.reduce((s, i) => s + i.score, 0));
   const techMax = round1(tech.reduce((s, i) => s + Math.max(0, i.max), 0));
 
+  // 확인 필요 항목이 있으면 그 항목이 0점일 때와 만점일 때 모두 같은 결과일 때만 통과·미달을 말한다
   let passed: boolean | undefined;
   let passLabel: string | undefined;
   let gap: number | undefined;
+  const judge = (score: number, need: number) => {
+    const lo = score >= need - 1e-6, hi = score + pending >= need - 1e-6;
+    passed = lo === hi ? lo : undefined;
+    gap = pending ? undefined : round1(score - need);
+  };
   if (sheet.pass?.kind === "total") {
-    passed = total >= sheet.pass.score - 1e-6;
-    gap = round1(total - sheet.pass.score);
+    judge(total, sheet.pass.score);
     passLabel = `종합평점 ${sheet.pass.score}점 이상`;
   } else if (sheet.pass?.kind === "techRatio") {
     const need = round1(techMax * sheet.pass.ratio);
-    passed = techScore >= need;
-    gap = round1(techScore - need);
+    judge(techScore, need);
     passLabel = `기술점수 ${need}점 이상 (배점의 ${Math.round(sheet.pass.ratio * 100)}%)`;
   }
 
   // 적격심사: 비가격 점수를 고정하고, 통과 가능한 투찰률 범위를 찾는다
   let rateWindow: Prediction["rateWindow"];
   const priceItem = sheet.items.find((i) => i.kind === "price");
-  if (sheet.method === "적격심사" && sheet.pass?.kind === "total" && priceItem) {
+  if (sheet.method === "적격심사" && sheet.pass?.kind === "total" && priceItem && !pending) {
     const nonPrice = total - (items.find((i) => i.id === priceItem.id)?.score ?? 0);
     const ok: number[] = [];
     const floor = bid.lowerLimitRate ?? 0;
@@ -704,6 +720,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   }
 
   const tips: string[] = [];
+  for (const u of items.filter((i) => i.unknown)) tips.push(`${u.label}(${u.max}점)은 기초금액이 없는 공고라 계산하지 못했습니다. 공고서의 실적 평가 기준을 확인하면 점수를 정할 수 있습니다.`);
   const losers = [...items].filter((i) => i.kind !== "price" && i.lost > 0).sort((a, b) => b.lost - a.lost).slice(0, 3);
   for (const l of losers) {
     const up = l.bands && l.bands[0].unit === "%" ? [...l.bands].sort((a, b) => a.min - b.min).find((b) => b.points > l.score && b.min > 0) : undefined;
@@ -717,7 +734,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   if (sheet.pass?.kind === "total" && rateWindow) tips.push(`통과 가능한 투찰률은 예정가격의 ${rateWindow.low}% ~ ${rateWindow.high}% 입니다.${bid.lowerLimitRate ? ` 낙찰하한율 ${bid.lowerLimitRate}%보다 낮게 쓰면 탈락합니다.` : ""}`);
   if (sheet.pass?.kind === "total" && !rateWindow && priceItem && !passed) tips.push("가격 만점을 받아도 통과 점수에 못 미칩니다. 실적·신용 항목을 먼저 보완해야 합니다.");
 
-  return { sheet, items, total, max, techScore, techMax, passed, passLabel, gap, rateWindow, tips };
+  return { sheet, items, total, max, pending, techScore, techMax, passed, passLabel, gap, rateWindow, tips };
 }
 
 /** 개업일(YYYY-MM-DD…)로 업력(년) 계산 */

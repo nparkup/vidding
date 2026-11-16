@@ -365,15 +365,20 @@ export function ScorePredictor() {
               <p className="text-sm text-ink-300">예상 평가점수</p>
               <div className="mt-2 flex items-end justify-between gap-3">
                 <p className="text-6xl font-extrabold tabular-nums tracking-tight">{result.total}<span className="text-xl text-ink-300">/{result.max}</span></p>
-                {result.passed !== undefined && (
+                {result.passed !== undefined ? (
                   <span className={`rounded-lg px-3 py-1.5 text-sm font-bold ${result.passed ? "bg-mint text-white" : "bg-coral text-white"}`}>
                     {result.passed ? "통과 예상" : "미달 예상"}
                   </span>
+                ) : result.pending > 0 && result.passLabel && (
+                  <span className="rounded-lg bg-amber px-3 py-1.5 text-sm font-bold text-ink">확인 필요</span>
                 )}
               </div>
+              {result.pending > 0 && (
+                <p className="mt-2 text-sm text-amber">확인 필요 항목 {result.pending}점 제외 · 그 항목까지 받으면 최대 {Math.round((result.total + result.pending) * 10) / 10}점</p>
+              )}
               {result.passLabel && (
                 <p className="mt-2 text-sm text-ink-300">
-                  기준 {result.passLabel} · {result.gap !== undefined && (result.gap >= 0 ? `${result.gap}점 여유` : `${Math.abs(result.gap)}점 부족`)}
+                  기준 {result.passLabel}{result.gap !== undefined && ` · ${result.gap >= 0 ? `${result.gap}점 여유` : `${Math.abs(result.gap)}점 부족`}`}
                 </p>
               )}
               {isNego && <p className="mt-1 text-sm text-ink-300">기술 {result.techScore}/{result.techMax} · 가격 {Math.round((result.total - result.techScore) * 10) / 10}</p>}
@@ -390,14 +395,14 @@ export function ScorePredictor() {
                   <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
                     <span className="font-semibold">{i.label}</span>
                     <span className="tabular-nums text-xs text-ink-300">
-                      현재: <b className="text-sm text-white">{i.score}점</b>
+                      현재: {i.unknown ? <b className="text-sm text-amber">확인 필요</b> : <b className="text-sm text-white">{i.score}점</b>}
                       <span className="mx-1.5 text-white/30">|</span>
                       공고 평가항목 기준: {i.max > 0 ? `총 ${i.max}점 만점` : "가·감점 항목"}
                     </span>
                   </div>
-                  {i.max > 0 && <ScoreBar value={Math.max(0, i.score)} max={i.max} />}
+                  {i.max > 0 && !i.unknown && <ScoreBar value={Math.max(0, i.score)} max={i.max} />}
                   <p className="mt-1 text-xs text-ink-300">
-                    {i.max > 0 && i.score >= i.max ? "만점 기준" : "산정 기준"}: {i.reason}{i.max > 0 ? ` ${pct(i.score, i.max)}%` : ""}
+                    {i.unknown ? `확인 필요: ${i.reason}` : <>{i.max > 0 && i.score >= i.max ? "만점 기준" : "산정 기준"}: {i.reason}{i.max > 0 ? ` ${pct(i.score, i.max)}%` : ""}</>}
                   </p>
                 </li>
               ))}

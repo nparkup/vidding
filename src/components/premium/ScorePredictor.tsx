@@ -10,7 +10,7 @@ import {
 } from "@/lib/evalscore";
 import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
-import { judgeEligibility, type BidQual, type Verdict } from "@/lib/eligibility";
+import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "@/lib/eligibility";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from "@/lib/rivalRate";
@@ -116,6 +116,12 @@ export function ScorePredictor() {
     perfSource: autoPerf.count ? `나라장터 낙찰 ${autoPerf.count}건 추정${manualPerf ? " + 직접 입력" : ""}` : undefined,
   }), [co, autoPerf, manualPerf]);
   const result = useMemo(() => (active && bid ? predict(active, bid, coEff) : null), [active, bid, coEff]);
+  // 참가자격 판정: 사업자번호를 조회하고 공고 자료가 오면 판정한다. 불가면 예상 점수 대신 사유를 보여 준다
+  const eligibility = useMemo(() => (corp && docs && bid ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역") : null), [corp, docs, bid]);
+  /** 예상 점수를 보여 줄 단계: 조회 기능이 없는 미리보기는 직접 입력값으로 바로 계산한다 */
+  const scoreStage: "criteria" | "checking" | "blocked" | "score" = !CORP_API
+    ? "score"
+    : !corp ? "criteria" : !eligibility ? "checking" : eligibility.verdict === "불가" ? "blocked" : "score";
   const sheetYears = useMemo(() => active
     ? sheetPerfYears(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]).concat(active.recognition ?? []))
     : undefined, [active]);
@@ -216,8 +222,8 @@ export function ScorePredictor() {
         </section>
         <aside className="card grid min-h-[12rem] min-w-0 place-items-center p-6 text-center">
           <div>
-            <p className="font-bold">예상 평가점수</p>
-            <p className="mt-2 text-sm text-ink-500">공고를 고르면 기업 정보 입력란과 항목별 예상 점수가 나옵니다.</p>
+            <p className="font-bold">평가 기준</p>
+            <p className="mt-2 text-sm text-ink-500">공고를 고르면 평가항목과 배점이 나옵니다. 사업자번호를 조회하면 참가자격을 확인하고 예상 평가점수를 계산합니다.</p>
           </div>
         </aside>
       </div>
@@ -287,7 +293,7 @@ export function ScorePredictor() {
                   ? "국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업기본정보·재무정보를 한 번에 조회합니다."
                   : "공개 미리보기에서는 직접 입력합니다. 이용 고객은 담당 매니저가 사업자번호로 기업 정보를 조회해 채워 드립니다.")}
               </p>}
-              {corp && <EligibilityPanel corp={corp} bid={bid} docs={docs} />}
+              {corp && <EligibilityPanel result={eligibility} />}
               {corp && <CorpPanel corp={corp} />}
               {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetYears={sheetYears} onChange={onPerf} />}
             </div>
@@ -342,67 +348,78 @@ export function ScorePredictor() {
         </section>
       </div>
 
-      {/* 결과 */}
+      {/* 결과: 사업자번호 조회 전에는 평가 기준만, 조회 후 참가 가능하면 예상 점수, 불가면 사유 */}
       <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-        <section className="overflow-hidden rounded-3xl bg-ink-900 text-white shadow-lift">
-          <div className="p-6">
-            <p className="text-sm text-ink-300">예상 평가점수</p>
-            <div className="mt-2 flex items-end justify-between gap-3">
-              <p className="text-6xl font-extrabold tabular-nums tracking-tight">{result.total}<span className="text-xl text-ink-300">/{result.max}</span></p>
-              {result.passed !== undefined && (
-                <span className={`rounded-lg px-3 py-1.5 text-sm font-bold ${result.passed ? "bg-mint text-white" : "bg-coral text-white"}`}>
-                  {result.passed ? "통과 예상" : "미달 예상"}
-                </span>
-              )}
-            </div>
-            {result.passLabel && (
-              <p className="mt-2 text-sm text-ink-300">
-                기준 {result.passLabel} · {result.gap !== undefined && (result.gap >= 0 ? `${result.gap}점 여유` : `${Math.abs(result.gap)}점 부족`)}
-              </p>
-            )}
-            {isNego && <p className="mt-1 text-sm text-ink-300">기술 {result.techScore}/{result.techMax} · 가격 {Math.round((result.total - result.techScore) * 10) / 10}</p>}
-            {result.rateWindow && (
-              <div className="mt-4 rounded-xl bg-white/5 p-3">
-                <p className="text-xs text-ink-300">통과 가능한 투찰률</p>
-                <p className="mt-0.5 text-lg font-bold tabular-nums">{result.rateWindow.low}% ~ {result.rateWindow.high}%</p>
-              </div>
-            )}
-          </div>
-          <ul className="space-y-4 border-t border-white/10 p-6">
-            {result.items.map((i) => (
-              <li key={i.id}>
-                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
-                  <span className="font-semibold">{i.label}</span>
-                  <span className="tabular-nums text-xs text-ink-300">
-                    현재: <b className="text-sm text-white">{i.score}점</b>
-                    <span className="mx-1.5 text-white/30">|</span>
-                    공고 평가항목 기준: {i.max > 0 ? `총 ${i.max}점 만점` : "가·감점 항목"}
-                  </span>
-                </div>
-                {i.max > 0 && <ScoreBar value={Math.max(0, i.score)} max={i.max} />}
-                <p className="mt-1 text-xs text-ink-300">
-                  {i.max > 0 && i.score >= i.max ? "만점 기준" : "산정 기준"}: {i.reason}{i.max > 0 ? ` ${pct(i.score, i.max)}%` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {result.tips.length > 0 && (
-          <section className="card mt-4 p-6">
-            <h3 className="font-bold">점수를 올릴 수 있는 곳</h3>
-            <ol className="mt-3 space-y-2 text-sm leading-relaxed">
-              {result.tips.map((t, n) => (
-                <li key={t} className="flex gap-2"><span className="font-bold text-mint-600 tabular-nums">{n + 1}</span>{t}</li>
-              ))}
-            </ol>
+        {scoreStage === "criteria" && <CriteriaPanel sheet={active} passLabel={result.passLabel} />}
+        {scoreStage === "checking" && (
+          <section className="card p-6">
+            <p className="font-bold">참가자격 확인 중</p>
+            <p className="mt-2 text-sm text-ink-500">공고의 업종·지역 제한과 조회한 기업 정보를 대조하고 있습니다. 끝나면 예상 평가점수가 나옵니다.</p>
           </section>
         )}
-        <p className="mt-4 text-xs leading-relaxed text-ink-300">
-          {active.source === "extracted" && active.items.some((i) => i.bands || i.recognition || i.criteria) || active.scale
-            ? "점수 구간·서류 인정 범위·정성 등급은 공고 첨부에서 읽은 기준을 적용했습니다. 정성평가는 위원이 제안서와 발표를 보고 매기므로, 제안 준비 수준으로 고른 등급은 예상치입니다. 실제로 인정되는 서류는 제출 전 공고 원문으로 확인하세요."
-            : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 표준 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
-        </p>
+        {scoreStage === "blocked" && eligibility && <BlockedPanel result={eligibility} corpName={corp?.corpName} />}
+        {scoreStage === "score" && (<>
+        {eligibility?.verdict === "확인 필요" && <ReviewNotice result={eligibility} />}
+          <section className="overflow-hidden rounded-3xl bg-ink-900 text-white shadow-lift">
+            <div className="p-6">
+              <p className="text-sm text-ink-300">예상 평가점수</p>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <p className="text-6xl font-extrabold tabular-nums tracking-tight">{result.total}<span className="text-xl text-ink-300">/{result.max}</span></p>
+                {result.passed !== undefined && (
+                  <span className={`rounded-lg px-3 py-1.5 text-sm font-bold ${result.passed ? "bg-mint text-white" : "bg-coral text-white"}`}>
+                    {result.passed ? "통과 예상" : "미달 예상"}
+                  </span>
+                )}
+              </div>
+              {result.passLabel && (
+                <p className="mt-2 text-sm text-ink-300">
+                  기준 {result.passLabel} · {result.gap !== undefined && (result.gap >= 0 ? `${result.gap}점 여유` : `${Math.abs(result.gap)}점 부족`)}
+                </p>
+              )}
+              {isNego && <p className="mt-1 text-sm text-ink-300">기술 {result.techScore}/{result.techMax} · 가격 {Math.round((result.total - result.techScore) * 10) / 10}</p>}
+              {result.rateWindow && (
+                <div className="mt-4 rounded-xl bg-white/5 p-3">
+                  <p className="text-xs text-ink-300">통과 가능한 투찰률</p>
+                  <p className="mt-0.5 text-lg font-bold tabular-nums">{result.rateWindow.low}% ~ {result.rateWindow.high}%</p>
+                </div>
+              )}
+            </div>
+            <ul className="space-y-4 border-t border-white/10 p-6">
+              {result.items.map((i) => (
+                <li key={i.id}>
+                  <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
+                    <span className="font-semibold">{i.label}</span>
+                    <span className="tabular-nums text-xs text-ink-300">
+                      현재: <b className="text-sm text-white">{i.score}점</b>
+                      <span className="mx-1.5 text-white/30">|</span>
+                      공고 평가항목 기준: {i.max > 0 ? `총 ${i.max}점 만점` : "가·감점 항목"}
+                    </span>
+                  </div>
+                  {i.max > 0 && <ScoreBar value={Math.max(0, i.score)} max={i.max} />}
+                  <p className="mt-1 text-xs text-ink-300">
+                    {i.max > 0 && i.score >= i.max ? "만점 기준" : "산정 기준"}: {i.reason}{i.max > 0 ? ` ${pct(i.score, i.max)}%` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {result.tips.length > 0 && (
+            <section className="card mt-4 p-6">
+              <h3 className="font-bold">점수를 올릴 수 있는 곳</h3>
+              <ol className="mt-3 space-y-2 text-sm leading-relaxed">
+                {result.tips.map((t, n) => (
+                  <li key={t} className="flex gap-2"><span className="font-bold text-mint-600 tabular-nums">{n + 1}</span>{t}</li>
+                ))}
+              </ol>
+            </section>
+          )}
+          <p className="mt-4 text-xs leading-relaxed text-ink-300">
+            {active.source === "extracted" && active.items.some((i) => i.bands || i.recognition || i.criteria) || active.scale
+              ? "점수 구간·서류 인정 범위·정성 등급은 공고 첨부에서 읽은 기준을 적용했습니다. 정성평가는 위원이 제안서와 발표를 보고 매기므로, 제안 준비 수준으로 고른 등급은 예상치입니다. 실제로 인정되는 서류는 제출 전 공고 원문으로 확인하세요."
+              : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 표준 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
+          </p>
+        </>)}
       </aside>
     </div>
 
@@ -467,8 +484,7 @@ const VERDICT_TITLE: Record<Verdict, string> = {
 };
 
 /** 사업자번호 조회 결과와 공고의 업종·지역 제한을 대조한 참가자격 1차 판정 */
-function EligibilityPanel({ corp, bid, docs }: { corp: CorpLookup; bid: Bid; docs: BidDocs | null }) {
-  const result = useMemo(() => (docs ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역") : null), [docs, corp, bid]);
+function EligibilityPanel({ result }: { result: Eligibility | null }) {
   if (!result) return <p className="mt-3 text-sm text-ink-300">공고의 참가자격 자료를 확인하는 중…</p>;
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-ink-100 text-sm">
@@ -491,6 +507,80 @@ function EligibilityPanel({ corp, bid, docs }: { corp: CorpLookup; bid: Bid; doc
         나라장터에 입력된 업종·지역 제한과 기업의 나라장터 등록 정보로 판정했습니다. 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 포함하지 않으니, 투찰 전 공고서의 참가자격을 함께 확인하세요.
       </p>
     </div>
+  );
+}
+
+/** 사업자번호 조회 전: 공고의 평가항목과 배점, 통과 기준만 보여 준다 */
+function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: string }) {
+  const max = Math.round(sheet.items.reduce((s, i) => s + Math.max(0, i.max), 0) * 10) / 10;
+  return (
+    <section className="card overflow-hidden">
+      <div className="p-6">
+        <p className="text-sm text-ink-500">평가 기준</p>
+        <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? "공고 첨부의 평가표" : `${sheet.method} 표준 평가표`} · {max}점 만점</p>
+        {passLabel && <p className="mt-1 text-sm text-ink-500">통과 기준 {passLabel}</p>}
+      </div>
+      <ul className="divide-y divide-ink-100 border-t border-ink-100">
+        {sheet.items.map((i) => (
+          <li key={i.id} className="flex min-w-0 items-baseline justify-between gap-3 px-6 py-3 text-sm">
+            <span className="min-w-0">
+              <span className="block font-semibold">{i.label}</span>
+              {i.group && <span className="block truncate text-xs text-ink-300">{i.group}</span>}
+            </span>
+            <span className="shrink-0 tabular-nums text-ink-500">{i.max > 0 ? `${i.max}점` : "가·감점"}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-ink-100 bg-ink-50 px-6 py-3 text-sm leading-relaxed text-ink-500">
+        사업자번호를 조회하면 참가자격을 먼저 확인하고, 참가할 수 있는 경우 항목별 예상 평가점수를 계산합니다.
+      </p>
+    </section>
+  );
+}
+
+/** 참가 불가: 예상 점수 대신 불가 사유를 보여 준다 */
+function BlockedPanel({ result, corpName }: { result: Eligibility; corpName?: string }) {
+  const blocked = result.checks.filter((c) => c.verdict === "불가");
+  const review = result.checks.filter((c) => c.verdict === "확인 필요");
+  return (
+    <section className="card overflow-hidden border-coral/40">
+      <div className="p-6">
+        <span className="inline-block rounded-lg bg-coral px-2.5 py-1 text-xs font-bold text-white">참가 불가</span>
+        {corpName && <p className="mt-3 text-sm text-ink-500">{corpName}</p>}
+        <p className={`${corpName ? "mt-0.5" : "mt-3"} text-lg font-bold leading-snug`}>현재 등록 정보로는 이 공고에 참가할 수 없습니다</p>
+        <p className="mt-1 text-sm text-ink-500">참가할 수 없는 공고라 예상 평가점수는 계산하지 않았습니다.</p>
+      </div>
+      <ol className="space-y-3 border-t border-ink-100 p-6 text-sm">
+        {blocked.map((c, n) => (
+          <li key={c.label} className="flex gap-3">
+            <span className="font-bold tabular-nums text-coral">{n + 1}</span>
+            <span className="min-w-0">
+              <span className="block font-semibold">{c.label}</span>
+              <span className="mt-0.5 block break-keep leading-relaxed text-ink-500">{c.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {review.length > 0 && (
+        <p className="border-t border-ink-100 px-6 py-3 text-xs leading-relaxed text-ink-500">
+          함께 확인할 것: {review.map((c) => c.label).join(", ")}. 자세한 내용은 왼쪽 입찰 참가자격 표에 있습니다.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** 확인 필요: 점수는 보여 주되 무엇을 확인해야 하는지 위에 적는다 */
+function ReviewNotice({ result }: { result: Eligibility }) {
+  const review = result.checks.filter((c) => c.verdict === "확인 필요");
+  return (
+    <section className="mb-4 rounded-2xl bg-amber-100 p-4 text-sm text-ink">
+      <p className="font-bold">참가 가능 여부 확인 필요</p>
+      <ul className="mt-2 space-y-1.5 leading-relaxed">
+        {review.map((c) => <li key={c.label} className="break-keep"><b>{c.label}</b>: {c.detail}</li>)}
+      </ul>
+      <p className="mt-2 text-xs text-ink-500">아래 점수는 참가할 수 있다고 보고 계산한 예상치입니다.</p>
+    </section>
   );
 }
 

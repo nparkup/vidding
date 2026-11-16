@@ -19,14 +19,14 @@ const SIZES = [
 ];
 
 /**
- * 무료 진단 신청 폼.
+ * 2주 무료 체험 신청 폼.
  * - 서버 배포: action(서버 액션)으로 접수 저장
  * - 정적 배포(GitHub Pages): 브라우저에서 바로 추천 공고를 계산하고, 신청 내용은 메일 앱으로 전송
  */
 export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: FormData) => void; error?: boolean; plan?: string; email?: string }) {
   const [result, setResult] = useState<{ company: string; ok: MatchResult[]; excluded: number; qs: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  // 정적 배포: 진단에 쓸 공고를 미리 받아 둔다
+  // 정적 배포: 참가 가능 공고 계산에 쓸 공고를 미리 받아 둔다
   useEffect(() => { if (!action) loadBids().catch(() => {}); }, [action]);
 
   async function onStatic(e: React.FormEvent<HTMLFormElement>) {
@@ -46,9 +46,9 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
     const lines = [
       `회사명: ${s("company")}`, `담당자: ${s("contactName")}`, `이메일: ${s("email")}`, `연락처: ${s("phone")}`,
       `보유 면허: ${licenses.join(", ") || "-"}`, `영업 지역: ${regions.join(", ") || "-"}`, `수행 규모: ${won(minAmount)} ~ ${won(maxAmount)}`,
-      `문의: ${s("message")}`, "", `(사이트 진단 결과: 참가 가능 공고 ${ok.length}건)`,
+      `문의: ${s("message")}`, "", `(사이트 분석 결과: 참가 가능 공고 ${ok.length}건)`,
     ];
-    if (email) window.location.href = `mailto:${email}?subject=${encodeURIComponent(`[입찰메이트LAB 무료진단] ${s("company")}`)}&body=${encodeURIComponent(lines.join("\n"))}`;
+    if (email) window.location.href = `mailto:${email}?subject=${encodeURIComponent(`[입찰메이트LAB 무료 체험 신청] ${s("company")}`)}&body=${encodeURIComponent(lines.join("\n"))}`;
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -57,7 +57,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
       <div className="space-y-4">
         <div className="card p-6 text-center sm:p-8">
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-mint text-white"><Check className="h-6 w-6" strokeWidth={3} /></span>
-          <p className="mt-4 text-2xl font-extrabold">{result.company || "귀사"} 조건의 진단 결과</p>
+          <p className="mt-4 text-2xl font-extrabold">{result.company || "귀사"} 조건의 분석 결과</p>
           <p className="mt-2 text-sm text-ink-500">메일 앱이 열리지 않았다면 {email}로 회사명과 연락처를 보내 주세요.</p>
           <div className="mx-auto mt-6 grid max-w-sm grid-cols-2 gap-3">
             <div className="rounded-2xl bg-mint-50 p-4"><p className="text-3xl font-extrabold text-mint-600">{result.ok.length}</p><p className="text-sm text-ink-500">참가 가능 공고</p></div>
@@ -109,8 +109,8 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
           {!plan && (
             <div><label className="label" htmlFor="message">문의 내용</label><textarea id="message" name="message" rows={3} className="input" placeholder="주로 참여하고 싶은 공고, 어려운 점 등을 적어 주세요." /></div>
           )}
-          <p className="text-xs text-ink-300">제출 시 상담 목적의 개인정보 수집·이용에 동의한 것으로 간주합니다.</p>
-          <button className="btn-mint w-full text-base" disabled={busy}>{busy ? "공고 불러오는 중…" : "무료 진단 결과 보기"}</button>
+          <p className="text-xs text-ink-300">제출 시 맞춤 공고 발송 목적의 개인정보 수집·이용에 동의한 것으로 간주합니다.</p>
+          <button className="btn-mint w-full text-base" disabled={busy}>{busy ? "공고 불러오는 중…" : "참가 가능 공고 보기"}</button>
           {!action && <p className="text-center text-xs text-ink-300">제출하면 메일 앱이 열려 신청 내용이 {email}로 전송됩니다.</p>}
         </form>
   );

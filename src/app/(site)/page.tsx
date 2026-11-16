@@ -624,13 +624,13 @@ export default async function Home() {
           <div className="container-x relative grid items-center gap-6 py-16 sm:py-20 lg:grid-cols-[1.1fr_1fr]">
             <div>
               <h2 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl sm:leading-[1.15]">입찰 업무,<br />오늘부터 맡겨 보세요.</h2>
-              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 1영업일 안에 담당 매니저가 연락드립니다.</p>
+              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 다음 영업일 아침부터 맞춤 공고 메일을 보내드립니다.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link href="/apply" className="btn-mint px-7 text-base">무료 진단 신청</Link>
+                <Link href="/apply" className="btn-mint px-7 text-base">2주 무료 체험 신청</Link>
                 <Link href="/pricing" className="btn-glass px-7 text-base">요금제 보기</Link>
               </div>
               <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-300">
-                {["상담만 받아도 괜찮아요", "카드 등록 없음", "2주 무료"].map((t) => (
+                {["약정 없음", "카드 등록 없음", "2주 무료"].map((t) => (
                   <li key={t} className="flex items-center gap-1.5"><Check className="h-4 w-4 text-mint-400" />{t}</li>
                 ))}
               </ul>

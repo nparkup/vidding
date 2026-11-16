@@ -30,7 +30,7 @@ export default async function ServicePage() {
         art={<DeskArt className="w-full" />}
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link href="/apply" className="btn-mint">무료 진단 받기</Link>
+          <Link href="/apply" className="btn-mint">2주 무료 체험</Link>
           <Link href="/report/sample" className="btn-ghost">주간 보고서 샘플</Link>
         </div>
       </PageHero>

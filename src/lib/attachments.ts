@@ -15,5 +15,8 @@ export async function loadAttachments(bid: Bid): Promise<BidAttachment[]> {
   }
   const qs = new URLSearchParams({ no: bid.bidNtceNo, ord: bid.bidNtceOrd, biz: bid.bizType ?? "용역" });
   const r = await fetch(`/api/premium/attachments?${qs}`);
-  return r.ok ? r.json() : [];
+  if (!r.ok) return [];
+  // 서버 응답은 { files, qual } 형태 (예전 응답은 배열)
+  const j = await r.json();
+  return Array.isArray(j) ? j : j.files ?? [];
 }

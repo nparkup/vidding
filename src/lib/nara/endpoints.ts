@@ -31,7 +31,7 @@ export const NARA_APIS = [
     path: "/ad/BidPublicInfoService02",
     required: false,
     approved: true,
-    usage: "공고 첨부파일(공고서·규격서 ntceSpecDocUrl1~10) 목록 · 평가점수 예측의 원문 확보에 필요",
+    usage: "공고 첨부파일(공고서·규격서 ntceSpecDocUrl1~10) 목록 · 평가점수 예측의 원문 확보, 면허제한·참가가능지역으로 참가자격 판정",
     operations: {
       serviceList: "getBidPblancListInfoServc02",
       constructionList: "getBidPblancListInfoCnstwk02",

@@ -10,6 +10,7 @@ import {
 } from "@/lib/evalscore";
 import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
+import { judgeEligibility, type BidQual, type Verdict } from "@/lib/eligibility";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from "@/lib/rivalRate";
@@ -23,7 +24,7 @@ const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium
 /** 유사 실적(나라장터 낙찰 이력) 조회: 정적 사이트는 같은 중계 서버, 서버 배포는 자체 API */
 const PERF_API = STATIC ? CORP_API : "/api/premium/perf";
 
-interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string }
+interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; qual?: BidQual }
 
 /** 정적 배포는 빌드 때 공고별로 만들어 둔 파일(첨부 목록 + 첨부에서 추출한 평가표)을, 서버 배포는 나라장터 첨부 목록을 바로 조회한다 */
 async function loadBidDocs(bid: Bid): Promise<BidDocs> {
@@ -286,6 +287,7 @@ export function ScorePredictor() {
                   ? "국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업기본정보·재무정보를 한 번에 조회합니다."
                   : "공개 미리보기에서는 직접 입력합니다. 이용 고객은 담당 매니저가 사업자번호로 기업 정보를 조회해 채워 드립니다.")}
               </p>}
+              {corp && <EligibilityPanel corp={corp} bid={bid} docs={docs} />}
               {corp && <CorpPanel corp={corp} />}
               {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetYears={sheetYears} onChange={onPerf} />}
             </div>
@@ -452,6 +454,46 @@ const fmtWon = (n?: number): string => {
 const friendly = (e: string) => (/[가-힣]/.test(e) ? e : "잠시 후 다시 시도해 주세요");
 
 /** 사업자번호 조회 결과: 출처별로 나눠 보여 준다 */
+const VERDICT_TONE: Record<Verdict, string> = {
+  가능: "bg-mint-50 text-mint-700",
+  불가: "bg-coral-100 text-ink",
+  "확인 필요": "bg-amber-100 text-ink",
+};
+const VERDICT_SOLID: Record<Verdict, string> = { 가능: "bg-mint text-white", 불가: "bg-coral text-white", "확인 필요": "bg-amber text-ink" };
+const VERDICT_TITLE: Record<Verdict, string> = {
+  가능: "업종·지역 기준 참가 가능",
+  불가: "현재 등록 정보로는 참가 불가",
+  "확인 필요": "참가 가능 여부 확인 필요",
+};
+
+/** 사업자번호 조회 결과와 공고의 업종·지역 제한을 대조한 참가자격 1차 판정 */
+function EligibilityPanel({ corp, bid, docs }: { corp: CorpLookup; bid: Bid; docs: BidDocs | null }) {
+  const result = useMemo(() => (docs ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역") : null), [docs, corp, bid]);
+  if (!result) return <p className="mt-3 text-sm text-ink-300">공고의 참가자격 자료를 확인하는 중…</p>;
+  return (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-ink-100 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3">
+        <p className="font-bold">입찰 참가자격</p>
+        <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${VERDICT_SOLID[result.verdict]}`}>{VERDICT_TITLE[result.verdict]}</span>
+      </div>
+      <ul className="divide-y divide-ink-100 border-t border-ink-100">
+        {result.checks.map((c) => (
+          <li key={c.label} className="grid gap-1 px-4 py-3 sm:grid-cols-[7.5rem_1fr]">
+            <div className="flex items-center justify-between gap-2 sm:block">
+              <p className="font-semibold">{c.label}</p>
+              <span className={`inline-block rounded-md px-1.5 py-0.5 text-xs font-semibold sm:mt-1 ${VERDICT_TONE[c.verdict]}`}>{c.verdict}</span>
+            </div>
+            <p className="min-w-0 break-keep leading-relaxed text-ink-500">{c.detail}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-ink-100 bg-ink-50 px-4 py-2.5 text-xs leading-relaxed text-ink-500">
+        나라장터에 입력된 업종·지역 제한과 기업의 나라장터 등록 정보로 판정했습니다. 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 포함하지 않으니, 투찰 전 공고서의 참가자격을 함께 확인하세요.
+      </p>
+    </div>
+  );
+}
+
 function CorpPanel({ corp }: { corp: CorpLookup }) {
   const { nts, nara, fsc, finance, errors } = corp;
   const ntsTone = !nts ? "" : !nts.registered || nts.state === "폐업자" ? "text-coral" : nts.state === "휴업자" ? "text-amber" : "text-mint-600";
@@ -476,7 +518,7 @@ function CorpPanel({ corp }: { corp: CorpLookup }) {
               {nara.industries.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {nara.industries.map((i) => (
-                    <span key={i.code + i.name} className={`rounded-md px-1.5 py-0.5 text-xs ${i.representative ? "bg-ink text-white" : "bg-ink-50 text-ink-500"}`}>{i.name}</span>
+                    <span key={i.code + i.name} className={`rounded-md px-1.5 py-0.5 text-xs ${i.representative ? "bg-ink text-white" : "bg-ink-50 text-ink-500"}`}>{i.name || `업종코드 ${i.code}`}</span>
                   ))}
                 </div>
               )}

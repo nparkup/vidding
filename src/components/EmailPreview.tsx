@@ -3,7 +3,7 @@ import { date, dday, won } from "@/lib/format";
 
 /** 영업일 아침 맞춤 공고 요약 이메일 미리보기 */
 export function EmailPreview({ digest, compact = false }: { digest: Digest; compact?: boolean }) {
-  const { client, recommended, closingSoon, newToday, excluded } = digest;
+  const { client, recommended, closingSoon, newToday } = digest;
   const today = date(new Date().toISOString());
   return (
     <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-lift">
@@ -16,7 +16,7 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
       <div className="p-5 sm:p-6">
         <p className="text-xs text-ink-300">보낸사람 입찰메이트LAB &lt;daily@ipchalmatelab.kr&gt;</p>
         <p className="mt-1 font-bold">[입찰메이트LAB] {today} {client.company} 맞춤 공고 {recommended.length}건</p>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <div className="mt-4 grid grid-cols-2 gap-2 text-center">
           <div className="rounded-xl bg-mint-50 p-3">
             <p className="text-xl font-extrabold text-mint-600">{newToday}</p>
             <p className="text-[11px] text-ink-500">신규 적합 공고</p>
@@ -24,10 +24,6 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
           <div className="rounded-xl bg-coral-100/60 p-3">
             <p className="text-xl font-extrabold text-coral">{closingSoon.length}</p>
             <p className="text-[11px] text-ink-500">3일 내 마감</p>
-          </div>
-          <div className="rounded-xl bg-paper p-3">
-            <p className="text-xl font-extrabold text-ink-500">{excluded}</p>
-            <p className="text-[11px] text-ink-500">조건 불일치 제외</p>
           </div>
         </div>
         <p className="mt-5 text-sm font-semibold">오늘의 추천 공고</p>

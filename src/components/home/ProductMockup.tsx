@@ -80,11 +80,10 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
               공고명·기관 검색
             </span>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2">
             {[
               ["신규 적합", digest.newToday, "text-mint-600 bg-mint-50"],
               ["3일 내 마감", digest.closingSoon.length, "text-coral bg-coral-100/60"],
-              ["조건 불일치 제외", digest.excluded, "text-ink-500 bg-paper"],
             ].map(([k, v, c]) => (
               <div key={String(k)} className={`rounded-xl p-3 ${c}`}>
                 <p className="text-xl font-extrabold tabular-nums sm:text-2xl">{v}</p>

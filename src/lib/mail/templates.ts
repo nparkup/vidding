@@ -42,12 +42,12 @@ export function dailyDigestMail(d: Digest) {
   const qs = profileQs(d.client);
   const subject = `[입찰메이트LAB] ${date(new Date().toISOString())} ${d.client.company} 맞춤 공고 ${d.recommended.length}건`;
   const stat = (n: number, label: string, color: string, bg: string) =>
-    `<td width="33%" style="padding:4px"><div style="background:${bg};border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:${color}">${n}</div><div style="font-size:12px;color:${C.sub}">${label}</div></div></td>`;
+    `<td width="50%" style="padding:4px"><div style="background:${bg};border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:${color}">${n}</div><div style="font-size:12px;color:${C.sub}">${label}</div></div></td>`;
   const body = `
 <p style="margin:0 0 4px;font-size:13px;color:${C.sub}">${esc(d.client.contactName || d.client.company)}님, 좋은 아침입니다.</p>
 <h1 style="margin:0 0 16px;font-size:20px">오늘 확인하실 공고 ${d.recommended.length}건</h1>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-${stat(d.newToday, "신규 적합 공고", C.mint, C.mintBg)}${stat(d.closingSoon.length, "3일 내 마감", C.coral, "#FBE3DE")}${stat(d.excluded, "조건 불일치 제외", C.sub, C.paper)}
+${stat(d.newToday, "신규 적합 공고", C.mint, C.mintBg)}${stat(d.closingSoon.length, "3일 내 마감", C.coral, "#FBE3DE")}
 </tr></table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px">
 ${d.recommended.length ? d.recommended.map((r, i) => bidRow(r, i, qs)).join("") : `<tr><td style="padding:16px 0;color:${C.sub}">오늘은 조건에 맞는 신규 공고가 없습니다.</td></tr>`}

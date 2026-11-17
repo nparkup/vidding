@@ -17,6 +17,7 @@ import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from 
 import { sheetPerfYears } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
+import { TrustPicker } from "./TrustPicker";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 /** 정적 사이트는 Cloudflare 중계 서버(worker/corp-lookup)로, 서버 배포는 자체 API로 조회한다. 정적 사이트에 중계 주소가 없으면 조회를 끈다 */
@@ -49,7 +50,7 @@ const KIND_LABEL: Record<ItemKind, string> = {
   price: "입찰가격",
   years: "업력",
   staff: "기술인력",
-  bonus: "신인도 가감점",
+  bonus: "신뢰도 가감점(신인도)",
   qualitative: "정성평가",
   other: "기타",
 };
@@ -305,8 +306,6 @@ export function ScorePredictor() {
               <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); setManualPerf(Math.round((Number(e.target.value) || 0) * 1e8)); }} />
               {perfBizno && <p className="mt-1 text-xs text-ink-500">자동 조회 기간보다 이전 실적과 수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
             </div>
-            <Num label="신인도 가점 (건)" value={co.bonusCount} onChange={(v) => set("bonusCount", v)} />
-            <Num label="제재·벌점 (최근 2년)" value={co.penaltyCount} onChange={(v) => set("penaltyCount", v)} />
             <div className="sm:col-span-2">
               <span className="label">신용평가등급</span>
               <div className="flex flex-wrap items-center gap-2">
@@ -328,6 +327,7 @@ export function ScorePredictor() {
                 ))}
               </div>
             </div>
+            <TrustPicker rule={result?.trust?.rule ?? active?.trust} selected={co.trustItems ?? []} onChange={(ids) => set("trustItems", ids)} score={result?.trust} />
             <Range
               label="투찰률 (예정가격 대비)"
               value={co.bidRate}

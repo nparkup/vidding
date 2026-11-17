@@ -1,5 +1,5 @@
 /**
- * 나라장터 낙찰 5년치(AWARD_YEARS)를 모아 Cloudflare R2(bidmate-awards)에 저장한다. GitHub Actions(.github/workflows/awards.yml)가 실행한다.
+ * 나라장터 낙찰 10년치(AWARD_YEARS)를 모아 Cloudflare R2(bidmate-awards)에 저장한다. GitHub Actions(.github/workflows/awards.yml)가 실행한다.
  *
  *   npx tsx scripts/awards/collect.ts            수집 + 샤드·통계 다시 만들기
  *   npx tsx scripts/awards/collect.ts check      토큰의 R2 읽기·쓰기 권한만 확인

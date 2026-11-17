@@ -14,7 +14,7 @@ import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from "@/lib/rivalRate";
-import { sheetPerfYears } from "@/lib/perfLookup";
+import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
 
@@ -122,8 +122,8 @@ export function ScorePredictor() {
   const scoreStage: "criteria" | "checking" | "blocked" | "score" = !CORP_API
     ? "score"
     : !corp ? "criteria" : !eligibility ? "checking" : eligibility.verdict === "불가" ? "blocked" : "score";
-  const sheetYears = useMemo(() => active
-    ? sheetPerfYears(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]).concat(active.recognition ?? []))
+  const sheetPeriod = useMemo(() => active
+    ? sheetPerfPeriod(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]), active.recognition ?? [])
     : undefined, [active]);
 
   const matches = useMemo(() => {
@@ -295,7 +295,7 @@ export function ScorePredictor() {
               </p>}
               {corp && <EligibilityPanel result={eligibility} />}
               {corp && <CorpPanel corp={corp} />}
-              {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetYears={sheetYears} onChange={onPerf} />}
+              {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetPeriod={sheetPeriod} onChange={onPerf} />}
             </div>
             <Num label="업력 (년)" value={co.years} onChange={(v) => set("years", v)} />
             <Num label="종업원 수 (명)" value={co.employees} onChange={(v) => set("employees", v)} />

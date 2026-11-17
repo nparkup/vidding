@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { won } from "@/lib/format";
 import {
-  CHUNK_CONCURRENCY, CHUNK_WEEKS, NTCE_BATCH, PERF_YEARS, chunk, judgeSimilarity, perfBizOf, perfWindows, spanOf,
-  type NtceClass, type PerfChunk, type PerfWin, type SimLevel,
+  CHUNK_CONCURRENCY, CHUNK_WEEKS, NTCE_BATCH, PERF_YEARS, chunk, judgeSimilarity, kstDate, perfBizOf, perfWindows, spanOf, yearsBefore,
+  type NtceClass, type PerfPeriod, type PerfChunk, type PerfWin, type SimLevel,
 } from "@/lib/perfLookup";
 import type { Bid } from "@/lib/types";
 import { PERF_DEFAULT_YEARS, firstLicense, metaCovers } from "@/lib/awards/format";
@@ -24,12 +24,8 @@ const LEVEL_STYLE: Record<SimLevel, string> = {
   키워드: "bg-paper text-ink-500",
 };
 
-/** 오늘부터 years년 전 날짜 YYYY-MM-DD */
-const yearsAgo = (years: number) => {
-  const d = new Date(Date.now() + 9 * 3600e3);
-  d.setUTCFullYear(d.getUTCFullYear() - years);
-  return d.toISOString().slice(0, 10);
-};
+/** "2021-01-01" → "2021.01.01" */
+const dot = (d: string) => d.replace(/-/g, ".");
 
 /** 빌드 때 붙인 공고 분류를 유사도 비교 형식으로 */
 const clsOfBid = (bid: Bid): NtceClass | undefined => {
@@ -43,21 +39,27 @@ const clsOfBid = (bid: Bid): NtceClass | undefined => {
  * 저장소가 아직 그 기간을 다 채우지 못했으면 예전처럼 나라장터 낙찰 이력(최근 PERF_YEARS년, 공고 업무구분 하나)을 7일 단위로 나눠 동시에 가져오고,
  * 선택 공고와 세부품명 → 중분류 → 공고명 키워드 순으로 비교해 유사 실적을 고른다. 사용자가 행마다 인정 여부를 바꿀 수 있다.
  */
-export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
+export function PerfLookup({ api, bid, bizno, since, sheetPeriod, onChange }: {
   api: string;
   bid: Bid;
   bizno: string;
   /** 조달업체 등록일: 이 전 주는 조회하지 않는다 */
   since?: string;
-  /** 평가표에 적힌 실적 인정 기간(년) */
-  sheetYears?: number;
+  /** 평가표에 적힌 실적 인정 기간 (최근 N년 또는 특정일 이후) */
+  sheetPeriod?: PerfPeriod;
   onChange: (s: PerfSummary) => void;
 }) {
   const biz = perfBizOf(bid.bizType);
   const [source, setSource] = useState<"r2" | "live">("r2");
-  // 저장소에서는 최근 5년까지 본다 (평가표가 더 짧으면 그 기간만). 직접 조회는 1년
-  const maxYears = source === "r2" ? PERF_DEFAULT_YEARS : PERF_YEARS;
-  const years = Math.min(maxYears, sheetYears ?? maxYears);
+  // 인정 기간은 공고일 기준이다: 평가표의 "최근 N년"은 공고일부터 거꾸로 N년, "2021.1.1 이후"는 그 날짜부터.
+  // 평가표에 기간이 없으면 최근 5년. 자동 조회는 저장소 최근 5년(직접 조회 1년)까지라 그보다 앞은 직접 입력으로 안내한다
+  const noticeDate = kstDate(bid.postedAt);
+  const sheetFrom = sheetPeriod?.from ?? yearsBefore(noticeDate, sheetPeriod?.years ?? PERF_DEFAULT_YEARS);
+  const capOf = (s: "r2" | "live") => yearsBefore(kstDate(), s === "r2" ? PERF_DEFAULT_YEARS : PERF_YEARS);
+  const fromOf = (s: "r2" | "live") => (sheetFrom > capOf(s) ? sheetFrom : capOf(s));
+  const from = fromOf(source);
+  const cut = sheetFrom < from;
+  const periodText = sheetPeriod?.from ? `${dot(sheetPeriod.from)} 이후` : `공고일 기준 최근 ${sheetPeriod?.years ?? PERF_DEFAULT_YEARS}년`;
   const [done, setDone] = useState(0);
   const [total, setTotal] = useState(0);
   const [phase, setPhase] = useState<"wins" | "classes" | "done" | "error">("wins");
@@ -82,12 +84,11 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
     setOn(new Set());
 
     (async () => {
-      // 1. 낙찰 저장소: 최근 5년(평가표가 더 짧으면 그 기간)을 한 번에 (분류까지 붙어 있다)
-      const r2Years = Math.min(PERF_DEFAULT_YEARS, sheetYears ?? PERF_DEFAULT_YEARS);
+      // 1. 낙찰 저장소: 인정 기간(최근 5년 안)을 한 번에 (분류까지 붙어 있다)
       try {
         const r = await fetch(`${api}?${new URLSearchParams({ awards: bizno, biz })}`, { signal: ac.signal });
         const j = r.ok ? ((await r.json()) as AwardLookup) : undefined;
-        const from = yearsAgo(r2Years);
+        const from = fromOf("r2");
         if (j?.ready && metaCovers(j.meta, from)) {
           if (!alive) return;
           let target = clsOfBid(bid);
@@ -115,7 +116,8 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
 
       // 2. 저장소가 아직 수집 중이면 조달청 낙찰정보를 7일 단위로 직접 조회 (최근 PERF_YEARS년)
       setSource("live");
-      const groups = chunk(perfWindows(since, Math.min(PERF_YEARS, sheetYears ?? PERF_YEARS)), CHUNK_WEEKS);
+      const liveFrom = fromOf("live");
+      const groups = chunk(perfWindows(since && since > liveFrom ? since : liveFrom), CHUNK_WEEKS);
       setTotal(groups.length);
       let miss = 0;
       const chunks = await pool(groups, CHUNK_CONCURRENCY, async (g) => {
@@ -162,7 +164,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
       if (!alive) return;
       const target = { title: bid.title, cls: classes.get(bid.bidNtceNo) };
       setRows(wins
-        .filter((w) => w.bidNtceNo !== bid.bidNtceNo)
+        .filter((w) => w.date >= liveFrom && w.bidNtceNo !== bid.bidNtceNo)
         .map((w) => {
           const cls = classes.get(w.bidNtceNo);
           return { ...w, cls, ...judgeSimilarity(target, { title: w.title, cls }) };
@@ -170,7 +172,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
       setPhase("done");
     })();
     return () => { alive = false; ac.abort(); };
-  }, [api, bid, biz, bizno, since, sheetYears, attempt]);
+  }, [api, bid, biz, bizno, since, sheetPeriod, attempt]);
 
   const keyOf = (r: Row) => `${r.bidNtceNo}-${r.bidNtceOrd}-${r.date}-${r.amount}`;
   const included = (r: Row) => (r.level ? !off.has(keyOf(r)) : on.has(keyOf(r)));
@@ -193,7 +195,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
   return (
     <div className="mt-3 min-w-0 rounded-2xl border border-ink-100 p-4 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="font-semibold">나라장터 유사 실적 (최근 {years}년 {biz} 낙찰)</p>
+        <p className="font-semibold">나라장터 유사 실적 ({dot(from)} 이후 {biz} 낙찰)</p>
         {phase === "done" && <p className="tabular-nums text-ink-500">인정 {summary.count}건 · {won(summary.amount)} <span className="text-ink-300">추정</span></p>}
       </div>
 
@@ -214,7 +216,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
       {phase === "done" && (
         <>
           {rows.length === 0 ? (
-            <p className="mt-2 text-xs text-ink-500">최근 {years}년 나라장터 {biz} 낙찰 이력이 없습니다. 수의계약·민간 실적은 아래 직접 입력칸에 넣어 주세요.</p>
+            <p className="mt-2 text-xs text-ink-500">{dot(from)} 이후 나라장터 {biz} 낙찰 이력이 없습니다. 수의계약·민간 실적은 아래 직접 입력칸에 넣어 주세요.</p>
           ) : (
             <>
               <p className="mt-2 text-xs text-ink-500">
@@ -230,7 +232,7 @@ export function PerfLookup({ api, bid, bizno, since, sheetYears, onChange }: {
             </>
           )}
           <ul className="mt-3 space-y-0.5 text-xs text-ink-300">
-            {(sheetYears ?? PERF_DEFAULT_YEARS) > maxYears && <li>{sheetYears ? `평가표는 최근 ${sheetYears}년 실적을 인정하지만, ` : ""}자동 조회는 최근 {maxYears}년까지만 합니다. 그 이전 실적은 직접 추가 실적에 입력해 주세요.</li>}
+            <li>인정 기간: {sheetPeriod ? `평가표 기준 ${periodText}` : `평가표에 기간이 없어 ${periodText}`}{cut ? `. 자동 조회는 ${dot(from)} 이후만 하니 그 이전 실적은 직접 추가 실적에 입력해 주세요.` : ""}</li>
             <li>낙찰금액 기준 추정치입니다. 변경계약·공동수급 지분은 반영되지 않으니 실적증명서로 확인해 주세요.</li>
             {failed > 0 && <li className="text-coral">일부 기간({failed}주)을 불러오지 못해 실제보다 적게 잡혔을 수 있습니다.</li>}
           </ul>

@@ -20,7 +20,7 @@ on:
         description: "collect = 수집, raw = 원자료만 받기(샤드·통계는 그대로), check = R2 권한만 확인"
         default: collect
         type: choice
-        options: [collect, raw, check, probe]
+        options: [collect, raw, check]
       max_minutes:
         description: "이번 실행에서 받는 시간 (분, 최대 300)"
         default: "100"
@@ -51,25 +51,21 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: API 필드 확인 (임시)
-        if: inputs.mode == 'probe'
-        run: npx tsx scripts/awards/probe.ts
       - name: R2 권한 확인
-        if: inputs.mode != 'probe'
         run: npx tsx scripts/awards/collect.ts check
       # 받은 원자료를 실행 사이에 보관해 R2에서 다시 내려받지 않는다 (없어도 R2에서 받아 온다)
       - name: 원자료 캐시 복원
-        if: github.event_name != 'pull_request' && inputs.mode != 'check' && inputs.mode != 'probe'
+        if: github.event_name != 'pull_request' && inputs.mode != 'check'
         uses: actions/cache/restore@v4
         with:
           path: .cache/awards
           key: awards-raw-${{ github.run_id }}
           restore-keys: awards-raw-
       - name: 수집
-        if: github.event_name != 'pull_request' && inputs.mode != 'check' && inputs.mode != 'probe'
+        if: github.event_name != 'pull_request' && inputs.mode != 'check'
         run: npx tsx scripts/awards/collect.ts ${{ inputs.mode == 'raw' && 'raw' || '' }}
       - name: 원자료 캐시 저장
-        if: always() && github.event_name != 'pull_request' && inputs.mode != 'check' && inputs.mode != 'probe'
+        if: always() && github.event_name != 'pull_request' && inputs.mode != 'check'
         uses: actions/cache/save@v4
         with:
           path: .cache/awards

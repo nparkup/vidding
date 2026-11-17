@@ -8,7 +8,7 @@ import type { License, Region } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 import { GradeBadge } from "./Badges";
 
-/** 업종별로 많이 쓰는 면허 (전체 목록은 공고 검색·진단 신청에서 선택) */
+/** 업종별로 많이 쓰는 면허 (전체 목록은 공고 검색·무료 체험 신청에서 선택) */
 const DEMO_LICENSES: License[] = [
   "건물위생관리업", "시설경비업", "소독업", "전기공사업", "정보통신공사업", "기계설비·가스공사업",
   "실내건축공사업", "건축공사업", "소프트웨어사업자", "건설엔지니어링업", "학술·연구용역", "식품판매업", "의료기기판매업",

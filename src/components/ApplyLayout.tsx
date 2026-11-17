@@ -9,14 +9,13 @@ export function ApplyLayout({ children }: { children: React.ReactNode }) {
           <div className="bg-grid mask-fade pointer-events-none absolute inset-0" />
           <div className="pointer-events-none absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-mint/25 blur-[100px]" />
           <div className="relative">
-            <p className="text-sm font-semibold text-mint-400">무료 맞춤 진단</p>
+            <p className="text-sm font-semibold text-mint-400">2주 무료 체험</p>
             <h1 className="mt-3 text-3xl font-extrabold leading-[1.2] tracking-[-0.04em] sm:text-4xl">조건만 알려주세요.<br />나머지는 저희가 찾습니다.</h1>
-            <p className="mt-4 leading-relaxed text-ink-300">신청 즉시 지금 참가 가능한 공고 목록을 보여드리고, 영업일 기준 1일 이내 담당 매니저가 연락드립니다.</p>
+            <p className="mt-4 leading-relaxed text-ink-300">신청 즉시 지금 참가 가능한 공고 목록을 보여드리고, 다음 영업일 아침부터 맞춤 공고 요약 메일을 보내드립니다.</p>
             <HeroCity className="mx-auto mt-4 w-full max-w-sm" />
             <ul className="mt-2 space-y-3">
               {[
                 ["즉시", "현재 참가 가능한 공고 수와 상위 공고 확인"],
-                ["1영업일 내", "담당 매니저 전화 상담, 조건 세부 조정"],
                 ["다음 날 아침", "첫 맞춤 공고 요약 이메일 발송, 2주 무료"],
               ].map(([k, v]) => (
                 <li key={k} className="glass flex items-center gap-3 rounded-2xl p-3">

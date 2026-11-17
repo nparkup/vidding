@@ -7,7 +7,10 @@
  *
  * 1. 한 주(월~일) 단위로 받는다. 낙찰정보·입찰공고정보 API는 한 번에 7일까지만 조회된다(2026-11-10 공지).
  *    - 낙찰: 낙찰정보서비스 getScsbidListSttus{Servc,Cnstwk,Thng} (최종낙찰자 목록, 등록일 기준)
- *    - 공고: 입찰공고정보서비스 getBidPblancListInfo{op}02 (계약방법·추정가격·분류), PrtcptPsblRgn02(지역), LicenseLimit02(업종)
+ *    - 공고: 입찰공고정보서비스 getBidPblancListInfo{op}02 (계약방법·추정가격·분류), PrtcptPsblRgn02(지역), LicenseLimit02(업종),
+ *      {op}BsisAmount02(기초금액)
+ *    - 예정가격: 낙찰정보서비스 getOpengResultListInfo{op}PreparPcDetail (개찰일 기준. 복수예비가격 15개마다 한 줄이라 공고별 한 줄로 묶어
+ *      예비가격 목록·추첨 번호·적격심사 기준과 함께 저장)
  *    최근 주부터 거꾸로 받고, 아직 끝나지 않은 최근 2주는 매번 다시 받는다. 끝난 주는 다시 받지 않는다.
  * 2. 실행 한 번에 MAX_MINUTES 분까지만 받고 멈춘다. 다음 실행이 이어 받는다(처음 채우는 기간은 며칠에 나눠 받는다).
  * 3. 받은 원자료를 공고번호로 합쳐 사업자번호별 샤드와 낙찰률 통계를 만들고, 바뀐 파일만 올린다.
@@ -35,15 +38,20 @@ const CONCURRENCY = 3;
 const GAP_MS = 250;
 const started = Date.now();
 
-type Kind = "award" | "notice" | "rgn" | "lic";
+type Kind = "award" | "notice" | "rgn" | "lic" | "base" | "plan";
 const KINDS: { kind: Kind; ops: string[]; path: string; op: (o: string) => string; lead: boolean }[] = [
   { kind: "award", ops: Object.values(OPS), path: "/as/ScsbidInfoService", op: (o) => `getScsbidListSttus${o}`, lead: false },
   { kind: "notice", ops: Object.values(OPS), path: "/ad/BidPublicInfoService02", op: (o) => `getBidPblancListInfo${o}02`, lead: true },
   { kind: "rgn", ops: ["all"], path: "/ad/BidPublicInfoService02", op: () => "getBidPblancListInfoPrtcptPsblRgn02", lead: true },
   { kind: "lic", ops: ["all"], path: "/ad/BidPublicInfoService02", op: () => "getBidPblancListInfoLicenseLimit02", lead: true },
+  { kind: "base", ops: Object.values(OPS), path: "/ad/BidPublicInfoService02", op: (o) => `getBidPblancListInfo${o}BsisAmount02`, lead: true },
+  { kind: "plan", ops: Object.values(OPS), path: "/as/ScsbidInfoService", op: (o) => `getOpengResultListInfo${o}PreparPcDetail`, lead: true },
 ];
 
-interface RawEntry { rows: number; bytes: number; at: string; calls: number }
+interface RawEntry { rows: number; bytes: number; at: string; calls: number; v?: number }
+/** 원자료 형식 버전: 저장하는 열이 바뀌면 올리고, 이전 버전 파일은 끝난 주라도 다시 받는다
+ * 2026-11-17: 공고에 낙찰하한율, 기초금액에 예가 범위, 예정가격에 적격심사 기준·복수예비가격·추첨 번호 추가 */
+const RAW_V: Partial<Record<Kind, number>> = { notice: 2, base: 2, plan: 2 };
 interface Manifest {
   v: 1;
   raw: Record<string, RawEntry>;
@@ -118,12 +126,38 @@ function slim(kind: Kind, i: Item): unknown[] {
     case "notice":
       return [t(i.bidNtceNo), t(i.bidNtceOrd) || "000", [t(i.cntrctCnclsMthdNm), t(i.sucsfbidMthdNm)].filter(Boolean).join(" / "), n(i.presmptPrce),
         t(i.pubPrcrmntClsfcNo || i.dtilPrdctClsfcNo), t(i.pubPrcrmntClsfcNm || i.dtilPrdctClsfcNoNm), t(i.pubPrcrmntMidClsfcNm),
-        t(i.pubPrcrmntLrgClsfcNm), t(i.mainCnsttyNm), t(i.cnstrtsiteRgnNm), t(i.ntceKindNm)];
+        t(i.pubPrcrmntLrgClsfcNm), t(i.mainCnsttyNm), t(i.cnstrtsiteRgnNm), t(i.ntceKindNm), n(i.sucsfbidLwltRate)];
     case "rgn":
       return [t(i.bidNtceNo), t(i.bidNtceOrd) || "000", t(i.prtcptPsblRgnNm)];
     case "lic":
       return [t(i.bidNtceNo), t(i.bidNtceOrd) || "000", t(i.lcnsLmtNm)];
+    case "base":
+      return [t(i.bidNtceNo), t(i.bidNtceOrd) || "000", t(i.bidClsfcNo), n(i.bssamt), t(i.rsrvtnPrceRngBgnRate), t(i.rsrvtnPrceRngEndRate)];
+    case "plan":
+      return [t(i.bidNtceNo), t(i.bidNtceOrd) || "000", t(i.bidClsfcNo), t(i.rbidNo), n(i.plnprc), n(i.bssamt),
+        t(i.bidwinrSlctnAplBssCntnts), n(i.compnoRsrvtnPrceSno), n(i.bsisPlnprc), t(i.drwtYn) === "Y" ? 1 : 0, n(i.drwtNum)];
   }
+}
+
+/**
+ * 금액이 없는 줄은 버린다. 예정가격은 복수예비가격(보통 15개)마다 한 줄씩 오므로 공고·분류·재입찰별 한 줄로 묶는다:
+ * [공고번호, 차수, 분류, 재입찰, 예정가격, 기초금액, 적격심사 기준(행자부·조달청 등), 예비가격[], 추첨된 번호[], 번호별 추첨 수[]]
+ */
+function keepRows(kind: Kind, rows: unknown[][]): unknown[][] {
+  if (kind === "base") return rows.filter((r) => (r[3] as number) > 0);
+  if (kind !== "plan") return rows;
+  const bids = new Map<string, { head: unknown[]; prices: Map<number, [number, number, number]> }>();
+  for (const r of rows) {
+    const [no, ord, clsfc, rbid, plnprc, bssamt, basis, sno, price, drawn, picks] = r as [string, string, string, string, number, number, string, number, number, number, number];
+    if (!(plnprc > 0 || bssamt > 0)) continue;
+    const k = `${no}|${ord}|${clsfc}|${rbid}`;
+    const b = bids.get(k) ?? bids.set(k, { head: [no, ord, clsfc, rbid, plnprc, bssamt, basis], prices: new Map() }).get(k)!;
+    if (sno > 0 && price > 0) b.prices.set(sno, [price, drawn, picks]);
+  }
+  return [...bids.values()].map(({ head, prices }) => {
+    const list = [...prices.entries()].sort((a, b) => a[0] - b[0]);
+    return [...head, list.map(([, v]) => v[0]), list.filter(([, v]) => v[1]).map(([sno]) => sno), list.map(([, v]) => v[2])];
+  });
 }
 
 /* ---------- 상태·용량 ---------- */
@@ -194,7 +228,7 @@ function plan(today: Date): { jobs: Job[]; awardWeeks: string[]; leadWeeks: stri
       for (const op of k.ops) {
         const key = `raw/${k.kind}/${op}/${w}.json.gz`;
         const e = manifest.raw[key];
-        if (e && (settled(w, e.at) || fresh(e.at))) continue;
+        if (e && (e.v ?? 1) >= (RAW_V[k.kind] ?? 1) && (settled(w, e.at) || fresh(e.at))) continue;
         jobs.push({ key, kind: k.kind, op, monday: w });
       }
     }
@@ -214,10 +248,10 @@ async function collect(jobs: Job[]): Promise<{ done: number; stopped?: string }>
       const k = KINDS.find((x) => x.kind === j.kind)!;
       try {
         const { items, calls: c } = await weekItems(k.path, k.op(j.op), j.monday);
-        const rows = items.map((i) => slim(j.kind, i)).filter((r) => r[0]);
+        const rows = keepRows(j.kind, items.map((i) => slim(j.kind, i)).filter((r) => r[0]));
         const body = gz(rows);
         await put(j.key, body);
-        manifest.raw[j.key] = { rows: rows.length, bytes: body.length, at: new Date().toISOString(), calls: c };
+        manifest.raw[j.key] = { rows: rows.length, bytes: body.length, at: new Date().toISOString(), calls: c, ...(RAW_V[j.kind] ? { v: RAW_V[j.kind] } : {}) };
         done++;
         if (done % 25 === 0) console.log(`  ${done}/${jobs.length} 받음 (호출 ${calls}회, ${Math.round((Date.now() - started) / 60_000)}분)`);
       } catch (e) {
@@ -234,7 +268,7 @@ async function collect(jobs: Job[]): Promise<{ done: number; stopped?: string }>
 
 /* ---------- 합치기 ---------- */
 
-interface NoticeInfo { method: string; price: number; clsNo: string; clsNm: string; mid: string; lrg: string; work: string; site: string }
+interface NoticeInfo { method: string; price: number; clsNo: string; clsNm: string; mid: string; lrg: string; work: string; site: string; lwlt: number }
 
 async function build(awardWeeks: string[], leadWeeks: string[]) {
   // 공고: 공고번호 → 마지막 차수 정보
@@ -244,10 +278,10 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
   for (const w of [...leadWeeks].reverse()) {
     for (const op of Object.values(OPS)) {
       for (const r of await readRaw(`raw/notice/${op}/${w}.json.gz`)) {
-        const [no, ord, method, price, clsNo, clsNm, mid, lrg, work, site] = r as [string, string, string, number, string, string, string, string, string, string];
+        const [no, ord, method, price, clsNo, clsNm, mid, lrg, work, site, , lwlt] = r as [string, string, string, number, string, string, string, string, string, string, string, number?];
         const prev = notices.get(no);
         if (prev && prev.ord > ord) continue;
-        notices.set(no, { ord, method, price, clsNo, clsNm, mid, lrg, work, site });
+        notices.set(no, { ord, method, price, clsNo, clsNm, mid, lrg, work, site, lwlt: lwlt || 0 });
       }
     }
     for (const r of await readRaw(`raw/rgn/all/${w}.json.gz`)) {
@@ -260,11 +294,35 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
     }
   }
 
+  // 기초금액·예정가격: 같은 공고·분류(·재입찰)는 마지막 차수 값을 쓴다
+  const base = new Map<string, { ord: string; amt: number; rng: string }>();
+  const plan = new Map<string, { ord: string; plnprc: number; base: number; basis: string }>();
+  const keepLatest = <T extends { ord: string }>(m: Map<string, T>, k: string, v: T) => { const p = m.get(k); if (!p || p.ord <= v.ord) m.set(k, v); };
+  for (const w of [...leadWeeks].reverse()) {
+    for (const op of Object.values(OPS)) {
+      for (const r of await readRaw(`raw/base/${op}/${w}.json.gz`)) {
+        const [no, ord, clsfc, amt, bgn, end] = r as [string, string, string, number, string?, string?];
+        const v = { ord, amt, rng: bgn || end ? `${bgn ?? ""}~${end ?? ""}` : "" };
+        keepLatest(base, `${no}|${clsfc}`, v);
+        keepLatest(base, no, v);
+      }
+      for (const r of await readRaw(`raw/plan/${op}/${w}.json.gz`)) {
+        const [no, ord, clsfc, rbid, plnprc, bssamt, basis] = r as [string, string, string, string, number, number, string?];
+        const v = { ord, plnprc, base: bssamt, basis: basis ?? "" };
+        keepLatest(plan, `${no}|${clsfc}|${rbid}`, v);
+        keepLatest(plan, `${no}|${clsfc}`, v);
+      }
+    }
+  }
+
   // 낙찰: 같은 공고·차수·분류·재입찰은 한 번만
   const seen = new Set<string>();
   const shards = new Map<string, ShardRow[]>();
   let rows = 0;
   let matched = 0;
+  let withBase = 0;
+  let withPlan = 0;
+  const prearng = new Map<string, number[]>();
   for (const w of awardWeeks) {
     for (const op of Object.values(OPS)) {
       const biz = BIZ_OF_OP[op] as AwardBiz;
@@ -277,10 +335,21 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
         seen.add(id);
         const nt = notices.get(no);
         if (nt) matched++;
+        const pl = plan.get(`${no}|${clsfc}|${rbid}`) ?? plan.get(`${no}|${clsfc}`);
+        const ba = base.get(`${no}|${clsfc}`) ?? base.get(no);
+        const bs = base.get(`${no}|${clsfc}`)?.amt || pl?.base || ba?.amt || 0;
+        if (bs) withBase++;
+        if (pl?.plnprc) withPlan++;
+        // 수요기관별 예정가격/기초금액 비율 (예가가 기초금액보다 높게·낮게 정해지는 경향)
+        if (pl?.plnprc && bs && agency) {
+          const ratio = (pl.plnprc / bs) * 100;
+          if (ratio > 90 && ratio < 110) (prearng.get(agency) ?? prearng.set(agency, []).get(agency)!).push(ratio);
+        }
         const row: ShardRow = [
           bizno, winner, no, ord, biz, title, agency, amount, rate, date, bidders,
           nt?.method ?? "", nt?.price ?? 0, nt?.clsNo ?? "", nt?.clsNm ?? "", nt?.mid ?? "", nt?.lrg ?? "", nt?.work ?? "",
           [...(region.get(no) ?? (nt?.site ? [nt.site] : []))].join(", "), [...(lic.get(no) ?? [])].join(", "),
+          bs, pl?.plnprc || 0, nt?.lwlt || 0, ba?.rng ?? "", pl?.basis ?? "",
         ];
         const k = shardOf(bizno);
         (shards.get(k) ?? shards.set(k, []).get(k)!).push(row);
@@ -288,7 +357,7 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
       }
     }
   }
-  console.log(`낙찰 ${rows.toLocaleString()}건 (공고 정보 붙은 건 ${matched.toLocaleString()}건), 공고 ${notices.size.toLocaleString()}건`);
+  console.log(`낙찰 ${rows.toLocaleString()}건 (공고 정보 붙은 건 ${matched.toLocaleString()}건, 기초금액 ${withBase.toLocaleString()}건, 예정가격 ${withPlan.toLocaleString()}건), 공고 ${notices.size.toLocaleString()}건`);
 
   let uploaded = 0;
   const keys = [...shards.keys()].sort();
@@ -356,6 +425,17 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
   }
   await put("stats/agency.json.gz", gz(agency));
 
+  // 수요기관별 예정가격/기초금액 비율(%) 분포: 5건 이상인 기관만
+  const q = (s: number[], p: number) => Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))] * 1000) / 1000;
+  const prearngStats: Record<string, { n: number; mean: number; p25: number; median: number; p75: number }> = {};
+  for (const [name, v] of prearng) {
+    if (v.length < 5) continue;
+    const s = v.sort((a, b) => a - b);
+    prearngStats[name] = { n: s.length, mean: Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 1000) / 1000, p25: q(s, 0.25), median: q(s, 0.5), p75: q(s, 0.75) };
+  }
+  await put("stats/prearng.json.gz", gz({ builtAt: new Date().toISOString(), agencies: prearngStats }));
+  console.log(`예정가격 경향: 수요기관 ${Object.keys(prearngStats).length.toLocaleString()}곳`);
+
   return { rows, shards: keys.length };
 }
 
@@ -382,7 +462,7 @@ async function main() {
   r2Measured = (await r2BucketBytes()) ?? 0;
   const today = kstNow();
   const { jobs, awardWeeks, leadWeeks } = plan(today);
-  const totalRaw = awardWeeks.length * 3 + leadWeeks.length * 5;
+  const totalRaw = KINDS.reduce((s, k) => s + (k.lead ? leadWeeks : awardWeeks).length * k.ops.length, 0);
   const haveRaw = Object.keys(manifest.raw).length;
   const used = Math.max(usedBytes(), r2Measured);
   // 예상 최종 용량: 지금까지 원자료 한 개당 크기로 남은 원자료를 채우고, 샤드·통계는 원자료와 비슷한 크기로 본다

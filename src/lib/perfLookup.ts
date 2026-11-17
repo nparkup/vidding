@@ -251,11 +251,61 @@ export function judgeSimilarity(target: { title: string; cls?: NtceClass }, win:
   return { level: null, why: b?.clsfcNm ? `분류 '${b.clsfcNm}'로 다른 사업` : "분류·공고명이 달라 제외" };
 }
 
-/** 평가표 실적 항목에 적힌 인정 기간(년). 못 찾으면 undefined */
-export function sheetPerfYears(texts: string[]): number | undefined {
-  for (const t of texts) {
-    const m = t.match(/(?:최근|직전|과거)\s*(\d{1,2})\s*년/);
-    if (m) return Number(m[1]);
+/** 평가표에 적힌 실적 인정 기간. years: 공고일부터 거꾸로 N년, from: 이 날짜(YYYY-MM-DD) 이후 실적 */
+export interface PerfPeriod { years?: number; from?: string }
+
+/** 실적 이야기인 문구 */
+const PERF_WORD_RE = /(실적|수행|납품|시공|준공|완료)/;
+/** 실적이 아닌 다른 항목(신용평가·제재·업력 등)의 기간 문구 */
+const OTHER_ITEM_RE = /(신용|평가\s*등급|제재|벌점|부정당|영업\s*정지|업력|설립|재무|기술\s*인력|자격증)/;
+/** 서류 발급·유효 기간 문구: "1년 이내 발급분"은 실적 인정 기간이 아니다 */
+const DOC_TERM_RE = /(발급|유효\s*기간|제출)/;
+
+const pad2 = (n: string | number) => String(n).padStart(2, "0");
+
+function parsePeriod(t: string): PerfPeriod | undefined {
+  if (DOC_TERM_RE.test(t)) return undefined;
+  // 날짜: 2021.1.1 이후 / 2021년 1월 1일부터 / '21.01.01 이후 / 2021-01-01 이후
+  const d = t.match(/(20\d{2}|['’]\d{2})\s*(?:[.\-/]|년)\s*(\d{1,2})\s*(?:[.\-/]|월)\s*(\d{1,2})\s*일?\s*\.?\s*(?:이후|부터|~)/);
+  if (d) {
+    const y = d[1].length === 4 ? d[1] : `20${d[1].slice(1)}`;
+    const m = Number(d[2]), day = Number(d[3]);
+    if (m >= 1 && m <= 12 && day >= 1 && day <= 31) return { from: `${y}-${pad2(m)}-${pad2(day)}` };
+  }
+  // 연도만: 2021년 이후 / 2021년부터
+  const y = t.match(/(20\d{2})\s*년\s*(?:이후|부터)/);
+  if (y) return { from: `${y[1]}-01-01` };
+  // 기간: 최근·직전·과거 N년(N개년), N년 이내·N년간·N년 동안
+  const n = t.match(/(?:최근|직전|과거)\s*(\d{1,2})\s*개?\s*년/) ?? t.match(/(\d{1,2})\s*개?\s*년\s*(?:이내|간|동안)/);
+  if (n) {
+    const v = Number(n[1]);
+    if (v >= 1 && v <= 15) return { years: v };
   }
   return undefined;
+}
+
+/**
+ * 평가표의 실적 인정 기간. 실적 항목의 문구(항목명·산정 기준·인정 기준)를 먼저 보고,
+ * 없으면 평가표 전체 인정 문구 가운데 실적 이야기만 본다 (신용평가 발급 기간 같은 다른 항목의 기간을 집지 않게).
+ */
+export function sheetPerfPeriod(itemTexts: string[], sheetTexts: string[] = []): PerfPeriod | undefined {
+  const texts = [...itemTexts, ...sheetTexts.filter((t) => PERF_WORD_RE.test(t) && !OTHER_ITEM_RE.test(t))];
+  for (const t of texts) {
+    const p = parsePeriod(t);
+    if (p) return p;
+  }
+  return undefined;
+}
+
+/** YYYY-MM-DD에서 years년을 뺀 날짜 */
+export function yearsBefore(date: string, years: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCFullYear(d.getUTCFullYear() - years);
+  return d.toISOString().slice(0, 10);
+}
+
+/** ISO 시각의 한국 날짜 YYYY-MM-DD (없거나 이상하면 오늘) */
+export function kstDate(iso?: string): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  return new Date((Number.isNaN(t) ? Date.now() : t) + 9 * 3600e3).toISOString().slice(0, 10);
 }

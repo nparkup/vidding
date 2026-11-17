@@ -62,7 +62,6 @@ export default async function ServicePage() {
             {[
               ["신규 적합 공고 수", "와 3일 내 마감 공고를 한눈에"],
               ["공고별 가능성 등급", ", 규모, 지역제한, 계약방법 요약"],
-              ["제외한 공고 수", "까지 투명하게 표시"],
               ["참가조건·서류 체크리스트", " 페이지로 바로 연결"],
             ].map(([b, r], i) => (
               <li key={b} className="flex items-center gap-4 rounded-2xl bg-paper p-4">

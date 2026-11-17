@@ -7,7 +7,7 @@ import {
   type NtceClass, type PerfPeriod, type PerfChunk, type PerfWin, type SimLevel,
 } from "@/lib/perfLookup";
 import type { Bid } from "@/lib/types";
-import { PERF_DEFAULT_YEARS, firstLicense, metaCovers } from "@/lib/awards/format";
+import { PERF_DEFAULT_YEARS, PERF_MAX_YEARS, firstLicense, metaCovers } from "@/lib/awards/format";
 import type { AwardLookup } from "@/lib/awards/read";
 import { LoadingBar } from "./LoadingBar";
 
@@ -35,7 +35,7 @@ const clsOfBid = (bid: Bid): NtceClass | undefined => {
 };
 
 /**
- * 사업자번호를 조회하면 먼저 낙찰 저장소(R2, 최근 PERF_DEFAULT_YEARS년)에서 그 업체의 낙찰 건을 한 번에 읽는다. 조달청 API는 부르지 않는다.
+ * 사업자번호를 조회하면 먼저 낙찰 저장소(R2, 평가표 인정 기간, 최대 PERF_MAX_YEARS년)에서 그 업체의 낙찰 건을 한 번에 읽는다. 조달청 API는 부르지 않는다.
  * 저장소가 아직 그 기간을 다 채우지 못했으면 예전처럼 나라장터 낙찰 이력(최근 PERF_YEARS년, 공고 업무구분 하나)을 7일 단위로 나눠 동시에 가져오고,
  * 선택 공고와 세부품명 → 중분류 → 공고명 키워드 순으로 비교해 유사 실적을 고른다. 사용자가 행마다 인정 여부를 바꿀 수 있다.
  */
@@ -55,9 +55,11 @@ export function PerfLookup({ api, bid, bizno, since, sheetPeriod, onChange }: {
   // 평가표에 기간이 없으면 최근 5년. 자동 조회는 저장소 최근 5년(직접 조회 1년)까지라 그보다 앞은 직접 입력으로 안내한다
   const noticeDate = kstDate(bid.postedAt);
   const sheetFrom = sheetPeriod?.from ?? yearsBefore(noticeDate, sheetPeriod?.years ?? PERF_DEFAULT_YEARS);
-  const capOf = (s: "r2" | "live") => yearsBefore(kstDate(), s === "r2" ? PERF_DEFAULT_YEARS : PERF_YEARS);
+  const capOf = (s: "r2" | "live") => yearsBefore(kstDate(), s === "r2" ? PERF_MAX_YEARS : PERF_YEARS);
   const fromOf = (s: "r2" | "live") => (sheetFrom > capOf(s) ? sheetFrom : capOf(s));
-  const from = fromOf(source);
+  // 저장소가 아직 앞선 해를 채우는 중이면 채운 데까지만 본다 (그 이전은 직접 입력 안내)
+  const [r2Floor, setR2Floor] = useState("");
+  const from = source === "r2" && r2Floor > fromOf("r2") ? r2Floor : fromOf(source);
   const cut = sheetFrom < from;
   const periodText = sheetPeriod?.from ? `${dot(sheetPeriod.from)} 이후` : `공고일 기준 최근 ${sheetPeriod?.years ?? PERF_DEFAULT_YEARS}년`;
   const [done, setDone] = useState(0);
@@ -82,14 +84,19 @@ export function PerfLookup({ api, bid, bizno, since, sheetPeriod, onChange }: {
     setErr("");
     setOff(new Set());
     setOn(new Set());
+    setR2Floor("");
 
     (async () => {
-      // 1. 낙찰 저장소: 인정 기간(최근 5년 안)을 한 번에 (분류까지 붙어 있다)
+      // 1. 낙찰 저장소: 인정 기간(최대 10년)을 한 번에 (분류까지 붙어 있다)
       try {
         const r = await fetch(`${api}?${new URLSearchParams({ awards: bizno, biz })}`, { signal: ac.signal });
         const j = r.ok ? ((await r.json()) as AwardLookup) : undefined;
-        const from = fromOf("r2");
-        if (j?.ready && metaCovers(j.meta, from)) {
+        const want = fromOf("r2");
+        // 10년치를 아직 채우는 중이어도 기본 기간(최근 5년)만큼 있으면 저장소를 쓰고, 채운 범위까지만 본다
+        const covered = j?.ready && j.meta ? (metaCovers(j.meta, want) ? want
+          : metaCovers(j.meta, yearsBefore(kstDate(), PERF_DEFAULT_YEARS)) && j.meta.from > want ? j.meta.from : "") : "";
+        const from = covered || want;
+        if (covered) {
           if (!alive) return;
           let target = clsOfBid(bid);
           if (!bid.cls) {
@@ -102,7 +109,8 @@ export function PerfLookup({ api, bid, bizno, since, sheetPeriod, onChange }: {
           if (!alive) return;
           const t = { title: bid.title, cls: target };
           setSource("r2");
-          setRows(j.wins
+          setR2Floor(from > want ? from : "");
+          setRows(j!.wins
             .filter((w) => w.date >= from && w.bidNtceNo !== bid.bidNtceNo)
             .sort((a, b) => b.date.localeCompare(a.date))
             .map((w) => ({ ...w, ...judgeSimilarity(t, { title: w.title, cls: w.cls }) })));

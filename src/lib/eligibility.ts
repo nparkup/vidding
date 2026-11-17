@@ -9,6 +9,7 @@
  * 원칙: 자동 판단이 틀리면 안 되므로 자료로 확실한 것만 '가능'·'불가'로 판정하고, 나머지는 '확인 필요'로 둔다.
  * 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 여기서 판단하지 않는다.
  */
+import type { EvalBasis } from "./criteria";
 import type { CorpLookup } from "./corpLookup";
 
 export interface LicenseReq {
@@ -31,6 +32,8 @@ export interface BidQual {
   regionBasis?: string;
   /** 입찰참가자격 등록 마감 (원문, 예: 2026-11-18 18:00) */
   registerBy?: string;
+  /** 평가 기준을 고르는 공고 값 (낙찰방법 세부, 낙찰하한율, 추정가격, 협상 배점 비율) */
+  basis?: EvalBasis;
 }
 
 export type Verdict = "가능" | "불가" | "확인 필요";

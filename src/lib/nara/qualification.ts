@@ -4,6 +4,7 @@ import { join } from "path";
 import { call, COLLECT_DAYS, mapLimit, recentDays } from "./client";
 import { NARA_APIS } from "./endpoints";
 import type { BidQual, LicenseReq } from "../eligibility";
+import { evalBasisOf } from "../criteria";
 
 /**
  * 공고별 입찰 참가자격 자료 (업종 제한·참가지역 제한) 수집.
@@ -66,6 +67,7 @@ export function buildQual(it: Item, licRows: Item[] | null, rgnRows: Item[] | nu
     regions,
     regionBasis: it.rgnLmtBidLocplcJdgmBssNm?.trim() || undefined,
     registerBy: it.bidQlfctRgstDt?.trim() || undefined,
+    basis: evalBasisOf(it),
   };
 }
 

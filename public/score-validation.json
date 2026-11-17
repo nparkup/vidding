@@ -1,0 +1,1488 @@
+{
+ "builtAt": "2026-11-17T16:26:28.840Z",
+ "period": {
+  "notices": [
+   "20261027",
+   "20261106"
+  ],
+  "awards": [
+   "20261028",
+   "20261117"
+  ]
+ },
+ "total": {
+  "notices": 3452,
+  "lwltCompared": 3394,
+  "lwltMatched": 2174,
+  "winners": 1003,
+  "winnersInside": 1000
+ },
+ "byKind": {
+  "조달청": {
+   "notices": 1171,
+   "lwltCompared": 1146,
+   "lwltMatched": 1103,
+   "winners": 379,
+   "winnersInside": 377
+  },
+  "행정안전부": {
+   "notices": 1780,
+   "lwltCompared": 1779,
+   "lwltMatched": 941,
+   "winners": 508,
+   "winnersInside": 508
+  },
+  "기관 자체": {
+   "notices": 501,
+   "lwltCompared": 469,
+   "lwltMatched": 130,
+   "winners": 116,
+   "winnersInside": 115
+  },
+  "모름": {
+   "notices": 0,
+   "lwltCompared": 0,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0
+  }
+ },
+ "groups": [
+  {
+   "group": "용역 · 기관 자체 · 관리규정외 수기심사(총점입력)",
+   "kind": "기관 자체",
+   "status": "일부 추정",
+   "notices": 330,
+   "lwltCompared": 326,
+   "lwltMatched": 13,
+   "winners": 73,
+   "winnersInside": 72,
+   "tableLower": 82.495,
+   "lwlt": [
+    86.745,
+    87.745,
+    85.495,
+    77.995
+   ],
+   "outside": [
+    {
+     "win": 56.892,
+     "low": 86.245,
+     "high": 100
+    }
+   ]
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 4억원 미만 2억원 이상인 입찰공사(실적제한 아님, 전문공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 263,
+   "lwltCompared": 263,
+   "lwltMatched": 263,
+   "winners": 110,
+   "winnersInside": 110,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 조달청 · 조달청 물품 (고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 256,
+   "lwltCompared": 255,
+   "lwltMatched": 252,
+   "winners": 80,
+   "winnersInside": 80,
+   "tableLower": 86.245,
+   "lwlt": [
+    86.245,
+    89.995,
+    88,
+    80
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 10억원 미만 4억원 이상인 입찰공사(실적제한 아님)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 255,
+   "lwltCompared": 255,
+   "lwltMatched": 255,
+   "winners": 93,
+   "winnersInside": 93,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 행정안전부 · 추정가격이 고시금액 미만인 물품의 평가기준(물품구매)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 214,
+   "lwltCompared": 214,
+   "lwltMatched": 1,
+   "winners": 63,
+   "winnersInside": 63,
+   "tableLower": 86.245,
+   "lwlt": [
+    84.245,
+    89.995,
+    86.245,
+    80.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 조달청 · 중소기업자간 경쟁물품 등 (고시금액 미만, 배점 구조는 조달청 물품 적격심사 준용)",
+   "kind": "조달청",
+   "status": "추정",
+   "notices": 136,
+   "lwltCompared": 136,
+   "lwltMatched": 134,
+   "winners": 55,
+   "winnersInside": 55,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995,
+    86.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 30억원 미만 10억원 이상인 입찰공사(실적제한 아님)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 121,
+   "lwltCompared": 121,
+   "lwltMatched": 121,
+   "winners": 31,
+   "winnersInside": 31,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 기관 자체 · 관리규정외 수기심사(총점입력)",
+   "kind": "기관 자체",
+   "status": "일부 추정",
+   "notices": 119,
+   "lwltCompared": 119,
+   "lwltMatched": 107,
+   "winners": 33,
+   "winnersInside": 33,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745,
+    88.745,
+    87.745,
+    87.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 조달청 · 중소기업자간 경쟁물품 등 (고시금액 이상, 배점 구조는 조달청 물품 적격심사 준용)",
+   "kind": "조달청",
+   "status": "추정",
+   "notices": 108,
+   "lwltCompared": 108,
+   "lwltMatched": 108,
+   "winners": 32,
+   "winnersInside": 32,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 행정안전부 · 추정가격이 10억원 미만 고시금액 이상인 물품의 평가기준(물품구매)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 106,
+   "lwltCompared": 106,
+   "lwltMatched": 1,
+   "winners": 32,
+   "winnersInside": 32,
+   "tableLower": 82.495,
+   "lwlt": [
+    80.495,
+    84.245,
+    82.495,
+    91
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 10억원 이상인 P.Q대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 104,
+   "lwltCompared": 104,
+   "lwltMatched": 0,
+   "winners": 13,
+   "winnersInside": 13,
+   "tableLower": 81.995,
+   "lwlt": [
+    79.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 4억원 미만 2억원 이상인 입찰공사(실적제한 아님, 그 밖의 공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 99,
+   "lwltCompared": 99,
+   "lwltMatched": 99,
+   "winners": 30,
+   "winnersInside": 30,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 조달청 · 조달청 물품 (고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 85,
+   "lwltCompared": 85,
+   "lwltMatched": 71,
+   "winners": 21,
+   "winnersInside": 21,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495,
+    91,
+    84.995,
+    86.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 2억원 미만 1억원 이상인 P.Q비대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 84,
+   "lwltCompared": 84,
+   "lwltMatched": 0,
+   "winners": 23,
+   "winnersInside": 23,
+   "tableLower": 89.745,
+   "lwlt": [
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 2억원 미만인 입찰공사 평가기준 (실적제한 아님, 그 밖의 공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 75,
+   "lwltCompared": 75,
+   "lwltMatched": 74,
+   "winners": 27,
+   "winnersInside": 27,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745,
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 3억 원 미만 8천만 원 이상, 전기·정보통신·소방 등)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 63,
+   "lwltCompared": 63,
+   "lwltMatched": 63,
+   "winners": 36,
+   "winnersInside": 36,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 2억 원 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 59,
+   "lwltCompared": 59,
+   "lwltMatched": 59,
+   "winners": 27,
+   "winnersInside": 27,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 10억 원 미만 3억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 55,
+   "lwltCompared": 55,
+   "lwltMatched": 55,
+   "winners": 22,
+   "winnersInside": 22,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 기관 자체 · 관리규정외 수기심사(총점입력)",
+   "kind": "기관 자체",
+   "status": "일부 추정",
+   "notices": 49,
+   "lwltCompared": 21,
+   "lwltMatched": 10,
+   "winners": 10,
+   "winnersInside": 10,
+   "tableLower": 82.495,
+   "lwlt": [
+    86.245,
+    88,
+    95,
+    84.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 기타 일반용역 (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 48,
+   "lwltCompared": 33,
+   "lwltMatched": 32,
+   "winners": 11,
+   "winnersInside": 9,
+   "tableLower": 86.245,
+   "lwlt": [
+    86.245,
+    86.25,
+    87.745
+   ],
+   "outside": [
+    {
+     "win": 51.127,
+     "low": 86.245,
+     "high": 100
+    },
+    {
+     "win": 55.105,
+     "low": 86.245,
+     "high": 100
+    }
+   ]
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 50억 원 미만 10억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 45,
+   "lwltCompared": 45,
+   "lwltMatched": 45,
+   "winners": 13,
+   "winnersInside": 13,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격 2억원 미만인 용역",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 41,
+   "lwltCompared": 41,
+   "lwltMatched": 0,
+   "winners": 14,
+   "winnersInside": 14,
+   "tableLower": 86.245,
+   "lwlt": [
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 행정안전부 · 추정가격이 고시금액 미만인 물품의 평가기준(물품제조)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 41,
+   "lwltCompared": 41,
+   "lwltMatched": 4,
+   "winners": 4,
+   "winnersInside": 4,
+   "tableLower": 86.245,
+   "lwlt": [
+    84.245,
+    86.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 50억 원 미만 3억 원 이상, 전기·정보통신·소방 등)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 39,
+   "lwltCompared": 39,
+   "lwltMatched": 39,
+   "winners": 4,
+   "winnersInside": 4,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745,
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 5억원 미만인 P.Q 대상 기술용역의 평가기준(사후PQ)",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 35,
+   "lwltCompared": 35,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 88.745,
+   "lwlt": [
+    86.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격 5억원 미만 2억원 이상인 용역",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 34,
+   "lwltCompared": 34,
+   "lwltMatched": 0,
+   "winners": 8,
+   "winnersInside": 8,
+   "tableLower": 86.245,
+   "lwlt": [
+    86.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 5억원 미만인 P.Q 대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 29,
+   "lwltCompared": 29,
+   "lwltMatched": 0,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 88.745,
+   "lwlt": [
+    86.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 100억원 미만 50억원 이상인 입찰공사(실적제한 아님, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 29,
+   "lwltCompared": 29,
+   "lwltMatched": 21,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495,
+    87.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 50억원 미만 30억원 이상인 입찰공사(실적제한 아님, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 27,
+   "lwltCompared": 27,
+   "lwltMatched": 27,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 2억원 미만인 입찰공사 평가기준 (실적제한 아님, 전문공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 27,
+   "lwltCompared": 27,
+   "lwltMatched": 27,
+   "winners": 14,
+   "winnersInside": 14,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 10억원 미만 5억원 이상인 P.Q 대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 26,
+   "lwltCompared": 26,
+   "lwltMatched": 0,
+   "winners": 4,
+   "winnersInside": 4,
+   "tableLower": 87.495,
+   "lwlt": [
+    85.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 8천만 원 미만, 전기·정보통신·소방 등)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 24,
+   "lwltCompared": 24,
+   "lwltMatched": 24,
+   "winners": 13,
+   "winnersInside": 13,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 기술용역 (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "공식 대조",
+   "notices": 23,
+   "lwltCompared": 23,
+   "lwltMatched": 23,
+   "winners": 10,
+   "winnersInside": 10,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 기술용역 (추정가격 10억 원 이상)",
+   "kind": "조달청",
+   "status": "공식 대조",
+   "notices": 22,
+   "lwltCompared": 22,
+   "lwltMatched": 12,
+   "winners": 2,
+   "winnersInside": 2,
+   "tableLower": 81.995,
+   "lwlt": [
+    79.995,
+    81.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 3억 원 미만 2억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 22,
+   "lwltCompared": 22,
+   "lwltMatched": 22,
+   "winners": 9,
+   "winnersInside": 9,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 행정안전부 · 추정가격이 10억원 미만 고시금액 이상인 물품의 평가기준(물품제조)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 22,
+   "lwltCompared": 22,
+   "lwltMatched": 0,
+   "winners": 9,
+   "winnersInside": 9,
+   "tableLower": 82.495,
+   "lwlt": [
+    80.495,
+    84.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 학술연구 (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 20,
+   "lwltCompared": 19,
+   "lwltMatched": 19,
+   "winners": 3,
+   "winnersInside": 3,
+   "tableLower": 86.245,
+   "lwlt": [
+    86.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 300억원미만 100억원이상인 입찰공사(실적제한 아님, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 19,
+   "lwltCompared": 19,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    84.095,
+    83.395,
+    81.995,
+    82.695
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 시설분야 (추정가격 5억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 18,
+   "lwltCompared": 18,
+   "lwltMatched": 17,
+   "winners": 4,
+   "winnersInside": 4,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995,
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 시설분야 (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 18,
+   "lwltCompared": 18,
+   "lwltMatched": 16,
+   "winners": 5,
+   "winnersInside": 5,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995,
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 여객운송 (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 16,
+   "lwltCompared": 16,
+   "lwltMatched": 15,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995,
+    87.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격 15억원 미만 5억원 이상인 용역",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 15,
+   "lwltCompared": 15,
+   "lwltMatched": 0,
+   "winners": 7,
+   "winnersInside": 7,
+   "tableLower": 82.495,
+   "lwlt": [
+    85.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 5억원 미만 2억원 이상인 P.Q비대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 15,
+   "lwltCompared": 15,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 88.745,
+   "lwlt": [
+    86.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 시설분야 (추정가격 5억 원 미만, 고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 15,
+   "lwltCompared": 15,
+   "lwltMatched": 15,
+   "winners": 13,
+   "winnersInside": 13,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 4억원 미만 2억원 이상인 입찰공사(실적제한 아님, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 14,
+   "lwltCompared": 14,
+   "lwltMatched": 14,
+   "winners": 3,
+   "winnersInside": 3,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 폐기물처리 (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 13,
+   "lwltCompared": 13,
+   "lwltMatched": 13,
+   "winners": 4,
+   "winnersInside": 4,
+   "tableLower": 86.245,
+   "lwlt": [
+    86.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 행정안전부 · 추정가격이 10억원 이상인 물품의 평가기준(물품구매)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 13,
+   "lwltCompared": 13,
+   "lwltMatched": 0,
+   "winners": 4,
+   "winnersInside": 4,
+   "tableLower": 82.495,
+   "lwlt": [
+    80.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 소프트웨어(중기경쟁) (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 11,
+   "lwltCompared": 11,
+   "lwltMatched": 11,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 1억원 미만인 P.Q비대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 11,
+   "lwltCompared": 11,
+   "lwltMatched": 0,
+   "winners": 5,
+   "winnersInside": 5,
+   "tableLower": 89.745,
+   "lwlt": [
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 기타 일반용역 (추정가격 5억 원 미만, 고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 7,
+   "lwltCompared": 2,
+   "lwltMatched": 2,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 100억 원 미만 50억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 7,
+   "lwltCompared": 7,
+   "lwltMatched": 5,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495,
+    87.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 폐기물처리 (추정가격 5억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 6,
+   "lwltCompared": 6,
+   "lwltMatched": 5,
+   "winners": 3,
+   "winnersInside": 3,
+   "tableLower": 82.495,
+   "lwlt": [
+    80.495,
+    82.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 소프트웨어 (추정가격 고시금액 미만)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 6,
+   "lwltCompared": 6,
+   "lwltMatched": 6,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 86.245,
+   "lwlt": [
+    86.245
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 50억원 미만 30억원 이상인 입찰공사(실적제한 아님, 그 밖의 공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 6,
+   "lwltCompared": 6,
+   "lwltMatched": 6,
+   "winners": 2,
+   "winnersInside": 2,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 조달청 · 조달청 물품 (추정가격 10억 원 이상 제조)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 6,
+   "lwltCompared": 6,
+   "lwltMatched": 2,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495,
+    84.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 학술연구 (추정가격 5억 원 미만, 고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 5,
+   "lwltCompared": 5,
+   "lwltMatched": 5,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 5억원 미만 고시금액 이상인 P.Q대상 기술용역 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 5,
+   "lwltCompared": 5,
+   "lwltMatched": 5,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 10억원 미만 5억원 이상인 P.Q 대상 기술용역의 평가기준(사후PQ)",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 5,
+   "lwltCompared": 5,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    85.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 여객운송 (추정가격 5억 원 미만, 고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 5,
+   "lwltCompared": 5,
+   "lwltMatched": 5,
+   "winners": 3,
+   "winnersInside": 3,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 5억원 미만 2억원 이상인 P.Q비대상 기술용역의 평가기준-지역업체참여도 미적용",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 5,
+   "lwltCompared": 5,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 89.745,
+   "lwlt": [
+    86.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 소프트웨어(중기경쟁) (추정가격 5억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 5,
+   "lwltCompared": 5,
+   "lwltMatched": 5,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 소프트웨어(중기경쟁) (추정가격 5억 원 미만, 고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 5,
+   "lwltCompared": 5,
+   "lwltMatched": 5,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 학술연구 (추정가격 5억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 4,
+   "lwltCompared": 3,
+   "lwltMatched": 2,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 82.495,
+   "lwlt": [
+    89.995,
+    82.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 기타 일반용역 (추정가격 5억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 4,
+   "lwltCompared": 2,
+   "lwltMatched": 2,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 기술용역 (추정가격 5억 원 이상 10억 원 미만)",
+   "kind": "조달청",
+   "status": "공식 대조",
+   "notices": 4,
+   "lwltCompared": 4,
+   "lwltMatched": 4,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 50억원 미만 30억원 이상인 입찰공사(실적제한 아님, 전문공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 4,
+   "lwltCompared": 4,
+   "lwltMatched": 4,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 기관 자체 · 추정가격 1억미만",
+   "kind": "기관 자체",
+   "status": "일부 추정",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 86.245,
+   "lwlt": [
+    80.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 5억원 미만인 P.Q 대상 기술용역의 평가기준-지역업체참여도 미적용",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 88.745,
+   "lwlt": [
+    86.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 소프트웨어 (추정가격 5억 원 미만, 고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 3,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 10억원 미만 5억원 이상인 P.Q 비대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 0,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 87.495,
+   "lwlt": [
+    85.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 여객운송 (추정가격 5억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 3,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 89.995,
+   "lwlt": [
+    89.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 300억원미만 100억원이상인 입찰공사(실적제한, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    83.395
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 2억원 미만인 입찰공사 평가기준 (실적제한 아님, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 3,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 10억원 미만 4억원 이상인 입찰공사(실적제한)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 3,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "물품 · 행정안전부 · 추정가격이 10억원 이상인 물품의 평가기준(물품제조)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 3,
+   "lwltCompared": 3,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 82.495,
+   "lwlt": [
+    80.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 폐기물처리 (추정가격 5억 원 미만, 고시금액 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 2,
+   "lwltCompared": 2,
+   "lwltMatched": 1,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495,
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 조달청 · 조달청 일반용역 소프트웨어 (추정가격 5억 원 이상)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 2,
+   "lwltCompared": 2,
+   "lwltMatched": 2,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 10억원 이상인 P.Q비대상 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 2,
+   "lwltCompared": 2,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 81.995,
+   "lwlt": [
+    79.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 100억원 미만 50억원 이상인 입찰공사(실적제한, 그 밖의 공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 2,
+   "lwltCompared": 2,
+   "lwltMatched": 2,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 4억원 미만 2억원 이상인 입찰공사(실적제한, 전문공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 2,
+   "lwltCompared": 2,
+   "lwltMatched": 2,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 2억원 미만인 입찰공사 평가기준 (실적제한, 전문공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 2,
+   "lwltCompared": 2,
+   "lwltMatched": 2,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격 30억원 미만 15억원 이상인 용역",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 0,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 82.495,
+   "lwlt": [
+    82.995
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 10억원 미만 5억원 이상인  P.Q비대상 기술용역 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "용역 · 행정안전부 · 추정가격이 1억원 이상인 재난복구 기술용역의 평가기준",
+   "kind": "행정안전부",
+   "status": "공식 대조",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 0,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 89.745,
+   "lwlt": [
+    87.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 조달청 · 조달청 시설공사 (추정가격 100억 원 미만 50억 원 이상, 전기·정보통신·소방 등)",
+   "kind": "조달청",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 2억원 미만인 입찰공사 평가기준 (실적제한, 그 밖의 공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 89.745,
+   "lwlt": [
+    89.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 100억원 미만 50억원 이상인 입찰공사(실적제한 아님, 그 밖의 공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 30억원미만 10억원이상인 재난복구공사 입찰공사(실적제한 아님)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 1,
+   "winnersInside": 1,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 30억원 미만 10억원 이상인 입찰공사(실적제한)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 100억원 미만 50억원 이상인 입찰공사(실적제한, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 87.495,
+   "lwlt": [
+    87.495
+   ],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 2억원 미만인 입찰공사 평가기준 (실적제한, 종합공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 0,
+   "lwltMatched": 0,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 89.745,
+   "lwlt": [],
+   "outside": []
+  },
+  {
+   "group": "공사 · 행정안전부 · 추정가격이 50억원미만 30억원이상인 재난복구공사 입찰공사(실적제한 아님, 그 밖의 공사)",
+   "kind": "행정안전부",
+   "status": "일부 추정",
+   "notices": 1,
+   "lwltCompared": 1,
+   "lwltMatched": 1,
+   "winners": 0,
+   "winnersInside": 0,
+   "tableLower": 88.745,
+   "lwlt": [
+    88.745
+   ],
+   "outside": []
+  }
+ ]
+}

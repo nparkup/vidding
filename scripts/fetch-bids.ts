@@ -10,6 +10,7 @@ import { fetchAllBids, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
+import { usableLwlt } from "../src/lib/criteria";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
 import { awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
 
@@ -45,6 +46,13 @@ async function main() {
       quals = r.quals;
       const s = r.stats;
       console.log(`참가자격: 공고 ${s.bids}건, 업종 제한 ${s.licenseLimited}건, 지역 제한 ${s.regionLimited}건, 자료 없음 ${s.unknown}건 (이번 호출 ${s.fetched}일분, 실패 ${s.failedDays}일분)`);
+      // 낙찰하한율: 개방표준 목록에는 없어 임시값을 넣어 두었다. 입찰공고정보서비스의 공고 값으로 바꾼다
+      let fixed = 0;
+      for (const bid of items) {
+        const v = usableLwlt(r.quals[bid.id]?.basis?.lwlt);
+        if (v !== undefined && bid.lowerLimitRate !== v) { bid.lowerLimitRate = v; fixed++; }
+      }
+      console.log(`낙찰하한율: 공고 값으로 ${fixed}건 바꿈`);
     } catch (e) {
       console.warn("참가자격 수집 건너뜀:", e instanceof Error ? e.message : e);
     }

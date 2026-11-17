@@ -8,6 +8,7 @@ import {
   CREDIT_GRADES, DEFAULT_COMPANY, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
+import { enrichSheet, TECH_GRADES } from "@/lib/criteria";
 import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "@/lib/eligibility";
@@ -53,9 +54,43 @@ const KIND_LABEL: Record<ItemKind, string> = {
   bonus: "신뢰도 가감점(신인도)",
   qualitative: "정성평가",
   other: "기타",
+  capability: "사업수행능력",
+  plan: "이행계획·확약",
+  finance: "재무비율",
+  techGrade: "기술등급",
+};
+
+/** 사업자번호 조회로 처음 채운 값과 그 출처. 고객이 바꾸면 '수정됨'으로 보여 준다 */
+type FactKey = "years" | "employees" | "equityRatio" | "creditGrade";
+interface AutoFact { value: number | string; from: string }
+
+/** 증빙 기준: 이 값을 무엇으로 확인하는지 */
+const EVIDENCE: Record<string, string> = {
+  years: "사업자등록증 개업일 또는 법인등기부 설립일",
+  employees: "4대 보험 가입자 명부 (심사기준일 기준)",
+  techStaff: "자격증 사본과 재직증명 (공고 분야 기술인력)",
+  creditGrade: "신용평가등급확인서 (입찰공고일 전 평가, 유효기간 안의 등급)",
+  pqScore: "사업수행능력 평가 결과 (발주기관 PQ 심사점수)",
+  techGrade: "기술등급 확인서 (중소기업기술정보진흥원 등)",
+  equityRatio: "최근 결산 재무제표 (자기자본 ÷ 총자산)",
+  currentRatio: "최근 결산 재무제표 (유동자산 ÷ 유동부채)",
+  smallFirm: "소기업·소상공인 확인서 또는 창업기업 확인서",
+  perf: "실적증명서 (발주기관 발급, 공고의 인정 기간·동등이상 기준)",
 };
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+
+/** 실제 공고·낙찰 결과와 기준표를 대조한 결과 (scripts/score/validate.ts) */
+interface Validation {
+  builtAt: string;
+  period: { notices: [string, string]; awards: [string, string] };
+  total: { notices: number; lwltCompared: number; lwltMatched: number; winners: number; winnersInside: number };
+  byKind: Record<string, Validation["total"]>;
+}
+async function loadValidation(): Promise<Validation | null> {
+  const r = await fetch(`${STATIC ? process.env.NEXT_PUBLIC_BASE_PATH ?? "" : ""}/score-validation.json`);
+  return r.ok ? r.json() : null;
+}
 
 export function ScorePredictor() {
   const sp = useSearchParams();
@@ -74,6 +109,7 @@ export function ScorePredictor() {
   const [perfBizno, setPerfBizno] = useState("");
   const [autoPerf, setAutoPerf] = useState<PerfSummary>({ amount: 0, count: 0 });
   const [manualPerf, setManualPerf] = useState(0);
+  const [auto, setAuto] = useState<Partial<Record<FactKey, AutoFact>>>({});
   const onPerf = useCallback((s: PerfSummary) => setAutoPerf((p) => (p.amount === s.amount && p.count === s.count ? p : s)), []);
 
   const bid: Bid | undefined = useMemo(() => {
@@ -82,11 +118,26 @@ export function ScorePredictor() {
     return bidId ? bids.find((b) => b.id === bidId) : undefined;
   }, [bids, bidId]);
 
-  const template = useMemo(() => (bid ? templateSheet(bid) : null), [bid]);
-  const active = sheet ?? template;
-
   // 공고를 고르면 첨부 목록과, 첨부에서 미리 추출해 둔 평가표를 불러온다 (없으면 표준 평가표)
   const [docs, setDocs] = useState<BidDocs | null>(null);
+  // 공고의 낙찰방법 세부·낙찰하한율·추정가격으로 그 공고에 맞는 기준표를 고른다
+  const basis = docs?.qual?.basis;
+  const template = useMemo(() => (bid ? templateSheet(bid, basis) : null), [bid, basis]);
+  // 첨부에서 읽은 평가표에는 기준표의 등급표·가격 산식·낙찰하한율을 보탠다
+  const active = useMemo(() => (sheet && template && !sheet.criteria ? enrichSheet(sheet, template) : sheet ?? template), [sheet, template]);
+  // 투찰률 기본값이 이 공고의 낙찰하한율보다 낮으면 기준표의 기준 투찰률(가격 만점 지점)로 옮긴다
+  const floorRate = active?.lowerLimit;
+  const baseRate = active?.price?.base;
+  useEffect(() => {
+    if (floorRate === undefined) return;
+    setCo((c) => (c.bidRate < floorRate ? { ...c, bidRate: Math.max(floorRate, baseRate ?? floorRate) } : c));
+  }, [floorRate, baseRate]);
+  const [validation, setValidation] = useState<Validation | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadValidation().then((v) => alive && setValidation(v)).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
   useEffect(() => {
     if (!bid) return;
     let alive = true;
@@ -123,6 +174,17 @@ export function ScorePredictor() {
   const scoreStage: "criteria" | "checking" | "blocked" | "score" = !CORP_API
     ? "score"
     : !corp ? "criteria" : !eligibility ? "checking" : eligibility.verdict === "불가" ? "blocked" : "score";
+  /** 이 평가표가 쓰는 업체 자료만 입력 칸을 보여 준다 */
+  const needs = useMemo(() => {
+    const it = active?.items ?? [];
+    return {
+      smallFirm: it.some((i) => i.smallFirmFull || i.kind === "performance"),
+      credit: it.some((i) => i.kind === "credit"),
+      capability: it.some((i) => i.kind === "capability"),
+      techGrade: it.some((i) => i.kind === "techGrade"),
+      finance: it.some((i) => i.kind === "finance"),
+    };
+  }, [active]);
   const sheetPeriod = useMemo(() => active
     ? sheetPerfPeriod(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]), active.recognition ?? [])
     : undefined, [active]);
@@ -142,7 +204,11 @@ export function ScorePredictor() {
     try {
       const d = await readDocument(f);
       const g = findCreditGrade(d.text);
-      if (g) { set("creditGrade", g); setCreditMsg(`${f.name}에서 신용평가등급 ${g}를 확인했습니다.`); }
+      if (g) {
+        set("creditGrade", g);
+        setAuto((a) => ({ ...a, creditGrade: { value: g, from: `서류 '${f.name}'` } }));
+        setCreditMsg(`${f.name}에서 신용평가등급 ${g}를 확인했습니다.`);
+      }
       else setCreditMsg("문서에서 등급을 찾지 못했습니다. 아래에서 직접 선택해 주세요.");
     } catch (e) {
       setCreditMsg(e instanceof UnsupportedDocError ? e.message : "파일을 읽지 못했습니다.");
@@ -164,16 +230,26 @@ export function ScorePredictor() {
       const c = j as CorpLookup;
       setCorp(c);
       if (PERF_API && (c.corpName || c.nts?.registered)) setPerfBizno(c.bizno);
+      // 공공데이터로 얻을 수 있는 값을 1차로 채운다. 고객이 증빙 기준으로 고치면 '수정됨'으로 표시한다
+      const opened = c.nara?.openedAt ?? c.fsc?.establishedAt ?? c.openedAt;
+      const fin = c.finance.find((f) => f.equity !== undefined && f.assets);
+      const equityRatio = fin && fin.assets ? Math.round(((fin.equity ?? 0) / fin.assets) * 1000) / 10 : undefined;
+      const facts: Partial<Record<FactKey, AutoFact>> = {};
+      if (opened) facts.years = { value: yearsSince(opened), from: `${c.nara?.openedAt ? "나라장터 개업일" : "금융위원회 설립일"} ${opened.slice(0, 10)}` };
+      if (c.employees !== undefined) facts.employees = { value: c.employees, from: c.nara?.employees !== undefined ? "나라장터 조달업체 정보" : "금융위원회 기업기본정보" };
+      if (equityRatio !== undefined && fin) facts.equityRatio = { value: equityRatio, from: `금융위원회 ${fin.year} ${fin.basis} 재무제표` };
+      setAuto(facts);
       setCo((prev) => ({
         ...prev,
         corpName: c.corpName ?? prev.corpName,
         bizno: c.bizno,
-        years: c.openedAt ? yearsSince(c.openedAt) : prev.years,
-        employees: c.employees ?? prev.employees,
+        years: facts.years ? Number(facts.years.value) : prev.years,
+        employees: facts.employees ? Number(facts.employees.value) : prev.employees,
+        equityRatio: facts.equityRatio ? Number(facts.equityRatio.value) : prev.equityRatio,
       }));
-      const filled = [c.openedAt && "업력", c.employees !== undefined && "종업원 수"].filter(Boolean);
+      const filled = [facts.years && "업력", facts.employees && "종업원 수", facts.equityRatio && "자기자본비율"].filter(Boolean);
       setCorpMsg(c.corpName || c.nts?.registered
-        ? filled.length ? `${filled.join("·")}를 조회 결과로 채웠습니다.` : "조회 결과에 업력·종업원 수가 없어 직접 입력해 주세요."
+        ? filled.length ? `${filled.join("·")}를 공공데이터 조회 결과로 1차로 채웠습니다. 증빙 서류와 다르면 고쳐 주세요.` : "조회 결과에 업력·종업원 수가 없어 직접 입력해 주세요."
         : "조회된 기업 정보가 없습니다. 번호를 확인하거나 직접 입력해 주세요.");
     } catch (e) {
       setCorpMsg((e as Error).message || "조회에 실패했습니다.");
@@ -258,7 +334,7 @@ export function ScorePredictor() {
                   <p className={`rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
                     {docs.sheet
                       ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
-                      : `이 공고의 첨부에서 평가 배점표를 찾지 못해 ${bid.contractMethod} 표준 평가표로 계산합니다.`}
+                      : `이 공고의 첨부에서 평가 배점표를 찾지 못해 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}
                   </p>
                 )}
                 {docs.files.length > 0 && (
@@ -298,27 +374,62 @@ export function ScorePredictor() {
               {corp && <CorpPanel corp={corp} />}
               {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetPeriod={sheetPeriod} onChange={onPerf} />}
             </div>
-            <Num label="업력 (년)" value={co.years} onChange={(v) => set("years", v)} />
-            <Num label="종업원 수 (명)" value={co.employees} onChange={(v) => set("employees", v)} />
-            <Num label="분야 기술인력 (명)" value={co.techStaff} onChange={(v) => set("techStaff", v)} />
+            <p className="text-xs leading-relaxed text-ink-500 sm:col-span-3">
+              값마다 출처를 표시합니다. <b className="text-mint-700">자동</b>은 공공데이터로 1차로 채운 값, <b className="text-ink">수정됨</b>은 고객이 증빙 서류 기준으로 고친 값, <b className="text-ink">직접 입력</b>은 공공데이터에 없어 고객이 넣는 값입니다. 심사에서는 증빙 서류 값이 기준입니다.
+            </p>
+            <Num label="업력 (년)" value={co.years} onChange={(v) => set("years", v)} tag={<FactTag auto={auto.years} current={co.years} onReset={(v) => set("years", Number(v))} />} hint={EVIDENCE.years} />
+            <Num label="종업원 수 (명)" value={co.employees} onChange={(v) => set("employees", v)} tag={<FactTag auto={auto.employees} current={co.employees} onReset={(v) => set("employees", Number(v))} />} hint={EVIDENCE.employees} />
+            <Num label="분야 기술인력 (명)" value={co.techStaff} onChange={(v) => set("techStaff", v)} tag={<FactTag />} hint={EVIDENCE.techStaff} />
             <div>
-              <span className="label">{perfBizno ? "직접 추가 실적 (억원)" : "3년 유사 실적 (억원)"}</span>
+              <span className="label flex flex-wrap items-center gap-1.5">{perfBizno ? "직접 추가 실적 (억원)" : "유사 실적 합계 (억원)"} <FactTag /></span>
               <input className="input" inputMode="decimal" placeholder="예: 6.5" value={perfEok} onChange={(e) => { setPerfEok(e.target.value); setManualPerf(Math.round((Number(e.target.value) || 0) * 1e8)); }} />
-              {perfBizno && <p className="mt-1 text-xs text-ink-500">자동 조회 기간보다 이전 실적과 수의계약·민간·하도급 등 나라장터 낙찰에 없는 실적</p>}
+              <p className="mt-1 text-xs text-ink-500">{perfBizno ? "자동 조회에 없는 실적: 수의계약·민간·하도급, 조회 기간 이전 실적. " : ""}증빙: {EVIDENCE.perf}</p>
             </div>
-            <div className="sm:col-span-2">
-              <span className="label">신용평가등급</span>
+            {needs.credit && <div className="sm:col-span-2">
+              <span className="label flex flex-wrap items-center gap-1.5">신용평가등급 <FactTag auto={auto.creditGrade} current={co.creditGrade} onReset={(v) => set("creditGrade", v as CreditGrade)} /></span>
               <div className="flex flex-wrap items-center gap-2">
-                <select className="input w-auto" value={co.creditGrade} onChange={(e) => set("creditGrade", e.target.value as CreditGrade)}>
+                <select className="input w-auto" value={co.creditGrade} onChange={(e) => set("creditGrade", e.target.value as CreditGrade | "없음")}>
                   {CREDIT_GRADES.map((g) => <option key={g}>{g}</option>)}
+                  <option value="없음">없음 (미제출)</option>
                 </select>
                 <label className="btn-ghost btn-sm cursor-pointer">
                   신용평가등급확인서로 읽기
                   <input type="file" accept=".pdf,.hwpx,.docx,.txt" className="sr-only" onChange={(e) => { onCreditFile(e.target.files); e.target.value = ""; }} />
                 </label>
               </div>
-              <p className="mt-1 text-xs text-ink-500">{creditMsg || "신용평가등급은 공공데이터로 제공되지 않아 확인서에서 읽거나 직접 고릅니다."}</p>
-            </div>
+              <p className="mt-1 text-xs text-ink-500">{creditMsg || "신용평가등급은 공공데이터로 제공되지 않아 확인서에서 읽거나 직접 고릅니다."} 증빙: {EVIDENCE.creditGrade}</p>
+            </div>}
+            {needs.smallFirm && (
+              <label className="flex items-start gap-2 text-sm sm:col-span-3">
+                <input type="checkbox" className="mt-1" checked={co.smallFirm} onChange={(e) => set("smallFirm", e.target.checked)} />
+                <span>
+                  <span className="flex flex-wrap items-center gap-1.5 font-semibold">창업기업·소기업·소상공인 <FactTag /></span>
+                  <span className="block text-xs text-ink-500">
+                    {corp?.fsc?.smallBusiness !== undefined ? `금융위원회 기업기본정보: ${corp.fsc.smallBusiness ? "중소기업" : "중소기업 아님"} (소기업 여부는 확인서로 판단). ` : ""}
+                    물품 고시금액 미만은 신용평가 만점, 일반용역 실적 인정기간 7년. 증빙: {EVIDENCE.smallFirm}
+                  </span>
+                </span>
+              </label>
+            )}
+            {needs.capability && <Num label="사업수행능력 평가점수 (0~100)" value={co.pqScore} onChange={(v) => set("pqScore", Math.min(100, v))} tag={<FactTag />} hint={EVIDENCE.pqScore} />}
+            {needs.techGrade && (
+              <div>
+                <span className="label flex flex-wrap items-center gap-1.5">기술등급 <FactTag /></span>
+                <select className="input" value={co.techGrade} onChange={(e) => set("techGrade", e.target.value)}>
+                  {TECH_GRADES.map((g) => <option key={g}>{g}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-ink-500">확인서가 없으면 최저등급(T8). 증빙: {EVIDENCE.techGrade}</p>
+              </div>
+            )}
+            {needs.finance && (<>
+              <Num label="자기자본비율 (%)" value={co.equityRatio ?? 0} onChange={(v) => set("equityRatio", v)} tag={<FactTag auto={auto.equityRatio} current={co.equityRatio ?? 0} onReset={(v) => set("equityRatio", Number(v))} />} hint={EVIDENCE.equityRatio} />
+              <Num label="유동비율 (%)" value={co.currentRatio ?? 0} onChange={(v) => set("currentRatio", v)} tag={<FactTag />} hint={`공시 요약재무제표에 유동자산·부채가 없어 직접 입력. 증빙: ${EVIDENCE.currentRatio}`} />
+              <div className="grid grid-cols-2 gap-3">
+                <Num label="기준 자기자본비율" value={co.equityBase} onChange={(v) => set("equityBase", v)} />
+                <Num label="기준 유동비율" value={co.currentBase} onChange={(v) => set("currentBase", v)} />
+                <p className="col-span-2 -mt-2 text-xs text-ink-500">공고서에 적힌 기준비율(한국은행 기업경영분석)을 넣으세요. 기본값은 추정입니다.</p>
+              </div>
+            </>)}
             <div>
               <span className="label">제안서 준비 수준</span>
               <div className="flex gap-2">
@@ -422,8 +533,10 @@ export function ScorePredictor() {
           <p className="mt-4 text-xs leading-relaxed text-ink-300">
             {active.source === "extracted" && active.items.some((i) => i.bands || i.recognition || i.criteria) || active.scale
               ? "점수 구간·서류 인정 범위·정성 등급은 공고 첨부에서 읽은 기준을 적용했습니다. 정성평가는 위원이 제안서와 발표를 보고 매기므로, 제안 준비 수준으로 고른 등급은 예상치입니다. 실제로 인정되는 서류는 제출 전 공고 원문으로 확인하세요."
-              : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 표준 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
+              : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 기준표 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
+            {active.criteria && ` 적용 기준표: ${active.criteria.name} (${active.criteria.status}).`}
           </p>
+          {validation && <ValidationNote v={validation} />}
         </>)}
       </aside>
     </div>
@@ -433,10 +546,11 @@ export function ScorePredictor() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">
-            <span className="chip">{active.source === "extracted" ? `원문 추출 · 신뢰도 ${active.confidence}` : "표준 평가표"}</span>
-            {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => setSheet(null)}>표준으로 되돌리기</button>}
+            <span className="chip">{active.source === "extracted" ? `원문 추출 · 신뢰도 ${active.confidence}` : "기준표"}</span>
+            {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => setSheet(null)}>기준표로 되돌리기</button>}
           </div>
         </div>
+        <CriteriaInfo sheet={active} />
         <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
           {active.items.map((i) => (
             <li key={i.id} className="min-w-0 rounded-2xl border border-ink-100 px-4 py-3">
@@ -532,7 +646,8 @@ function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: str
     <section className="card overflow-hidden">
       <div className="p-6">
         <p className="text-sm text-ink-500">평가 기준</p>
-        <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? "공고 첨부의 평가표" : `${sheet.method} 표준 평가표`} · {max}점 만점</p>
+        <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? "공고 첨부의 평가표" : sheet.criteria?.name ?? `${sheet.method} 기준표`} · {max}점 만점</p>
+        {sheet.criteria && <p className="mt-1 text-xs text-ink-500">{sheet.criteria.status} · {sheet.criteria.source}</p>}
         {passLabel && <p className="mt-1 text-sm text-ink-500">통과 기준 {passLabel}</p>}
       </div>
       <ul className="divide-y divide-ink-100 border-t border-ink-100">
@@ -691,13 +806,27 @@ function Step({ n, title }: { n: number; title: string }) {
   );
 }
 
-function Num({ label, value, onChange, hint }: { label: string; value: number; onChange: (v: number) => void; hint?: string }) {
+function Num({ label, value, onChange, hint, tag }: { label: string; value: number; onChange: (v: number) => void; hint?: string; tag?: React.ReactNode }) {
   return (
-    <div>
-      <span className="label">{label}</span>
+    <div className="min-w-0">
+      <span className="label flex flex-wrap items-center gap-1.5">{label}{tag}</span>
       <input className="input" type="number" min={0} value={value} onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))} />
-      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-ink-500">{tag ? "증빙: " : ""}{hint}</p>}
     </div>
+  );
+}
+
+/** 값의 출처 표시: 공공데이터 자동 / 고객 수정 / 직접 입력 */
+function FactTag({ auto, current, onReset }: { auto?: AutoFact; current?: number | string; onReset?: (v: number | string) => void }) {
+  if (!auto) return <span className="rounded-md bg-ink-50 px-1.5 py-0.5 text-[11px] font-semibold text-ink-500">직접 입력</span>;
+  if (String(auto.value) === String(current)) {
+    return <span className="rounded-md bg-mint-50 px-1.5 py-0.5 text-[11px] font-semibold text-mint-700" title={auto.from}>자동 · {auto.from}</span>;
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-ink">
+      수정됨 · 자동값 {String(auto.value)}
+      {onReset && <button type="button" className="font-semibold text-ink-500 underline" onClick={() => onReset(auto.value)}>되돌리기</button>}
+    </span>
   );
 }
 
@@ -735,6 +864,48 @@ function AddItem({ onAdd }: { onAdd: (label: string, max: number) => void }) {
       <input className="input w-24 py-2 text-sm" placeholder="배점" inputMode="decimal" value={max} onChange={(e) => setMax(e.target.value)} />
       <button className="btn-ghost btn-sm shrink-0">추가</button>
     </form>
+  );
+}
+
+const STATUS_TONE: Record<string, string> = { "공식 대조": "bg-mint-50 text-mint-700", "일부 추정": "bg-amber-100 text-ink", 추정: "bg-coral-100 text-ink" };
+
+/** 적용한 기준표와 근거, 추정한 값 */
+function CriteriaInfo({ sheet }: { sheet: EvalSheet }) {
+  const c = sheet.criteria;
+  if (!c) return null;
+  return (
+    <div className="mt-4 rounded-2xl border border-ink-100 px-4 py-3 text-xs leading-relaxed">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">적용 기준표: {c.name}</p>
+        <span className={`rounded-md px-1.5 py-0.5 font-semibold ${STATUS_TONE[c.status]}`}>{c.status}</span>
+      </div>
+      <dl className="mt-2 grid gap-x-4 gap-y-1 text-ink-500 sm:grid-cols-[6.5rem_1fr]">
+        <dt className="font-semibold text-ink">근거</dt><dd className="min-w-0">{c.source}</dd>
+        {c.methodText && (<><dt className="font-semibold text-ink">공고 낙찰방법</dt><dd className="min-w-0 break-keep">{c.methodText}</dd></>)}
+        {sheet.pass && (<><dt className="font-semibold text-ink">통과 기준</dt><dd>{sheet.pass.kind === "total" ? `종합평점 ${sheet.pass.score}점 이상` : `기술점수 배점의 ${Math.round(sheet.pass.ratio * 100)}% 이상`}</dd></>)}
+        {sheet.lowerLimit !== undefined && (<><dt className="font-semibold text-ink">낙찰하한율</dt><dd>{sheet.lowerLimit}%</dd></>)}
+        {sheet.price && (<><dt className="font-semibold text-ink">가격 산식</dt><dd className="min-w-0">{sheet.price.text}{sheet.price.derived ? " (계수 역산)" : ""}</dd></>)}
+      </dl>
+      {c.estimates.length > 0 && (
+        <div className="mt-2 border-t border-ink-100 pt-2 text-ink-500">
+          <p className="font-semibold text-ink">추정한 부분</p>
+          <ul className="mt-0.5 space-y-0.5">{c.estimates.map((e) => <li key={e}>{e}</li>)}</ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 실제 공고·낙찰 결과와 대조한 검증 요약 */
+function ValidationNote({ v }: { v: Validation }) {
+  const p = v.byKind["조달청"];
+  const t = v.total;
+  const d = (x: string) => `${Number(x.slice(4, 6))}.${Number(x.slice(6, 8))}`;
+  if (!p) return null;
+  return (
+    <p className="mt-2 text-xs leading-relaxed text-ink-300">
+      검증 ({d(v.period.notices[0])}~{d(v.period.notices[1])} 나라장터 적격심사 공고 {t.notices.toLocaleString()}건): 조달청 기준표 공고 {p.lwltCompared.toLocaleString()}건 중 기준표 낙찰하한율이 공고 값과 일치 {pct(p.lwltMatched, p.lwltCompared)}%, 실제 낙찰자 투찰률이 예측 통과 구간 안 {p.winnersInside.toLocaleString()}/{p.winners.toLocaleString()}건. 행정안전부·기관 자체 기준 공고는 기준표 원문을 대조하지 못해 공고 낙찰하한율로 맞춘 추정입니다 (낙찰자 {(t.winnersInside - p.winnersInside).toLocaleString()}/{(t.winners - p.winners).toLocaleString()}건 구간 안).
+    </p>
   );
 }
 

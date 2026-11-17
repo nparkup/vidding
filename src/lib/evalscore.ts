@@ -9,8 +9,9 @@
  * 표준 평가표와 채점 규칙은 조달청 적격심사·협상계약 평가 구조를 단순화한 추정 모델이다.
  * 실제 점수는 공고마다 세부기준이 달라, 공고문에서 추출한 배점이 있으면 그 배점을 우선한다.
  */
-import type { Bid, BizType, ContractMethod } from "./types";
+import type { Bid, ContractMethod } from "./types";
 import { estimatedRule, generalServiceRule, parseTrustRule, scoreTrust, type TrustRule, type TrustScore } from "./trustscore";
+import { criteriaSheet, type CriteriaRef, type EvalBasis } from "./criteria";
 
 /* ---------- 신용평가등급 ---------- */
 
@@ -36,7 +37,16 @@ export function findCreditGrade(text: string): CreditGrade | undefined {
 /* ---------- 평가표 ---------- */
 
 /** 항목 유형: 채점 규칙을 고르는 기준 */
-export type ItemKind = "performance" | "credit" | "price" | "years" | "staff" | "bonus" | "qualitative" | "other";
+export type ItemKind =
+  | "performance" | "credit" | "price" | "years" | "staff" | "bonus" | "qualitative" | "other"
+  /** 사업수행능력(PQ) 평가점수 환산 (기술용역) */
+  | "capability"
+  /** 확약서·계획서를 내면 만점인 항목 (근로조건 이행계획, 하도급관리계획 등) */
+  | "plan"
+  /** 재무비율 (자기자본비율·유동비율) */
+  | "finance"
+  /** 물품 기술등급 (T1~T8) */
+  | "techGrade";
 
 export interface EvalItem {
   id: string;
@@ -51,6 +61,27 @@ export interface EvalItem {
   recognition?: string[];
   /** 정성 항목의 평가 요소 (원문 문장) */
   criteria?: string[];
+  /** 기준표의 등급별 점수 (신용평가등급, 기술등급). missing 이 −1 이면 자료가 없을 때 최저등급 점수 */
+  lookup?: { of: "credit" | "techGrade"; points: Record<string, number>; missing: number };
+  /** 실적계수 방식: 점수 = 배점 × min(1, 실적 ÷ (기준금액 × perfLinear)) */
+  perfLinear?: number;
+  /** 창업기업·소기업·소상공인이면 만점 (물품 고시금액 미만 경영상태) */
+  smallFirmFull?: boolean;
+}
+
+/** 입찰가격 평점 산식 */
+export interface PriceRule {
+  /** qual: 배점 − k × |기준 − 투찰률|, nego: 배점 × 최저가 ÷ 입찰가, lowest: 최저가 */
+  kind: "qual" | "nego" | "lowest";
+  base?: number;
+  k?: number;
+  /** 이 투찰률 이상은 이 투찰률로 계산 */
+  capAt?: number;
+  min?: number;
+  /** 계수를 통과점수·하한율로 역산했는지 */
+  derived?: boolean;
+  /** 화면 표시 산식 */
+  text: string;
 }
 
 /**
@@ -88,10 +119,21 @@ export interface EvalSheet {
   panelRule?: string;
   /** 공고 전체에 걸친 서류 인정 기준 (기준일, 발급 기관, 공동수급 지분 등) */
   recognition?: string[];
+  /** 입찰가격 평점 산식 */
+  price?: PriceRule;
+  /** 낙찰하한율 (%) */
+  lowerLimit?: number;
+  /** 실적 비율 등의 기준 금액 (추정가격). 없으면 공고 기초금액 */
+  refAmount?: number;
+  /** 적용한 기준표와 근거 */
+  criteria?: CriteriaRef;
 }
 
 const KIND_RULES: [ItemKind, RegExp][] = [
   ["price", /입찰\s*가격|가격\s*평가|입찰금액|투찰\s*금액|가격점수|가격\s*제안/],
+  ["capability", /사업\s*수행\s*능력\s*평가|P\.?\s*Q\s*점수/],
+  ["plan", /근로\s*조건\s*이행|하도급\s*관리\s*계획|자재\s*및\s*인력\s*조달/],
+  ["techGrade", /기술\s*등급/],
   ["credit", /신용|경영\s*상태|재무|부채비율|유동비율/],
   ["performance", /실적|이행\s*경험|수행\s*경험|시공\s*경험|납품\s*경험|유사\s*용역/],
   ["years", /업력|업무\s*경력|영업\s*기간|설립/],
@@ -114,6 +156,10 @@ const GROUP_OF: Record<ItemKind, string> = {
   bonus: "신뢰도 가감점",
   qualitative: "기술(정성)",
   other: "기타",
+  capability: "수행능력",
+  plan: "이행계획",
+  finance: "경영상태",
+  techGrade: "기술능력",
 };
 
 let seq = 0;
@@ -121,93 +167,13 @@ const item = (label: string, max: number, kind: ItemKind, basis?: string, group?
   id: `i${++seq}`, label, max, kind, basis, group: group ?? GROUP_OF[kind],
 });
 
-/** 고시금액(용역 2.3억 원 내외) 이상 여부: 적격심사 배점 구조가 갈린다 */
-const NOTICE_AMOUNT = 230_000_000;
-
 /**
- * 표준 평가표. 공고문을 확보하지 못했을 때 쓰는 기본 구조로, 실제 배점은 공고별 세부기준을 따른다.
+ * 공고 첨부에서 평가표를 못 읽었을 때 쓰는 기준표. 공고의 낙찰방법 세부·낙찰하한율·추정가격(basis)이 있으면
+ * 그 공고에 맞는 공식 기준표를 고른다 (criteria.ts).
  */
-export function templateSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category">): EvalSheet {
-  const biz: BizType = bid.bizType ?? "용역";
-  const amt = bid.baseAmount;
-  const notes = ["공고문·규격서를 넣으면 원문 배점으로 바꿔 다시 계산합니다."];
-
-  if (bid.contractMethod === "협상에 의한 계약") {
-    return {
-      method: "협상에 의한 계약",
-      title: "협상에 의한 계약 제안서 평가 (기술 80 · 가격 20)",
-      source: "template",
-      confidence: "보통",
-      pass: { kind: "techRatio", ratio: 0.85 },
-      trust: estimatedRule("협상계약 가점 (평가표 배점 기준, 항목 점수는 일반용역 기준 준용)", 2, 2),
-      notes: [...notes, "기술능력 평가점수가 배점의 85% 이상인 업체가 협상적격자가 됩니다."],
-      items: [
-        item("유사 사업 수행실적", 8, "performance", "최근 3년 유사 사업 실적 금액·건수", "정량평가"),
-        item("경영상태 (신용평가등급)", 6, "credit", "회사채·기업어음·기업신용평가등급", "정량평가"),
-        item("참여 인력 보유", 4, "staff", "투입 인력 자격·경력", "정량평가"),
-        item("신뢰도 가점(신인도)", 2, "bonus", "여성·장애인·사회적기업, 고용우수 등", "정량평가"),
-        item("사업 이해도·추진 전략", 15, "qualitative", undefined, "정성평가"),
-        item("수행 방법론·세부 계획", 25, "qualitative", undefined, "정성평가"),
-        item("관리 방안 (품질·일정·보안·안전)", 12, "qualitative", undefined, "정성평가"),
-        item("제안 발표·질의응답", 8, "qualitative", undefined, "정성평가"),
-        item("입찰가격", 20, "price", "배점 × (최저 입찰가격 ÷ 해당 입찰가격)"),
-      ],
-    };
-  }
-
-  if (bid.contractMethod === "적격심사") {
-    if (biz === "공사") {
-      return {
-        method: "적격심사",
-        title: "공사 적격심사 (시공경험·경영상태·가격)",
-        source: "template",
-        confidence: "보통",
-        pass: { kind: "total", score: 92 },
-        trust: estimatedRule("공사 적격심사 (상·하한 ±2점 추정, 항목 점수는 일반용역 기준 준용)", 2, 2),
-        notes: [...notes, "추정가격 100억 원 미만 공사는 종합평점 92점 이상이면 낙찰자로 결정됩니다."],
-        items: [
-          item("시공경험 (최근 10년 동일·유사 공사)", 15, "performance", "공사 규모 대비 실적 누계"),
-          item("기술능력 (기술자 보유)", 0, "staff", "규모에 따라 시공경험에 포함되거나 별도 배점"),
-          item("경영상태 (신용평가등급)", 15, "credit", "등급별 평점, 미달 시 재무비율 평가"),
-          item("신뢰도 가감점(신인도)", 0, "bonus", "±2점 내외, 부실벌점 감점"),
-          item("입찰가격", 70, "price", "70 − 2 × |88/100 − 입찰가격/예정가격| × 100"),
-        ].filter((i) => i.max > 0 || i.kind === "bonus"),
-      };
-    }
-    const big = amt >= NOTICE_AMOUNT;
-    return {
-      method: "적격심사",
-      title: `${biz} 적격심사 (${big ? "고시금액 이상" : "고시금액 미만"})`,
-      source: "template",
-      confidence: "보통",
-      pass: { kind: "total", score: 85 },
-      trust: biz === "물품" ? estimatedRule("물품 적격심사 (상·하한 +2 ~ △3 추정, 항목 점수는 일반용역 기준 준용)", 2, 3) : generalServiceRule(),
-      notes: [...notes, "종합평점 85점 이상인 업체 가운데 최저가 순으로 낙찰자를 정합니다."],
-      items: big
-        ? [
-            item(`${biz === "물품" ? "납품" : "용역 수행"}실적`, 15, "performance", "최근 3년 유사 실적 ÷ 추정가격"),
-            item("경영상태 (신용평가등급)", 15, "credit", "신용평가등급별 평점"),
-            item("신뢰도 가감점(신인도)", 0, "bonus", biz === "물품" ? "+2 ~ −3점, 고용·인증·제재 이력" : "+4.25 ~ −5.0점, 고용·인증·제재 이력 (일반용역 기준)"),
-            item("입찰가격", 70, "price", "70 − 4 × |88/100 − 입찰가격/예정가격| × 100"),
-          ]
-        : [
-            item(`${biz === "물품" ? "납품" : "용역 수행"}실적`, 10, "performance", "최근 3년 유사 실적 ÷ 추정가격"),
-            item("경영상태 (신용평가등급)", 10, "credit", "신용평가등급별 평점"),
-            item("신뢰도 가감점(신인도)", 0, "bonus", biz === "물품" ? "+2 ~ −3점" : "+4.25 ~ −5.0점 (일반용역 기준)"),
-            item("입찰가격", 80, "price", "80 − 4 × |88/100 − 입찰가격/예정가격| × 100"),
-          ],
-    };
-  }
-
-  // 최저가·수의계약: 점수 평가가 없거나 가격만 본다
-  return {
-    method: bid.contractMethod,
-    title: `${bid.contractMethod} (가격 중심)`,
-    source: "template",
-    confidence: "보통",
-    notes: [...notes, "이 계약방법은 별도 평가점수 없이 자격 충족 후 가격으로 낙찰자를 정합니다."],
-    items: [item("입찰가격", 100, "price", "예정가격 이하 최저가 (하한율 적용 시 그 이상)")],
-  };
+export function templateSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category" | "lowerLimitRate">, basis?: EvalBasis): EvalSheet {
+  const sheet = criteriaSheet(bid, basis);
+  return { ...sheet, notes: ["공고 첨부의 평가표를 찾으면 원문 배점으로 바꿔 계산합니다.", ...sheet.notes] };
 }
 
 /* ---------- 원문 추출 ---------- */
@@ -496,8 +462,20 @@ export interface CompanyInput {
   employees: number;
   /** 공고 분야 기술인력 수 */
   techStaff: number;
-  creditGrade: CreditGrade;
-  /** 최근 3년 유사 실적 합계(원) */
+  /** 신용평가등급. "없음"이면 기준표의 미제출 처리(최저등급 또는 0점) */
+  creditGrade: CreditGrade | "없음";
+  /** 창업기업·소기업·소상공인 (물품 고시금액 미만 경영상태 만점, 일반용역 실적 인정기간 7년) */
+  smallFirm: boolean;
+  /** 사업수행능력(PQ) 평가점수 (0~100, 기술용역) */
+  pqScore: number;
+  /** 물품 기술등급 (T1~T8) */
+  techGrade: string;
+  /** 자기자본비율(%)·유동비율(%) 과 공고의 기준비율 (기술용역 고시금액 미만 경영상태) */
+  equityRatio?: number;
+  currentRatio?: number;
+  equityBase: number;
+  currentBase: number;
+  /** 유사 실적 합계(원) */
   pastPerformance: number;
   /** 실적 중 나라장터 낙찰 이력에서 자동으로 찾은 금액이 있으면 그 설명 (예: "나라장터 낙찰 4건 추정") */
   perfSource?: string;
@@ -516,6 +494,11 @@ export const DEFAULT_COMPANY: CompanyInput = {
   employees: 25,
   techStaff: 4,
   creditGrade: "BBB0",
+  smallFirm: false,
+  pqScore: 90,
+  techGrade: "T8",
+  equityBase: 40,
+  currentBase: 130,
   pastPerformance: 0,
   trustItems: [],
   proposal: "중",
@@ -553,10 +536,13 @@ export interface Prediction {
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const TECH_POINTS: Record<string, number> = { T1: 10, T2: 9.8, T3: 9.6, T4: 9.4, T5: 9.2, T6: 9.0, T7: 8.8, T8: 8 };
 const clamp = (n: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, n));
 
 /** 금액 구간별로 만점이 나오는 신용등급이 달라진다 (규모가 클수록 높은 등급 요구) */
-function creditRatio(grade: CreditGrade, amount: number): number {
+function creditRatio(g: CreditGrade | "없음", amount: number): number {
+  const grade: CreditGrade = g === "없음" ? "CCC+" : g;
   const idx = CREDIT_GRADES.indexOf(grade);
   const fullAt = amount >= 5_000_000_000 ? CREDIT_GRADES.indexOf("A-") : amount >= 1_000_000_000 ? CREDIT_GRADES.indexOf("BBB-") : CREDIT_GRADES.indexOf("BB+");
   if (grade === "D") return 0;
@@ -574,10 +560,24 @@ const yearsRatio = (y: number) => (y >= 10 ? 1 : y >= 7 ? 0.9 : y >= 5 ? 0.8 : y
 const staffRatio = (n: number, amount: number) => clamp(n / Math.max(2, Math.ceil(amount / 1_000_000_000) + 2), 0.2);
 const LEVEL_RATIO: Record<Level, number> = { 상: 0.9, 중: 0.8, 하: 0.68 };
 
-/** 적격심사 가격 평점: 배점 − k × |88 − 투찰률| (k는 평가식에서 읽고, 없으면 2. 최저 2점) */
-function qualPrice(max: number, rate: number, basis?: string): number {
+/**
+ * 적격심사 가격 평점. 기준표 산식이 있으면 그것(배점 − k × |기준 − 투찰률|, 상한 투찰률, 최저점)을 쓰고,
+ * 없으면 평가식 문구에서 계수를 읽어 기준 88로 계산한다 (최저 2점).
+ */
+function qualPrice(max: number, rate: number, basis?: string, rule?: PriceRule): number {
+  if (rule?.kind === "qual" && rule.k !== undefined) {
+    const r = rule.capAt !== undefined ? Math.min(rate, rule.capAt) : rate;
+    return Math.max(rule.min ?? 2, max - rule.k * Math.abs((rule.base ?? 90) - r));
+  }
   const k = Number(basis?.match(/[−-]\s*(\d+)\s*×/)?.[1]) || 2;
   return Math.max(2, max - k * Math.abs(88 - rate));
+}
+
+/** 재무비율 점수 (기술용역): 기준비율 대비 100% 이상 5, 90% 4.5, 80% 4, 70% 3.5, 미만 3 */
+function ratioPoints(v: number | undefined, base: number): number {
+  if (!v || !(base > 0)) return 3;
+  const r = (v / base) * 100;
+  return r >= 100 ? 5 : r >= 90 ? 4.5 : r >= 80 ? 4 : r >= 70 ? 3.5 : 3;
 }
 
 /** 공고의 점수 구간으로 채점한다. 값에 맞는 구간이 없으면(최저 구간 미만) 0점 */
@@ -597,7 +597,7 @@ function scoreByBands(bands: ScoreBand[], value: number): { points: number; band
 function bandValue(it: EvalItem, c: CompanyInput, amt: number): number | undefined {
   const unit = it.bands?.[0]?.unit;
   if (!unit) return undefined;
-  if (unit === "grade") return it.kind === "credit" ? CREDIT_GRADES.indexOf(c.creditGrade) : undefined;
+  if (unit === "grade") return it.kind === "credit" ? (c.creditGrade === "없음" ? CREDIT_GRADES.length - 1 : CREDIT_GRADES.indexOf(c.creditGrade)) : undefined;
   if (unit === "%") return it.kind === "performance" && amt > 0 ? (c.pastPerformance / amt) * 100 : undefined;
   if (unit === "명") return it.kind === "staff" ? c.techStaff : undefined;
   if (unit === "년") return it.kind === "years" ? c.years : undefined;
@@ -612,16 +612,45 @@ function scaleLevel(scale: ScaleLevel[], lv: Level): ScaleLevel {
 }
 
 export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLimitRate">, c: CompanyInput): Prediction {
-  const amt = bid.baseAmount;
+  const amt = sheet.refAmount || bid.baseAmount;
+  const amtLabel = sheet.refAmount ? "추정가격" : "기초금액";
+  const gradeText = c.creditGrade === "없음" ? "신용평가등급 없음(미제출)" : `신용평가등급 ${c.creditGrade}`;
   const items: PredictedItem[] = sheet.items.map((it) => {
     let ratio = 0;
     let reason = "";
+    // 기준표 등급표 (신용평가등급, 기술등급)
+    if (it.lookup && it.max > 0) {
+      const pts = it.lookup.points;
+      const lowest = Math.min(...Object.values(pts));
+      let s: number;
+      let why: string;
+      if (it.lookup.of === "credit" && it.smallFirmFull && c.smallFirm) {
+        s = it.max; why = "창업기업·소기업·소상공인: 기준표상 만점";
+      } else if (it.lookup.of === "credit") {
+        const missing = c.creditGrade === "없음";
+        s = missing ? (it.lookup.missing < 0 ? lowest : it.lookup.missing) : pts[c.creditGrade] ?? lowest;
+        why = missing ? `${gradeText}: 기준표상 ${it.lookup.missing < 0 ? "최저등급" : `${it.lookup.missing}점`}` : `${gradeText} → 기준표 ${round2(s)}점`;
+      } else {
+        s = pts[c.techGrade] ?? (it.lookup.missing < 0 ? lowest : it.lookup.missing);
+        why = `기술등급 ${c.techGrade} → 기준표 ${round2(s)}점`;
+      }
+      s = Math.min(it.max, s);
+      return { ...it, score: round2(s), ratio: s / it.max, reason: why, lost: round2(it.max - s) };
+    }
+    // 실적계수 방식 (공사 시공경험)
+    if (it.perfLinear && it.kind === "performance" && it.max > 0) {
+      if (!(amt > 0)) return { ...it, score: 0, ratio: 0, lost: 0, unknown: true, reason: `${amtLabel}이 없는 공고라 실적계수를 계산할 수 없습니다` };
+      const coef = Math.min(1, c.pastPerformance / (amt * it.perfLinear));
+      const s = it.max * coef;
+      return { ...it, score: round2(s), ratio: coef, reason: `실적계수 ${coef.toFixed(3)} = 실적 ${Math.round(c.pastPerformance / 1e6).toLocaleString()}백만 원 ÷ (${amtLabel} × ${it.perfLinear})${c.perfSource ? `, ${c.perfSource}` : ""}`, lost: round2(it.max - s) };
+    }
     const bv = it.bands?.length ? bandValue(it, c, amt) : undefined;
     if (bv !== undefined && it.bands && it.max > 0) {
       const { points, band } = scoreByBands(it.bands, bv);
       const s = Math.min(it.max, points);
-      const what = it.kind === "credit" ? `신용평가등급 ${c.creditGrade}` : it.kind === "performance" ? `유사 실적 ${Math.round(bv)}% (기초금액 대비${c.perfSource ? `, ${c.perfSource}` : ""})` : it.kind === "staff" ? `기술인력 ${c.techStaff}명` : `업력 ${c.years}년`;
-      return { ...it, score: round1(s), ratio: s / it.max, reason: `${what} → 공고 구간 ${band ? `'${band.cond}' ${band.points}점` : "최저 구간 미만"}`, lost: round1(it.max - s) };
+      const what = it.kind === "credit" ? gradeText : it.kind === "performance" ? `유사 실적 ${Math.round(bv)}% (${amtLabel} 대비${c.perfSource ? `, ${c.perfSource}` : ""})` : it.kind === "staff" ? `기술인력 ${c.techStaff}명` : `업력 ${c.years}년`;
+      const where = sheet.source === "extracted" ? "공고 구간" : "기준표 구간";
+      return { ...it, score: round2(s), ratio: s / it.max, reason: `${what} → ${where} ${band ? `'${band.cond}' ${round2(band.points)}점` : "최저 구간 미만"}`, lost: round2(it.max - s) };
     }
     if ((it.kind === "qualitative" || it.kind === "other") && sheet.scale?.length) {
       const lv = scaleLevel(sheet.scale, c.proposal);
@@ -634,18 +663,35 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
         if (!(amt > 0)) {
           return {
             ...it, score: 0, ratio: 0, lost: 0, unknown: true,
-            reason: `기초금액이 없는 공고라 기초금액 대비 실적 비율로 계산할 수 없습니다${c.perfSource ? ` (인정 실적: ${c.perfSource})` : ""}. 공고서의 실적 평가 기준(건수·금액)을 확인하세요`,
+            reason: `${amtLabel}이 없는 공고라 ${amtLabel} 대비 실적 비율로 계산할 수 없습니다${c.perfSource ? ` (인정 실적: ${c.perfSource})` : ""}. 공고서의 실적 평가 기준(건수·금액)을 확인하세요`,
           };
         }
         ratio = performanceRatio(c.pastPerformance, amt);
         reason = c.pastPerformance
-          ? `유사 실적 ${Math.round((c.pastPerformance / amt) * 100)}% (기초금액 대비${c.perfSource ? `, ${c.perfSource}` : ""})`
+          ? `유사 실적 ${Math.round((c.pastPerformance / amt) * 100)}% (${amtLabel} 대비${c.perfSource ? `, ${c.perfSource}` : ""})`
           : "유사 실적 미입력: 0점으로 계산";
         break;
       }
       case "credit":
         ratio = creditRatio(c.creditGrade, amt);
-        reason = `신용평가등급 ${c.creditGrade}`;
+        reason = `${gradeText} (공고 등급표를 읽지 못해 금액대별 표준 비율로 추정)`;
+        break;
+      case "capability":
+        ratio = clamp(c.pqScore / 100);
+        reason = `사업수행능력 평가점수 ${c.pqScore}점 × ${it.max} ÷ 100`;
+        break;
+      case "plan":
+        ratio = 1;
+        reason = "확약서·계획서를 기준대로 내면 만점 (미제출이면 0점)";
+        break;
+      case "finance": {
+        const e = ratioPoints(c.equityRatio, c.equityBase), cu = ratioPoints(c.currentRatio, c.currentBase);
+        const s = Math.min(it.max, ((e + cu) * it.max) / 10);
+        return { ...it, score: round2(s), ratio: s / it.max, reason: `자기자본비율 ${c.equityRatio ? `${c.equityRatio}%` : "미입력"} (기준 ${c.equityBase}%) ${e}점 + 유동비율 ${c.currentRatio ? `${c.currentRatio}%` : "미입력"} (기준 ${c.currentBase}%) ${cu}점`, lost: round2(it.max - s) };
+      }
+      case "techGrade":
+        ratio = (TECH_POINTS[c.techGrade] ?? 8) / 10;
+        reason = `기술등급 ${c.techGrade}`;
         break;
       case "years":
         ratio = yearsRatio(c.years);
@@ -663,8 +709,11 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
           ratio = clamp(Math.min(c.bidRate, c.rivalRate) / c.bidRate);
           reason = `투찰률 ${c.bidRate}% vs 예상 최저 ${c.rivalRate}%`;
         } else if (sheet.method === "적격심사") {
-          const s = qualPrice(it.max, c.bidRate, it.basis);
-          return { ...it, score: round1(s), ratio: s / it.max, reason: `투찰률 ${c.bidRate}% (예정가격 대비)`, lost: round1(it.max - s) };
+          const rule = sheet.price?.kind === "qual" ? sheet.price : undefined;
+          const s = qualPrice(it.max, c.bidRate, it.basis, rule);
+          const under = sheet.lowerLimit ?? bid.lowerLimitRate;
+          const note = under && c.bidRate < under ? `, 낙찰하한율 ${under}% 미만이라 낙찰 대상 아님` : "";
+          return { ...it, score: round2(s), ratio: s / it.max, reason: `투찰률 ${c.bidRate}% (예정가격 대비)${rule ? `: ${rule.text}` : ""}${note}`, lost: round2(it.max - s) };
         } else {
           ratio = 1;
           reason = "가격 경쟁: 최저가 순위로 결정";
@@ -689,7 +738,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
     const base = sheet.trust ?? (sheet.method === "적격심사" && first.max <= 0 ? generalServiceRule() : estimatedRule("평가표 배점 기준", first.max > 0 ? first.max : 2, first.max > 0 ? first.max : 3));
     const rule: TrustRule = first.max > 0 && !base.capFromNotice ? { ...base, plusCap: first.max, minusCap: Math.max(first.max, base.minusCap) } : base;
     const room = sheet.method === "적격심사"
-      ? items.filter((i) => !i.unknown && ["performance", "credit", "years", "staff"].includes(i.kind)).reduce((s, i) => s + i.lost, 0)
+      ? items.filter((i) => !i.unknown && ["performance", "credit", "years", "staff", "capability", "finance", "techGrade"].includes(i.kind)).reduce((s, i) => s + i.lost, 0)
       : undefined;
     const ts = scoreTrust(c.trustItems ?? [], rule, room);
     trust = { ...ts, rule };
@@ -707,11 +756,11 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
     }
   }
 
-  const total = round1(items.reduce((s, i) => s + i.score, 0));
+  const total = round2(items.reduce((s, i) => s + i.score, 0));
   const max = round1(items.reduce((s, i) => s + i.max, 0));
   const pending = round1(items.filter((i) => i.unknown).reduce((s, i) => s + Math.max(0, i.max), 0));
   const tech = items.filter((i) => i.kind !== "price");
-  const techScore = round1(tech.reduce((s, i) => s + i.score, 0));
+  const techScore = round2(tech.reduce((s, i) => s + i.score, 0));
   const techMax = round1(tech.reduce((s, i) => s + Math.max(0, i.max), 0));
 
   // 확인 필요 항목이 있으면 그 항목이 0점일 때와 만점일 때 모두 같은 결과일 때만 통과·미달을 말한다
@@ -721,7 +770,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   const judge = (score: number, need: number) => {
     const lo = score >= need - 1e-6, hi = score + pending >= need - 1e-6;
     passed = lo === hi ? lo : undefined;
-    gap = pending ? undefined : round1(score - need);
+    gap = pending ? undefined : round2(score - need);
   };
   if (sheet.pass?.kind === "total") {
     judge(total, sheet.pass.score);
@@ -738,14 +787,16 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   if (sheet.method === "적격심사" && sheet.pass?.kind === "total" && priceItem && !pending) {
     const nonPrice = total - (items.find((i) => i.id === priceItem.id)?.score ?? 0);
     const ok: number[] = [];
-    const floor = bid.lowerLimitRate ?? 0;
-    const start = Math.max(80, floor);
+    const floor = sheet.lowerLimit ?? bid.lowerLimitRate ?? 0;
+    const start = Math.max(70, floor);
     const rates = Array.from({ length: Math.floor((100 - start) / 0.01) + 1 }, (_, n) => Math.round((start + n * 0.01) * 1000) / 1000);
     if (start <= 88) rates.push(88);
     for (const r of rates.sort((x, y) => x - y)) {
-      if (nonPrice + qualPrice(priceItem.max, r, priceItem.basis) >= sheet.pass.score - 1e-6) ok.push(r);
+      // 점수는 소수점 처리 차이가 있어 0.01점 안쪽은 같은 점수로 본다
+      if (nonPrice + qualPrice(priceItem.max, r, priceItem.basis, sheet.price) >= sheet.pass.score - 0.01) ok.push(r);
     }
-    if (ok.length) rateWindow = { low: Math.round(ok[0] * 100) / 100, high: Math.round(ok[ok.length - 1] * 100) / 100 };
+    // 낙찰하한율은 기준표 산식의 끝자리 처리(…745, …995)를 반영한 값이라, 계산한 하한과 0.02%p 안이면 하한율을 쓴다
+    if (ok.length) rateWindow = { low: floor && ok[0] - floor <= 0.02 ? floor : Math.round(ok[0] * 1000) / 1000, high: Math.round(ok[ok.length - 1] * 100) / 100 };
   }
 
   const tips: string[] = [];
@@ -753,14 +804,17 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   const losers = [...items].filter((i) => i.kind !== "price" && i.lost > 0).sort((a, b) => b.lost - a.lost).slice(0, 3);
   for (const l of losers) {
     const up = l.bands && l.bands[0].unit === "%" ? [...l.bands].sort((a, b) => a.min - b.min).find((b) => b.points > l.score && b.min > 0) : undefined;
-    if (l.kind === "performance" && up) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공고 구간상 유사 실적이 기초금액의 ${up.min}%(${Math.round((amt * up.min) / 100 / 1e6).toLocaleString()}백만 원) 이상이면 ${up.points}점입니다. 공동수급 지분 합산도 검토하세요.`);
+    if (l.kind === "performance" && up) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. ${sheet.source === "extracted" ? "공고" : "기준표"} 구간상 유사 실적이 ${amtLabel}의 ${up.min}%(${Math.round((amt * up.min) / 100 / 1e6).toLocaleString()}백만 원) 이상이면 ${up.points}점입니다. 공동수급 지분 합산도 검토하세요.`);
     else if (l.kind === "performance") tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공동수급으로 실적을 합산하면 만점에 가까워질 수 있습니다.`);
-    else if (l.kind === "credit") tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공고일 전 신용평가 재평가 일정을 확인하세요.`);
+    else if (l.kind === "credit") tips.push(c.creditGrade === "없음" ? `${l.label}에서 ${l.lost}점이 빠집니다. 유효한 신용평가등급확인서가 없으면 최저등급(공사는 0점)으로 평가하니 공고일 전 신용평가를 받으세요.` : `${l.label}에서 ${l.lost}점이 빠집니다. 공고일 전 신용평가 재평가 일정을 확인하세요.`);
+    else if (l.kind === "capability") tips.push(`사업수행능력 평가점수가 ${c.pqScore}점이라 ${l.lost}점이 빠집니다. 참여기술인·유사 용역 실적 서류를 보강하세요.`);
+    else if (l.kind === "finance") tips.push(`재무비율이 공고 기준비율보다 낮아 ${l.lost}점이 빠집니다. 최근 결산 재무제표 기준으로 다시 확인하세요.`);
     else if (l.kind === "staff") tips.push(`기술인력이 부족해 ${l.lost}점이 빠집니다. 투입 예정 인력의 자격증·재직증명을 미리 준비하세요.`);
     else if (l.kind === "qualitative") tips.push(`정성평가 '${l.label}'에서 ${l.lost}점 차이가 납니다. 발주기관 과업지시서 요구사항을 목차에 1:1로 대응시키세요.`);
     else if (l.kind === "years") tips.push(`업력 항목에서 ${l.lost}점이 빠집니다.`);
   }
-  if (sheet.pass?.kind === "total" && rateWindow) tips.push(`통과 가능한 투찰률은 예정가격의 ${rateWindow.low}% ~ ${rateWindow.high}% 입니다.${bid.lowerLimitRate ? ` 낙찰하한율 ${bid.lowerLimitRate}%보다 낮게 쓰면 탈락합니다.` : ""}`);
+  const lwlt = sheet.lowerLimit ?? bid.lowerLimitRate;
+  if (sheet.pass?.kind === "total" && rateWindow) tips.push(`통과 가능한 투찰률은 예정가격의 ${rateWindow.low}% ~ ${rateWindow.high}% 입니다.${lwlt ? ` 낙찰하한율 ${lwlt}%보다 낮게 쓰면 탈락합니다.` : ""}`);
   if (sheet.pass?.kind === "total" && !rateWindow && priceItem && !passed) tips.push("가격 만점을 받아도 통과 점수에 못 미칩니다. 실적·신용 항목을 먼저 보완해야 합니다.");
 
   return { sheet, items, total, max, pending, techScore, techMax, passed, passLabel, gap, rateWindow, tips, trust };

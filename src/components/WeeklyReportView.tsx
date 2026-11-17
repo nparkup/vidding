@@ -1,7 +1,7 @@
 import type { Bid, ClientProfile } from "@/lib/types";
 import { bidPriceGuide, keyPoints, rank, type MatchResult } from "@/lib/analysis";
 import { dateTime, dday, shortDate, won, wonFull } from "@/lib/format";
-import { ScoreMeter } from "./Badges";
+import { GradeBadge, ScoreMeter } from "./Badges";
 
 /** 입찰 가능성 점수 구성 (src/lib/analysis.ts evaluate 와 동일한 배점) */
 const WEIGHTS: [string, number, string][] = [
@@ -155,7 +155,22 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
         </Section>
 
         <Section no="02" title={`이번 주 꼭 볼 공고 TOP ${top.length}`} desc="입찰 가능성 점수순">
-          <div className="overflow-x-auto">
+          <ol className="divide-y divide-ink-100 sm:hidden">
+            {top.map((r, i) => (
+              <li key={r.bid.id} className="grid grid-cols-[20px_1fr] gap-x-2 py-3">
+                <span className="font-bold tabular-nums">{i + 1}</span>
+                <div className="min-w-0">
+                  <p className="font-semibold leading-snug">{r.bid.title}</p>
+                  <p className="mt-0.5 text-xs text-ink-500">{r.bid.demandAgency} · {r.bid.contractMethod}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <GradeBadge grade={r.grade} score={r.score} />
+                    <p className="text-sm tabular-nums"><b>{won(r.bid.baseAmount)}</b><span className="ml-2 text-xs text-ink-500">마감 {shortDate(r.bid.closeAt)} {dday(r.daysLeft)}</span></p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <div className="hidden overflow-x-auto sm:block">
             <table className="table-x min-w-[600px]">
               <thead><tr><th>#</th><th>공고명</th><th>규모</th><th>마감</th><th>입찰 가능성</th></tr></thead>
               <tbody>
@@ -213,7 +228,22 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
 
         {schedule.length > 0 && (
           <Section no="05" title="A등급 이상 공고 마감 일정" desc="마감일순">
-            <div className="overflow-x-auto">
+            <ul className="divide-y divide-ink-100 sm:hidden">
+              {schedule.map((r) => (
+                <li key={r.bid.id} className="py-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 font-semibold leading-snug">{r.bid.title}</p>
+                    <p className="shrink-0 font-bold">{r.grade} <span className="font-normal tabular-nums text-ink-400">{r.score}</span></p>
+                  </div>
+                  <dl className="mt-1.5 grid grid-cols-[64px_1fr] gap-y-0.5 text-xs tabular-nums text-ink-500">
+                    <dt>입찰 마감</dt><dd className="text-ink">{dateTime(r.bid.closeAt)} <span className="text-ink-300">{dday(r.daysLeft)}</span></dd>
+                    <dt>현장설명회</dt><dd>{r.bid.briefingAt ? dateTime(r.bid.briefingAt) : "없음"}</dd>
+                    <dt>개찰</dt><dd>{dateTime(r.bid.openAt)}</dd>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto sm:block">
               <table className="table-x min-w-[600px]">
                 <thead><tr><th>입찰 마감</th><th>공고명</th><th>현장설명회</th><th>개찰</th><th>등급</th></tr></thead>
                 <tbody>
@@ -246,12 +276,12 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
 
         <section className="border-t border-ink-100 pt-6 text-xs leading-relaxed text-ink-500">
           <h3 className="text-sm font-bold text-ink">분석 기준 및 유의사항</h3>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[480px] text-left">
-              <thead className="text-ink-300"><tr><th className="py-1.5 pr-4 font-semibold">평가 항목</th><th className="py-1.5 pr-4 font-semibold">배점</th><th className="py-1.5 font-semibold">판정 기준</th></tr></thead>
+          <div className="mt-3">
+            <table className="w-full text-left">
+              <thead className="text-ink-300"><tr><th className="whitespace-nowrap py-1.5 pr-3 font-semibold sm:pr-4">평가 항목</th><th className="whitespace-nowrap py-1.5 pr-3 font-semibold sm:pr-4">배점</th><th className="py-1.5 font-semibold">판정 기준</th></tr></thead>
               <tbody className="divide-y divide-ink-100">
                 {WEIGHTS.map(([k, w, d]) => (
-                  <tr key={k}><td className="py-1.5 pr-4 font-semibold text-ink-700">{k}</td><td className="py-1.5 pr-4 tabular-nums">{w}점</td><td className="py-1.5">{d}</td></tr>
+                  <tr key={k}><td className="whitespace-nowrap py-1.5 pr-3 align-top font-semibold text-ink-700 sm:pr-4">{k}</td><td className="whitespace-nowrap py-1.5 pr-3 align-top tabular-nums sm:pr-4">{w}점</td><td className="py-1.5">{d}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -292,7 +322,26 @@ function LeadAnalysis({ r }: { r: MatchResult }) {
           <ScoreMeter grade={r.grade} score={r.score} />
         </div>
 
-        <div className="mt-5 overflow-x-auto">
+        <ul className="mt-5 divide-y divide-ink-100 border-y border-ink-100 sm:hidden">
+          {r.factors.map((f) => {
+            const assumed = f.label === "경쟁 강도" && !b.stats;
+            return (
+              <li key={f.label} className="py-3">
+                <div className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 text-sm font-semibold">{f.label}</span>
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-100"><span className={`block h-full rounded-full ${f.ok ? "bg-mint" : "bg-amber"}`} style={{ width: `${(f.score / f.max) * 100}%` }} /></span>
+                  <span className="w-14 shrink-0 text-right text-sm tabular-nums"><b>{f.score}</b><span className="text-xs text-ink-300"> / {f.max}</span></span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-ink-500">{assumed ? "유사 공고 낙찰 통계 미연동, 평균 25개사 기준으로 산정" : f.note}</p>
+              </li>
+            );
+          })}
+          <li className="bg-ink-50/60 px-2 py-3">
+            <div className="flex items-center justify-between text-sm"><span className="font-bold">합계</span><span className="tabular-nums"><b>{r.score}</b><span className="text-xs text-ink-300"> / 100</span></span></div>
+            <p className="mt-1 text-xs leading-relaxed text-ink-500">{r.grade}등급 ({GRADE_RULE})</p>
+          </li>
+        </ul>
+        <div className="mt-5 hidden overflow-x-auto sm:block">
           <table className="table-x min-w-[560px]">
             <thead><tr><th>평가 항목</th><th className="w-[160px]">득점</th><th>판정 근거</th></tr></thead>
             <tbody>

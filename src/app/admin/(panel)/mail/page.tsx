@@ -23,7 +23,7 @@ export default async function MailPage() {
       </PageHead>
       {!smtpConfigured() && (
         <p className="mb-4 rounded-xl bg-amber-100 p-3 text-sm text-[#9A6412]">
-          SMTP가 설정되지 않아 실제 메일은 나가지 않고 기록만 남습니다. 환경변수 SMTP_HOST·SMTP_USER·SMTP_PASS·MAIL_FROM을 설정하세요.
+          SMTP가 설정되지 않아 실제 메일은 나가지 않고 기록만 남습니다. 환경변수 <span className="break-all">SMTP_HOST·SMTP_USER·SMTP_PASS·MAIL_FROM</span>을 설정하세요.
         </p>
       )}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -33,16 +33,16 @@ export default async function MailPage() {
         <Kpi label="전체 기록" value={log.length} />
       </div>
       <div className="card overflow-x-auto">
-        <table className="table-x min-w-[760px]">
-          <thead><tr><th>시각</th><th>종류</th><th>고객사</th><th>제목</th><th>추천</th><th>상태</th></tr></thead>
+        <table className="table-x md:min-w-[760px]">
+          <thead><tr><th>시각</th><th className="hidden md:table-cell">종류</th><th>고객사</th><th className="hidden md:table-cell">제목</th><th className="hidden md:table-cell">추천</th><th>상태</th></tr></thead>
           <tbody>
             {log.slice(0, 200).map((m) => (
               <tr key={m.id}>
                 <td className="whitespace-nowrap text-xs text-ink-500">{dateTime(m.createdAt)}</td>
-                <td className="text-xs">{KIND[m.kind]}</td>
-                <td><Link href={`/admin/clients/${m.clientId}`} className="font-semibold hover:text-mint-600">{name(m.clientId)}</Link><p className="text-xs text-ink-300">{m.to}</p></td>
-                <td className="max-w-[320px] truncate text-xs">{m.subject}</td>
-                <td className="tabular-nums">{m.itemCount}</td>
+                <td className="hidden text-xs md:table-cell">{KIND[m.kind]}</td>
+                <td><Link href={`/admin/clients/${m.clientId}`} className="font-semibold hover:text-mint-600">{name(m.clientId)}</Link><p className="break-all text-xs text-ink-300">{m.to}</p><p className="mt-1 text-xs text-ink-500 md:hidden">{KIND[m.kind]} · 추천 {m.itemCount}건</p></td>
+                <td className="hidden max-w-[320px] truncate text-xs md:table-cell">{m.subject}</td>
+                <td className="hidden tabular-nums md:table-cell">{m.itemCount}</td>
                 <td>
                   <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-bold ${TONE[m.status]}`}>{m.status}</span>
                   {m.error && <p className="mt-1 max-w-[200px] truncate text-xs text-coral" title={m.error}>{m.error}</p>}

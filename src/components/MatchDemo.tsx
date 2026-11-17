@@ -38,8 +38,8 @@ export function MatchDemo() {
 
   return (
     <div className="card overflow-hidden">
-      <div className="grid gap-0 lg:grid-cols-[1fr_1.15fr]">
-        <div className="space-y-5 border-b border-ink-100 p-5 sm:p-6 lg:border-b-0 lg:border-r">
+      <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div className="min-w-0 space-y-5 border-b border-ink-100 p-5 sm:p-6 lg:border-b-0 lg:border-r">
           <div>
             <p className="label">보유 면허</p>
             <div className="flex flex-wrap gap-1.5">
@@ -74,16 +74,16 @@ export function MatchDemo() {
             </div>
           </div>
         </div>
-        <div className="bg-paper/60 p-5 sm:p-6">
-          <div className="flex items-end justify-between">
-            <div>
+        <div className="min-w-0 bg-paper/60 p-5 sm:p-6">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0">
               <p className="text-sm text-ink-500">지금 참가 가능한 공고{bids.length === 0 && " (불러오는 중…)"}</p>
               <p className="text-4xl font-extrabold tabular-nums">
                 {eligible.length.toLocaleString()}
                 <span className="ml-1 text-lg font-bold text-ink-300">/ {results.length.toLocaleString()}건</span>
               </p>
             </div>
-            <p className="text-right text-xs text-ink-500">
+            <p className="text-xs text-ink-500 sm:text-right">
               면허·지역·규모가 안 맞는
               <br />
               <b className="text-coral">{(results.length - eligible.length).toLocaleString()}건</b>은 자동 제외
@@ -97,8 +97,8 @@ export function MatchDemo() {
           <ul className="mt-4 space-y-2">
             {eligible.slice(0, 3).map((r) => (
               <li key={r.bid.id} className="rounded-xl border border-ink-100 bg-white p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-semibold">{r.bid.title}</p>
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-sm font-semibold">{r.bid.title}</p>
                   <GradeBadge grade={r.grade} />
                 </div>
                 <p className="mt-1 text-xs text-ink-500">

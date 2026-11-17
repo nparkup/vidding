@@ -1,7 +1,9 @@
 import "server-only";
+import type { BidQual } from "./eligibility";
 import type { AppSettings, Bid, BidAttachment, ClientProfile, Inquiry, MailLog, WeeklyReport } from "./types";
 import { adapter } from "./db";
 import type { EvalSheet } from "./evalscore";
+import type { AwardStats } from "./rivalRate";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
 import { fetchAllBids, hasServiceKey } from "./nara/client";
@@ -38,7 +40,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, { sheet: EvalSheet; file: string }>; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, { sheet: EvalSheet; file: string }>; quals?: Record<string, BidQual>; awardStats?: AwardStats; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -79,6 +81,22 @@ export async function getExtractedSheets(): Promise<Record<string, { sheet: Eval
   if (!process.env.BIDS_FILE) return {};
   sheetMemo ??= fileBids()?.sheets ?? {};
   return sheetMemo;
+}
+
+let awardMemo: AwardStats | null | undefined;
+/** 빌드 때 만든 전년도 낙찰률 통계 (없으면 null) */
+export async function getAwardStats(): Promise<AwardStats | null> {
+  if (!process.env.BIDS_FILE) return null;
+  if (awardMemo === undefined) awardMemo = fileBids()?.awardStats ?? null;
+  return awardMemo;
+}
+
+let qualMemo: Record<string, BidQual> | null = null;
+/** 빌드 때 수집한 공고별 참가자격 자료 (업종 제한·참가지역) */
+export async function getQualifications(): Promise<Record<string, BidQual>> {
+  if (!process.env.BIDS_FILE) return {};
+  qualMemo ??= fileBids()?.quals ?? {};
+  return qualMemo;
 }
 
 let attachMemo: Record<string, BidAttachment[]> | null = null;

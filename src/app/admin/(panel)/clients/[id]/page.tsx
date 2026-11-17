@@ -2,7 +2,7 @@ import { Star } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHead, Status } from "@/components/AdminUI";
-import { ScoreMeter } from "@/components/Badges";
+import { GradeBadge, ScoreMeter } from "@/components/Badges";
 import { EmailPreview } from "@/components/EmailPreview";
 import { documentChecklist, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
@@ -31,8 +31,8 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
       </PageHead>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-6">
-          <section className="card grid gap-4 p-5 sm:grid-cols-4">
+        <div className="min-w-0 space-y-6">
+          <section className="card grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
             {[
               ["요금제", planName(c.plan)],
               ["상태", <Status key="s" value={c.status} />],
@@ -41,7 +41,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
             ].map(([k, v]) => (
               <div key={String(k)}><p className="text-xs text-ink-500">{k}</p><div className="mt-1 text-sm font-bold">{v}</div></div>
             ))}
-            <div className="sm:col-span-4 flex flex-wrap gap-1.5">
+            <div className="col-span-2 flex flex-wrap gap-1.5 sm:col-span-4">
               {c.licenses.map((l) => <span key={l} className="chip border-ink bg-ink text-white">{l}</span>)}
               {c.regions.map((r) => <span key={r} className="chip border-mint-100 bg-mint-50 text-mint-600">{r}</span>)}
             </div>
@@ -53,8 +53,8 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
               <p className="text-xs text-ink-300">별표 = 관심 공고 (서류 체크리스트 제공)</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="table-x min-w-[640px]">
-                <thead><tr><th></th><th>공고</th><th>규모</th><th>마감</th><th>가능성</th></tr></thead>
+              <table className="table-x sm:min-w-[640px]">
+                <thead><tr><th></th><th>공고</th><th className="hidden sm:table-cell">규모</th><th className="hidden sm:table-cell">마감</th><th className="hidden sm:table-cell">가능성</th></tr></thead>
                 <tbody>
                   {ok.map((r) => {
                     const on = c.watchlist.includes(r.bid.id);
@@ -68,10 +68,11 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                         <td>
                           <Link href={`/bids/${r.bid.id}?${qs}`} target="_blank" className="font-semibold hover:text-mint-600">{r.bid.title}</Link>
                           <p className="text-xs text-ink-300">{r.bid.demandAgency} · {r.bid.contractMethod}</p>
+                          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-500 sm:hidden"><GradeBadge grade={r.grade} score={r.score} />{won(r.bid.baseAmount)} · 마감 {dday(r.daysLeft)}</p>
                         </td>
-                        <td className="tabular-nums">{won(r.bid.baseAmount)}</td>
-                        <td className="text-xs">{dday(r.daysLeft)}</td>
-                        <td><ScoreMeter grade={r.grade} score={r.score} /></td>
+                        <td className="hidden sm:table-cell tabular-nums">{won(r.bid.baseAmount)}</td>
+                        <td className="hidden sm:table-cell text-xs">{dday(r.daysLeft)}</td>
+                        <td className="hidden sm:table-cell"><ScoreMeter grade={r.grade} score={r.score} /></td>
                       </tr>
                     );
                   })}
@@ -101,7 +102,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
           </section>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <p className="mb-3 text-sm font-semibold text-ink-500">내일 아침 발송될 메일 미리보기</p>
           <EmailPreview digest={digest} />
         </div>

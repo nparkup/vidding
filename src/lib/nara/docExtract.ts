@@ -2,11 +2,12 @@ import "server-only";
 import { inflateRawSync } from "zlib";
 import type { Bid, BidAttachment } from "../types";
 import { extractSheet, templateSheet, type EvalSheet } from "../evalscore";
+import { hwpText } from "./hwpText";
 
 /**
  * 배포(빌드) 때 공고 첨부파일을 내려받아 평가표를 미리 추출한다.
  * 브라우저는 나라장터 파일을 직접 열 수 없어(CORS), 공고를 고르면 여기서 만든 평가표를 바로 쓴다.
- * - 읽는 형식: PDF(pdf.js), HWPX(압축 XML). 구형 HWP는 대개 PDF 변환본이 함께 올라와 그쪽을 읽는다.
+ * - 읽는 형식: PDF(pdf.js), HWPX(압축 XML), 구형 HWP(hwpText.ts, 2026-11-16 실제 공고서 50건 시험: 모두 본문 읽힘, 같은 공고 PDF 대비 낱말 93%).
  * - 평가 구조가 있는 계약방법(적격심사·협상)만, 평가기준이 있을 법한 파일 순서로 공고당 최대 3개.
  * - 전체 시간·파일 수 한도를 두고, 넘으면 남은 공고는 표준 평가표로 둔다.
  */
@@ -17,12 +18,21 @@ export interface ExtractedSheet {
 }
 
 const LIKELY = /(평가|심사|제안요청|과업|공고문|입찰공고|규격)/;
-const READABLE = /\.(pdf|hwpx)$/i;
+const READABLE = /\.(pdf|hwpx|hwp)$/i;
 
 function rankFiles(files: BidAttachment[]): BidAttachment[] {
   const score = (f: BidAttachment) =>
     (/(평가|심사)/.test(f.name) ? 4 : 0) + (/제안요청/.test(f.name) ? 3 : 0) + (/과업|규격/.test(f.name) ? 2 : 0) + (LIKELY.test(f.name) ? 1 : 0);
-  return files.filter((f) => READABLE.test(f.name)).sort((a, b) => score(b) - score(a)).slice(0, 3);
+  // 같은 문서가 HWP와 PDF로 함께 오면 PDF를 먼저 읽고, 평가표를 확실히 못 찾았을 때 HWP도 읽어 신뢰도가 높은 쪽을 쓴다
+  // (HWP는 표의 한 행이 한 줄로 나와 PDF보다 배점표가 깔끔하게 잡히는 경우가 있다)
+  const stem = (n: string) => n.replace(/\.[^.]+$/, "").replace(/\s+/g, "");
+  const readable = files.filter((f) => READABLE.test(f.name));
+  const converted = new Set(readable.filter((f) => !/\.hwp$/i.test(f.name)).map((f) => stem(f.name)));
+  // 변환본이 있는 HWP는 다른 문서보다 뒤에 둔다 (공고당 3개 한도 안에서 다른 문서를 먼저 읽도록)
+  const twin = (f: BidAttachment) => /\.hwp$/i.test(f.name) && converted.has(stem(f.name));
+  return readable
+    .sort((a, b) => Number(twin(a)) - Number(twin(b)) || score(b) - score(a))
+    .slice(0, 3);
 }
 
 async function download(url: string, timeoutMs: number): Promise<Buffer | null> {
@@ -97,7 +107,9 @@ export function hwpxText(buf: Buffer): string {
 const decode = (t: string) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 
 async function textOf(f: BidAttachment, buf: Buffer): Promise<string> {
-  return /\.pdf$/i.test(f.name) ? pdfText(buf) : hwpxText(buf);
+  if (/\.pdf$/i.test(f.name)) return pdfText(buf);
+  if (/\.hwp$/i.test(f.name)) return hwpText(buf).text;
+  return hwpxText(buf);
 }
 
 export async function extractSheetsForBids(

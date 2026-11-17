@@ -1,0 +1,72 @@
+name: 낙찰 저장소 수집
+
+# 나라장터 낙찰 5년치를 Cloudflare R2 버킷 bidmate-awards 에 모으고, 매일 추가분을 받는다 (scripts/awards/collect.ts).
+# 처음 5년치는 한 번만 수동 실행(workflow_dispatch, max_minutes 200)으로 채운다. 예약 실행은 매일 05:10 KST 한 번이고,
+# 최근 2주만 다시 받아 몇 분이면 끝난다. 처음 채우기가 시간 한도로 덜 끝났으면 예약 실행이 남은 주를 이어 받는다.
+# 필요한 저장소 Secrets: DATA_GO_KR_SERVICE_KEY, CLOUDFLARE_API_TOKEN (Workers R2 Storage Write 권한), CLOUDFLARE_ACCOUNT_ID
+# 용량 한도: R2 사용량이 승인 용량(저장소 변수 R2_APPROVED_BYTES, 기본 5GB)의 90%에 닿거나 예상 최종 용량이 넘으면 올리지 않고 실패로 끝난다.
+on:
+  schedule:
+    - cron: "10 20 * * *"   # 매일 05:10 KST (추가분. 사이트 배포 06:40 전에 끝난다)
+  # PR에서는 수집하지 않고 토큰의 R2 읽기·쓰기 권한만 확인한다
+  pull_request:
+    paths:
+      - "scripts/awards/**"
+      - "src/lib/awards/**"
+      - ".github/workflows/awards.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "collect = 수집, raw = 원자료만 받기(샤드·통계는 그대로), check = R2 권한만 확인"
+        default: collect
+        type: choice
+        options: [collect, raw, check]
+      max_minutes:
+        description: "이번 실행에서 받는 시간 (분, 최대 300)"
+        default: "100"
+
+permissions:
+  contents: read
+
+# PR 점검(R2 권한 확인)은 따로 돌린다: 같은 그룹이면 대기 중인 수집 실행을 밀어내 취소시킨다
+concurrency:
+  group: awards-${{ github.event_name == 'pull_request' && github.ref || 'collect' }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_APPROVED_BYTES: ${{ vars.R2_APPROVED_BYTES || '5000000000' }}
+      MAX_MINUTES: ${{ inputs.max_minutes || '100' }}
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: R2 권한 확인
+        run: npx tsx scripts/awards/collect.ts check
+      # 받은 원자료를 실행 사이에 보관해 R2에서 다시 내려받지 않는다 (없어도 R2에서 받아 온다)
+      - name: 원자료 캐시 복원
+        if: github.event_name != 'pull_request' && inputs.mode != 'check'
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/awards
+          key: awards-raw-${{ github.run_id }}
+          restore-keys: awards-raw-
+      - name: 수집
+        if: github.event_name != 'pull_request' && inputs.mode != 'check'
+        run: npx tsx scripts/awards/collect.ts ${{ inputs.mode == 'raw' && 'raw' || '' }}
+      - name: 원자료 캐시 저장
+        if: always() && github.event_name != 'pull_request' && inputs.mode != 'check'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/awards
+          key: awards-raw-${{ github.run_id }}

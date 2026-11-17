@@ -177,7 +177,7 @@ export function documentChecklist(bid: Bid): { group: string; items: { name: str
       { name: "기술인력 보유현황 및 재직증명", required: false },
       ...(isFacility(bid) ? [{ name: "노무비 지급 확약서·근로조건 이행계획서", note: "청소·경비 용역 필수 (용역근로자 보호지침)", required: true }] : []),
       ...(bizOf(bid) === "공사" ? [{ name: "건설업 등록증·건설공제조합 출자증권", note: "시공능력평가액 확인", required: true }] : []),
-      { name: "고용개선·신인도 가점 증빙", note: "여성/장애인기업, 고용우수기업 등", required: false },
+      { name: "고용개선·신뢰도 가점(신인도) 증빙", note: "여성/장애인기업, 고용우수기업 등", required: false },
     ],
     "협상에 의한 계약": [
       { name: "제안서 (정성평가용)", note: "업무수행계획·인력운영·품질관리·안전관리", required: true },

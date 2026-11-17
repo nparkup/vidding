@@ -1,5 +1,5 @@
 /**
- * 나라장터 낙찰 5년치 저장소(Cloudflare R2 버킷 bidmate-awards)의 파일 형식.
+ * 나라장터 낙찰 10년치 저장소(Cloudflare R2 버킷 bidmate-awards)의 파일 형식.
  * 수집(scripts/awards/collect.ts), 중계 서버(worker/corp-lookup), 화면이 같이 쓴다. Node 전용 모듈은 쓰지 않는다.
  *
  * R2 안의 파일
@@ -12,9 +12,9 @@
  * - manifest.json                        : 수집 상태 (어떤 주를 언제 받았는지, 파일별 크기)
  */
 
-/** 저장 기간(년). 2026-11-15 사용자 요청으로 3년 → 5년 */
-export const AWARD_YEARS = 5;
-/** 나라장터 유사 실적 자동 조회 기간(년). 저장 기간과 같은 최근 5년 (2026-11-15 사용자 요청). 평가표 기간이 더 짧으면 그 기간만 */
+/** 저장 기간(년). 2026-11-15 사용자 요청으로 3년 → 5년, 2026-11-17 5년 → 10년 */
+export const AWARD_YEARS = 10;
+/** 나라장터 유사 실적 자동 조회 기간(년). 최근 5년 (2026-11-15 사용자 요청. 저장은 10년). 평가표 기간이 더 짧으면 그 기간만 */
 export const PERF_DEFAULT_YEARS = 5;
 /** 공고는 낙찰보다 먼저 나오므로 낙찰 기간보다 이만큼 앞선 주부터 받는다 */
 export const NOTICE_LEAD_WEEKS = 13;

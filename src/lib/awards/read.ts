@@ -1,6 +1,6 @@
 /**
  * 낙찰 저장소(R2)에서 한 업체의 낙찰 건을 읽는다. Cloudflare Worker(worker/corp-lookup)가 R2 바인딩으로 부른다.
- * 조달청 API를 부르지 않으므로 호출 한도와 상관없이 저장 기간(5년) 전체를 한 번에 돌려준다.
+ * 조달청 API를 부르지 않으므로 호출 한도와 상관없이 저장 기간(10년) 전체를 한 번에 돌려준다.
  */
 import { SHARD_COLS, firstLicense, shardOf, type AwardMeta, type ShardFile } from "./format";
 import type { NtceClass, PerfBiz, PerfWin } from "../perfLookup";

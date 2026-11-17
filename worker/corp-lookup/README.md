@@ -28,7 +28,7 @@ Worker는 그 기간을 7일 단위로 다시 쪼개 조달청 낙찰정보서�
 
 ## 낙찰 저장소 (R2)
 
-유사 실적과 낙찰률 통계는 Cloudflare R2 버킷 `bidmate-awards` 에 모은 나라장터 낙찰 5년치를 먼저 쓴다. 조회 때 조달청 API를 부르지 않는다.
+유사 실적과 낙찰률 통계는 Cloudflare R2 버킷 `bidmate-awards` 에 모은 나라장터 낙찰 10년치(유사 실적은 최근 5년)를 먼저 쓴다. 조회 때 조달청 API를 부르지 않는다.
 
 - 수집: `.github/workflows/awards.yml` → `scripts/awards/collect.ts`. 한 주씩 낙찰·공고·참가가능지역·업종제한을 받아 `raw/` 에 두고,
   공고번호로 합쳐 사업자번호 6~9번째 자리별 `shards/0000~9999.json.gz` 와 `stats/` 를 만든다. 처음 채우는 기간은 실행마다 100분씩 며칠에 나눠 채운다.

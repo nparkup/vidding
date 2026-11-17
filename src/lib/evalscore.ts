@@ -10,6 +10,7 @@
  * 실제 점수는 공고마다 세부기준이 달라, 공고문에서 추출한 배점이 있으면 그 배점을 우선한다.
  */
 import type { Bid, BizType, ContractMethod } from "./types";
+import { estimatedRule, generalServiceRule, parseTrustRule, scoreTrust, type TrustRule, type TrustScore } from "./trustscore";
 
 /* ---------- 신용평가등급 ---------- */
 
@@ -81,6 +82,8 @@ export interface EvalSheet {
   notes: string[];
   /** 정성평가 등급표 */
   scale?: ScaleLevel[];
+  /** 신뢰도 가감점(신인도) 기준표: 항목별 점수와 상·하한 */
+  trust?: TrustRule;
   /** 평가위원 점수 처리 방식 (예: 최고·최저 점수를 뺀 산술평균) */
   panelRule?: string;
   /** 공고 전체에 걸친 서류 인정 기준 (기준일, 발급 기관, 공동수급 지분 등) */
@@ -108,7 +111,7 @@ const GROUP_OF: Record<ItemKind, string> = {
   price: "입찰가격",
   years: "수행능력",
   staff: "기술능력",
-  bonus: "신인도",
+  bonus: "신뢰도 가감점",
   qualitative: "기술(정성)",
   other: "기타",
 };
@@ -136,12 +139,13 @@ export function templateSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "bas
       source: "template",
       confidence: "보통",
       pass: { kind: "techRatio", ratio: 0.85 },
+      trust: estimatedRule("협상계약 가점 (평가표 배점 기준, 항목 점수는 일반용역 기준 준용)", 2, 2),
       notes: [...notes, "기술능력 평가점수가 배점의 85% 이상인 업체가 협상적격자가 됩니다."],
       items: [
         item("유사 사업 수행실적", 8, "performance", "최근 3년 유사 사업 실적 금액·건수", "정량평가"),
         item("경영상태 (신용평가등급)", 6, "credit", "회사채·기업어음·기업신용평가등급", "정량평가"),
         item("참여 인력 보유", 4, "staff", "투입 인력 자격·경력", "정량평가"),
-        item("신인도 가점", 2, "bonus", "여성·장애인·사회적기업, 고용우수 등", "정량평가"),
+        item("신뢰도 가점(신인도)", 2, "bonus", "여성·장애인·사회적기업, 고용우수 등", "정량평가"),
         item("사업 이해도·추진 전략", 15, "qualitative", undefined, "정성평가"),
         item("수행 방법론·세부 계획", 25, "qualitative", undefined, "정성평가"),
         item("관리 방안 (품질·일정·보안·안전)", 12, "qualitative", undefined, "정성평가"),
@@ -159,12 +163,13 @@ export function templateSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "bas
         source: "template",
         confidence: "보통",
         pass: { kind: "total", score: 92 },
+        trust: estimatedRule("공사 적격심사 (상·하한 ±2점 추정, 항목 점수는 일반용역 기준 준용)", 2, 2),
         notes: [...notes, "추정가격 100억 원 미만 공사는 종합평점 92점 이상이면 낙찰자로 결정됩니다."],
         items: [
           item("시공경험 (최근 10년 동일·유사 공사)", 15, "performance", "공사 규모 대비 실적 누계"),
           item("기술능력 (기술자 보유)", 0, "staff", "규모에 따라 시공경험에 포함되거나 별도 배점"),
           item("경영상태 (신용평가등급)", 15, "credit", "등급별 평점, 미달 시 재무비율 평가"),
-          item("신인도 가·감점", 0, "bonus", "±2점 내외, 부실벌점 감점"),
+          item("신뢰도 가감점(신인도)", 0, "bonus", "±2점 내외, 부실벌점 감점"),
           item("입찰가격", 70, "price", "70 − 2 × |88/100 − 입찰가격/예정가격| × 100"),
         ].filter((i) => i.max > 0 || i.kind === "bonus"),
       };
@@ -176,18 +181,19 @@ export function templateSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "bas
       source: "template",
       confidence: "보통",
       pass: { kind: "total", score: 85 },
+      trust: biz === "물품" ? estimatedRule("물품 적격심사 (상·하한 +2 ~ △3 추정, 항목 점수는 일반용역 기준 준용)", 2, 3) : generalServiceRule(),
       notes: [...notes, "종합평점 85점 이상인 업체 가운데 최저가 순으로 낙찰자를 정합니다."],
       items: big
         ? [
             item(`${biz === "물품" ? "납품" : "용역 수행"}실적`, 15, "performance", "최근 3년 유사 실적 ÷ 추정가격"),
             item("경영상태 (신용평가등급)", 15, "credit", "신용평가등급별 평점"),
-            item("신인도 가·감점", 0, "bonus", "+2 ~ −3점, 고용·인증·제재 이력"),
+            item("신뢰도 가감점(신인도)", 0, "bonus", biz === "물품" ? "+2 ~ −3점, 고용·인증·제재 이력" : "+4.25 ~ −5.0점, 고용·인증·제재 이력 (일반용역 기준)"),
             item("입찰가격", 70, "price", "70 − 4 × |88/100 − 입찰가격/예정가격| × 100"),
           ]
         : [
             item(`${biz === "물품" ? "납품" : "용역 수행"}실적`, 10, "performance", "최근 3년 유사 실적 ÷ 추정가격"),
             item("경영상태 (신용평가등급)", 10, "credit", "신용평가등급별 평점"),
-            item("신인도 가·감점", 0, "bonus", "+2 ~ −3점"),
+            item("신뢰도 가감점(신인도)", 0, "bonus", biz === "물품" ? "+2 ~ −3점" : "+4.25 ~ −5.0점 (일반용역 기준)"),
             item("입찰가격", 80, "price", "80 − 4 × |88/100 − 입찰가격/예정가격| × 100"),
           ],
     };
@@ -474,6 +480,7 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     scale: parseScale(text),
     panelRule: parsePanelRule(text),
     recognition: recognitionAll.length ? recognitionAll : undefined,
+    trust: parseTrustRule(text, fallback?.trust ?? generalServiceRule()),
   };
 }
 
@@ -494,10 +501,8 @@ export interface CompanyInput {
   pastPerformance: number;
   /** 실적 중 나라장터 낙찰 이력에서 자동으로 찾은 금액이 있으면 그 설명 (예: "나라장터 낙찰 4건 추정") */
   perfSource?: string;
-  /** 신인도 가점 항목 수 (여성·장애인·사회적기업, 고용우수, 인증 등) */
-  bonusCount: number;
-  /** 최근 2년 제재·벌점 건수 */
-  penaltyCount: number;
+  /** 신뢰도 가감점(신인도) 해당 항목 id (trustscore.ts TRUST_ITEMS) */
+  trustItems: string[];
   /** 제안서·정성평가 준비 수준 */
   proposal: Level;
   /** 투찰률: 입찰가격 ÷ 예정가격 (%) */
@@ -512,8 +517,7 @@ export const DEFAULT_COMPANY: CompanyInput = {
   techStaff: 4,
   creditGrade: "BBB0",
   pastPerformance: 0,
-  bonusCount: 0,
-  penaltyCount: 0,
+  trustItems: [],
   proposal: "중",
   bidRate: 88,
   rivalRate: 86,
@@ -541,6 +545,8 @@ export interface Prediction {
   passed?: boolean;
   passLabel?: string;
   gap?: number;
+  /** 신뢰도 가감점 계산 내역 */
+  trust?: TrustScore & { rule: TrustRule };
   /** 적격심사: 통과에 필요한 투찰률 범위 */
   rateWindow?: { low: number; high: number };
   tips: string[];
@@ -649,12 +655,9 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
         ratio = staffRatio(c.techStaff, amt);
         reason = `기술인력 ${c.techStaff}명`;
         break;
-      case "bonus": {
-        const plus = Math.min(2, c.bonusCount * 0.5);
-        const minus = Math.min(3, c.penaltyCount * 1);
-        const pts = it.max > 0 ? clamp((plus - minus) / it.max, -1, 1) * it.max : plus - minus;
-        return { ...it, score: round1(pts), ratio: it.max > 0 ? clamp(pts / it.max) : 0, reason: `가점 ${c.bonusCount}건${c.penaltyCount ? `, 감점 ${c.penaltyCount}건` : ""}`, lost: it.max > 0 ? round1(Math.max(0, it.max - pts)) : 0 };
-      }
+      case "bonus":
+        // 다른 항목 점수를 본 뒤 아래에서 채운다 (가점은 수행능력에서 잃은 점수 안에서만 더해진다)
+        return { ...it, score: 0, ratio: 0, reason: "", lost: 0 };
       case "price": {
         if (sheet.method === "협상에 의한 계약" || sheet.method === "종합심사") {
           ratio = clamp(Math.min(c.bidRate, c.rivalRate) / c.bidRate);
@@ -677,6 +680,32 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
     const score = round1(it.max * ratio);
     return { ...it, score, ratio, reason, lost: round1(it.max - score) };
   });
+
+  // 신뢰도 가감점: 평가표에 항목이 여럿이면(가점·감점 따로) 첫 항목에 합산한다
+  let trust: Prediction["trust"];
+  const bonusItems = items.filter((i) => i.kind === "bonus");
+  if (bonusItems.length) {
+    const first = bonusItems[0];
+    const base = sheet.trust ?? (sheet.method === "적격심사" && first.max <= 0 ? generalServiceRule() : estimatedRule("평가표 배점 기준", first.max > 0 ? first.max : 2, first.max > 0 ? first.max : 3));
+    const rule: TrustRule = first.max > 0 && !base.capFromNotice ? { ...base, plusCap: first.max, minusCap: Math.max(first.max, base.minusCap) } : base;
+    const room = sheet.method === "적격심사"
+      ? items.filter((i) => !i.unknown && ["performance", "credit", "years", "staff"].includes(i.kind)).reduce((s, i) => s + i.lost, 0)
+      : undefined;
+    const ts = scoreTrust(c.trustItems ?? [], rule, room);
+    trust = { ...ts, rule };
+    const parts = [
+      ts.applied.length ? null : "해당 항목 없음",
+      ts.plus ? `가점 +${ts.plus}` : null,
+      ts.minus ? `감점 △${ts.minus}` : null,
+    ].filter(Boolean).join(", ");
+    first.score = round1(ts.total);
+    first.ratio = first.max > 0 ? clamp(ts.total / first.max) : 0;
+    first.lost = first.max > 0 ? round1(Math.max(0, first.max - ts.total)) : 0;
+    first.reason = `${parts || "0점"} (${rule.name}${rule.fromNotice ? ", 공고서 기준 반영" : ""})`;
+    for (const o of bonusItems.slice(1)) {
+      o.reason = `${first.label}에 합산해 계산`;
+    }
+  }
 
   const total = round1(items.reduce((s, i) => s + i.score, 0));
   const max = round1(items.reduce((s, i) => s + i.max, 0));
@@ -734,7 +763,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   if (sheet.pass?.kind === "total" && rateWindow) tips.push(`통과 가능한 투찰률은 예정가격의 ${rateWindow.low}% ~ ${rateWindow.high}% 입니다.${bid.lowerLimitRate ? ` 낙찰하한율 ${bid.lowerLimitRate}%보다 낮게 쓰면 탈락합니다.` : ""}`);
   if (sheet.pass?.kind === "total" && !rateWindow && priceItem && !passed) tips.push("가격 만점을 받아도 통과 점수에 못 미칩니다. 실적·신용 항목을 먼저 보완해야 합니다.");
 
-  return { sheet, items, total, max, pending, techScore, techMax, passed, passLabel, gap, rateWindow, tips };
+  return { sheet, items, total, max, pending, techScore, techMax, passed, passLabel, gap, rateWindow, tips, trust };
 }
 
 /** 개업일(YYYY-MM-DD…)로 업력(년) 계산 */

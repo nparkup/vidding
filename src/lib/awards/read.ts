@@ -22,6 +22,12 @@ export interface AwardWin extends PerfWin {
   base: number;
   /** 예정가격(원), 없으면 0 */
   plnprc: number;
+  /** 낙찰하한율(%), 없으면 0 */
+  lwlt: number;
+  /** 예비가격 범위 (예: "-2~+2") */
+  rng: string;
+  /** 적격심사 기준 (행자부·조달청 등) */
+  basis: string;
 }
 
 export interface AwardLookup {
@@ -66,9 +72,12 @@ export async function readAwards(bucket: R2BucketLike | undefined, bizno: string
       method: r[c.method] as string,
       region: r[c.region] as string,
       lic: r[c.lic] as string,
-      // 2026-11-17 이전에 만든 샤드에는 두 열이 없다
+      // 2026-11-17 이전에 만든 샤드에는 이 열들이 없다
       base: c.base === undefined ? 0 : (r[c.base] as number) || 0,
       plnprc: c.plnprc === undefined ? 0 : (r[c.plnprc] as number) || 0,
+      lwlt: c.lwlt === undefined ? 0 : (r[c.lwlt] as number) || 0,
+      rng: c.rng === undefined ? "" : (r[c.rng] as string) || "",
+      basis: c.basis === undefined ? "" : (r[c.basis] as string) || "",
       cls: {
         bidNtceNo: r[c.no] as string,
         clsfcNo: (r[c.clsNo] as string) || undefined,

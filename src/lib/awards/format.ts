@@ -28,6 +28,7 @@ export const BIZ_OF_OP: Record<string, AwardBiz> = { Servc: "용역", Cnstwk: "�
 export const SHARD_COLS = [
   "bizno", "winner", "no", "ord", "biz", "title", "agency", "amount", "rate", "date", "bidders",
   "method", "price", "clsNo", "clsNm", "mid", "lrg", "work", "region", "lic", "base", "plnprc",
+  "lwlt", "rng", "basis",
 ] as const;
 export type ShardRow = [
   bizno: string, winner: string, no: string, ord: string, biz: AwardBiz, title: string, agency: string,
@@ -36,6 +37,8 @@ export type ShardRow = [
   clsNo: string, clsNm: string, mid: string, lrg: string, /** 공사 주공종 */ work: string,
   /** 참가가능지역 (여러 곳이면 쉼표) */ region: string, /** 업종제한 (여러 곳이면 쉼표) */ lic: string,
   /** 기초금액(원), 없으면 0 */ base: number, /** 예정가격(원), 없으면 0 */ plnprc: number,
+  /** 낙찰하한율(%), 없으면 0 */ lwlt: number, /** 예비가격 범위 (예: "-2~+2"), 없으면 "" */ rng: string,
+  /** 적격심사 기준 (행자부·조달청 등), 없으면 "" */ basis: string,
 ];
 
 export interface ShardFile { v: 1; cols: readonly string[]; rows: ShardRow[] }

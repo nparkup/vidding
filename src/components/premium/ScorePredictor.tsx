@@ -19,6 +19,7 @@ import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
 import { TrustPicker } from "./TrustPicker";
+import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 /** 정적 사이트는 Cloudflare 중계 서버(worker/corp-lookup)로, 서버 배포는 자체 API로 조회한다. 정적 사이트에 중계 주소가 없으면 조회를 끈다 */
@@ -110,6 +111,8 @@ export function ScorePredictor() {
   const [autoPerf, setAutoPerf] = useState<PerfSummary>({ amount: 0, count: 0 });
   const [manualPerf, setManualPerf] = useState(0);
   const [auto, setAuto] = useState<Partial<Record<FactKey, AutoFact>>>({});
+  /** 신뢰도 가감점 항목 중 API로 확인한 것 */
+  const [trustAuto, setTrustAuto] = useState<Record<string, TrustAuto>>({});
   const onPerf = useCallback((s: PerfSummary) => setAutoPerf((p) => (p.amount === s.amount && p.count === s.count ? p : s)), []);
 
   const bid: Bid | undefined = useMemo(() => {
@@ -220,6 +223,7 @@ export function ScorePredictor() {
     if (!validBizno(no)) { setCorpMsg("올바른 사업자등록번호가 아닙니다. 숫자를 다시 확인해 주세요."); return; }
     setCorpLoading(true);
     setCorp(null);
+    setTrustAuto({});
     setPerfBizno("");
     setAutoPerf({ amount: 0, count: 0 });
     setCorpMsg("국세청·나라장터·금융위원회 정보를 조회하는 중…");
@@ -239,15 +243,18 @@ export function ScorePredictor() {
       if (c.employees !== undefined) facts.employees = { value: c.employees, from: c.nara?.employees !== undefined ? "나라장터 조달업체 정보" : "금융위원회 기업기본정보" };
       if (equityRatio !== undefined && fin) facts.equityRatio = { value: equityRatio, from: `금융위원회 ${fin.year} ${fin.basis} 재무제표` };
       setAuto(facts);
+      const ta = trustFromCorp(c);
+      setTrustAuto(ta);
       setCo((prev) => ({
         ...prev,
+        trustItems: applyTrustAuto(prev.trustItems ?? [], ta),
         corpName: c.corpName ?? prev.corpName,
         bizno: c.bizno,
         years: facts.years ? Number(facts.years.value) : prev.years,
         employees: facts.employees ? Number(facts.employees.value) : prev.employees,
         equityRatio: facts.equityRatio ? Number(facts.equityRatio.value) : prev.equityRatio,
       }));
-      const filled = [facts.years && "업력", facts.employees && "종업원 수", facts.equityRatio && "자기자본비율"].filter(Boolean);
+      const filled = [facts.years && "업력", facts.employees && "종업원 수", facts.equityRatio && "자기자본비율", Object.keys(ta).length && "신뢰도 가감점 일부 항목"].filter(Boolean);
       setCorpMsg(c.corpName || c.nts?.registered
         ? filled.length ? `${filled.join("·")}를 공공데이터 조회 결과로 1차로 채웠습니다. 증빙 서류와 다르면 고쳐 주세요.` : "조회 결과에 업력·종업원 수가 없어 직접 입력해 주세요."
         : "조회된 기업 정보가 없습니다. 번호를 확인하거나 직접 입력해 주세요.");
@@ -438,7 +445,7 @@ export function ScorePredictor() {
                 ))}
               </div>
             </div>
-            <TrustPicker rule={result?.trust?.rule ?? active?.trust} selected={co.trustItems ?? []} onChange={(ids) => set("trustItems", ids)} score={result?.trust} />
+            <TrustPicker rule={result?.trust?.rule ?? active?.trust} selected={co.trustItems ?? []} onChange={(ids) => set("trustItems", ids)} score={result?.trust} auto={trustAuto} checked={!!corp} />
             <Range
               label="투찰률 (예정가격 대비)"
               value={co.bidRate}
@@ -587,7 +594,7 @@ const fmtWon = (n?: number): string => {
   return won(n);
 };
 /** 영문 네트워크 오류는 그대로 보이지 않는다 */
-const friendly = (e: string) => (/[가-힣]/.test(e) ? e : "잠시 후 다시 시도해 주세요");
+const friendly = (e: string) => (/등록되지 않은 서비스키/.test(e) ? "이 자료의 공공데이터포털 활용신청이 아직 승인되지 않았습니다." : /[가-힣]/.test(e) ? e : "잠시 후 다시 시도해 주세요");
 
 /** 사업자번호 조회 결과: 출처별로 나눠 보여 준다 */
 const VERDICT_TONE: Record<Verdict, string> = {
@@ -777,9 +784,36 @@ function CorpPanel({ corp }: { corp: CorpLookup }) {
             )}
           </Row>
         )}
+        <Row title="부정당제재" source="나라장터" error={errors.sanction} empty="부정당제재 이력이 없습니다.">
+          {corp.sanctions && corp.sanctions.length > 0 && (
+            <ul className="space-y-1">
+              {corp.sanctions.slice(0, 5).map((x, i) => (
+                <li key={i}>
+                  <span className={`font-semibold ${x.active ? "text-coral" : "text-ink-500"}`}>{x.active ? "제재 중" : x.state || "종료"}</span>
+                  {` · ${x.agency} · ${x.begin ?? ""}~${x.end ?? ""}`}
+                  {x.reason && <span className="block text-xs text-ink-500">{x.reason}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Row>
+        <Row title="장애인·여성기업" source="공공구매종합정보망" error={errors.disabledCert ?? errors.womenCert}>
+          {(corp.certs?.disabled !== undefined || corp.certs?.women !== undefined) && (
+            <>
+              {corp.certs?.disabled !== undefined && <p>장애인기업확인서 {certText(corp.certs.disabled)}</p>}
+              {corp.certs?.women !== undefined && <p>여성기업확인서 {certText(corp.certs.women)}</p>}
+              {corp.certs?.women === undefined && !errors.womenCert && <p className="text-xs text-ink-500">여성기업확인서는 아직 자동 조회를 연결하지 않아 증빙으로 확인합니다.</p>}
+            </>
+          )}
+        </Row>
       </dl>
     </div>
   );
+}
+
+function certText(c: { valid: boolean; validTo?: string } | null) {
+  if (!c) return "없음";
+  return c.valid ? `유효${c.validTo ? ` (~${c.validTo})` : ""}` : `유효기간 지남${c.validTo ? ` (${c.validTo})` : ""}`;
 }
 
 function Row({ title, source, error, empty, children }: { title: string; source: string; error?: string; empty?: string; children?: React.ReactNode }) {

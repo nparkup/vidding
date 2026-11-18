@@ -4,7 +4,7 @@
  * 공고 쪽: 조달청 입찰공고정보서비스의 면허제한·참가가능지역 (빌드 때 수집, src/lib/nara/qualification.ts)
  *  - 면허제한은 그룹으로 온다. 나라장터 공고 상세의 "[토목공사업] 업종 또는 [지반조성·포장공사업과 철근·콘크리트공사업] 업종"처럼
  *    같은 그룹 안은 모두 보유해야 하고, 그룹끼리는 '또는'이다. 각 업종에는 대신 인정되는 허용업종이 붙는다.
- * 기업 쪽: 나라장터 사용자정보서비스의 등록 업종(코드)·소재지, 국세청 사업자 상태 (src/lib/corpLookup.ts)
+ * 기업 쪽: 나라장터 사용자정보서비스의 등록 업종(코드)·소재지·부정당제재, 국세청 사업자 상태 (src/lib/corpLookup.ts)
  *
  * 원칙: 자동 판단이 틀리면 안 되므로 자료로 확실한 것만 '가능'·'불가'로 판정하고, 나머지는 '확인 필요'로 둔다.
  * 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 여기서 판단하지 않는다.
@@ -116,6 +116,17 @@ export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizTy
     else checks.push({ label: "사업자 상태", verdict: "확인 필요", detail: `국세청 상태가 '${nts.state || "확인 불가"}'입니다. 휴업 중에는 입찰에 참가할 수 없으니 재개 여부를 확인하세요.` });
   } else {
     checks.push({ label: "사업자 상태", verdict: "확인 필요", detail: "국세청 사업자 상태를 조회하지 못했습니다." });
+  }
+
+  // 1-2. 부정당제재 (나라장터 사용자정보서비스): 제재 기간에는 입찰에 참가할 수 없다
+  if (corp.sanctions) {
+    const act = corp.sanctions.filter((x) => x.active);
+    const past = corp.sanctions.filter((x) => !x.active);
+    const line = (x: NonNullable<CorpLookup["sanctions"]>[number]) => `${x.agency} ${x.begin ?? ""}~${x.end ?? ""}${x.reason ? ` (${x.reason})` : ""}`;
+    if (act.length) checks.push({ label: "부정당제재", verdict: "불가", detail: `입찰참가자격 제한 기간입니다: ${act.map(line).join("; ")}. 제재 기간에는 입찰에 참가할 수 없습니다.` });
+    else checks.push({ label: "부정당제재", verdict: "가능", detail: past.length ? `현재 제재 중이 아닙니다. 지난 제재 ${past.length}건: ${past.slice(0, 3).map(line).join("; ")}.` : "나라장터 부정당제재 이력이 없습니다." });
+  } else if (errors.sanction) {
+    checks.push({ label: "부정당제재", verdict: "확인 필요", detail: "나라장터 부정당제재 정보를 조회하지 못했습니다. 입찰참가자격 제한 중인지 나라장터에서 확인하세요." });
   }
 
   // 2. 나라장터 조달업체 등록과 참여 분야

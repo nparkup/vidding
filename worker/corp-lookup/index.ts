@@ -96,7 +96,8 @@ export default {
     try {
       const data = await lookupCompany(no, env.DATA_GO_KR_SERVICE_KEY);
       // 출처 중 하나라도 실패했으면 캐시하지 않는다 (일시 장애가 12시간 남지 않게)
-      if (!Object.keys(data.errors).length) {
+      // 활용신청 전인 자료(등록되지 않은 서비스키)는 다시 불러도 같으니 캐시를 막지 않는다
+      if (!Object.values(data.errors).some((m) => !/등록되지 않은 서비스키/.test(m))) {
         ctx.waitUntil(cache.put(cacheKey, new Response(JSON.stringify(data), { headers: { "Cache-Control": `max-age=${CACHE_SECONDS}` } })));
       }
       return json(data);

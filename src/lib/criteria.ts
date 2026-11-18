@@ -24,6 +24,7 @@
 import type { Bid, BizType } from "./types";
 import type { CreditGrade, EvalItem, EvalSheet, ItemKind, PriceRule, ScoreBand } from "./evalscore";
 import { estimatedRule, generalServiceRule, techServiceRule, type TrustRule } from "./trustscore";
+import type { NoticeCriteria } from "./noticeCriteria";
 
 /** 공고 목록에서 평가 기준을 고르는 데 쓰는 값 (빌드 때 참가자격 자료와 함께 공고별 파일에 넣는다) */
 export interface EvalBasis {
@@ -375,11 +376,11 @@ export const usableLwlt = (v?: number) => (v !== undefined && v >= 70 && v <= 95
  * 공고 낙찰하한율이 기준표 값과 다르면(행정안전부·기관 자체 기준, 특례 물품 등) 배점 구조는 그대로 두고
  * 가격 산식 계수를 공고 낙찰하한율에서 통과점수가 정확히 나오도록 역산한다.
  */
-function calibrate(t: Table, kind: ReturnType<typeof basisKind>, rawLwlt?: number): Table {
+function calibrate(t: Table, kind: ReturnType<typeof basisKind>, rawLwlt?: number, force = false, stdName?: string): Table {
   const lwlt = usableLwlt(rawLwlt);
-  if (!lwlt) return t;
+  if (!lwlt) return stdName ? named(t, kind, stdName) : t;
   const foreign = kind === "행정안전부" || kind === "기관 자체";
-  if (!foreign && t.lowerLimit !== undefined && Math.abs(lwlt - t.lowerLimit) <= 0.02) return { ...t, lowerLimit: lwlt };
+  if (!foreign && !force && t.lowerLimit !== undefined && Math.abs(lwlt - t.lowerLimit) <= 0.02) return { ...t, lowerLimit: lwlt };
   const priceItem = t.items.find((i) => i.kind === "price");
   if (!priceItem) return t;
   const nonPrice = t.items.filter((i) => i.kind !== "price" && i.kind !== "bonus").reduce((s, i) => s + i.max, 0);
@@ -395,7 +396,7 @@ function calibrate(t: Table, kind: ReturnType<typeof basisKind>, rawLwlt?: numbe
   if (!foreign) {
     return { ...t, items, price, lowerLimit: lwlt, ref: { ...t.ref, status: t.ref.status === "공식 대조" ? "일부 추정" : t.ref.status, estimates: [...t.ref.estimates, `공고 낙찰하한율 ${lwlt}%가 기준표 값 ${t.lowerLimit !== undefined ? round3(t.lowerLimit) : "-"}%와 달라 ${estimate}`] } };
   }
-  const who = kind === "행정안전부" ? "행정안전부 지방자치단체 낙찰자 결정기준" : "발주기관 자체 기준";
+  const who = stdName ? `「${stdName}」` : kind === "행정안전부" ? "행정안전부 지방자치단체 낙찰자 결정기준" : "발주기관 자체 기준";
   return {
     ...t,
     items,
@@ -409,6 +410,12 @@ function calibrate(t: Table, kind: ReturnType<typeof basisKind>, rawLwlt?: numbe
       estimates: [`${who} 원문을 대조하지 못해 같은 업무·금액대 조달청 기준표 배점을 씀`, estimate, ...t.ref.estimates],
     },
   };
+}
+
+/** 하한율이 없어 역산하지 않을 때도 공고서가 적은 기준 이름은 붙인다 */
+function named(t: Table, kind: ReturnType<typeof basisKind>, stdName: string): Table {
+  if (kind === "조달청") return t;
+  return { ...t, ref: { ...t.ref, name: `「${stdName}」 (배점 구조는 ${t.ref.name} 준용)`, source: `「${stdName}」: 원문 기준표 미대조. 배점 구조는 ${t.ref.source}`, status: "추정", estimates: [`「${stdName}」 원문을 대조하지 못해 같은 업무·금액대 조달청 기준표 배점을 씀`, ...t.ref.estimates] } };
 }
 
 /** 협상에 의한 계약: 공고의 기술·가격 배점 비율을 쓴다 */
@@ -449,8 +456,11 @@ function negoSheet(b?: EvalBasis): EvalSheet {
 }
 
 /** 공고에 맞는 평가표 (공고 첨부에서 평가표를 못 읽었을 때 쓰는 기준표) */
-export function criteriaSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category" | "lowerLimitRate">, b?: EvalBasis): EvalSheet {
-  if (bid.contractMethod === "협상에 의한 계약") return negoSheet(b);
+export function criteriaSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category" | "lowerLimitRate">, b?: EvalBasis, notice?: NoticeCriteria): EvalSheet {
+  if (bid.contractMethod === "협상에 의한 계약") {
+    const s = negoSheet(b);
+    return notice?.pass ? { ...s, pass: notice.pass.value } : s;
+  }
   if (bid.contractMethod !== "적격심사") {
     return {
       method: bid.contractMethod,
@@ -463,8 +473,15 @@ export function criteriaSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "bas
       items: [mk("입찰가격", 100, "price", "입찰가격", { basis: "예정가격 이하 최저가 (하한율 적용 시 그 이상)" })],
     };
   }
-  const kind = basisKind(b);
-  const t = calibrate(pickTable(bid, b), kind, b?.lwlt);
+  // 공고서가 적용 기준(발주기관 기준, 환경부 건설폐기물 기준 등)과 통과점수를 적었으면 그것이 우선이다
+  const std = notice?.standard;
+  const kind = std ? (std.issuer === "조달청" || std.issuer === "행정안전부" ? std.issuer : "기관 자체") : basisKind(b);
+  const forTable: EvalBasis | undefined = std || notice?.tier ? { ...b, method: [b?.method, std?.value, notice?.tier?.value].filter(Boolean).join(" ") } : b;
+  let base = pickTable(bid, forTable);
+  const noticePass = notice?.pass?.value.kind === "total" ? notice.pass.value.score : undefined;
+  const passChanged = noticePass !== undefined && noticePass !== base.pass;
+  if (passChanged) base = { ...base, pass: noticePass, notes: [`종합평점 ${noticePass}점 이상이면 낙찰자로 결정됩니다 (공고서).`] };
+  const t = calibrate(base, kind, b?.lwlt, passChanged, std?.value);
   const lwlt = usableLwlt(b?.lwlt);
   const notes = [...t.notes];
   return {
@@ -519,4 +536,90 @@ function round3(n: number) { return Math.round(n * 1000) / 1000; }
 export function tableCheck(bid: Pick<Bid, "bizType" | "baseAmount" | "category">, b?: EvalBasis): { kind: ReturnType<typeof basisKind>; name: string; lowerLimit?: number; status: CriteriaRef["status"] } {
   const t = pickTable(bid, b);
   return { kind: basisKind(b), name: t.ref.name, lowerLimit: t.lowerLimit, status: t.ref.status };
+}
+
+/**
+ * 공고 원문에서 읽은 배점표가 그대로 써도 될 만큼 온전한지.
+ * 가격 배점을 실제로 읽었고 합계가 100이거나, 협상계약에서 기술 배점 합이 공고의 기술 배점과 같아야 한다.
+ * (문서 전체에서 세부 기준·등급표 숫자를 함께 잡으면 합계가 100을 넘거나, 모자란 만큼 가격으로 채워져 100처럼 보인다)
+ */
+export function adoptable(ex: EvalSheet, b?: EvalBasis): boolean {
+  const price = ex.items.filter((i) => i.kind === "price");
+  if (ex.items.length < 3 || price.length !== 1) return false;
+  // 산식·등급 줄을 항목으로 잘못 읽은 경우
+  if (ex.items.some((i) => /[=＝]|^평점|^[o□■①-⑳]\s/.test(i.label))) return false;
+  // 협상계약은 공고의 기술·가격 배점(나라장터 목록 값)과 맞아야 한다
+  if (b?.priceRatio !== undefined && Math.abs(price[0].max - b.priceRatio) > 0.5) return false;
+  const sum = ex.items.reduce((a, i) => a + i.max, 0);
+  const tech = sum - price[0].max;
+  if (!ex.priceFilled) return Math.abs(sum - 100) <= 0.5;
+  return b?.techRatio !== undefined && Math.abs(tech - b.techRatio) <= 0.5;
+}
+
+/**
+ * 공고 한 건의 평가표: 공고 원문 > 공고서 문장 > 기준표 순으로 쓴다.
+ * - 원문 배점표가 온전하면 그 배점에 기준표의 등급표·가격 산식을 보탠다.
+ * - 협상계약에서 정량평가 표만 읽혔으면, 정량 항목은 공고 배점으로, 나머지 기술 배점은 정성평가로 둔다.
+ * - 어느 경우든 공고서에 적힌 통과점수·적용 기준·낙찰하한율·신인도 범위·기준비율·실적 인정 범위를 덮어쓴다.
+ */
+export function bidSheet(
+  bid: Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category" | "lowerLimitRate">,
+  b: EvalBasis | undefined,
+  opts: { extracted?: EvalSheet; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string } } = {},
+): EvalSheet {
+  const { extracted, notice, quant } = opts;
+  const basis: EvalBasis | undefined = notice?.lowerLimit && !usableLwlt(b?.lwlt) ? { ...b, lwlt: notice.lowerLimit.value } : b;
+  const tpl = criteriaSheet(bid, basis, notice);
+  const facts: NonNullable<EvalSheet["noticeFacts"]> = [];
+  let sheet: EvalSheet;
+  if (extracted && adoptable(extracted, b)) {
+    sheet = enrichSheet(extracted, tpl);
+    sheet.pass = notice?.pass?.value ?? extracted.pass ?? tpl.pass;
+    facts.push({ label: "평가항목·배점", value: `공고 원문 배점표 ${extracted.items.length}개 항목`, quote: extracted.notes[0] ?? "" });
+  } else if (quant && tpl.method === "협상에 의한 계약") {
+    const price = tpl.items.find((i) => i.kind === "price");
+    const techMax = 100 - (price?.max ?? 0);
+    const rest = round2(techMax - quant.total);
+    const items: EvalItem[] = [
+      ...quant.items.map((i) => ({ ...i, group: "정량평가" })),
+      ...(rest > 0 ? [mk("정성평가 (제안서·발표)", rest, "qualitative", "정성평가", { basis: `기술 배점 ${techMax}점에서 공고 정량평가 ${quant.total}점을 뺀 나머지` })] : []),
+      ...(price ? [price] : []),
+    ];
+    sheet = { ...tpl, items, source: "extracted", title: `공고 정량평가 표 + ${tpl.title}`, confidence: "보통" };
+    facts.push({ label: "정량평가 배점", value: quant.items.map((i) => `${i.label} ${i.max}점`).join(", "), quote: quant.quote });
+  } else {
+    sheet = tpl;
+  }
+  if (!notice) return sheet;
+  if (notice.standard) facts.push({ label: "적용 기준", value: notice.standard.value + (notice.tier ? ` · ${notice.tier.value}` : ""), quote: notice.standard.quote });
+  else if (notice.tier) facts.push({ label: "적용 구간", value: notice.tier.value, quote: notice.tier.quote });
+  if (notice.pass) {
+    const p = notice.pass.value;
+    facts.push({ label: "통과 기준", value: p.kind === "total" ? `${sheet.method === "적격심사" ? "종합평점" : "합산점수"} ${p.score}점 이상` : `기술점수가 배점의 ${Math.round(p.ratio * 100)}% 이상`, quote: notice.pass.quote });
+    sheet.pass = p;
+  }
+  if (notice.lowerLimit) facts.push({ label: "낙찰하한율", value: `${notice.lowerLimit.value}%`, quote: notice.lowerLimit.quote });
+  if (notice.trustRange && sheet.trust) {
+    const { plus, minus } = notice.trustRange.value;
+    sheet.trust = { ...sheet.trust, plusCap: plus, minusCap: minus, capFromNotice: true, fromNotice: [...(sheet.trust.fromNotice ?? []), `상·하한 +${plus} ~ △${minus}`] };
+    facts.push({ label: "신뢰도 가감점 범위", value: `+${plus} ~ △${minus}`, quote: notice.trustRange.quote });
+  }
+  if (notice.financeBase) {
+    sheet.financeBase = notice.financeBase.value;
+    const f = notice.financeBase.value;
+    facts.push({ label: "경영상태 기준비율", value: [f.equity !== undefined ? `자기자본비율 ${f.equity}%` : "", f.current !== undefined ? `유동비율 ${f.current}%` : ""].filter(Boolean).join(", "), quote: notice.financeBase.quote });
+  }
+  if (notice.refAmount) {
+    sheet.refAmount = notice.refAmount.value;
+    facts.push({ label: "평가 기준금액", value: `${notice.refAmount.value.toLocaleString("ko-KR")}원`, quote: notice.refAmount.quote });
+  }
+  if (notice.recognition) {
+    const key = (t: string) => t.replace(/[\s\d)①-⑳.,]/g, "").slice(0, 30);
+    const merged: string[] = [];
+    for (const t of [...notice.recognition, ...(sheet.recognition ?? [])]) if (!merged.some((m) => key(m) === key(t))) merged.push(t);
+    sheet.recognition = merged.slice(0, 6);
+    facts.push({ label: "실적 인정 범위", value: notice.recognition[0], quote: notice.recognition[0] });
+  }
+  sheet.noticeFacts = facts;
+  return sheet;
 }

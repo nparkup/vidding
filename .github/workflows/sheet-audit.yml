@@ -1,0 +1,36 @@
+name: 공고 평가표 대조
+
+# 실제 공고 첨부에서 읽은 평가 기준과 평가점수 예측이 쓰는 기준을 대조해 로그와 산출물로 남긴다.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "공고일 (YYYYMMDD, 쉼표로 여러 날)"
+        required: true
+      per:
+        description: "묶음(업무 × 지자체/국가)당 공고 수"
+        default: "4"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: 대조
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: npx tsx --conditions=react-server scripts/score/sheet-audit.ts "${{ inputs.days || '20261112,20261113,20261116,20261117' }}" "${{ inputs.per || '8' }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sheet-audit
+          path: sheet-audit.json.gz
+          retention-days: 7

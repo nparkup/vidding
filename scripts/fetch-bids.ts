@@ -62,7 +62,7 @@ async function main() {
   try {
     const r = await extractSheetsForBids(items, attachments);
     sheets = r.sheets;
-    console.log(`평가표 추출: 대상 ${r.stats.bids}건, 파일 ${r.stats.files}개(실패 ${r.stats.downloadFailed}), 추출 ${r.stats.found}건${r.stats.timedOut ? ", 시간 한도로 일부만 처리" : ""}`);
+    console.log(`평가표 추출: 대상 ${r.stats.bids}건, 파일 ${r.stats.files}개(실패 ${r.stats.downloadFailed}), 배점표 ${r.stats.found}건, 공고 기준 문장 ${r.stats.notice}건${r.stats.timedOut ? ", 시간 한도로 일부만 처리" : ""}`);
   } catch (e) {
     console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);
   }

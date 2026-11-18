@@ -8,7 +8,8 @@ import {
   CREDIT_GRADES, DEFAULT_COMPANY, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
-import { enrichSheet, TECH_GRADES } from "@/lib/criteria";
+import { bidSheet, TECH_GRADES } from "@/lib/criteria";
+import type { NoticeCriteria } from "@/lib/noticeCriteria";
 import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "@/lib/eligibility";
@@ -28,7 +29,7 @@ const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium
 /** 유사 실적(나라장터 낙찰 이력) 조회: 정적 사이트는 같은 중계 서버, 서버 배포는 자체 API */
 const PERF_API = STATIC ? CORP_API : "/api/premium/perf";
 
-interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; qual?: BidQual }
+interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
 
 /** 정적 배포는 빌드 때 공고별로 만들어 둔 파일(첨부 목록 + 첨부에서 추출한 평가표)을, 서버 배포는 나라장터 첨부 목록을 바로 조회한다 */
 async function loadBidDocs(bid: Bid): Promise<BidDocs> {
@@ -99,6 +100,7 @@ export function ScorePredictor() {
   const { bids, error } = useBids();
   const [bidId, setBidId] = useState<string | null>(sp.get("bid"));
   const [query, setQuery] = useState("");
+  /** 고객이 항목을 고치거나 더한 평가표. 없으면 공고 기준으로 만든 평가표를 쓴다 */
   const [sheet, setSheet] = useState<EvalSheet | null>(null);
   const [co, setCo] = useState<CompanyInput>(DEFAULT_COMPANY);
   const [perfEok, setPerfEok] = useState("");
@@ -127,8 +129,15 @@ export function ScorePredictor() {
   // 공고의 낙찰방법 세부·낙찰하한율·추정가격으로 그 공고에 맞는 기준표를 고른다
   const basis = docs?.qual?.basis;
   const template = useMemo(() => (bid ? templateSheet(bid, basis) : null), [bid, basis]);
-  // 첨부에서 읽은 평가표에는 기준표의 등급표·가격 산식·낙찰하한율을 보탠다
-  const active = useMemo(() => (sheet && template && !sheet.criteria ? enrichSheet(sheet, template) : sheet ?? template), [sheet, template]);
+  // 이 공고의 평가표: 공고 원문 배점표 > 공고서에 적힌 기준(통과점수·적용 기준·하한율·기준비율·실적 인정 범위) > 기준표
+  const bidCriteria = useMemo(() => (bid && docs ? bidSheet(bid, basis, { extracted: docs.sheet, notice: docs.notice, quant: docs.quant }) : null), [bid, docs, basis]);
+  const active = sheet ?? bidCriteria ?? template;
+  // 공고서에 경영상태 기준비율이 있으면 입력 칸 기본값으로 쓴다
+  const finBase = active?.financeBase;
+  useEffect(() => {
+    if (!finBase) return;
+    setCo((c) => ({ ...c, equityBase: finBase.equity ?? c.equityBase, currentBase: finBase.current ?? c.currentBase }));
+  }, [finBase]);
   // 투찰률 기본값이 이 공고의 낙찰하한율보다 낮으면 기준표의 기준 투찰률(가격 만점 지점)로 옮긴다
   const floorRate = active?.lowerLimit;
   const baseRate = active?.price?.base;
@@ -148,7 +157,7 @@ export function ScorePredictor() {
     setDocs(null);
     setSheet(null);
     loadBidDocs(bid)
-      .then((d) => { if (!alive) return; setDocs(d); if (d.sheet) setSheet(d.sheet); })
+      .then((d) => { if (alive) setDocs(d); })
       .catch(() => alive && setDocs({ files: [] }));
     return () => { alive = false; };
   }, [bid]);
@@ -554,10 +563,11 @@ export function ScorePredictor() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">
-            <span className="chip">{active.source === "extracted" ? `원문 추출 · 신뢰도 ${active.confidence}` : "기준표"}</span>
-            {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => setSheet(null)}>기준표로 되돌리기</button>}
+            <span className="chip">{active.source === "extracted" ? `공고 원문 배점 · 신뢰도 ${active.confidence}` : active.noticeFacts?.length ? `기준표 + 공고서 기준 ${active.noticeFacts.length}가지` : "기준표"}</span>
+            {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => setSheet(null)}>공고 기준으로 되돌리기</button>}
           </div>
         </div>
+        <NoticeFacts sheet={active} />
         <CriteriaInfo sheet={active} />
         <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
           {active.items.map((i) => (
@@ -657,6 +667,7 @@ function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: str
         <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? "공고 첨부의 평가표" : sheet.criteria?.name ?? `${sheet.method} 기준표`} · {max}점 만점</p>
         {sheet.criteria && <p className="mt-1 text-xs text-ink-500">{sheet.criteria.status} · {sheet.criteria.source}</p>}
         {passLabel && <p className="mt-1 text-sm text-ink-500">통과 기준 {passLabel}</p>}
+        <NoticeFacts sheet={sheet} />
       </div>
       <ul className="divide-y divide-ink-100 border-t border-ink-100">
         {sheet.items.map((i) => (
@@ -904,6 +915,29 @@ function AddItem({ onAdd }: { onAdd: (label: string, max: number) => void }) {
 
 const STATUS_TONE: Record<string, string> = { "공식 대조": "bg-mint-50 text-mint-700", "일부 추정": "bg-amber-100 text-ink", 추정: "bg-coral-100 text-ink" };
 
+/** 공고서에서 읽어 기준표보다 우선 적용한 이 공고의 기준 (원문 문장과 함께) */
+function NoticeFacts({ sheet }: { sheet: EvalSheet }) {
+  const f = sheet.noticeFacts;
+  if (!f?.length) return null;
+  return (
+    <div className="mt-4 rounded-2xl bg-mint-50 px-4 py-3 text-xs leading-relaxed">
+      <p className="text-sm font-semibold">이 공고의 기준 (공고서에서 읽어 우선 적용)</p>
+      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-[7.5rem_1fr]">
+        {f.map((x, n) => (
+          <div key={x.label} className="contents">
+            <dt className="font-semibold text-ink">{x.label}</dt>
+            <dd className="min-w-0 break-keep text-ink-500">
+              <span className="text-ink">{x.value}</span>
+              {/* 같은 문장에서 읽은 값은 원문을 한 번만 보여 준다 */}
+              {x.quote && x.quote !== x.value && f.findIndex((y) => y.quote === x.quote) === n && <span className="mt-0.5 block text-ink-300">원문: {x.quote}</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 /** 적용한 기준표와 근거, 추정한 값 */
 function CriteriaInfo({ sheet }: { sheet: EvalSheet }) {
   const c = sheet.criteria;
@@ -917,7 +951,7 @@ function CriteriaInfo({ sheet }: { sheet: EvalSheet }) {
       <dl className="mt-2 grid gap-x-4 gap-y-1 text-ink-500 sm:grid-cols-[6.5rem_1fr]">
         <dt className="font-semibold text-ink">근거</dt><dd className="min-w-0">{c.source}</dd>
         {c.methodText && (<><dt className="font-semibold text-ink">공고 낙찰방법</dt><dd className="min-w-0 break-keep">{c.methodText}</dd></>)}
-        {sheet.pass && (<><dt className="font-semibold text-ink">통과 기준</dt><dd>{sheet.pass.kind === "total" ? `종합평점 ${sheet.pass.score}점 이상` : `기술점수 배점의 ${Math.round(sheet.pass.ratio * 100)}% 이상`}</dd></>)}
+        {sheet.pass && (<><dt className="font-semibold text-ink">통과 기준</dt><dd>{sheet.pass.kind === "total" ? `${sheet.method === "적격심사" ? "종합평점" : "합산점수"} ${sheet.pass.score}점 이상` : `기술점수 배점의 ${Math.round(sheet.pass.ratio * 100)}% 이상`}</dd></>)}
         {sheet.lowerLimit !== undefined && (<><dt className="font-semibold text-ink">낙찰하한율</dt><dd>{sheet.lowerLimit}%</dd></>)}
         {sheet.price && (<><dt className="font-semibold text-ink">가격 산식</dt><dd className="min-w-0">{sheet.price.text}{sheet.price.derived ? " (계수 역산)" : ""}</dd></>)}
       </dl>

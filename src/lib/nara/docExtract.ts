@@ -1,7 +1,8 @@
 import "server-only";
 import { inflateRawSync } from "zlib";
 import type { Bid, BidAttachment } from "../types";
-import { extractSheet, templateSheet, type EvalSheet } from "../evalscore";
+import { extractQuantBlock, extractSheet, templateSheet, type EvalItem, type EvalSheet } from "../evalscore";
+import { readNoticeCriteria, type NoticeCriteria } from "../noticeCriteria";
 import { hwpText } from "./hwpText";
 
 /**
@@ -9,20 +10,26 @@ import { hwpText } from "./hwpText";
  * 브라우저는 나라장터 파일을 직접 열 수 없어(CORS), 공고를 고르면 여기서 만든 평가표를 바로 쓴다.
  * - 읽는 형식: PDF(pdf.js), HWPX(압축 XML), 구형 HWP(hwpText.ts, 2026-11-16 실제 공고서 50건 시험: 모두 본문 읽힘, 같은 공고 PDF 대비 낱말 93%).
  * - 평가 구조가 있는 계약방법(적격심사·협상)만, 평가기준이 있을 법한 파일 순서로 공고당 최대 3개.
+ *   공고서(공고문)는 배점표가 없어도 적용 기준·통과점수 같은 그 공고의 기준을 적고 있어 꼭 읽는다.
  * - 전체 시간·파일 수 한도를 두고, 넘으면 남은 공고는 표준 평가표로 둔다.
  */
 
 export interface ExtractedSheet {
-  sheet: EvalSheet;
-  file: string;
+  /** 첨부에서 읽은 배점표 (없을 수 있다. 쓸지는 화면에서 criteria.ts adoptable 로 가린다) */
+  sheet?: EvalSheet;
+  file?: string;
+  /** 공고서 문장에서 읽은 이 공고의 기준 (적용 기준·통과점수·낙찰하한율·기준비율·실적 인정 범위 등) */
+  notice?: NoticeCriteria;
+  /** 협상 제안요청서의 정량평가 표 */
+  quant?: { items: EvalItem[]; total: number; quote: string };
 }
 
 const LIKELY = /(평가|심사|제안요청|과업|공고문|입찰공고|규격)/;
 const READABLE = /\.(pdf|hwpx|hwp)$/i;
 
-function rankFiles(files: BidAttachment[]): BidAttachment[] {
+export function rankFiles(files: BidAttachment[]): BidAttachment[] {
   const score = (f: BidAttachment) =>
-    (/(평가|심사)/.test(f.name) ? 4 : 0) + (/제안요청/.test(f.name) ? 3 : 0) + (/과업|규격/.test(f.name) ? 2 : 0) + (LIKELY.test(f.name) ? 1 : 0);
+    (/(평가|심사)/.test(f.name) ? 4 : 0) + (/제안요청/.test(f.name) ? 3 : 0) + (/공고(문|서)|입찰\s*공고|입찰\s*설명/.test(f.name) || f.kind === "공고서" ? 3 : 0) + (/과업|규격/.test(f.name) ? 2 : 0) + (LIKELY.test(f.name) ? 1 : 0);
   // 같은 문서가 HWP와 PDF로 함께 오면 PDF를 먼저 읽고, 평가표를 확실히 못 찾았을 때 HWP도 읽어 신뢰도가 높은 쪽을 쓴다
   // (HWP는 표의 한 행이 한 줄로 나와 PDF보다 배점표가 깔끔하게 잡히는 경우가 있다)
   const stem = (n: string) => n.replace(/\.[^.]+$/, "").replace(/\s+/g, "");
@@ -35,7 +42,7 @@ function rankFiles(files: BidAttachment[]): BidAttachment[] {
     .slice(0, 3);
 }
 
-async function download(url: string, timeoutMs: number): Promise<Buffer | null> {
+export async function download(url: string, timeoutMs: number): Promise<Buffer | null> {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": "Mozilla/5.0 (bid-analysis build)" } });
   if (!res.ok) return null;
   const buf = Buffer.from(await res.arrayBuffer());
@@ -106,7 +113,7 @@ export function hwpxText(buf: Buffer): string {
 
 const decode = (t: string) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 
-async function textOf(f: BidAttachment, buf: Buffer): Promise<string> {
+export async function textOf(f: BidAttachment, buf: Buffer): Promise<string> {
   if (/\.pdf$/i.test(f.name)) return pdfText(buf);
   if (/\.hwp$/i.test(f.name)) return hwpText(buf).text;
   return hwpxText(buf);
@@ -116,12 +123,12 @@ export async function extractSheetsForBids(
   bids: Bid[],
   attachments: Record<string, BidAttachment[]>,
   opts: { budgetMs?: number; maxFiles?: number; concurrency?: number } = {},
-): Promise<{ sheets: Record<string, ExtractedSheet>; stats: { bids: number; files: number; downloadFailed: number; found: number; timedOut: boolean } }> {
+): Promise<{ sheets: Record<string, ExtractedSheet>; stats: { bids: number; files: number; downloadFailed: number; found: number; notice: number; timedOut: boolean } }> {
   const budget = Date.now() + (opts.budgetMs ?? 8 * 60_000);
   const maxFiles = opts.maxFiles ?? 2500;
   const targets = bids.filter((b) => (b.contractMethod === "적격심사" || b.contractMethod === "협상에 의한 계약") && attachments[b.id]?.length);
   const sheets: Record<string, ExtractedSheet> = {};
-  const stats = { bids: targets.length, files: 0, downloadFailed: 0, found: 0, timedOut: false };
+  const stats = { bids: targets.length, files: 0, downloadFailed: 0, found: 0, notice: 0, timedOut: false };
   let next = 0;
 
   async function worker() {
@@ -141,16 +148,24 @@ export async function extractSheetsForBids(
           continue;
         }
         const sheet = extractSheet(texts.join("\n"), templateSheet(bid));
-        if (sheet && (!best || rankConfidence(sheet) > rankConfidence(best.sheet))) best = { sheet, file: f.name };
-        if (best?.sheet.confidence === "높음") break;
+        if (sheet && (!best?.sheet || rankConfidence(sheet) > rankConfidence(best.sheet))) best = { sheet, file: f.name };
       }
-      // 공고문 속 다른 숫자를 배점으로 잘못 읽은 경우를 거르기 위해: 신뢰도 높음, 또는 보통이면서 실적·신용·가격 중 2가지 이상이 잡힌 표만 쓴다
-      const core = best ? new Set(best.sheet.items.map((i) => i.kind).filter((k) => k === "performance" || k === "credit" || k === "price")).size : 0;
-      if (best && (best.sheet.confidence === "높음" || (best.sheet.confidence === "보통" && core >= 2))) { sheets[bid.id] = best; stats.found++; }
+      if (!texts.length) continue;
+      const all = texts.join("\n");
+      const notice = readNoticeCriteria(all);
+      const quant = bid.contractMethod === "협상에 의한 계약" ? extractQuantBlock(all) : undefined;
+      // 배점표는 합계가 100에서 크게 벗어나면 버린다 (쓸지 최종 판단은 화면에서 공고 기준 값과 함께 한다)
+      const sum = best?.sheet ? best.sheet.items.reduce((a, i) => a + i.max, 0) : 0;
+      const keep = best?.sheet && sum >= 90 && sum <= 110 ? best : undefined;
+      if (keep || notice || quant) {
+        sheets[bid.id] = { ...(keep ?? {}), notice, quant };
+        if (keep) stats.found++;
+        if (notice) stats.notice++;
+      }
     }
   }
   await Promise.all(Array.from({ length: opts.concurrency ?? 6 }, worker));
   return { sheets, stats };
 }
 
-const rankConfidence = (s: EvalSheet) => ({ 높음: 3, 보통: 2, 낮음: 1 })[s.confidence] * 100 + s.items.length;
+const rankConfidence = (s: EvalSheet): number => ({ 높음: 3, 보통: 2, 낮음: 1 })[s.confidence] * 100 + s.items.length;

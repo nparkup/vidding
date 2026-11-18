@@ -2,12 +2,13 @@ import Link from "next/link";
 import type { MatchResult } from "@/lib/analysis";
 import type { Bid } from "@/lib/types";
 import { daysLeft } from "@/lib/analysis";
-import { shortDate, won } from "@/lib/format";
+import { isoDate, shortDate, won } from "@/lib/format";
 import { DdayBadge, ScoreMeter } from "./Badges";
 import { bidHref } from "@/lib/links";
 
 export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; href?: string }) {
   const left = match?.daysLeft ?? daysLeft(bid.closeAt);
+  const closeDay = isoDate(bid.closeAt);
   return (
     <Link
       href={href ?? bidHref(bid.id)}
@@ -20,7 +21,10 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
           <span className="chip">{bid.region === "전국" ? "전국" : `${bid.region} 제한`}</span>
           <span className="chip">{bid.contractMethod}</span>
         </div>
-        <p className="mt-2 truncate text-[16px] font-semibold group-hover:text-mint-600">{bid.title}</p>
+        <p className="mt-2 line-clamp-2 text-[16px] font-semibold group-hover:text-mint-600 sm:line-clamp-1">
+          {closeDay && <span className="tabular-nums text-ink-500">[{closeDay}] </span>}
+          {bid.title}
+        </p>
         <p className="mt-1 line-clamp-1 text-sm text-ink-500">
           {bid.demandAgency} · 면허 {bid.licenseRaw || bid.licenses.join(", ") || "제한없음"}
         </p>

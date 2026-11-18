@@ -85,10 +85,11 @@ export const NARA_APIS = [
     path: "/ao/UsrInfoService02",
     required: false,
     approved: true,
-    usage: "사업자등록번호로 조달업체 기본정보(개업일·종업원 수·소재지)와 등록 업종 조회 · 평가점수 예측의 기업 정보",
+    usage: "사업자등록번호로 조달업체 기본정보(개업일·종업원 수·소재지)·등록 업종·부정당제재 조회 · 평가점수 예측의 기업 정보와 참가자격",
     operations: {
       corpBasic: "getPrcrmntCorpBasicInfo02",
       corpIndustry: "getPrcrmntCorpIndstrytyInfo02",
+      sanction: "getUnptRsttCorpInfo02",
     },
   },
 ] as const;

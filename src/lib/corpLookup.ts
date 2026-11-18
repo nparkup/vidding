@@ -7,7 +7,7 @@
  * 3. 금융위원회_기업기본정보: 법인등록번호, 설립일, 종업원 수, 중소기업 여부, 감사의견 (법인만)
  * 4. 금융위원회_기업 재무정보: 요약재무제표 매출·영업이익·순이익·자산·부채·자본·부채비율 (공시·외감 법인만)
  * 5. 조달청_나라장터 사용자정보서비스 부정당제재업체정보조회: 입찰참가자격 제한 이력과 기간
- * 6. 한국중소벤처기업유통원_공공구매종합정보망 인증서 정보 제공 서비스: 장애인기업확인서·여성기업확인서 유효기간
+ * 6. 한국중소벤처기업유통원_공공구매종합정보망 인증서 정보 제공 서비스: 장애인기업확인서(getDspsnList)·여성기업확인서(getFnrssList) 유효기간
  *    (신뢰도 가감점 항목 1차 확인. 포털에서 활용신청이 안 되어 있으면 '등록되지 않은 서비스키'로 실패하고 나머지는 그대로 보여 준다)
  *
  * 금융위원회_개인사업자평가정보는 업체를 특정할 수 없는 익명 통계(지역·업종별 등급 분포)라 사업자번호 조회에는 쓰지 않는다.
@@ -19,11 +19,8 @@ const FSC_CORP = "https://apis.data.go.kr/1160100/service/GetCorpBasicInfoServic
 const FSC_FIN = "https://apis.data.go.kr/1160100/service/GetFinaStatInfoService_V2/getSummFinaStat_V2";
 const NTS_STATUS = "https://api.odcloud.kr/api/nts-businessman/v1/status";
 const SMPP_CERT = "https://apis.data.go.kr/B550598/smppCertInfo";
-/**
- * 공공구매종합정보망 인증서 API 오퍼레이션. 장애인기업확인은 getDspsnList 로 확인했다.
- * 여성기업확인 오퍼레이션 이름은 포털 공개 화면에 없어, 활용신청 후 상세기능에서 확인해 채운다 (빈 값이면 조회하지 않는다).
- */
-export const SMPP_CERT_OPS = { disabled: "getDspsnList", women: "" } as const;
+/** 공공구매종합정보망 인증서 API 오퍼레이션: 장애인기업확인 상세조회, 여성기업확인 상세조회 */
+export const SMPP_CERT_OPS = { disabled: "getDspsnList", women: "getFnrssList" } as const;
 
 export interface NtsStatus {
   /** 계속사업자 / 휴업자 / 폐업자, 미등록이면 빈 값 */
@@ -86,6 +83,8 @@ export interface Sanction {
   law?: string;
   /** 오늘이 제재 기간 안이고 해제·집행정지가 아니면 true */
   active: boolean;
+  /** 제재 시작일이 아직 오지 않았으면 true */
+  upcoming: boolean;
 }
 
 /** 공공구매종합정보망 확인서 (장애인기업·여성기업) */
@@ -93,6 +92,8 @@ export interface CertRecord {
   validFrom?: string;
   validTo?: string;
   certifiedAt?: string;
+  /** 발급 기관 (예: 서울지방중소벤처기업청) */
+  issuer?: string;
   /** 오늘 기준 유효한지 */
   valid: boolean;
 }
@@ -232,6 +233,7 @@ async function sanctions(key: string, no: string): Promise<Sanction[]> {
       reason: clean(i.enfcPrvNm) ?? clean(i.lawordArtclClauseCdNm),
       law: [clean(i.lawordNm)?.replace(/-부정당제재근거법령$/, ""), clean(i.lawordArtclClause)].filter(Boolean).join(" ") || undefined,
       active: !lifted && !!begin && begin <= today && (!end || end >= today),
+      upcoming: !lifted && !!begin && begin > today,
     };
   }).sort((a, b) => (b.begin ?? "").localeCompare(a.begin ?? ""));
 }
@@ -241,6 +243,8 @@ function xmlItems(text: string): Item[] {
   const auth = text.match(/<returnAuthMsg>([^<]*)<\/returnAuthMsg>/)?.[1];
   if (auth) throw new Error(auth);
   const code = text.match(/<resultCode>([^<]*)<\/resultCode>/)?.[1];
+  // 90: 매칭데이터가 존재하지 않습니다 (확인서 없음)
+  if (code === "90") return [];
   if (code && code !== "00") throw new Error(`API 오류(${code}): ${text.match(/<resultMsg>([^<]*)<\/resultMsg>/)?.[1] ?? ""}`);
   return [...text.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => {
     const o: Item = {};
@@ -258,7 +262,7 @@ async function smppCert(key: string, no: string, op: string): Promise<CertRecord
   const recs = rows.map((i) => {
     const validFrom = dateOf(i.validPdBeginDe);
     const validTo = dateOf(i.validPdEndDe ?? i.validPdDe);
-    return { validFrom, validTo, certifiedAt: dateOf(i.certfcDe), valid: (!validFrom || validFrom <= today) && (!validTo || validTo >= today) };
+    return { validFrom, validTo, certifiedAt: dateOf(i.certfcDe), issuer: clean(i.issuInstt), valid: (!validFrom || validFrom <= today) && (!validTo || validTo >= today) };
   });
   return recs.find((c) => c.valid) ?? recs.sort((a, b) => (b.validTo ?? "").localeCompare(a.validTo ?? ""))[0];
 }
@@ -329,7 +333,7 @@ export async function lookupCompany(bizno: string, serviceKey: string): Promise<
     catchTo("fsc", fscCorp(serviceKey, no)),
     catchTo("sanction", sanctions(serviceKey, no)),
     catchTo("disabledCert", smppCert(serviceKey, no, SMPP_CERT_OPS.disabled)),
-    SMPP_CERT_OPS.women ? catchTo("womenCert", smppCert(serviceKey, no, SMPP_CERT_OPS.women)) : Promise.resolve(undefined),
+    catchTo("womenCert", smppCert(serviceKey, no, SMPP_CERT_OPS.women)),
   ]);
   const fin = fsc ? (await catchTo("finance", finance(serviceKey, fsc.crno))) ?? [] : [];
 

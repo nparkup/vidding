@@ -121,9 +121,11 @@ export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizTy
   // 1-2. 부정당제재 (나라장터 사용자정보서비스): 제재 기간에는 입찰에 참가할 수 없다
   if (corp.sanctions) {
     const act = corp.sanctions.filter((x) => x.active);
-    const past = corp.sanctions.filter((x) => !x.active);
+    const soon = corp.sanctions.filter((x) => x.upcoming);
+    const past = corp.sanctions.filter((x) => !x.active && !x.upcoming);
     const line = (x: NonNullable<CorpLookup["sanctions"]>[number]) => `${x.agency} ${x.begin ?? ""}~${x.end ?? ""}${x.reason ? ` (${x.reason})` : ""}`;
     if (act.length) checks.push({ label: "부정당제재", verdict: "불가", detail: `입찰참가자격 제한 기간입니다: ${act.map(line).join("; ")}. 제재 기간에는 입찰에 참가할 수 없습니다.` });
+    else if (soon.length) checks.push({ label: "부정당제재", verdict: "확인 필요", detail: `곧 시작되는 제재가 있습니다: ${soon.map(line).join("; ")}. 개찰일이 제재 기간에 들면 참가할 수 없으니 일정을 확인하세요.` });
     else checks.push({ label: "부정당제재", verdict: "가능", detail: past.length ? `현재 제재 중이 아닙니다. 지난 제재 ${past.length}건: ${past.slice(0, 3).map(line).join("; ")}.` : "나라장터 부정당제재 이력이 없습니다." });
   } else if (errors.sanction) {
     checks.push({ label: "부정당제재", verdict: "확인 필요", detail: "나라장터 부정당제재 정보를 조회하지 못했습니다. 입찰참가자격 제한 중인지 나라장터에서 확인하세요." });

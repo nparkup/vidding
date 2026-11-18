@@ -789,7 +789,7 @@ function CorpPanel({ corp }: { corp: CorpLookup }) {
             <ul className="space-y-1">
               {corp.sanctions.slice(0, 5).map((x, i) => (
                 <li key={i}>
-                  <span className={`font-semibold ${x.active ? "text-coral" : "text-ink-500"}`}>{x.active ? "제재 중" : x.state || "종료"}</span>
+                  <span className={`font-semibold ${x.active || x.upcoming ? "text-coral" : "text-ink-500"}`}>{x.active ? "제재 중" : x.upcoming ? "제재 예정" : x.state === "제재" ? "종료" : x.state || "종료"}</span>
                   {` · ${x.agency} · ${x.begin ?? ""}~${x.end ?? ""}`}
                   {x.reason && <span className="block text-xs text-ink-500">{x.reason}</span>}
                 </li>
@@ -802,7 +802,6 @@ function CorpPanel({ corp }: { corp: CorpLookup }) {
             <>
               {corp.certs?.disabled !== undefined && <p>장애인기업확인서 {certText(corp.certs.disabled)}</p>}
               {corp.certs?.women !== undefined && <p>여성기업확인서 {certText(corp.certs.women)}</p>}
-              {corp.certs?.women === undefined && !errors.womenCert && <p className="text-xs text-ink-500">여성기업확인서는 아직 자동 조회를 연결하지 않아 증빙으로 확인합니다.</p>}
             </>
           )}
         </Row>

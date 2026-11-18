@@ -18,9 +18,14 @@ async function list(op: string, day: string): Promise<Item[]> {
   const out: Item[] = [];
   for (let p = 1; p < 10; p++) {
     const q = new URLSearchParams({ type: "json", numOfRows: "999", pageNo: String(p), inqryDiv: "1", inqryBgnDt: `${day}0000`, inqryEndDt: `${day}2359` });
-    const j = await (await fetch(`https://apis.data.go.kr/1230000/ad/BidPublicInfoService02/getBidPblancListInfo${op}02?serviceKey=${KEY}&${q}`, { signal: AbortSignal.timeout(90_000) })).json();
+    let j: { response?: { body?: { items?: unknown; totalCount?: string } } } = {};
+    for (let t = 0; t < 5; t++) {
+      try { j = await (await fetch(`https://apis.data.go.kr/1230000/ad/BidPublicInfoService02/getBidPblancListInfo${op}02?serviceKey=${KEY}&${q}`, { signal: AbortSignal.timeout(90_000) })).json(); break; }
+      catch (e) { if (t === 4) throw e; await new Promise((r) => setTimeout(r, 5000 * (t + 1))); }
+    }
     const b = j.response?.body;
-    const items: Item[] = Array.isArray(b?.items) ? b.items : [];
+    const items: Item[] = Array.isArray(b?.items) ? (b!.items as Item[]) : [];
+    if (!b) break;
     out.push(...items);
     if (!items.length || out.length >= Number(b.totalCount)) break;
   }

@@ -20,7 +20,7 @@ export interface ExtractedSheet {
 const LIKELY = /(평가|심사|제안요청|과업|공고문|입찰공고|규격)/;
 const READABLE = /\.(pdf|hwpx|hwp)$/i;
 
-function rankFiles(files: BidAttachment[]): BidAttachment[] {
+export function rankFiles(files: BidAttachment[]): BidAttachment[] {
   const score = (f: BidAttachment) =>
     (/(평가|심사)/.test(f.name) ? 4 : 0) + (/제안요청/.test(f.name) ? 3 : 0) + (/과업|규격/.test(f.name) ? 2 : 0) + (LIKELY.test(f.name) ? 1 : 0);
   // 같은 문서가 HWP와 PDF로 함께 오면 PDF를 먼저 읽고, 평가표를 확실히 못 찾았을 때 HWP도 읽어 신뢰도가 높은 쪽을 쓴다
@@ -35,7 +35,7 @@ function rankFiles(files: BidAttachment[]): BidAttachment[] {
     .slice(0, 3);
 }
 
-async function download(url: string, timeoutMs: number): Promise<Buffer | null> {
+export async function download(url: string, timeoutMs: number): Promise<Buffer | null> {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": "Mozilla/5.0 (bid-analysis build)" } });
   if (!res.ok) return null;
   const buf = Buffer.from(await res.arrayBuffer());
@@ -106,7 +106,7 @@ export function hwpxText(buf: Buffer): string {
 
 const decode = (t: string) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 
-async function textOf(f: BidAttachment, buf: Buffer): Promise<string> {
+export async function textOf(f: BidAttachment, buf: Buffer): Promise<string> {
   if (/\.pdf$/i.test(f.name)) return pdfText(buf);
   if (/\.hwp$/i.test(f.name)) return hwpText(buf).text;
   return hwpxText(buf);

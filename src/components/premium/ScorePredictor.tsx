@@ -172,7 +172,7 @@ export function ScorePredictor() {
   }), [co, autoPerf, manualPerf]);
   const result = useMemo(() => (active && bid ? predict(active, bid, coEff) : null), [active, bid, coEff]);
   // 참가자격 판정: 사업자번호를 조회하고 공고 자료가 오면 판정한다. 불가면 예상 점수 대신 사유를 보여 준다
-  const eligibility = useMemo(() => (corp && docs && bid ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역") : null), [corp, docs, bid]);
+  const eligibility = useMemo(() => (corp && docs && bid ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역", new Date(), { itemNo: bid.cls?.no, itemName: bid.cls?.nm, smallBizOnly: bid.smallBizOnly }) : null), [corp, docs, bid]);
   /** 예상 점수를 보여 줄 단계: 조회 기능이 없는 미리보기는 직접 입력값으로 바로 계산한다 */
   const scoreStage: "criteria" | "checking" | "blocked" | "score" = !CORP_API
     ? "score"
@@ -797,11 +797,12 @@ function CorpPanel({ corp }: { corp: CorpLookup }) {
             </ul>
           )}
         </Row>
-        <Row title="장애인·여성기업" source="공공구매종합정보망" error={errors.disabledCert ?? errors.womenCert}>
+        <Row title="공공구매 확인서" source="공공구매종합정보망" error={errors.disabledCert ?? errors.womenCert}>
           {(corp.certs?.disabled !== undefined || corp.certs?.women !== undefined) && (
             <>
               {corp.certs?.disabled !== undefined && <p>장애인기업확인서 {certText(corp.certs.disabled)}</p>}
               {corp.certs?.women !== undefined && <p>여성기업확인서 {certText(corp.certs.women)}</p>}
+              {corp.directProduction && <p className="text-ink-500">직접생산확인증명 {corp.directProduction.filter((d) => d.valid).length ? `유효 ${corp.directProduction.filter((d) => d.valid).length}개 세부품명` : "없음"}</p>}
             </>
           )}
         </Row>

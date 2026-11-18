@@ -7,7 +7,7 @@
  * 3. 금융위원회_기업기본정보: 법인등록번호, 설립일, 종업원 수, 중소기업 여부, 감사의견 (법인만)
  * 4. 금융위원회_기업 재무정보: 요약재무제표 매출·영업이익·순이익·자산·부채·자본·부채비율 (공시·외감 법인만)
  * 5. 조달청_나라장터 사용자정보서비스 부정당제재업체정보조회: 입찰참가자격 제한 이력과 기간
- * 6. 한국중소벤처기업유통원_공공구매종합정보망 인증서 정보 제공 서비스: 장애인기업확인서(getDspsnList)·여성기업확인서(getFnrssList) 유효기간
+ * 6. 한국중소벤처기업유통원_공공구매종합정보망 인증서 정보 제공 서비스: 장애인기업확인서(getDspsnList)·여성기업확인서(getFnrssList)·직접생산확인증명(getDPrductList) 유효기간
  *    (신뢰도 가감점 항목 1차 확인. 포털에서 활용신청이 안 되어 있으면 '등록되지 않은 서비스키'로 실패하고 나머지는 그대로 보여 준다)
  *
  * 금융위원회_개인사업자평가정보는 업체를 특정할 수 없는 익명 통계(지역·업종별 등급 분포)라 사업자번호 조회에는 쓰지 않는다.
@@ -20,7 +20,7 @@ const FSC_FIN = "https://apis.data.go.kr/1160100/service/GetFinaStatInfoService_
 const NTS_STATUS = "https://api.odcloud.kr/api/nts-businessman/v1/status";
 const SMPP_CERT = "https://apis.data.go.kr/B550598/smppCertInfo";
 /** 공공구매종합정보망 인증서 API 오퍼레이션: 장애인기업확인 상세조회, 여성기업확인 상세조회 */
-export const SMPP_CERT_OPS = { disabled: "getDspsnList", women: "getFnrssList" } as const;
+export const SMPP_CERT_OPS = { disabled: "getDspsnList", women: "getFnrssList", direct: "getDPrductList" } as const;
 
 export interface NtsStatus {
   /** 계속사업자 / 휴업자 / 폐업자, 미등록이면 빈 값 */
@@ -98,6 +98,13 @@ export interface CertRecord {
   valid: boolean;
 }
 
+/** 직접생산확인증명 한 건 (세부품명번호 10자리) */
+export interface DirectProduction {
+  itemNo: string;
+  validTo?: string;
+  valid: boolean;
+}
+
 export interface CorpLookup {
   bizno: string;
   corpName?: string;
@@ -112,6 +119,8 @@ export interface CorpLookup {
   sanctions?: Sanction[];
   /** 확인서 조회 결과. null 은 조회했지만 확인서가 없음, undefined 는 조회하지 못했거나 하지 않음 */
   certs?: { disabled?: CertRecord | null; women?: CertRecord | null };
+  /** 직접생산확인증명 (세부품명번호별). undefined 면 조회하지 못했다 */
+  directProduction?: DirectProduction[];
   /** 출처별 실패 사유: 한 곳이 실패해도 나머지는 보여 준다 */
   errors: Record<string, string>;
 }
@@ -267,6 +276,23 @@ async function smppCert(key: string, no: string, op: string): Promise<CertRecord
   return recs.find((c) => c.valid) ?? recs.sort((a, b) => (b.validTo ?? "").localeCompare(a.validTo ?? ""))[0];
 }
 
+/** 직접생산확인증명 전체 (세부품명별). 물품 공고의 세부품명과 대조한다 */
+async function directProduction(key: string, no: string): Promise<DirectProduction[]> {
+  const today = todayKst();
+  const r = await fetchRetry(`${SMPP_CERT}/${SMPP_CERT_OPS.direct}?${qs(key, { pageNo: "1", numOfRows: "500", bsnmNo: no, stdrDate: today.replace(/-/g, "") })}`);
+  const best = new Map<string, DirectProduction>();
+  for (const i of xmlItems(await r.text())) {
+    const itemNo = (i.detailPrdnmNo ?? "").replace(/\D/g, "");
+    if (!itemNo) continue;
+    const from = dateOf(i.validPdBeginDe);
+    const validTo = dateOf(i.validPdEndDe);
+    const rec = { itemNo, validTo, valid: (!from || from <= today) && (!validTo || validTo >= today) };
+    const cur = best.get(itemNo);
+    if (!cur || (rec.valid && !cur.valid) || (rec.valid === cur.valid && (rec.validTo ?? "") > (cur.validTo ?? ""))) best.set(itemNo, rec);
+  }
+  return [...best.values()];
+}
+
 async function fscCorp(key: string, no: string): Promise<FscCorp | undefined> {
   const items = itemsOf(await getJson(`${FSC_CORP}?${qs(key, { resultType: "json", pageNo: "1", numOfRows: "20", bzno: no })}`))
     .filter((i) => i.bzno === no && i.crno);
@@ -327,13 +353,14 @@ export async function lookupCompany(bizno: string, serviceKey: string): Promise<
   const errors: Record<string, string> = {};
   const catchTo = <T,>(src: string, p: Promise<T>) => p.catch((e: Error) => { errors[src] = e.message || "조회 실패"; return undefined; });
 
-  const [nts, nara, fsc, sanc, disabled, women] = await Promise.all([
+  const [nts, nara, fsc, sanc, disabled, women, direct] = await Promise.all([
     catchTo("nts", ntsStatus(serviceKey, no)),
     catchTo("nara", naraCorp(serviceKey, no)),
     catchTo("fsc", fscCorp(serviceKey, no)),
     catchTo("sanction", sanctions(serviceKey, no)),
     catchTo("disabledCert", smppCert(serviceKey, no, SMPP_CERT_OPS.disabled)),
     catchTo("womenCert", smppCert(serviceKey, no, SMPP_CERT_OPS.women)),
+    catchTo("directProduction", directProduction(serviceKey, no)),
   ]);
   const fin = fsc ? (await catchTo("finance", finance(serviceKey, fsc.crno))) ?? [] : [];
 
@@ -349,6 +376,7 @@ export async function lookupCompany(bizno: string, serviceKey: string): Promise<
     finance: fin,
     sanctions: sanc,
     certs: { disabled, women },
+    directProduction: direct,
     errors,
   };
 }

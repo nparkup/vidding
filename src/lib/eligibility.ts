@@ -7,7 +7,8 @@
  * 기업 쪽: 나라장터 사용자정보서비스의 등록 업종(코드)·소재지·부정당제재, 국세청 사업자 상태 (src/lib/corpLookup.ts)
  *
  * 원칙: 자동 판단이 틀리면 안 되므로 자료로 확실한 것만 '가능'·'불가'로 판정하고, 나머지는 '확인 필요'로 둔다.
- * 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 여기서 판단하지 않는다.
+ * 직접생산확인은 물품 공고의 세부품명과 공공구매종합정보망 직접생산확인증명을 대조해, 없으면 '확인 필요'로만 둔다
+ * (그 품명이 중소기업자간 경쟁제품인지는 공고서로 확인해야 한다). 중소기업·실적·등급 제한처럼 공고서 본문에만 있는 조건은 판단하지 않는다.
  */
 import type { EvalBasis } from "./criteria";
 import type { CorpLookup } from "./corpLookup";
@@ -103,7 +104,15 @@ function satisfies(req: LicenseReq, held: Map<string, HeldIndustry>): HeldIndust
 
 const worst = (vs: Verdict[]): Verdict => (vs.includes("불가") ? "불가" : vs.includes("확인 필요") ? "확인 필요" : "가능");
 
-export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizType?: string, now = new Date()): Eligibility {
+/** 물품 공고의 세부품명 (직접생산확인 대조용) */
+export interface GoodsInfo {
+  itemNo?: string;
+  itemName?: string;
+  /** 중소기업 제한 공고 */
+  smallBizOnly?: boolean;
+}
+
+export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizType?: string, now = new Date(), goods?: GoodsInfo): Eligibility {
   const checks: Check[] = [];
   const { nts, nara, errors } = corp;
   const by = q?.registerBy ? ` 입찰참가자격 등록 마감(${q.registerBy})까지` : " 입찰참가자격 등록 마감 전까지";
@@ -190,6 +199,22 @@ export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizTy
       checks.push({ label: "참가 지역", verdict: "불가", detail: `${where}. 본사 소재지 기준 지역제한 공고인데 본사가 참가가능지역 밖에 있습니다.` });
     } else {
       checks.push({ label: "참가 지역", verdict: "확인 필요", detail: `${where}. 소재지가 지역 밖입니다. 공고에 판단 기준(본사·지사)이 없어 공고서로 확인하세요.` });
+    }
+  }
+
+  // 5. 직접생산확인 (물품): 중소기업자간 경쟁제품은 그 세부품명의 직접생산확인증명이 있어야 참가할 수 있다
+  const itemNo = goods?.itemNo?.replace(/\D/g, "");
+  if (bizType === "물품" && itemNo && itemNo.length === 10) {
+    const name = `세부품명 ${goods?.itemName ? `${goods.itemName}(${itemNo})` : itemNo}`;
+    const rec = corp.directProduction?.find((d) => d.itemNo === itemNo);
+    if (!corp.directProduction) {
+      if (goods?.smallBizOnly) checks.push({ label: "직접생산확인", verdict: "확인 필요", detail: `${name}의 직접생산확인증명을 조회하지 못했습니다. 중소기업자간 경쟁제품이면 공공구매종합정보망에서 확인하세요.` });
+    } else if (rec?.valid) {
+      checks.push({ label: "직접생산확인", verdict: "가능", detail: `${name} 직접생산확인증명이 유효합니다${rec.validTo ? ` (~${rec.validTo})` : ""}.` });
+    } else if (rec) {
+      checks.push({ label: "직접생산확인", verdict: "확인 필요", detail: `${name} 직접생산확인증명의 유효기간이 지났습니다${rec.validTo ? ` (${rec.validTo})` : ""}. 중소기업자간 경쟁제품이면 갱신해야 참가할 수 있습니다.` });
+    } else if (goods?.smallBizOnly) {
+      checks.push({ label: "직접생산확인", verdict: "확인 필요", detail: `${name}의 직접생산확인증명이 없습니다. 중소기업자간 경쟁제품이면 직접생산확인을 받아야 참가할 수 있으니 공고서의 참가자격을 확인하세요.` });
     }
   }
 

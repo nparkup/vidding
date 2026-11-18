@@ -3,7 +3,8 @@
  * 사용: DATA_GO_KR_SERVICE_KEY=... npx tsx --conditions=react-server scripts/score/sheet-audit.ts [공고일 YYYYMMDD,…] [묶음당 공고 수]
  * 나라장터 첨부 서버(g2b.go.kr)에 닿는 곳(GitHub Actions)에서 돌린다.
  */
-import { writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
+import { gzipSync } from "zlib";
 import type { Bid, BidAttachment, BizType } from "../../src/lib/types";
 import { evalBasisOf, enrichSheet } from "../../src/lib/criteria";
 import { extractSheet, templateSheet, predict, DEFAULT_COMPANY, type EvalSheet } from "../../src/lib/evalscore";
@@ -79,9 +80,12 @@ async function main() {
     console.log(ex ? `--- 추출 (신뢰도 ${ex.confidence}) 통과 ${JSON.stringify(ex.pass)} 신인도 ${ex.trust?.name}\n${fmt(ex)}\n  notes: ${ex.notes.join(" ")}` : "--- 추출: 없음");
     console.log(`--- 예측에 쓰인 기준 (${act.source}) 통과 ${JSON.stringify(act.pass)} 하한 ${act.lowerLimit} 가격 ${act.price?.text ?? "-"}\n${fmt(act)}\n  예측 합계 ${p.total} / 투찰 구간 ${JSON.stringify(p.rateWindow)}`);
     summary.push(`${id}\t${biz}\t${LOCAL.test(it.ntceInsttNm ?? "") ? "지자체" : "국가"}\t${nego ? "협상" : "적격"}\t파일${texts.length}/${files.length}\t추출 ${ex ? `${ex.confidence} ${ex.items.length}항목 합${ex.items.reduce((s, i) => s + i.max, 0)}` : "없음"}\t${(it.ntceInsttNm ?? "").slice(0, 16)}`);
-    dump[id] = { it, texts, tpl, ex, act };
+    dump[id] = { biz, it, texts };
   }
   console.log(`\n==================== 요약\n${summary.join("\n")}`);
-  writeFileSync("sheet-audit.json", JSON.stringify(dump));
+  // 원문은 로컬에서 추출 규칙을 다시 돌려 볼 수 있도록 저장한다 (AUDIT_OUT)
+  const out = process.env.AUDIT_OUT ?? "sheet-audit.json.gz";
+  if (out.includes("/")) mkdirSync(out.replace(/\/[^/]+$/, ""), { recursive: true });
+  writeFileSync(out, gzipSync(JSON.stringify(dump)));
 }
 main().catch((e) => { console.error(e); process.exit(1); });

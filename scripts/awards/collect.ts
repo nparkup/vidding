@@ -89,6 +89,8 @@ async function call(path: string, op: string, params: Record<string, string>): P
       const auth = j.OpenAPI_ServiceResponse?.cmmMsgHeader;
       if (auth) {
         const msg = `${auth.returnReasonCode ?? ""} ${auth.returnAuthMsg ?? "인증 오류"}`;
+        // 01 어플리케이션 에러·04 HTTP 에러·05 서비스 연결실패는 잠깐 끊긴 것이다(2026-11-18 00:25 KST에 05로 수집이 멈춤). 쉬었다 다시 부른다
+        if (["01", "04", "05"].includes(auth.returnReasonCode ?? "")) { last = new Error(`${op}: ${msg}`); await sleep(30_000); continue; }
         // 하루 한도 초과(22)·키 오류 등: 이번 실행은 여기까지
         throw Object.assign(new Error(`${op}: ${msg}`), { fatal: true });
       }

@@ -127,6 +127,19 @@ export interface EvalSheet {
   refAmount?: number;
   /** 적용한 기준표와 근거 */
   criteria?: CriteriaRef;
+  /** 공고서에서 읽어 기준표보다 우선 적용한 값 (화면에 원문 근거로 보여 준다) */
+  noticeFacts?: NoticeFactView[];
+  /** 공고서의 경영상태 기준비율 (자기자본비율·유동비율, %) */
+  financeBase?: { equity?: number; current?: number };
+  /** 원문에 가격 배점이 없어 100점에서 나머지를 가격으로 채웠는지 */
+  priceFilled?: boolean;
+}
+
+/** 공고서에서 읽은 기준 한 가지 */
+export interface NoticeFactView {
+  label: string;
+  value: string;
+  quote: string;
 }
 
 const KIND_RULES: [ItemKind, RegExp][] = [
@@ -290,13 +303,25 @@ const tidy = (l: string) => l.replace(/^[\s\-·○◦•▪※*]+/, "").replace(
  * - 합계·소계·통과 기준 문장은 제외하고, 같은 이름은 한 번만 넣는다.
  * - 배점 합계가 100에 가까우면 신뢰도 높음.
  */
-export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | undefined {
-  const lines = text.split(/\r?\n/).map((l) => l.replace(/ /g, " ").trim()).filter(Boolean);
+interface Scan { found: EvalItem[]; lineOf: Map<EvalItem, number>; inline: Map<EvalItem, ScoreBand[]> }
+
+/** 배점표 머리글 ("평가항목 … 배점", "구분 … 배점한도") */
+const TABLE_HEAD_RE = /배\s*점/;
+const TABLE_HEAD_COL_RE = /(평가\s*항목|평가\s*요소|구\s*분|심사\s*항목|심사\s*분야|평가\s*분야)/;
+/** 배점표 끝 (합계 100) */
+const TABLE_END_RE = /^(?:[^\d]{0,12})?(?:합\s*계|총\s*계|총\s*점|계)\s*[:：]?\s*\(?\s*(100|1000)\s*(?:점)?\s*\)?/;
+
+/**
+ * lines[from, to) 에서 평가항목을 읽는다.
+ * window 가 참이면 배점표 안이라고 보고, "항목 이름 … 숫자"로 끝나는 줄을 종류와 상관없이 항목으로 읽는다.
+ */
+function scanItems(lines: string[], from: number, to: number, window: boolean): Scan {
   const found: EvalItem[] = [];
   const seen = new Set<string>();
-  let inTable = false;
+  let inTable = window;
   let lastLabel = "";
-  let cur = -1; // 지금 읽는 줄 번호
+  let curGroup: string | undefined;
+  let cur = from - 1;
   const lineOf = new Map<EvalItem, number>();
   const inline = new Map<EvalItem, ScoreBand[]>();
 
@@ -304,23 +329,31 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     let label = cleanLabel(rawLabel).replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
     // 표의 첫 열(구분)이 같은 줄에 붙어 오면 그룹 이름으로 떼어 낸다
     let group: string | undefined;
-    const g = label.match(/^((?:정량|정성|기술|가격|신인도)\s*(?:평가)?|수행\s*능력|경영\s*상태)\s+(.{2,})$/);
-    if (g) { group = g[1].replace(/\s/g, ""); label = g[2]; }
+    const g = label.match(/^((?:정량|정성|기술|가격|신인도)\s*(?:적\s*)?(?:평가)?(?:\s*\(\s*\d+\s*\))?|수행\s*능력|경영\s*상태)\s+(.{2,})$/);
+    if (g) { group = g[1].replace(/\s|\(\d+\)/g, ""); label = g[2]; curGroup = group; }
+    else if (window) group = curGroup;
+    label = label.replace(/^[○●◦·•▪\-]\s*/, "").trim();
     if (!label || label.length < 2 || /^\d/.test(label) || SKIP_RE.test(label)) return;
     if (!(max > 0 && max <= 80)) return;
+    // 배점표 안에서도 조건 문장·등급표 줄·신인도 세부 항목은 평가항목이 아니다
+    if (window && (/^(배\s*점|평가\s*항목|구\s*분)/.test(label) || /(인\s*경우|에\s*준하는|없음\s*없음|^[(（+]|^[A-Z][.)]\s|이상인|미만인|이하인)/.test(label) || (kindOf(label) === "bonus" && !/^(신인도|신뢰도|가\s*점|감\s*점)/.test(label)))) return;
     const key = label.replace(/\s/g, "");
     if (seen.has(key)) return;
     seen.add(key);
-    const it = item(label, max, kindOf(label), basis.slice(0, 80), group);
+    // 정성평가 묶음 안의 항목은 이름에 '기술능력'·'인력'이 있어도 위원이 매기는 정성 항목이다
+    const k = kindOf(label);
+    const it = item(label, max, group && /정성/.test(group) && k !== "price" ? "qualitative" : k, basis.slice(0, 80), group);
     lineOf.set(it, cur);
     found.push(it);
   };
 
-  for (const line of lines) {
-    cur++;
+  for (let n = from; n < to; n++) {
+    const line = lines[n];
+    cur = n;
+    if (window && n > from && (TABLE_END_RE.test(line.replace(/\s+/g, " ")) || (TABLE_HEAD_RE.test(line) && TABLE_HEAD_COL_RE.test(line) && found.length))) break;
     // 앞 항목의 점수 구간 줄("80% 이상 13점", "A0 이상 15점")은 새 항목으로 만들지 않는다
     if (found.length && isBandLine(line, found[found.length - 1].max, found[found.length - 1].kind)) { lastLabel = ""; continue; }
-    if (/배\s*점/.test(line) && /(평가\s*항목|평가\s*요소|구\s*분|심사\s*항목)/.test(line)) { inTable = true; continue; }
+    if (TABLE_HEAD_RE.test(line) && TABLE_HEAD_COL_RE.test(line)) { inTable = true; continue; }
     if (SKIP_RE.test(line) && /\d/.test(line)) { lastLabel = ""; continue; }
 
     const pts = [...line.matchAll(POINT_RE)];
@@ -355,8 +388,17 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
       continue;
     }
     if (inTable) {
-      const m = line.match(/^(.{2,40}?)\s+(\d{1,2}(?:\.\d{1,2})?)$/);
-      if (m && kindOf(m[1]) !== "other") { push(m[1], Number(m[2]), line); continue; }
+      // 배점표 안: "항목 이름 … 15" (등급별 점수 열이 뒤따르면 첫 숫자가 배점)
+      const m = line.match(/^(.{2,60}?)\s+(\d{1,2}(?:\.\d{1,2})?)(?:\s+\d{1,2}(?:\.\d{1,2})?){0,5}(?:\s+[가-힣()·\s]{0,12})?$/)
+        // 배점표 안에서는 배점 뒤에 평가 기준 문장이 이어져도 된다 ("1. 용역수행 실적 6 ○ 최근 10년 이내 …")
+        ?? (window ? line.match(/^(.{2,40}?)\s+(\d{1,2}(?:\.\d{1,2})?)\s+(?![\d.%점년건명])\S.*$/) : null);
+      if (m && (window || kindOf(m[1]) !== "other") && !/^\(?\d/.test(cleanLabel(m[1]))) {
+        // 그룹 머리("기술(80) 소 계 20")와 그룹 배점만 있는 줄은 건너뛴다
+        if (!/소\s*계/.test(m[1])) { push(m[1].replace(/\s*\(\s*\d+\s*\)\s*$/, ""), Number(m[2]), line); continue; }
+      }
+      // "입찰가격평가(20) 20", "수행실적(5)" 처럼 괄호 배점
+      const p = line.match(/^(.{2,40}?)\s*\(\s*(\d{1,2}(?:\.\d)?)\s*(?:점)?\s*\)\s*$/);
+      if (window && p && kindOf(p[1]) !== "other") { push(p[1], Number(p[2]), line); continue; }
     }
     // 다음 줄에 점수만 있는 경우를 위해 기억
     lastLabel = kindOf(line) !== "other" && line.length <= 40 ? line : "";
@@ -368,13 +410,63 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     let j = i + 1;
     while (j < found.length && acc + found[j].max <= found[i].max + 0.001) { acc += found[j].max; j++; }
     const groupLike = /(정량|정성|계량|비계량|기술\s*능력|평가\s*분야|부문|분야)/.test(found[i].label) && !["performance", "credit", "price", "staff", "years"].includes(found[i].kind);
-    if (groupLike && j > i + 2 && Math.abs(acc - found[i].max) < 0.01) {
+    // 배점표 안에서는 바로 뒤 2개 이상 항목의 합과 배점이 같은 항목(대분류)을 머리글로 본다
+    if ((groupLike ? j > i + 2 : window && found[i].kind !== "price" && j > i + 2) && Math.abs(acc - found[i].max) < 0.01) {
       const group = found[i].label.replace(/\s*\(.*$/, "");
       for (let k = i + 1; k < j; k++) found[k].group = group;
       found.splice(i, 1);
       i = j - 2;
     }
   }
+  return { found, lineOf, inline };
+}
+
+/** "평 가 항 목", "배 점" 처럼 한 글자씩 띄운 표 머리글을 붙인다 */
+const despace = (l: string) => l.replace(/(?:(?<![가-힣])[가-힣] ){1,}[가-힣](?![가-힣])/g, (m) => (m.length <= 3 && !/^(배 점|합 계|총 계|소 계|구 분)$/.test(m) ? m : m.replace(/ /g, "")));
+const prepLines = (text: string) => text.split(/\r?\n/).map((l) => despace(l.replace(/\u00a0/g, " ").trim())).filter(Boolean);
+
+const QUANT_KINDS: ItemKind[] = ["performance", "credit", "staff", "years", "bonus", "finance", "techGrade"];
+
+/**
+ * 협상 제안요청서의 정량평가 표만 읽는다 (예: "정량적 평가 (20점)의 평가항목 및 기준"의 실적 6 · 경영상태 2 · 인력 10 · 신인도 2).
+ * 전체 배점표를 못 읽었을 때 정량 항목은 공고 배점으로, 나머지 기술점수는 정성평가로 둔다.
+ */
+export function extractQuantBlock(text: string): { items: EvalItem[]; total: number; quote: string } | undefined {
+  const lines = prepLines(text);
+  let best: { items: EvalItem[]; total: number; quote: string } | undefined;
+  for (let n = 0; n < lines.length; n++) {
+    if (!(TABLE_HEAD_RE.test(lines[n]) && TABLE_HEAD_COL_RE.test(lines[n]))) continue;
+    const ctx = lines.slice(Math.max(0, n - 3), n + 1).join(" ");
+    const declared = ctx.match(/정량\s*(?:적)?\s*평가[^\d]{0,6}\(?\s*(\d{1,2})\s*점/);
+    if (!/정량/.test(ctx)) continue;
+    const { found } = scanItems(lines, n, Math.min(lines.length, n + 30), true);
+    const items = found.filter((i) => QUANT_KINDS.includes(i.kind) || i.kind === "other");
+    if (items.length < 2 || items.length !== found.length) continue;
+    const total = items.reduce((a, i) => a + i.max, 0);
+    if (total < 5 || total > 60 || (declared && Math.abs(total - Number(declared[1])) > 0.01)) continue;
+    if (!items.some((i) => i.kind === "performance" || i.kind === "credit")) continue;
+    if (!best || items.length > best.items.length) best = { items, total, quote: ctx.slice(0, 100) };
+  }
+  return best;
+}
+
+export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | undefined {
+  const lines = prepLines(text);
+  // 문서 전체를 읽은 결과와, 배점표 머리글마다 그 표만 읽은 결과 가운데 배점 합계가 100에 가장 맞는 것을 쓴다
+  // (협상 제안요청서는 배점표 뒤에 세부 평가기준·등급표가 이어져 문서 전체를 읽으면 같은 배점이 두세 번 잡힌다)
+  const sumOf = (s: Scan) => s.found.reduce((a, i) => a + i.max, 0);
+  const cands: Scan[] = [scanItems(lines, 0, lines.length, false)];
+  for (let n = 0; n < lines.length; n++) {
+    if (!(TABLE_HEAD_RE.test(lines[n]) && TABLE_HEAD_COL_RE.test(lines[n]))) continue;
+    cands.push(scanItems(lines, n, Math.min(lines.length, n + 70), true));
+  }
+  const fit = (s: Scan) => {
+    const sum = sumOf(s);
+    if (s.found.length < 2 || s.found.filter((i) => i.kind === "price").length > 1) return -1e9;
+    const off = Math.abs(sum - 100);
+    return (off <= 0.5 ? 1000 : off <= 2 ? 500 : 0) - off + Math.min(s.found.length, 12) * 2 + (s.found.some((i) => i.kind === "price") ? 5 : 0);
+  };
+  const { found, lineOf, inline } = cands.reduce((a, b) => (fit(b) > fit(a) ? b : a));
 
   if (found.length < 2) return undefined;
 
@@ -420,10 +512,12 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
   const detailed = found.filter((i) => i.bands || i.recognition || i.criteria).length;
   if (detailed) notes.push(`세부기준(점수 구간·인정 범위·평가 요소)을 ${detailed}개 항목에서 읽어 함께 적용했습니다.`);
   if (!near100) notes.push("배점 합계가 100점과 달라 일부 항목이 빠졌거나 세부항목이 겹쳤을 수 있습니다. 항목을 확인해 주세요.");
+  let priceFilled = false;
   if (!found.some((i) => i.kind === "price") && method !== "종합심사") {
     const priceMax = Math.max(0, 100 - sum);
     if (priceMax >= 5) {
       found.push(item("입찰가격", priceMax, "price", "원문에 가격 배점이 없어 100점에서 나머지로 계산"));
+      priceFilled = true;
       notes.push(`가격 배점을 찾지 못해 나머지 ${round1(priceMax)}점을 입찰가격으로 두었습니다.`);
     }
   }
@@ -447,6 +541,7 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     panelRule: parsePanelRule(text),
     recognition: recognitionAll.length ? recognitionAll : undefined,
     trust: parseTrustRule(text, fallback?.trust ?? generalServiceRule()),
+    priceFilled: priceFilled || undefined,
   };
 }
 
@@ -774,7 +869,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   };
   if (sheet.pass?.kind === "total") {
     judge(total, sheet.pass.score);
-    passLabel = `종합평점 ${sheet.pass.score}점 이상`;
+    passLabel = `${sheet.method === "적격심사" ? "종합평점" : "합산점수"} ${sheet.pass.score}점 이상`;
   } else if (sheet.pass?.kind === "techRatio") {
     const need = round1(techMax * sheet.pass.ratio);
     judge(techScore, need);

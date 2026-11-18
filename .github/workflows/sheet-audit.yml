@@ -10,12 +10,9 @@ on:
       per:
         description: "묶음(업무 × 지자체/국가)당 공고 수"
         default: "4"
-  push:
-    branches: ["claude/**"]
-    paths: ["scripts/score/sheet-audit.ts", "src/lib/evalscore.ts", "src/lib/criteria.ts", "src/lib/nara/docExtract.ts", ".github/workflows/sheet-audit.yml"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   audit:
@@ -32,12 +29,8 @@ jobs:
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: npx tsx --conditions=react-server scripts/score/sheet-audit.ts "${{ inputs.days || '20261112,20261113,20261116,20261117' }}" "${{ inputs.per || '8' }}"
-        # 작업 브랜치에서 돌 때만: 받은 원문을 브랜치에 올려 로컬에서 추출 규칙을 다시 돌려 볼 수 있게 한다 (PR 전에 지운다)
-      - name: 원문 저장 (작업 브랜치)
-        if: github.event_name == 'push'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          mkdir -p .audit && mv sheet-audit.json.gz .audit/
-          git add .audit/sheet-audit.json.gz
-          git commit -m "공고 평가표 대조 원문 [skip ci]" && git push origin HEAD:${{ github.ref_name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sheet-audit
+          path: sheet-audit.json.gz
+          retention-days: 7

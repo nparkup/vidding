@@ -6,8 +6,9 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { gzipSync } from "zlib";
 import type { Bid, BidAttachment, BizType } from "../../src/lib/types";
-import { evalBasisOf, enrichSheet } from "../../src/lib/criteria";
-import { extractSheet, templateSheet, predict, DEFAULT_COMPANY, type EvalSheet } from "../../src/lib/evalscore";
+import { adoptable, bidSheet, evalBasisOf } from "../../src/lib/criteria";
+import { readNoticeCriteria } from "../../src/lib/noticeCriteria";
+import { extractQuantBlock, extractSheet, templateSheet, predict, DEFAULT_COMPANY, type EvalSheet } from "../../src/lib/evalscore";
 import { download, textOf } from "../../src/lib/nara/docExtract";
 
 type Item = Record<string, string | undefined>;
@@ -68,8 +69,10 @@ async function main() {
     const bid = { id, contractMethod: nego ? "협상에 의한 계약" : "적격심사", bizType: biz, baseAmount: amt, category: "기타 용역", lowerLimitRate: 87.745 } as unknown as Bid;
     const basis = evalBasisOf(it);
     const tpl = templateSheet(bid, basis);
-    const ex = extractSheet(texts.map((t) => t.text).join("\n"), tpl);
-    const act = ex ? enrichSheet(ex, tpl) : tpl;
+    const all = texts.map((t) => t.text).join("\n");
+    const ex = extractSheet(all, tpl);
+    const notice = readNoticeCriteria(all);
+    const act = bidSheet(bid, basis, { extracted: ex, notice, quant: nego ? extractQuantBlock(all) : undefined });
     const p = predict(act, bid, DEFAULT_COMPANY);
     console.log(`\n==================== ${id} [${biz}] ${it.ntceInsttNm} / ${it.dminsttNm}`);
     console.log(`${it.bidNtceNm}\n낙찰방법: ${it.sucsfbidMthdNm} | 하한율 ${it.sucsfbidLwltRate} | 금액 ${amt.toLocaleString()} | 추정 ${it.presmptPrce}`);
@@ -83,8 +86,9 @@ async function main() {
     else console.log("| (평가 기준 문구 없음)");
     console.log(`--- 기준표 (${tpl.title}) 통과 ${JSON.stringify(tpl.pass)} 하한 ${tpl.lowerLimit}\n${fmt(tpl)}`);
     console.log(ex ? `--- 추출 (신뢰도 ${ex.confidence}) 통과 ${JSON.stringify(ex.pass)} 신인도 ${ex.trust?.name}\n${fmt(ex)}\n  notes: ${ex.notes.join(" ")}` : "--- 추출: 없음");
-    console.log(`--- 예측에 쓰인 기준 (${act.source}) 통과 ${JSON.stringify(act.pass)} 하한 ${act.lowerLimit} 가격 ${act.price?.text ?? "-"}\n${fmt(act)}\n  예측 합계 ${p.total} / 투찰 구간 ${JSON.stringify(p.rateWindow)}`);
-    summary.push(`${id}\t${biz}\t${LOCAL.test(it.ntceInsttNm ?? "") ? "지자체" : "국가"}\t${nego ? "협상" : "적격"}\t파일${texts.length}/${files.length}\t추출 ${ex ? `${ex.confidence} ${ex.items.length}항목 합${ex.items.reduce((s, i) => s + i.max, 0)}` : "없음"}\t${(it.ntceInsttNm ?? "").slice(0, 16)}`);
+    console.log(`--- 공고서 기준: ${(act.noticeFacts ?? []).map((f) => `${f.label}=${f.value}`).join(" | ") || "없음"}`);
+    console.log(`--- 예측에 쓰인 기준 (${ex && adoptable(ex, basis) ? "원문 배점표" : act.title}) 통과 ${JSON.stringify(act.pass)} 하한 ${act.lowerLimit} 가격 ${act.price?.text ?? "-"}\n${fmt(act)}\n  예측 합계 ${p.total} / 투찰 구간 ${JSON.stringify(p.rateWindow)}`);
+    summary.push(`${id}\t${biz}\t${LOCAL.test(it.ntceInsttNm ?? "") ? "지자체" : "국가"}\t${nego ? "협상" : "적격"}\t파일${texts.length}/${files.length}\t배점표 ${ex && adoptable(ex, basis) ? "사용" : "없음"}\t통과 ${JSON.stringify(tpl.pass)}→${JSON.stringify(act.pass)}\t공고서 기준 ${act.noticeFacts?.length ?? 0}가지\t${(it.ntceInsttNm ?? "").slice(0, 16)}`);
     dump[id] = { biz, it, texts };
   }
   console.log(`\n==================== 요약\n${summary.join("\n")}`);

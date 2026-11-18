@@ -2,7 +2,7 @@ import "server-only";
 import type { BidQual } from "./eligibility";
 import type { AppSettings, Bid, BidAttachment, ClientProfile, Inquiry, MailLog, WeeklyReport } from "./types";
 import { adapter } from "./db";
-import type { EvalSheet } from "./evalscore";
+import type { ExtractedSheet } from "./nara/docExtract";
 import type { AwardStats } from "./rivalRate";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
@@ -40,7 +40,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, { sheet: EvalSheet; file: string }>; quals?: Record<string, BidQual>; awardStats?: AwardStats; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -75,9 +75,9 @@ export async function getBids(): Promise<Bid[]> {
 }
 
 /** 공고별 첨부파일 목록 (정적 빌드에서 미리 받아 둔 것). 서버 배포에서는 /api/premium/attachments 로 공고마다 조회 */
-let sheetMemo: Record<string, { sheet: EvalSheet; file: string }> | null = null;
-/** 빌드 때 첨부에서 미리 추출한 평가표 */
-export async function getExtractedSheets(): Promise<Record<string, { sheet: EvalSheet; file: string }>> {
+let sheetMemo: Record<string, ExtractedSheet> | null = null;
+/** 빌드 때 첨부에서 미리 읽은 평가표와 공고서의 기준 */
+export async function getExtractedSheets(): Promise<Record<string, ExtractedSheet>> {
   if (!process.env.BIDS_FILE) return {};
   sheetMemo ??= fileBids()?.sheets ?? {};
   return sheetMemo;

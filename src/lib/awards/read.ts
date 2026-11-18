@@ -2,7 +2,7 @@
  * 낙찰 저장소(R2)에서 한 업체의 낙찰 건을 읽는다. Cloudflare Worker(worker/corp-lookup)가 R2 바인딩으로 부른다.
  * 조달청 API를 부르지 않으므로 호출 한도와 상관없이 저장 기간(10년) 전체를 한 번에 돌려준다.
  */
-import { SHARD_COLS, firstLicense, shardOf, type AwardMeta, type ShardFile } from "./format";
+import { SHARD_COLS, firstLicense, shardOf, type AwardMeta, type ShardFile, type TopBidder } from "./format";
 import type { NtceClass, PerfBiz, PerfWin } from "../perfLookup";
 
 /** Worker R2 바인딩 중 쓰는 부분만 */
@@ -28,6 +28,8 @@ export interface AwardWin extends PerfWin {
   rng: string;
   /** 적격심사 기준 (행자부·조달청 등) */
   basis: string;
+  /** 개찰 순위 1~5위 (아직 안 받은 공고는 빈 목록) */
+  top: { rank: number; bizno: string; name: string; amount: number; rate: number }[];
 }
 
 export interface AwardLookup {
@@ -78,6 +80,7 @@ export async function readAwards(bucket: R2BucketLike | undefined, bizno: string
       lwlt: c.lwlt === undefined ? 0 : (r[c.lwlt] as number) || 0,
       rng: c.rng === undefined ? "" : (r[c.rng] as string) || "",
       basis: c.basis === undefined ? "" : (r[c.basis] as string) || "",
+      top: c.top === undefined ? [] : ((r[c.top] as TopBidder[]) || []).map(([rank, bizno, name, amount, rate]) => ({ rank, bizno, name, amount, rate })),
       cls: {
         bidNtceNo: r[c.no] as string,
         clsfcNo: (r[c.clsNo] as string) || undefined,

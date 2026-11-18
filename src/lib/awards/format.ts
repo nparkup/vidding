@@ -8,8 +8,10 @@
  *                                          파일 하나를 작게(약 200건) 해 중계 서버가 무료 CPU 한도(요청당 10ms) 안에서 읽게 한다
  * - stats/rates.json                     : 업무·계약방법·금액대·업종별 낙찰률 통계 (최근 1년, 전체 기간)
  * - stats/agency.json.gz                 : 수요기관별 적격심사·협상계약 낙찰률 목록 (같은 기관의 과거 유사 공고 찾기용)
+ * - raw/rank/{op}/{YYYYMMDD}.json.gz     : 그 주 낙찰 공고의 개찰 순위 1~5위 (공고마다 따로 불러 받는다. 참가 1곳인 공고는 부르지 않는다)
  * - stats/meta.json                      : 수집 범위·완료 여부·용량
  * - manifest.json                        : 수집 상태 (어떤 주를 언제 받았는지, 파일별 크기)
+ * - rank-state.json                      : 개찰 순위 수집 상태 (따로 도는 실행이 쓴다. 주별 받은 공고 수, 날짜별 호출 수)
  */
 
 /** 저장 기간(년). 2026-11-15 사용자 요청으로 3년 → 5년, 2026-11-17 5년 → 10년 */
@@ -30,8 +32,12 @@ export const BIZ_OF_OP: Record<string, AwardBiz> = { Servc: "용역", Cnstwk: "�
 export const SHARD_COLS = [
   "bizno", "winner", "no", "ord", "biz", "title", "agency", "amount", "rate", "date", "bidders",
   "method", "price", "clsNo", "clsNm", "mid", "lrg", "work", "region", "lic", "base", "plnprc",
-  "lwlt", "rng", "basis",
+  "lwlt", "rng", "basis", "top",
 ] as const;
+/** 개찰 순위 몇 위까지 저장하는지 (2026-11-18 사용자 요청) */
+export const RANK_TOP = 5;
+/** 개찰 순위 한 줄: [순위, 사업자번호, 업체명, 투찰금액(원), 투찰률(%)] */
+export type TopBidder = [rank: number, bizno: string, name: string, amount: number, rate: number];
 export type ShardRow = [
   bizno: string, winner: string, no: string, ord: string, biz: AwardBiz, title: string, agency: string,
   /** 낙찰금액(원) */ amount: number, /** 낙찰률(%), 없으면 0 */ rate: number, /** 최종낙찰일 YYYY-MM-DD */ date: string,
@@ -41,6 +47,7 @@ export type ShardRow = [
   /** 기초금액(원), 없으면 0 */ base: number, /** 예정가격(원), 없으면 0 */ plnprc: number,
   /** 낙찰하한율(%), 없으면 0 */ lwlt: number, /** 예비가격 범위 (예: "-2~+2"), 없으면 "" */ rng: string,
   /** 적격심사 기준 (행자부·조달청 등), 없으면 "" */ basis: string,
+  /** 개찰 순위 1~5위, 아직 안 받았거나 참가 1곳이면 [] */ top: TopBidder[],
 ];
 
 export interface ShardFile { v: 1; cols: readonly string[]; rows: ShardRow[] }
@@ -59,6 +66,8 @@ export interface AwardMeta {
   /** 낙찰·공고·지역·업종 자료를 저장 기간을 모두 받았는지 */
   complete: boolean;
   rows: number;
+  /** 개찰 순위(1~5위)를 받은 낙찰 주 수 (업무별 주 합 / 3), 없으면 0 */
+  rankWeeks?: number;
   /** R2에 올린 파일 크기 합 (바이트) */
   bytes: number;
 }

@@ -30,3 +30,11 @@ export function dday(days: number): string {
   if (days === 1) return "D-1";
   return `D-${days}`;
 }
+
+/** 한국 시간 기준 YYYY-MM-DD. 날짜가 없거나 잘못되면 빈 문자열 */
+export function isoDate(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-CA", tz);
+}

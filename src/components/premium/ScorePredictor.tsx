@@ -19,6 +19,7 @@ import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from 
 import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
+import { CloseDay } from "../CloseDay";
 import { TrustPicker } from "./TrustPicker";
 import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
 
@@ -291,7 +292,7 @@ export function ScorePredictor() {
                 {matches.map((m) => (
                   <li key={m.id}>
                     <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
-                      <span className="block truncate font-semibold">{m.title}</span>
+                      <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDay iso={m.closeAt} />{m.title}</span>
                       <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
                     </button>
                   </li>
@@ -335,7 +336,7 @@ export function ScorePredictor() {
           <Step n={1} title="공고 선택" />
           <div className="mt-4 rounded-2xl bg-paper p-4">
             <p className="text-xs text-ink-500">{bid.bizType ?? "용역"} · {bid.category} · {bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
-            <p className="mt-1 font-bold leading-snug">{bid.title}</p>
+            <p className="mt-1 font-bold leading-snug"><CloseDay iso={bid.closeAt} />{bid.title}</p>
             <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
           </div>
           {searchBox}

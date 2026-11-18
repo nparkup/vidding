@@ -4,10 +4,13 @@ name: 낙찰 저장소 수집
 # 처음 채우기(10년치)는 수동 실행(workflow_dispatch, max_minutes 200)으로 채운다. 예약 실행은 매일 05:10 KST 한 번이고,
 # 최근 2주만 다시 받아 몇 분이면 끝난다. 처음 채우기가 시간 한도로 덜 끝났으면 예약 실행이 남은 주를 이어 받는다.
 # 필요한 저장소 Secrets: DATA_GO_KR_SERVICE_KEY, CLOUDFLARE_API_TOKEN (Workers R2 Storage Write 권한), CLOUDFLARE_ACCOUNT_ID
+# 개찰 순위 1~5위는 매일 00:40 KST 예약 실행(mode rank)이 따로 받는다. 공고마다 불러야 해서 하루 호출 한도(RANK_DAILY_CALLS) 안에서
+# 최근 주부터 채우고, 수집 실행과 상태 파일이 달라 동시에 돌아도 된다. 다음 수집 실행의 합치기가 샤드에 붙인다.
 # 용량 한도: R2 사용량이 승인 용량(저장소 변수 R2_APPROVED_BYTES, 기본 5GB)의 90%에 닿거나 예상 최종 용량이 넘으면 올리지 않고 실패로 끝난다.
 on:
   schedule:
     - cron: "10 20 * * *"   # 매일 05:10 KST (추가분. 사이트 배포 06:40 전에 끝난다)
+    - cron: "40 15 * * *"   # 매일 00:40 KST 개찰 순위 (하루 호출 한도가 새로 시작된 뒤)
   # PR에서는 수집하지 않고 토큰의 R2 읽기·쓰기 권한만 확인한다
   pull_request:
     paths:
@@ -17,20 +20,24 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "collect = 수집, raw = 원자료만 받기(샤드·통계는 그대로), check = R2 권한만 확인"
+        description: "collect = 수집, raw = 원자료만 받기(샤드·통계는 그대로), rank = 개찰 순위만 받기, check = R2 권한만 확인"
         default: collect
         type: choice
-        options: [collect, raw, check]
+        options: [collect, raw, rank, check]
       max_minutes:
         description: "이번 실행에서 받는 시간 (분, 최대 300)"
         default: "100"
+      rank_dry:
+        description: "rank 시험 실행: 한 주만 받아 보여 주고 R2에 쓰지 않는다"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 # PR 점검(R2 권한 확인)은 따로 돌린다: 같은 그룹이면 대기 중인 수집 실행을 밀어내 취소시킨다
 concurrency:
-  group: awards-${{ github.event_name == 'pull_request' && github.ref || 'collect' }}
+  group: awards-${{ (inputs.mode == 'rank' || github.event.schedule == '40 15 * * *') && 'rank' || github.event_name == 'pull_request' && github.ref || 'collect' }}
   cancel-in-progress: false
 
 jobs:
@@ -42,7 +49,9 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       R2_APPROVED_BYTES: ${{ vars.R2_APPROVED_BYTES || '5000000000' }}
-      MAX_MINUTES: ${{ inputs.max_minutes || '100' }}
+      MODE: ${{ github.event.schedule == '40 15 * * *' && 'rank' || inputs.mode || 'collect' }}
+      MAX_MINUTES: ${{ inputs.max_minutes || (github.event.schedule == '40 15 * * *' && '300') || '100' }}
+      RANK_DRY: ${{ inputs.rank_dry && '1' || '' }}
       NODE_OPTIONS: --max-old-space-size=11264
     steps:
       - uses: actions/checkout@v4
@@ -53,19 +62,22 @@ jobs:
       - run: npm ci
       - name: R2 권한 확인
         run: npx tsx scripts/awards/collect.ts check
+      - name: 개찰 순위
+        if: github.event_name != 'pull_request' && env.MODE == 'rank'
+        run: npx tsx scripts/awards/collect.ts rank
       # 받은 원자료를 실행 사이에 보관해 R2에서 다시 내려받지 않는다 (없어도 R2에서 받아 온다)
       - name: 원자료 캐시 복원
-        if: github.event_name != 'pull_request' && inputs.mode != 'check'
+        if: github.event_name != 'pull_request' && env.MODE != 'check' && env.MODE != 'rank'
         uses: actions/cache/restore@v4
         with:
           path: .cache/awards
           key: awards-raw-${{ github.run_id }}
           restore-keys: awards-raw-
       - name: 수집
-        if: github.event_name != 'pull_request' && inputs.mode != 'check'
+        if: github.event_name != 'pull_request' && env.MODE != 'check' && env.MODE != 'rank'
         run: npx tsx scripts/awards/collect.ts ${{ inputs.mode == 'raw' && 'raw' || '' }}
       - name: 원자료 캐시 저장
-        if: always() && github.event_name != 'pull_request' && inputs.mode != 'check'
+        if: always() && github.event_name != 'pull_request' && env.MODE != 'check' && env.MODE != 'rank'
         uses: actions/cache/save@v4
         with:
           path: .cache/awards

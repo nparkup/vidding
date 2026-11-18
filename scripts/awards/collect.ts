@@ -4,6 +4,7 @@
  *   npx tsx scripts/awards/collect.ts            수집 + 샤드·통계 다시 만들기
  *   npx tsx scripts/awards/collect.ts check      토큰의 R2 읽기·쓰기 권한만 확인
  *   npx tsx scripts/awards/collect.ts raw        원자료만 받고 샤드·통계는 그대로 둔다 (배포 전 코드로 미리 채울 때)
+ *   npx tsx scripts/awards/collect.ts rank       개찰 순위 1~5위만 받는다 (수집과 따로, 매일 하루 호출 한도 안에서)
  *
  * 1. 한 주(월~일) 단위로 받는다. 낙찰정보·입찰공고정보 API는 한 번에 7일까지만 조회된다(2026-11-10 공지).
  *    - 낙찰: 낙찰정보서비스 getScsbidListSttus{Servc,Cnstwk,Thng} (최종낙찰자 목록, 등록일 기준)
@@ -14,16 +15,19 @@
  *    최근 주부터 거꾸로 받고, 아직 끝나지 않은 최근 2주는 매번 다시 받는다. 끝난 주는 다시 받지 않는다.
  * 2. 실행 한 번에 MAX_MINUTES 분까지만 받고 멈춘다. 다음 실행이 이어 받는다(처음 채우는 기간은 며칠에 나눠 받는다).
  * 3. 받은 원자료를 공고번호로 합쳐 사업자번호별 샤드와 낙찰률 통계를 만들고, 바뀐 파일만 올린다.
+ * 개찰 순위: 낙찰정보서비스 getOpengResultListInfoOpengCompt 는 기간 조회가 안 되고 공고번호마다 불러야 한다(2026-11-18 확인).
+ *    10년치 약 300만 공고라 하루 한도(운영계정 10만 회) 안에서 최근 주부터 약 4주에 나눠 받는다. 참가 1곳인 공고는 부르지 않는다.
+ *    상태는 rank-state.json 에 따로 둬서 수집 실행과 동시에 돌아도 manifest.json 을 덮어쓰지 않는다.
  * 4. 용량 한도: R2 사용량이 승인 용량(R2_APPROVED_BYTES, 기본 5GB)의 90%에 닿거나, 예상 최종 용량이 승인 용량을 넘으면
  *    올리기 전에 멈추고 실패로 끝낸다(사용자 승인 후 R2_APPROVED_BYTES 를 올려야 이어진다).
  */
 import { createHash } from "crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { gunzipSync, gzipSync } from "zlib";
 import {
-  AWARD_YEARS, BIZ_OF_OP, NOTICE_LEAD_WEEKS, OPS, SHARD_COLS, addDays, awardStartWeek, iso, kstNow, mondayOf, rateMethodOf,
-  firstLicense, shardOf, weeksBetween, type AwardBiz, type AwardMeta, type ShardFile, type ShardRow,
+  AWARD_YEARS, BIZ_OF_OP, NOTICE_LEAD_WEEKS, OPS, RANK_TOP, SHARD_COLS, addDays, awardStartWeek, iso, kstNow, mondayOf, rateMethodOf,
+  firstLicense, shardOf, weeksBetween, ymd, type AwardBiz, type AwardMeta, type ShardFile, type ShardRow, type TopBidder,
 } from "../../src/lib/awards/format";
 import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
@@ -169,9 +173,11 @@ const local = (key: string) => join(WORK, key);
 const fmtGB = (b: number) => `${(b / 1e9).toFixed(2)}GB`;
 
 let manifest: Manifest = { v: 1, raw: {}, files: {} };
+let rankState: RankState = { v: 1, weeks: {}, days: {} };
 let r2Measured = 0;
 
-const usedBytes = () => Object.values(manifest.files).reduce((s, f) => s + f.bytes, 0);
+const rankBytes = () => Object.values(rankState.weeks).reduce((s, w) => s + w.bytes, 0);
+const usedBytes = () => Object.values(manifest.files).reduce((s, f) => s + f.bytes, 0) + rankBytes();
 
 class QuotaStop extends Error {}
 
@@ -266,6 +272,152 @@ async function collect(jobs: Job[]): Promise<{ done: number; stopped?: string }>
   return { done, stopped };
 }
 
+/* ---------- 개찰 순위 1~5위 ---------- */
+
+/** 하루 호출 한도 (운영계정 10만 회 중 사이트 조회 몫을 남긴다) */
+const RANK_DAILY = Number(process.env.RANK_DAILY_CALLS || 95_000);
+const RANK_CONCURRENCY = 4;
+const RANK_PATH = "/as/ScsbidInfoService";
+const RANK_OP = "getOpengResultListInfoOpengCompt";
+/** 시험 실행: R2에 쓰지 않고 받은 결과만 보여 준다 */
+const RANK_DRY = process.env.RANK_DRY === "1";
+
+interface RankWeek { bids: number; rows: number; bytes: number; at: string; calls: number; /** 이 주 낙찰 원자료를 받은 시각. 같으면 다시 볼 필요가 없다. 덜 받았으면 "" */ awardAt: string }
+interface RankState { v: 1; weeks: Record<string, RankWeek>; days: Record<string, number>; updatedAt?: string }
+/** [분류, 재입찰, 순위, 사업자번호, 업체명, 투찰금액, 투찰률, 추첨번호1, 추첨번호2] */
+type RankRow = [string, string, number, string, string, number, number, number, number];
+/** [공고번호, 차수, 1~5위 줄] (빈 목록이면 불렀지만 결과가 없던 공고) */
+type RankEntry = [string, string, RankRow[]];
+
+const rankKey = (op: string, w: string) => `raw/rank/${op}/${w}.json.gz`;
+
+async function saveRankState() {
+  if (RANK_DRY) return;
+  rankState.updatedAt = new Date().toISOString();
+  await r2Put("rank-state.json", Buffer.from(JSON.stringify(rankState)), "application/json");
+}
+
+/** 한 공고의 1~5위. want = 분류|재입찰 → 참가업체 수. 보통 10줄 한 번이면 되고, 분류가 여럿이라 모자라면 큰 쪽으로 다시 받는다 */
+async function fetchRanks(no: string, ord: string, want: Map<string, number>): Promise<RankRow[]> {
+  const pick = (items: Item[]): RankRow[] => items.map((i): RankRow => [
+    t(i.bidClsfcNo), t(i.rbidNo) || "000", n(i.opengRank), t(i.prcbdrBizno).replace(/\D/g, ""), t(i.prcbdrNm),
+    n(i.bidprcAmt), n(i.bidprcrt), n(i.drwtNo1), n(i.drwtNo2),
+  ]).filter((r) => r[2] >= 1 && r[2] <= RANK_TOP);
+  const enough = (rows: RankRow[]) => [...want].every(([k, c]) => rows.filter((r) => `${r[0]}|${r[1]}` === k).length >= Math.min(RANK_TOP, c));
+  const uniq = (rows: RankRow[]) => [...new Map(rows.map((r) => [`${r[0]}|${r[1]}|${r[2]}|${r[3]}`, r])).values()];
+  const p = { bidNtceNo: no, bidNtceOrd: ord };
+  const first = await call(RANK_PATH, RANK_OP, { ...p, numOfRows: "10", pageNo: "1" });
+  if (first.total <= first.items.length || enough(pick(first.items))) return uniq(pick(first.items));
+  const rows: RankRow[] = [];
+  const pages = Math.min(3, Math.ceil(first.total / ROWS));
+  for (let pg = 1; pg <= pages; pg++) {
+    rows.push(...pick((await call(RANK_PATH, RANK_OP, { ...p, numOfRows: String(ROWS), pageNo: String(pg) })).items));
+    if (enough(rows)) break;
+  }
+  return uniq(rows);
+}
+
+async function rankMode() {
+  const m = await r2Get("manifest.json");
+  if (m) manifest = JSON.parse(m.toString()) as Manifest;
+  const rs = await r2Get("rank-state.json");
+  if (rs) rankState = JSON.parse(rs.toString()) as RankState;
+  r2Measured = (await r2BucketBytes()) ?? 0;
+  const today = kstNow();
+  const day = ymd(today);
+  const weeks = weeksBetween(awardStartWeek(today), mondayOf(today)).reverse();
+  const jobs: { op: string; w: string; awardAt: string }[] = [];
+  for (const w of weeks) {
+    for (const op of Object.values(OPS)) {
+      const a = manifest.raw[`raw/award/${op}/${w}.json.gz`];
+      if (!a) continue;
+      if (rankState.weeks[rankKey(op, w)]?.awardAt === a.at) continue;
+      jobs.push({ op, w, awardAt: a.at });
+    }
+  }
+  const usedToday = () => rankState.days[day] ?? 0;
+  const doneWeeks = Object.values(rankState.weeks).filter((x) => x.awardAt).length;
+  console.log(`개찰 순위: ${doneWeeks}/${weeks.length * 3}개 주·업무 완료, 이번에 볼 것 ${jobs.length}개, 오늘(${day}) 호출 ${usedToday()}/${RANK_DAILY}회${RANK_DRY ? " (시험: R2에 쓰지 않음)" : ""}`);
+
+  let stopped: string | undefined;
+  let fetched = 0;
+  let lastSave = Date.now();
+  for (const job of jobs) {
+    if (stopped) break;
+    const key = rankKey(job.op, job.w);
+    // 받을 공고: 참가 2곳 이상, 공고번호·차수마다 한 번
+    const need = new Map<string, Map<string, number>>();
+    for (const r of await readRaw(`raw/award/${job.op}/${job.w}.json.gz`)) {
+      const [no, ord, clsfc, rbid, , bidders] = r as [string, string, string, string, string, number];
+      if (!no || !(bidders >= 2)) continue;
+      const k = `${no}|${ord}`;
+      (need.get(k) ?? need.set(k, new Map()).get(k)!).set(`${clsfc}|${rbid || "000"}`, bidders);
+    }
+    const entries: RankEntry[] = rankState.weeks[key] ? ((await readRaw(key)) as RankEntry[]) : [];
+    const have = new Set(entries.map((e) => `${e[0]}|${e[1]}`));
+    const todo = [...need.keys()].filter((k) => !have.has(k));
+    const before = calls;
+    let next = 0;
+    await Promise.all(Array.from({ length: RANK_CONCURRENCY }, async () => {
+      while (next < todo.length && !stopped) {
+        if (Date.now() - started > MAX_MS) { stopped = `시간 한도 ${MAX_MS / 60_000}분`; break; }
+        if (usedToday() >= RANK_DAILY) { stopped = `오늘 호출 한도 ${RANK_DAILY}회`; break; }
+        const k = todo[next++];
+        const [no, ord] = k.split("|");
+        const c0 = calls;
+        try {
+          entries.push([no, ord, await fetchRanks(no, ord, need.get(k)!)]);
+          fetched++;
+          if (fetched % 2000 === 0) console.log(`  공고 ${fetched.toLocaleString()}건 받음 (오늘 호출 ${usedToday().toLocaleString()}회, ${Math.round((Date.now() - started) / 60_000)}분)`);
+        } catch (e) {
+          if ((e as { fatal?: boolean }).fatal) { stopped = (e as Error).message; break; }
+          console.warn(`  건너뜀 ${k}: ${(e as Error).message}`);
+        } finally {
+          rankState.days[day] = usedToday() + (calls - c0);
+        }
+        await sleep(100);
+      }
+    }));
+    const got = new Set(entries.map((e) => `${e[0]}|${e[1]}`));
+    const complete = [...need.keys()].every((k) => got.has(k));
+    const body = gz(entries);
+    if (RANK_DRY) {
+      const sample = entries.find((e) => e[2].length >= 3);
+      console.log(`  [시험] ${key}: 공고 ${need.size}건 중 ${entries.length}건, 줄 ${entries.reduce((s, e) => s + e[2].length, 0)}개, ${body.length.toLocaleString()}B, 호출 ${calls - before}회`);
+      if (sample) console.log(`  [시험] 예: ${JSON.stringify(sample)}`);
+      if (!stopped) stopped = "시험은 한 주만";
+      break;
+    }
+    const after = Math.max(usedBytes(), r2Measured) - (rankState.weeks[key]?.bytes ?? 0) + body.length;
+    if (after > STOP_AT) { stopped = `R2 사용량이 ${fmtGB(after)}가 되어 승인 용량 ${fmtGB(APPROVED)}의 90%를 넘습니다`; break; }
+    await r2Put(key, body, "application/gzip");
+    writeLocal(key, body);
+    rankState.weeks[key] = {
+      bids: entries.length, rows: entries.reduce((s, e) => s + e[2].length, 0), bytes: body.length, at: new Date().toISOString(),
+      calls: (rankState.weeks[key]?.calls ?? 0) + (calls - before), awardAt: complete ? job.awardAt : "",
+    };
+    if (Date.now() - lastSave > 3 * 60_000 || stopped) { lastSave = Date.now(); await saveRankState(); }
+  }
+  // 30일 넘은 날짜별 호출 기록은 지운다
+  for (const d of Object.keys(rankState.days)) if (d < ymd(new Date(today.getTime() - 30 * 86400e3))) delete rankState.days[d];
+  await saveRankState();
+  const done = Object.values(rankState.weeks).filter((x) => x.awardAt).length;
+  console.log(`개찰 순위 이번 실행: 공고 ${fetched.toLocaleString()}건, 호출 ${calls.toLocaleString()}회 · 완료 ${done}/${weeks.length * 3}개 주·업무 · 순위 파일 ${fmtGB(rankBytes())}${stopped ? ` · 멈춤: ${stopped}` : ""}`);
+  if (stopped && /승인 용량/.test(stopped)) { console.error(`::error::${stopped}. 사용자 승인 후 저장소 변수 R2_APPROVED_BYTES 를 올려 주세요.`); process.exit(2); }
+}
+
+/** 순위 파일은 따로 도는 실행이 바꾸므로, 내 캐시가 rank-state 와 크기가 다르면 R2에서 다시 받는다 */
+async function readRank(key: string): Promise<RankEntry[]> {
+  const st = rankState.weeks[key];
+  if (!st) return [];
+  if (!existsSync(local(key)) || statSync(local(key)).size !== st.bytes) {
+    const b = await r2Get(key);
+    if (!b) return [];
+    writeLocal(key, b);
+  }
+  return JSON.parse(gunzipSync(readFileSync(local(key))).toString("utf8")) as RankEntry[];
+}
+
 /* ---------- 합치기 ---------- */
 
 interface NoticeInfo { method: string; price: number; clsNo: string; clsNm: string; mid: string; lrg: string; work: string; site: string; lwlt: number }
@@ -322,10 +474,18 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
   let matched = 0;
   let withBase = 0;
   let withPlan = 0;
+  let withTop = 0;
   const prearng = new Map<string, number[]>();
   for (const w of awardWeeks) {
     for (const op of Object.values(OPS)) {
       const biz = BIZ_OF_OP[op] as AwardBiz;
+      const top = new Map<string, TopBidder[]>();
+      for (const [no, ord, list] of await readRank(rankKey(op, w))) {
+        for (const [clsfc, rbid, rank, bz, name, amt, rt] of list) {
+          const k = `${no}|${ord}|${clsfc}|${rbid}`;
+          (top.get(k) ?? top.set(k, []).get(k)!).push([rank, bz, name, amt, rt]);
+        }
+      }
       for (const r of await readRaw(`raw/award/${op}/${w}.json.gz`)) {
         const [no, ord, clsfc, rbid, title, bidders, winner, bizno, amount, rate, agency, date] =
           r as [string, string, string, string, string, number, string, string, number, number, string, string];
@@ -350,14 +510,16 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
           nt?.method ?? "", nt?.price ?? 0, nt?.clsNo ?? "", nt?.clsNm ?? "", nt?.mid ?? "", nt?.lrg ?? "", nt?.work ?? "",
           [...(region.get(no) ?? (nt?.site ? [nt.site] : []))].join(", "), [...(lic.get(no) ?? [])].join(", "),
           bs, pl?.plnprc || 0, nt?.lwlt || 0, ba?.rng ?? "", pl?.basis ?? "",
+          (top.get(`${no}|${ord}|${clsfc}|${rbid || "000"}`) ?? []).sort((a, b) => a[0] - b[0]),
         ];
+        if (row[25].length) withTop++;
         const k = shardOf(bizno);
         (shards.get(k) ?? shards.set(k, []).get(k)!).push(row);
         rows++;
       }
     }
   }
-  console.log(`낙찰 ${rows.toLocaleString()}건 (공고 정보 붙은 건 ${matched.toLocaleString()}건, 기초금액 ${withBase.toLocaleString()}건, 예정가격 ${withPlan.toLocaleString()}건), 공고 ${notices.size.toLocaleString()}건`);
+  console.log(`낙찰 ${rows.toLocaleString()}건 (공고 정보 붙은 건 ${matched.toLocaleString()}건, 기초금액 ${withBase.toLocaleString()}건, 예정가격 ${withPlan.toLocaleString()}건, 개찰 순위 ${withTop.toLocaleString()}건), 공고 ${notices.size.toLocaleString()}건`);
 
   let uploaded = 0;
   const keys = [...shards.keys()].sort();
@@ -456,9 +618,12 @@ async function check() {
 
 async function main() {
   if (process.argv[2] === "check") return check();
+  if (process.argv[2] === "rank") return rankMode();
 
   const m = await r2Get("manifest.json");
   if (m) manifest = JSON.parse(m.toString()) as Manifest;
+  const rs = await r2Get("rank-state.json");
+  if (rs) rankState = JSON.parse(rs.toString()) as RankState;
   r2Measured = (await r2BucketBytes()) ?? 0;
   const today = kstNow();
   const { jobs, awardWeeks, leadWeeks } = plan(today);
@@ -467,7 +632,10 @@ async function main() {
   const used = Math.max(usedBytes(), r2Measured);
   // 예상 최종 용량: 지금까지 원자료 한 개당 크기로 남은 원자료를 채우고, 샤드·통계는 원자료와 비슷한 크기로 본다
   const rawBytes = Object.values(manifest.raw).reduce((s, e) => s + e.bytes, 0);
-  const projected = haveRaw >= 20 ? Math.round((rawBytes / haveRaw) * totalRaw * 2.2) : 0;
+  // 개찰 순위: 받은 주의 평균 크기로 10년치를 채우고, 샤드에 붙는 몫만큼 두 배로 본다
+  const rankDone = Object.values(rankState.weeks).filter((x) => x.awardAt);
+  const rankProjected = rankDone.length >= 10 ? Math.round((rankDone.reduce((s, x) => s + x.bytes, 0) / rankDone.length) * awardWeeks.length * 3 * 2) : 0;
+  const projected = haveRaw >= 20 ? Math.round((rawBytes / haveRaw) * totalRaw * 2.2) + rankProjected : 0;
   console.log(`기간: 낙찰 ${iso(awardWeeks[awardWeeks.length - 1])}부터 ${awardWeeks.length}주, 공고 ${leadWeeks.length}주 (${AWARD_YEARS}년 + 앞선 ${NOTICE_LEAD_WEEKS}주)`);
   console.log(`원자료 ${haveRaw}/${totalRaw}개 보유, 이번에 받을 것 ${jobs.length}개`);
   console.log(`R2 사용량 ${fmtGB(used)} (직접 집계 ${fmtGB(usedBytes())}, Cloudflare 집계 ${r2Measured ? fmtGB(r2Measured) : "확인 불가"}), 예상 최종 ${projected ? fmtGB(projected) : "아직 계산 불가"}, 승인 용량 ${fmtGB(APPROVED)}`);
@@ -520,6 +688,7 @@ async function main() {
   const meta: AwardMeta = {
     builtAt: new Date().toISOString(), from, to: iso(addDays(mondayOf(today), 6)), weeks: awardPerOp, totalWeeks: awardWeeks.length,
     complete, rows: built.rows, bytes: usedBytes(),
+    rankWeeks: Math.floor(Object.values(rankState.weeks).filter((x) => x.awardAt).length / 3),
   };
   if (!quota) await put("stats/meta.json", Buffer.from(JSON.stringify(meta)), "application/json").catch((e) => { if (e instanceof QuotaStop) quota = e.message; else throw e; });
   if (quota) {

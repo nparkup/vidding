@@ -335,7 +335,10 @@ async function rankMode() {
       jobs.push({ op, w, awardAt: a.at });
     }
   }
-  const usedToday = () => rankState.days[day] ?? 0;
+  // 오늘 이미 쓴 호출 + 이번 실행 호출. 동시에 도는 공고끼리 호출 수가 겹쳐 세지지 않게 전체 호출 수로 센다
+  const dayBase = rankState.days[day] ?? 0;
+  const callsBase = calls;
+  const usedToday = () => dayBase + (calls - callsBase);
   const doneWeeks = Object.values(rankState.weeks).filter((x) => x.awardAt).length;
   console.log(`개찰 순위: ${doneWeeks}/${weeks.length * 3}개 주·업무 완료, 이번에 볼 것 ${jobs.length}개, 오늘(${day}) 호출 ${usedToday()}/${RANK_DAILY}회${RANK_DRY ? " (시험: R2에 쓰지 않음)" : ""}`);
 
@@ -364,7 +367,6 @@ async function rankMode() {
         if (usedToday() >= RANK_DAILY) { stopped = `오늘 호출 한도 ${RANK_DAILY}회`; break; }
         const k = todo[next++];
         const [no, ord] = k.split("|");
-        const c0 = calls;
         try {
           entries.push([no, ord, await fetchRanks(no, ord, need.get(k)!)]);
           fetched++;
@@ -373,7 +375,7 @@ async function rankMode() {
           if ((e as { fatal?: boolean }).fatal) { stopped = (e as Error).message; break; }
           console.warn(`  건너뜀 ${k}: ${(e as Error).message}`);
         } finally {
-          rankState.days[day] = usedToday() + (calls - c0);
+          rankState.days[day] = usedToday();
         }
         await sleep(100);
       }

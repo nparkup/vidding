@@ -575,7 +575,7 @@ export function bidSheet(
   if (extracted && adoptable(extracted, b)) {
     sheet = enrichSheet(extracted, tpl);
     sheet.pass = notice?.pass?.value ?? extracted.pass ?? tpl.pass;
-    facts.push({ label: "평가항목·배점", value: `공고 원문 배점표 ${extracted.items.length}개 항목`, quote: extracted.notes[0] ?? "" });
+    facts.push({ label: "평가항목·배점", value: `공고 원문 배점표 ${extracted.items.length}개 항목${extracted.reader?.by === "ai" ? " (AI 판독)" : ""}`, quote: extracted.notes[0] ?? "" });
   } else if (quant && tpl.method === "협상에 의한 계약") {
     const price = tpl.items.find((i) => i.kind === "price");
     const techMax = 100 - (price?.max ?? 0);

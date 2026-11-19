@@ -122,7 +122,11 @@ export async function textOf(f: BidAttachment, buf: Buffer): Promise<string> {
 export async function extractSheetsForBids(
   bids: Bid[],
   attachments: Record<string, BidAttachment[]>,
-  opts: { budgetMs?: number; maxFiles?: number; concurrency?: number } = {},
+  opts: {
+    budgetMs?: number; maxFiles?: number; concurrency?: number;
+    /** 공고마다 읽은 본문(파일 이름 머리글 포함)과 규칙 파서 결과를 넘긴다 (AI 판독 대상 고르기, aiSheet.ts) */
+    collect?: (bid: Bid, text: string, ruleSheet: EvalSheet | undefined) => void;
+  } = {},
 ): Promise<{ sheets: Record<string, ExtractedSheet>; stats: { bids: number; files: number; downloadFailed: number; found: number; notice: number; timedOut: boolean } }> {
   const budget = Date.now() + (opts.budgetMs ?? 8 * 60_000);
   const maxFiles = opts.maxFiles ?? 2500;
@@ -136,13 +140,16 @@ export async function extractSheetsForBids(
       if (Date.now() > budget || stats.files >= maxFiles) { stats.timedOut = true; return; }
       const bid = targets[next++];
       const texts: string[] = [];
+      const named: string[] = [];
       let best: ExtractedSheet | undefined;
       for (const f of rankFiles(attachments[bid.id])) {
         stats.files++;
         try {
           const buf = await download(f.url, 20_000);
           if (!buf) { stats.downloadFailed++; continue; }
-          texts.push(await textOf(f, buf));
+          const t = await textOf(f, buf);
+          texts.push(t);
+          named.push(`=== 파일: ${f.name} ===\n${t}`);
         } catch {
           stats.downloadFailed++;
           continue;
@@ -157,6 +164,7 @@ export async function extractSheetsForBids(
       // 배점표는 합계가 100에서 크게 벗어나면 버린다 (쓸지 최종 판단은 화면에서 공고 기준 값과 함께 한다)
       const sum = best?.sheet ? best.sheet.items.reduce((a, i) => a + i.max, 0) : 0;
       const keep = best?.sheet && sum >= 90 && sum <= 110 ? best : undefined;
+      opts.collect?.(bid, named.join("\n"), keep?.sheet);
       if (keep || notice || quant) {
         sheets[bid.id] = { ...(keep ?? {}), notice, quant };
         if (keep) stats.found++;

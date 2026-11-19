@@ -13,6 +13,7 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
 import { awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
+import { aiSheetsEnabled, makeCollector, runAiSheets } from "./aiSheets";
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -39,7 +40,7 @@ async function main() {
     console.warn("첨부파일 목록 수집 건너뜀:", e instanceof Error ? e.message : e);
   }
   // 입찰 참가자격(업종 제한·참가지역): 사업자번호 조회 때 공고별로 가능/불가/확인 필요를 판정하는 데 쓴다. 실패해도 배포는 계속
-  let quals = {};
+  let quals: Awaited<ReturnType<typeof fetchQualBulk>>["quals"] = {};
   if (listItems.size) {
     try {
       const r = await fetchQualBulk(listItems, { cacheDir: process.env.AWARD_CACHE_DIR ? `${process.env.AWARD_CACHE_DIR}/qual` : ".cache/award/qual" });
@@ -58,13 +59,26 @@ async function main() {
     }
   }
   // 첨부를 내려받아 평가표를 미리 추출 (평가점수 예측이 공고 선택만으로 원문 배점을 쓰도록). 실패해도 배포는 계속
-  let sheets = {};
+  let sheets: Awaited<ReturnType<typeof extractSheetsForBids>>["sheets"] = {};
+  // 규칙 파서가 쓸 수 있는 배점표를 못 읽은 공고는 본문을 모아 두었다가 AI로 읽는다 (ANTHROPIC_API_KEY 가 있을 때만)
+  const ai = aiSheetsEnabled() ? makeCollector(quals) : undefined;
   try {
-    const r = await extractSheetsForBids(items, attachments);
+    const r = await extractSheetsForBids(items, attachments, { collect: ai?.collect });
     sheets = r.sheets;
     console.log(`평가표 추출: 대상 ${r.stats.bids}건, 파일 ${r.stats.files}개(실패 ${r.stats.downloadFailed}), 배점표 ${r.stats.found}건, 공고 기준 문장 ${r.stats.notice}건${r.stats.timedOut ? ", 시간 한도로 일부만 처리" : ""}`);
   } catch (e) {
     console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  if (ai) {
+    try {
+      const r = await runAiSheets(ai.candidates, quals, new Set(items.map((b) => b.id)));
+      for (const [id, sheet] of Object.entries(r.sheets)) sheets[id] = { ...sheets[id], sheet, file: "AI 판독" };
+      console.log(r.log);
+    } catch (e) {
+      console.warn("AI 판독 건너뜀:", e instanceof Error ? e.message : e);
+    }
+  } else {
+    console.log("AI 판독: ANTHROPIC_API_KEY 없음, 건너뜀");
   }
   // 예상 최저 경쟁 투찰률 통계. 낙찰 저장소(R2)에 최근 1년치가 있으면 그것을 쓰고(조달청 호출 없음),
   // 아직 수집 중이면 예전처럼 전년도 낙찰을 조금씩 받아 GitHub Actions 캐시에 쌓는다. 실패해도 배포는 계속

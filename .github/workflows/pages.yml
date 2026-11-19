@@ -42,6 +42,10 @@ jobs:
           # 낙찰 저장소(R2)에서 낙찰률 통계와 공고 분류를 읽는다. 없으면 예전 방식으로 간다
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 규칙 파서가 못 읽은 공고 배점표를 AI로 읽는다 (scripts/aiSheets.ts). 키가 없으면 건너뛴다
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_SHEET_MODEL: ${{ vars.AI_SHEET_MODEL }}
+          AI_SHEET_MAX: ${{ vars.AI_SHEET_MAX }}
         run: npx tsx --conditions=react-server scripts/fetch-bids.ts data/bids.json
       - name: 전년도 낙찰률 캐시 저장
         if: always()

@@ -11,6 +11,7 @@
     "validate:score": "tsx scripts/score/validate.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
     "cfb": "1.2.2",
     "lucide-react": "0.511.0",
     "next": "15.5.28",

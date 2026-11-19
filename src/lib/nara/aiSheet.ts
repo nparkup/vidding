@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 4;
+export const AI_SHEET_VERSION = 5;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -296,24 +296,11 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   // 가격평가가 없는 공고(기술 100점)는 가격 항목 없이 받는다. 가격 배점이 적혀 있는데 항목이 없거나 둘 이상이면 탈락
   if (prices.length > 1 || (prices.length === 0 && (out.price_total ?? 0) > 0)) return { reason: "입찰가격 항목을 하나로 정하지 못함" };
   const price = prices[0]?.max ?? 0;
-  const round2 = (n: number) => Math.round(n * 100) / 100;
-  const sum = round2(items.reduce((a, i) => a + i.max, 0));
-  const scaleNotes: string[] = [];
+  const sum = Math.round(items.reduce((a, i) => a + i.max, 0) * 100) / 100;
+  // 원문 배점은 바꾸지 않는다. 같은 항목을 합친 뒤에도 표 합계와 맞지 않으면 쓰지 않고 기준표(추정)로 계산한다
   if (Math.abs(sum - 100) > 0.5) {
-    // 표 합계 줄이 우선: 원문에 "합계 100"처럼 적힌 합계가 있으면 기술 항목을 그 합계에 맞게 비율로 환산한다
-    const stated = out.stated_total;
-    const techSum = sum - price;
-    const target = 100 - price;
-    const statedOk = stated !== null && (Math.abs(stated - 100) <= 0.5 || Math.abs(stated - target) <= 0.5)
-      && new RegExp(`(합계|총계|총점|계)${String(stated).replace(".", "\\.")}(?!\\d)`).test(flat);
-    const f = techSum > 0 ? target / techSum : 0;
-    if (!statedOk || f < 0.5 || f > 2) return { reason: `항목 배점을 더하면 ${sum}점이라 100점과 맞지 않음` };
-    for (const it of items) {
-      if (it.kind === "price") continue;
-      it.max = round2(it.max * f);
-      if (it.bands) it.bands = it.bands.map((b) => ({ ...b, points: round2(b.points * f) }));
-    }
-    scaleNotes.push(`표 합계 ${stated}점 기준: 항목을 더하면 ${sum}점이라 각 항목을 ${stated}점에 맞게 비율 환산(x${f.toFixed(3)})`);
+    const stated = out.stated_total !== null ? `표 합계 ${out.stated_total}점과 ` : "";
+    return { reason: `항목 배점을 더하면 ${sum}점이라 ${stated || "100점과 "}맞지 않음` };
   }
   if (out.tech_total !== null && Math.abs(out.tech_total + price - 100) > 0.5) return { reason: `기술 ${out.tech_total}점 + 가격 ${price}점이 100점이 아님` };
   const pass: EvalSheet["pass"] =
@@ -329,8 +316,8 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
       pass,
       source: "extracted",
       reader: { by: "ai", model },
-      confidence: missing.length === 0 && !scaleNotes.length ? "높음" : "보통",
-      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...scaleNotes, ...(mergedNames.length ? [`쪽이 넘어가며 다시 적힌 같은 평가항목을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
+      confidence: missing.length === 0 ? "높음" : "보통",
+      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...(mergedNames.length ? [`쪽이 넘어가며 다시 적힌 같은 평가항목을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
       ...(out.panel_rule ? { panelRule: out.panel_rule.slice(0, 120) } : {}),
     },
   };

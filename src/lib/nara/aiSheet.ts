@@ -375,13 +375,13 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   return {
     sheet: {
       method,
-      title: "공고 첨부의 평가표 (AI 판독)",
+      title: "공고 첨부의 평가표",
       items,
       pass,
       source: "extracted",
       reader: { by: "ai", model },
       confidence: missing.length === 0 ? "높음" : "보통",
-      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...(outside.length ? [`합계 밖 가감점 ${outside.length}개는 배점 합에 넣지 않음`] : []), ...(mergedNames.length ? [`같은 평가항목 칸에 속한 줄을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
+      notes: [`배점표 원문: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...(outside.length ? [`합계 밖 가감점 ${outside.length}개는 배점 합에 넣지 않음`] : []), ...(mergedNames.length ? [`같은 평가항목 칸에 속한 줄을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
       ...(out.panel_rule ? { panelRule: out.panel_rule.slice(0, 120) } : {}),
     },
   };

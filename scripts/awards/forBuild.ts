@@ -10,6 +10,7 @@ import { similarity, titleKey, type PriorTarget } from "../../src/lib/nara/award
 import type { AwardStats, PriorMatch, RateStat } from "../../src/lib/rivalRate";
 import type { Bid } from "../../src/lib/types";
 import { r2Get } from "./r2";
+import { agencyBucket, analyzeBid, type AgencyIndexFile, type AwardAnalysis, type SimilarIndexFile } from "../../src/lib/awards/analysis";
 
 const canUse = () => !!process.env.R2_LOCAL_DIR || (!!process.env.CLOUDFLARE_API_TOKEN && !!process.env.CLOUDFLARE_ACCOUNT_ID);
 
@@ -72,6 +73,34 @@ export async function recentNoticeClasses(weeks = 10): Promise<Map<string, NonNu
         if (!clsNo && !mid && !work) continue;
         out.set(no, { no: clsNo || undefined, nm: clsNm || undefined, mid: mid || undefined, lrg: lrg || undefined, work: work || undefined });
       }
+    }
+  }
+  return out;
+}
+
+/**
+ * 지금 공고마다 낙찰 결과 분석 (전년도 같은 사업, 과거 같은 사업 추이, 비슷한 공고). src/lib/awards/analysis.ts
+ * 색인(idx/)이 아직 없으면 null. 수요기관 색인은 지금 공고들의 수요기관이 들어 있는 파일만 받는다
+ */
+export async function awardAnalysesFromR2(items: Bid[]): Promise<Record<string, AwardAnalysis> | null> {
+  if (!(await awardMeta())) return null;
+  const simGz = await r2Get("idx/similar.json.gz");
+  if (!simGz) return null;
+  const similar = JSON.parse(gunzipSync(simGz).toString("utf8")) as SimilarIndexFile;
+  const need = new Map<string, Bid[]>();
+  for (const b of items) {
+    const k = agencyBucket(b.demandAgency);
+    (need.get(k) ?? need.set(k, []).get(k)!).push(b);
+  }
+  const range = { from: "", to: similar.to };
+  const out: Record<string, AwardAnalysis> = {};
+  for (const [k, bids] of need) {
+    const gz = await r2Get(`idx/agency/${k}.json.gz`).catch(() => null);
+    const file = gz ? (JSON.parse(gunzipSync(gz).toString("utf8")) as AgencyIndexFile) : null;
+    for (const b of bids) {
+      const rows = file?.agencies[b.demandAgency];
+      if (rows?.length && (!range.from || rows[rows.length - 1][2] < range.from)) range.from = rows[rows.length - 1][2];
+      out[b.id] = analyzeBid(b, rows, similar.groups, range);
     }
   }
   return out;

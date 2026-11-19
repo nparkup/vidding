@@ -12,7 +12,7 @@ import { extractSheetsForBids } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -95,7 +95,18 @@ async function main() {
   } catch (e) {
     console.warn("공고 분류 붙이기 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, syncedAt, source: "g2b" }));
+  // 낙찰 결과 분석 (평가점수 예측): 분류를 붙인 뒤에 만든다 (비슷한 공고를 세부품명으로 찾는다). 실패해도 배포는 계속
+  let analyses;
+  try {
+    analyses = await awardAnalysesFromR2(items) ?? undefined;
+    if (analyses) {
+      const v = Object.values(analyses);
+      console.log(`낙찰 결과 분석: 공고 ${v.length}건, 전년도 같은 사업 ${v.filter((a) => a.prior).length}건, 과거 같은 사업 2건 이상 ${v.filter((a) => a.history.length >= 2).length}건, 비슷한 공고 ${v.filter((a) => a.similar).length}건`);
+    } else console.log("낙찰 결과 분석: 낙찰 저장소 색인이 아직 없어 건너뜀");
+  } catch (e) {
+    console.warn("낙찰 결과 분석 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

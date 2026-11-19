@@ -44,32 +44,35 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount }: { fc: 
           <div>
             <dt className="flex items-center justify-between gap-2">
               <span className="text-ink-500">낙찰 가능성</span>
-              <span className="font-bold tabular-nums">{chance.low === chance.high ? `${chance.low}%` : `${chance.low}% ~ ${chance.high}%`}</span>
+              <span className="text-right font-bold tabular-nums">
+                {chance.low === chance.high ? `${chance.low}%` : `${chance.low}% ~ ${chance.high}%`}
+                {chance.ifPassed && chance.ifPassed.high > 0 && <span className="block text-xs font-normal text-ink-500">통과 시 {chance.ifPassed.low === chance.ifPassed.high ? `${chance.ifPassed.low}%` : `${chance.ifPassed.low}~${chance.ifPassed.high}%`}</span>}
+              </span>
             </dt>
             <dd className="mt-0.5 space-y-0.5 text-xs text-ink-500">{chance.basis.map((b) => <p key={b}>{b}</p>)}</dd>
           </div>
         )}
         {fc.winRate && (
           <div className="flex items-baseline justify-between gap-2">
-            <dt className="text-ink-500">과거 낙찰률</dt>
-            <dd className="text-right"><b className="tabular-nums">{pct(fc.winRate.value)}</b> <span className="block text-xs text-ink-300">{fc.winRate.basis}</span></dd>
+            <dt className="shrink-0 text-ink-500">과거 낙찰률</dt>
+            <dd className="text-right"><b className="tabular-nums">{pct(fc.winRate.value)}</b> <span className="block text-xs text-ink-300">{fc.winRate.basis}{!isNego && fc.suggestRate ? " (당시 하한율 기준)" : ""}</span></dd>
           </div>
         )}
         {isNego && fc.rival && (
           <div className="flex items-baseline justify-between gap-2">
-            <dt className="text-ink-500">예상 최저 경쟁 투찰률</dt>
+            <dt className="shrink-0 text-ink-500">예상 최저 경쟁 투찰률</dt>
             <dd className="text-right"><b className="tabular-nums">{pct(fc.rival.value)}</b> <span className="block text-xs text-ink-300">가격점수에 반영</span></dd>
           </div>
         )}
         {!isNego && fc.suggestRate && (
           <div className="flex items-baseline justify-between gap-2">
-            <dt className="text-ink-500">과거 낙찰자 투찰률</dt>
+            <dt className="shrink-0 text-ink-500">과거 낙찰자 투찰률</dt>
             <dd className="text-right"><b className="tabular-nums">{pct(fc.suggestRate.value)}</b> <span className="block text-xs text-ink-300">{pct(fc.suggestRate.low)} ~ {pct(fc.suggestRate.high)} · 투찰률 기본값</span></dd>
           </div>
         )}
         {prePrice > 0 && (
           <div className="flex items-baseline justify-between gap-2">
-            <dt className="text-ink-500">예상 예정가격</dt>
+            <dt className="shrink-0 text-ink-500">예상 예정가격</dt>
             <dd className="text-right">
               <b className="tabular-nums">{won(prePrice)}</b>
               <span className="block text-xs text-ink-300">기초금액의 {pct(fc.pre!.value)} · 투찰 {won(Math.round((prePrice * bidRate) / 100))}</span>

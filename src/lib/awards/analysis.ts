@@ -361,6 +361,8 @@ export interface WinChance {
   high: number;
   level: Level3;
   basis: string[];
+  /** 통과 미달이라 0%일 때, 통과 기준을 채우면 받는 범위 */
+  ifPassed?: { low: number; high: number };
 }
 
 /**
@@ -386,7 +388,10 @@ export function winChance(input: {
   const m = methodCode(input.method);
   const [nLo, , nHi] = fc.bidders.q.map((n) => Math.max(1, n));
   const basis: string[] = [`예상 참가 ${fc.bidders.q[0] === fc.bidders.q[2] ? `${fc.bidders.q[1]}곳` : `${fc.bidders.q[0]}~${fc.bidders.q[2]}곳`} (${fc.bidders.basis})`];
-  if (input.passed === false) return { low: 0, high: 0, level: "낮음", basis: [...basis, "예상 점수가 통과 기준에 못 미쳐 낙찰 대상이 아닙니다"] };
+  if (input.passed === false) {
+    const p = winChance({ ...input, passed: undefined });
+    return { low: 0, high: 0, level: "낮음", basis: [...basis, `예상 점수가 통과 기준에 못 미쳐 낙찰 대상이 아닙니다${p && p.high > 0 ? `. 통과 기준을 채우면 ${p.low === p.high ? `${p.low}%` : `${p.low}~${p.high}%`}입니다` : ""}`], ifPassed: p && { low: p.low, high: p.high } };
+  }
   if (input.floor && input.bidRate < input.floor) return { low: 0, high: 0, level: "낮음", basis: [...basis, `투찰률이 낙찰하한율 ${input.floor}%보다 낮아 낙찰 대상이 아닙니다`] };
   let lo = 1 / nHi, hi = 1 / nLo;
   if (m === "N") {
@@ -397,7 +402,10 @@ export function winChance(input: {
   } else {
     // 과거 낙찰률 중 내 투찰률 이상인 비율: 내 투찰률이 낙찰자들보다 높으면 그만큼 순서에서 밀린다
     const rates = [...input.history.map((x) => x.rate)].filter((r) => r > 50 && r <= 110).sort((a, b) => a - b);
+    // 하한율이 해마다 바뀌므로(2026 기준 개정 등) 당시 하한율이 있으면 '하한율보다 얼마나 높게 썼는지'로 비교한다
+    const gaps = input.floor ? input.history.filter((x) => x.lwlt > 0 && x.rate >= x.lwlt && x.rate - x.lwlt < 10).map((x) => x.rate - x.lwlt) : [];
     const above = (r: number) => {
+      if (gaps.length >= 3 && input.floor) { const g = r - input.floor; return gaps.filter((x) => x >= g - 1e-9).length / gaps.length; }
       if (rates.length >= 3) return rates.filter((x) => x >= r).length / rates.length;
       const q = input.similar?.rate?.q;
       if (!q) return 1;
@@ -409,11 +417,13 @@ export function winChance(input: {
     };
     const w = Math.max(0.02, above(input.bidRate));
     lo *= w; hi *= w;
-    if (fc.winRate) basis.push(`투찰률 ${input.bidRate}%보다 높게 쓴 과거 낙찰자 비율 ${Math.round(w * 100)}% (${rates.length >= 3 ? "과거 같은 사업" : "비슷한 공고"})`);
+    if (gaps.length >= 3) basis.push(`하한율보다 ${Math.round((input.bidRate - (input.floor ?? 0)) * 1000) / 1000}%p 높게 쓰면, 과거 같은 사업 낙찰자 중 그보다 높게 쓴 비율 ${Math.round(w * 100)}%`);
+    else if (fc.winRate) basis.push(`투찰률 ${input.bidRate}%보다 높게 쓴 과거 낙찰자 비율 ${Math.round(w * 100)}% (${rates.length >= 3 ? "과거 같은 사업" : "비슷한 공고"})`);
     if (m === "Q") basis.push("적격심사는 예정가격 추첨에 따라 하한율 바로 위 업체가 정해져, 같은 투찰률대 업체끼리는 운의 몫이 큽니다");
   }
   if (fc.incumbent && fc.incumbent.count >= 3) { lo *= 0.8; hi *= 0.8; basis.push(`같은 업체(${fc.incumbent.name})가 ${fc.incumbent.total}건 중 ${fc.incumbent.count}건 낙찰해 기존 업체가 유리할 수 있습니다`); }
-  const pct = (x: number) => Math.min(95, Math.round(x * 1000) / 10);
+  // 1% 아래는 소수 둘째 자리까지 (참가업체가 수백 곳인 공사)
+  const pct = (x: number) => Math.min(95, x < 0.01 ? Math.round(x * 10000) / 100 : Math.round(x * 1000) / 10);
   const low = pct(lo), high = Math.max(pct(hi), low);
   const mid = (low + high) / 2;
   const level: Level3 = mid >= 30 ? "높음" : mid >= 10 ? "보통" : "낮음";

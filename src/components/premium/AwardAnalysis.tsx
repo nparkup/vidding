@@ -91,7 +91,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
           <div>
             <dt className="text-ink-500">참가 예상 기업</dt>
             <dd className="mt-1">
-              <ul className="mt-1 divide-y divide-ink-100 rounded-xl border border-ink-100">
+              <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
                 {fc.likely.slice(0, 6).map((b) => (
                   <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
                     <span className="min-w-0 truncate font-semibold">{b.name}</span>

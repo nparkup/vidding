@@ -98,7 +98,7 @@ export function titleKey(title: string) {
     .replace(/\d{2}\s*(년도|년)/g, "")
     .replace(/제?\d+\s*(차|회|분기)/g, "")
     .replace(/\(?(긴급|재공고|재입찰|변경|정정)\)?/g, "")
-    .replace(/[\s()\[\]{}<>「」『』【】〔〕·,.\-_/'"‘’“”]/g, "");
+    .replace(/[\s()\[\]{}<>「」『』【】〔〕·,.\-_/'"‘’“”~]/g, "");
 }
 /** 공고명 유사도: 두 글자 묶음(bigram)의 Dice 계수, 0~1 */
 export function similarity(a: string, b: string) {
@@ -147,6 +147,14 @@ export interface AwardAnalysis {
   history: PastAward[];
   /** 비슷한 공고: 가장 좁은 묶음부터 표본이 충분한 것 */
   similar?: { label: string; key: string; stat: SimilarStat };
+  /** 공고명에 적힌 계약 기간이 2년 이상이면 그 햇수 (전년도 대신 그만큼 전의 직전 계약을 찾는다) */
+  cycleYears?: number;
+  /** 같은 사업인지 애매한 후보 (최대 10건). 화면에서 확인을 거쳐 이력에 넣는다 */
+  maybe?: PastAward[];
+  /** 애매한 후보 확인용 지금 공고 정보 */
+  subject?: { title: string; agency: string; baseAmount: number; postedAt: string };
+  /** 애매한 후보 중 같은 사업으로 확인되어 이력에 넣은 공고번호 */
+  confirmed?: string[];
 }
 
 export interface AnalyzeTarget {
@@ -205,42 +213,180 @@ export function similarCandidates(t: AnalyzeTarget): { key: string; label: strin
   return out;
 }
 
-const KEY_MEMO = new WeakMap<AgencyRow[], string[]>();
+/* ---------- 같은 사업 판정 ---------- */
+
+/**
+ * 구분어: 같은 기관이 권역·학년·노선·공구만 바꿔 같은 날 여러 건 내는 공고(형제 공고)를 가른다.
+ * 두 공고명에 같은 종류의 구분어가 있는데 값이 다르면 다른 사업이다.
+ */
+const DIVIDERS: RegExp[] = [
+  /([가-힣]{1,2}부)\s*권(?!역)/, /(\d+)\s*권역/, /(\d+)\s*학년(?!도)/, /국도\s*(\d+)\s*호선/, /지방도\s*(\d+)\s*호선/,
+  /(\d+)\s*공구/, /(\d+)\s*단계/, /(상|하)\s*반기/, /(\d+)\s*(?:블록|BL)\b/i,
+];
+function dividers(title: string): (string | undefined)[] {
+  return DIVIDERS.map((re) => title.match(re)?.[1]);
+}
+/** 사업 종류: 둘 다 있고 겹치지 않으면 다른 사업. 감리·설계는 한쪽에만 있어도 다른 사업 */
+const KINDS: [string, RegExp][] = [
+  ["유지", /유지\s*(?:관리|보수)|운영\s*(?:및\s*)?유지/], ["구축", /구축|개발|도입/], ["전환", /전환|이관|마이그레이션/],
+  ["개선", /개선|고도화|개편|재구축/], ["컨설팅", /컨설팅|ISP|ISMP|정보화\s*전략/], ["수학여행", /수학여행/], ["수련", /수련/],
+];
+const EXCLUSIVE: [string, RegExp][] = [["감리", /감리/], ["설계", /설계/]];
+function kinds(title: string): Set<string> {
+  return new Set(KINDS.filter(([, re]) => re.test(title)).map(([k]) => k));
+}
+/** 두 공고명이 구분어·사업 종류 때문에 다른 사업인지 */
+export function differentProject(a: string, b: string): string | undefined {
+  const da = dividers(a), db = dividers(b);
+  for (let i = 0; i < da.length; i++) if (da[i] && db[i] && da[i] !== db[i]) return "구분어";
+  for (const [, re] of EXCLUSIVE) if (re.test(a) !== re.test(b)) return "사업 종류";
+  const ka = kinds(a), kb = kinds(b);
+  if (ka.size && kb.size && ![...ka].some((k) => kb.has(k))) return "사업 종류";
+  return undefined;
+}
+/** 금액 차이가 이보다 크면 다른 사업 */
+export const AMOUNT_RATIO = 3;
+/** 색인 한 줄의 비교용 금액: 기초금액, 없으면 낙찰금액 */
+const rowAmount = (r: AgencyRow) => r[9] || r[4];
+function amountFar(target: number, r: AgencyRow): boolean {
+  const x = rowAmount(r);
+  if (!(target > 0 && x > 0)) return false;
+  return Math.max(target, x) / Math.min(target, x) > AMOUNT_RATIO;
+}
+
+/**
+ * 기관 공고명 전체에서 흔한 두 글자 묶음은 가볍게 본다 (가중 Dice).
+ * 같은 기관이 '○○교 등 4개소 시설물 보수공사'처럼 틀이 같은 공고를 많이 내면 틀 문구는 거의 0, 교량명·시스템명 같은 고유한 부분이 무겁다.
+ */
+interface Idf { n: number; df: Map<string, number> }
+const grams = (s: string) => { const m = new Map<string, number>(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) ?? 0) + 1); } return m; };
+function buildIdf(keys: string[]): Idf {
+  const df = new Map<string, number>();
+  for (const k of keys) for (const g of grams(k).keys()) df.set(g, (df.get(g) ?? 0) + 1);
+  return { n: keys.length, df };
+}
+const weight = (idf: Idf, g: string) => Math.log((idf.n + 1) / ((idf.df.get(g) ?? 0) + 0.5));
+export function weightedSimilarity(a: string, b: string, idf: Idf): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const ga = grams(a), gb = grams(b);
+  let common = 0, ta = 0, tb = 0;
+  for (const [g, c] of ga) { const w = weight(idf, g); ta += c * w; common += Math.min(c, gb.get(g) ?? 0) * w; }
+  for (const [g, c] of gb) tb += c * weight(idf, g);
+  return ta + tb > 0 ? (2 * common) / (ta + tb) : 0;
+}
+/** 같은 사업: 공고명 유사도와 고유한 부분 유사도가 둘 다 넘어야 한다 */
+export const SAME_WEIGHTED = 0.5;
+/** 이 사이는 애매한 후보: 화면에서 따로 확인을 부탁한다 */
+export const MAYBE_PLAIN = 0.45;
+export const MAYBE_WEIGHTED = 0.3;
+/** 같은 날 가까이(이 일수 안) 낸 공고는 한 묶음(형제 공고)으로 보고 가장 비슷한 1건만 남긴다 */
+const BATCH_DAYS = 10;
+
+const KEY_MEMO = new WeakMap<AgencyRow[], { keys: string[]; idf: Idf }>();
 
 /** 비슷한 공고 통계로 쓰려면 이만큼은 있어야 한다 */
 const SIMILAR_USE = 10;
 
-export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined, groups: Record<string, SimilarStat>, range: { from: string; to: string }): AwardAnalysis {
+/** 공고명에 적힌 계약 기간(년). '(2027~2028)'처럼 괄호 안이나 끝에 있는 여러 해 기간만 본다 */
+export function contractYears(title: string): number {
+  const m = title.match(/\(\s*(20\d{2})\s*(?:년|년도)?\s*[~\-–]\s*(20\d{2})\s*(?:년|년도)?\s*\)/);
+  if (!m) return 1;
+  const d = Number(m[2]) - Number(m[1]) + 1;
+  return d >= 2 && d <= 5 ? d : 1;
+}
+
+/** 전년도(직전 계약): 지금 공고일 기준 계약 기간만큼 전(1년이면 8~20개월 전) 중 가장 비슷한 것 */
+export function pickPrior(history: PastAward[], posted: string, years = 1): PastAward | undefined {
+  const days = (d: string) => (Date.parse(posted) - Date.parse(d)) / 86400e3;
+  const lo = 365 * years - 125, hi = 365 * years + 235;
+  return history
+    .filter((h) => days(h.date) >= lo && days(h.date) <= hi)
+    .sort((a, b) => b.similarity - a.similarity || Math.abs(days(a.date) - 365 * years) - Math.abs(days(b.date) - 365 * years))[0];
+}
+
+/** 형제 공고 묶음: 날짜가 가까운 것끼리 묶어 가장 비슷한 1건만 남긴다 */
+function dedupeBatches<T extends { r: AgencyRow; s: number }>(xs: T[]): T[] {
+  const sorted = [...xs].sort((a, b) => b.s - a.s);
+  const kept: T[] = [];
+  for (const x of sorted) {
+    const t = Date.parse(x.r[2]);
+    if (kept.some((k) => Math.abs(Date.parse(k.r[2]) - t) <= BATCH_DAYS * 86400e3)) continue;
+    kept.push(x);
+  }
+  return kept;
+}
+
+export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined, groups: Record<string, SimilarStat>, range: { from: string; to: string }, opts: { legacy?: boolean } = {}): AwardAnalysis {
   const biz = t.bizType === "공사" || t.bizType === "물품" ? t.bizType : "용역";
   const key = titleKey(t.title);
   const posted = t.postedAt.slice(0, 10);
   const rows = agencyRows ?? [];
-  // 같은 기관 공고를 여러 번 비교하므로 공고명 키를 한 번만 만든다
-  let keys = KEY_MEMO.get(rows);
-  if (!keys) { keys = rows.map((r) => titleKey(r[1])); KEY_MEMO.set(rows, keys); }
-  const ks = keys;
-  const hits = rows
+  // 같은 기관 공고를 여러 번 비교하므로 공고명 키와 흔한 글자 통계를 한 번만 만든다
+  let memo = KEY_MEMO.get(rows);
+  if (!memo) { const keys = rows.map((r) => titleKey(r[1])); memo = { keys, idf: buildIdf(keys) }; KEY_MEMO.set(rows, memo); }
+  const { keys: ks, idf } = memo;
+  const base = rows
     .map((r, i) => ({ r, i }))
-    .filter(({ r }) => r[3] === biz && r[0] !== t.bidNtceNo && r[2] < posted)
-    .map(({ r, i }) => ({ r, s: similarity(key, ks[i]) }))
-    .filter((x) => x.s >= SAME_PROJECT);
+    .filter(({ r }) => r[3] === biz && r[0] !== t.bidNtceNo && r[2] < posted);
   // 같은 공고번호(재입찰 등)는 한 번만
-  const byNo = new Map<string, { r: AgencyRow; s: number }>();
-  for (const h of hits) { const p = byNo.get(h.r[0]); if (!p || p.s < h.s) byNo.set(h.r[0], h); }
-  const history = [...byNo.values()].sort((a, b) => b.r[2].localeCompare(a.r[2]) || b.s - a.s).slice(0, 10).map(({ r, s }) => toPast(r, s));
+  const once = <T extends { r: AgencyRow; s: number }>(xs: T[]) => { const m = new Map<string, T>(); for (const h of xs) { const p = m.get(h.r[0]); if (!p || p.s < h.s) m.set(h.r[0], h); } return [...m.values()]; };
+  const sortRecent = <T extends { r: AgencyRow; s: number }>(xs: T[]) => xs.sort((a, b) => b.r[2].localeCompare(a.r[2]) || b.s - a.s);
 
-  // 전년도: 지금 공고일 기준 8~20개월 전 중 가장 비슷한 것 (같으면 1년에 가까운 것)
-  const days = (d: string) => (Date.parse(posted) - Date.parse(d)) / 86400e3;
-  const prior = history
-    .filter((h) => days(h.date) >= 240 && days(h.date) <= 600)
-    .sort((a, b) => b.similarity - a.similarity || Math.abs(days(a.date) - 365) - Math.abs(days(b.date) - 365))[0];
+  if (opts.legacy) {
+    const hits = once(base.map(({ r, i }) => ({ r, s: similarity(key, ks[i]) })).filter((x) => x.s >= SAME_PROJECT));
+    const history = sortRecent(hits).slice(0, 10).map(({ r, s }) => toPast(r, s));
+    return { v: 1, builtAt: new Date().toISOString(), range, prior: pickPrior(history, posted), history, similar: pickSimilar(t, groups, key, true) };
+  }
 
-  let similar: AwardAnalysis["similar"];
+  const scored = base.map(({ r, i }) => {
+    const plain = similarity(key, ks[i]);
+    const w = plain >= MAYBE_PLAIN ? weightedSimilarity(key, ks[i], idf) : 0;
+    const hard = plain >= MAYBE_PLAIN ? (differentProject(t.title, r[1]) ?? (amountFar(t.baseAmount, r) ? "금액" : undefined)) : "유사도";
+    return { r, s: Math.min(plain, w), plain, w, hard };
+  }).filter((x) => !x.hard);
+  const sure = dedupeBatches(once(scored.filter((x) => x.plain >= SAME_PROJECT && x.w >= SAME_WEIGHTED)));
+  const history = sortRecent(sure).slice(0, 10).map(({ r, s }) => toPast(r, s));
+  // 애매한 후보: 확실한 것과 같은 묶음(형제 공고)이 아닌 것만, 최근 10건
+  const near = (r: AgencyRow) => sure.some((k) => Math.abs(Date.parse(k.r[2]) - Date.parse(r[2])) <= BATCH_DAYS * 86400e3);
+  const maybe = sortRecent(dedupeBatches(once(scored.filter((x) => !(x.plain >= SAME_PROJECT && x.w >= SAME_WEIGHTED) && x.w >= MAYBE_WEIGHTED && !near(x.r)))))
+    .slice(0, 10).map(({ r, s }) => toPast(r, s));
+  const years = contractYears(t.title);
+  const prior = pickPrior(history, posted, years);
+  const out: AwardAnalysis = { v: 1, builtAt: new Date().toISOString(), range, prior, history, similar: pickSimilar(t, groups, key) };
+  if (years > 1) out.cycleYears = years;
+  // 애매한 후보가 있으면 확인용으로 지금 공고 정보를 같이 둔다 (중계 서버가 이 파일만 읽고 묻는다)
+  if (maybe.length) { out.maybe = maybe; out.subject = { title: t.title, agency: t.demandAgency, baseAmount: t.baseAmount, postedAt: posted }; }
+  return out;
+}
+
+/** 비슷한 공고 묶음 고르기. 최근 낙찰 예는 공고명이 조금이라도 겹치는 것만 (가까운 순 5건) */
+function pickSimilar(t: AnalyzeTarget, groups: Record<string, SimilarStat>, key: string, legacy = false): AwardAnalysis["similar"] {
   for (const c of similarCandidates(t)) {
     const st = groups[c.key];
-    if (st && st.n >= SIMILAR_USE) { similar = { ...c, stat: st }; break; }
+    if (!st || st.n < SIMILAR_USE) continue;
+    if (legacy || !st.ex) return { ...c, stat: legacy && st.ex ? { ...st, ex: st.ex.slice(0, 5) } : st };
+    const ex = st.ex
+      .map((e) => ({ e, s: similarity(key, titleKey(e[1])) }))
+      .filter((x) => x.s >= EX_SIMILAR && !differentProject(t.title, x.e[1]))
+      .sort((a, b) => b.s - a.s || b.e[3].localeCompare(a.e[3]))
+      .slice(0, 5).map((x) => x.e);
+    const stat = { ...st };
+    if (ex.length) stat.ex = ex; else delete stat.ex;
+    return { ...c, stat };
   }
-  return { v: 1, builtAt: new Date().toISOString(), range, prior, history, similar };
+  return undefined;
+}
+/** 비슷한 공고의 최근 낙찰 예로 보여 줄 최소 공고명 유사도 */
+export const EX_SIMILAR = 0.2;
+
+/** 애매한 후보 중 같은 사업으로 확인된 공고를 이력에 넣고 전년도를 다시 고른다 */
+export function withConfirmed(a: AwardAnalysis, nos: string[], posted: string): AwardAnalysis {
+  if (!a.maybe?.length || !nos.length) return a;
+  const ok = a.maybe.filter((m) => nos.includes(m.no));
+  if (!ok.length) return a;
+  const history = [...a.history, ...ok].sort((x, y) => y.date.localeCompare(x.date)).slice(0, 10);
+  return { ...a, history, prior: pickPrior(history, posted, a.cycleYears ?? 1), confirmed: ok.map((m) => m.no) };
 }
 
 /* ---------- 예측에 반영 ---------- */
@@ -310,7 +456,9 @@ const fmt = (n: number, d = 3) => String(Math.round(n * 10 ** d) / 10 ** d);
 export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMethod: string; lowerLimitRate?: number }, floor?: number): Forecast {
   if (!a) return {};
   const out: Forecast = {};
-  const h = a.history;
+  // 1곳 수의계약은 경쟁 결과가 아니므로 낙찰률·참가업체 통계에서 뺀다 (낙찰업체 이력에는 남긴다)
+  const all = a.history;
+  const h = all.filter((x) => x.bidders !== 1);
   const st = a.similar?.stat;
 
   // 참가업체 수: 같은 사업 이력이 2건 이상이면 그 분포, 아니면 비슷한 공고 분포. 전년도 값이 있으면 근거에 같이 적는다
@@ -386,13 +534,13 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
     const d = last.rate - first.rate;
     out.trend = { first: first.rate, last: last.rate, years, text: Math.abs(d) < 0.3 ? "낙찰률이 거의 같게 유지됩니다" : d > 0 ? `낙찰률이 ${fmt(d, 2)}%p 올랐습니다` : `낙찰률이 ${fmt(-d, 2)}%p 내려갔습니다` };
   }
-  if (h.length >= 2) {
+  if (all.length >= 2) {
     const c = new Map<string, number>();
-    for (const x of h) if (x.winner) c.set(x.winner, (c.get(x.winner) ?? 0) + 1);
+    for (const x of all) if (x.winner) c.set(x.winner, (c.get(x.winner) ?? 0) + 1);
     const [name, count] = [...c].sort((x, y) => y[1] - x[1])[0] ?? ["", 0];
-    if (count >= 2) out.incumbent = { name, count, total: h.length };
+    if (count >= 2) out.incumbent = { name, count, total: all.length };
   }
-  const likely = likelyBidders(h, st);
+  const likely = likelyBidders(all, st);
   if (likely.length) out.likely = likely;
   return out;
 }
@@ -443,9 +591,10 @@ export function winChance(input: {
     basis.push(`제안 준비 수준 '${input.proposal ?? "중"}'과 가격점수 ${Math.round(p * 100)}%를 반영했습니다. 기술평가(정성) 결과에 따라 달라집니다`);
   } else {
     // 과거 낙찰률 중 내 투찰률 이상인 비율: 내 투찰률이 낙찰자들보다 높으면 그만큼 순서에서 밀린다
-    const rates = [...input.history.map((x) => x.rate)].filter((r) => r > 50 && r <= 110).sort((a, b) => a - b);
+    const hist = input.history.filter((x) => x.bidders !== 1);
+    const rates = [...hist.map((x) => x.rate)].filter((r) => r > 50 && r <= 110).sort((a, b) => a - b);
     // 하한율이 해마다 바뀌므로(2026 기준 개정 등) 당시 하한율이 있으면 '하한율보다 얼마나 높게 썼는지'로 비교한다
-    const gaps = input.floor ? input.history.filter((x) => x.lwlt > 0 && x.rate >= x.lwlt && x.rate - x.lwlt < 10).map((x) => x.rate - x.lwlt) : [];
+    const gaps = input.floor ? hist.filter((x) => x.lwlt > 0 && x.rate >= x.lwlt && x.rate - x.lwlt < 10).map((x) => x.rate - x.lwlt) : [];
     const above = (r: number) => {
       if (gaps.length >= 3 && input.floor) { const g = r - input.floor; return gaps.filter((x) => x >= g - 1e-9).length / gaps.length; }
       if (rates.length >= 3) return rates.filter((x) => x >= r).length / rates.length;

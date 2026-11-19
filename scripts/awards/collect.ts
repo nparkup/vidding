@@ -33,7 +33,8 @@ import {
 import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
 import {
   AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, forecast, methodCode, METHOD_NAME, quantile, r3, similarKey,
-  type AgencyIndexFile, type AgencyRow, type SimilarIndexFile, type SimilarStat,
+  type AgencyIndexFile,
+  type AwardAnalysis, type AgencyRow, type SimilarIndexFile, type SimilarStat,
 } from "../../src/lib/awards/analysis";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 
@@ -535,7 +536,8 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
     // 색인만: 샤드·통계·수집 상태는 건드리지 않는다 (동시에 도는 수집 실행의 manifest.json 을 덮지 않게 바로 올린다)
     const ix = await buildIndexes([...shards.values()].flat(), async (key, body) => { await r2Put(key, body, "application/gzip"); writeLocal(key, body); return true; });
     printSamples(ix);
-    backtest(ix);
+    const trial = backtest(ix);
+    await relateTrial(trial);
     return { rows, shards: keys.length };
   }
   let uploaded = 0;
@@ -621,6 +623,9 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
 
 /* ---------- 낙찰 결과 분석 색인 (src/lib/awards/analysis.ts) ---------- */
 
+/** 비슷한 공고 묶음마다 저장하는 최근 낙찰 예 수 (화면은 지금 공고명과 겹치는 5건만 고른다) */
+const SIMILAR_EX = 15;
+
 async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer) => Promise<boolean>): Promise<{ rows: ShardRow[]; buckets: AgencyIndexFile[]; similar: SimilarIndexFile }> {
   // 공고 1건당 1줄: 같은 공고번호는 낙찰금액이 가장 큰 줄 (분류가 여럿인 공고)
   const byNo = new Map<string, ShardRow>();
@@ -680,7 +685,7 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
       }
       if (wr) { a.firstN++; if (wr === 1) a.first++; }
       if (r[21] > 0 && r[20] > 0) { const p = (r[21] / r[20]) * 100; if (p > 90 && p < 110) a.pre.push(p); }
-      if (!k.endsWith("|*") && a.ex!.length < 5) a.ex!.push([r[2], r[5], r[6], r[9], r[7], r[8], r[10], r[1], wr, r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])]);
+      if (!k.endsWith("|*") && a.ex!.length < SIMILAR_EX) a.ex!.push([r[2], r[5], r[6], r[9], r[7], r[8], r[10], r[1], wr, r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])]);
     }
   }
   const out: SimilarIndexFile = { v: 1, builtAt: new Date().toISOString(), from: since, to: iso(addDays(today, 6)), groups: {} };
@@ -736,10 +741,15 @@ function printSamples(ix: Awaited<ReturnType<typeof buildIndexes>>) {
 /**
  * 되짚어 보기: 최근 8주 낙찰 공고를 '지금 공고'로 보고 그 전 자료만으로 예측한 낙찰률·참가업체 수를 실제와 비교한다
  */
-function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>) {
+const fmtWon = (n: number) => (n >= 1e8 ? `${(n / 1e8).toFixed(1)}억` : n >= 1e4 ? `${Math.round(n / 1e4).toLocaleString()}만` : `${n}`);
+
+function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { a: AwardAnalysis; actual: { winner: string } }[] {
   const since = iso(addDays(mondayOf(kstNow()), -56));
   const range = { from: "", to: "" };
-  const acc = new Map<string, { n: number; rateN: number; rateErr: number[]; inBand: number; bidN: number; bidIn: number; bidErr: number[] }>();
+  type Acc = { n: number; rateN: number; rateErr: number[]; inBand: number; bidN: number; bidIn: number; bidErr: number[]; prior: number; priorNear: number; priorErr: number[]; hist: number; maybe: number; maybeN: number; exN: number };
+  const accs = { old: new Map<string, Acc>(), now: new Map<string, Acc>() };
+  const diffs: string[] = [];
+  const trial: { a: AwardAnalysis; actual: { winner: string } }[] = [];
   let seen = 0;
   for (const r of ix.rows) {
     if (r[9] < since) break;
@@ -751,23 +761,67 @@ function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>) {
       id: r[2], bidNtceNo: r[2], title: r[5], demandAgency: r[6], bizType: r[4], contractMethod: METHOD_NAME[m], baseAmount: r[20] || r[12] || r[7],
       postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined },
     };
-    const a = analyzeBid(target, ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]], ix.similar.groups, range);
-    const fc = forecast(a, { contractMethod: target.contractMethod, lowerLimitRate: r[22] || undefined });
-    const k = `${r[4]} ${METHOD_NAME[m]}`;
-    const x = acc.get(k) ?? acc.set(k, { n: 0, rateN: 0, rateErr: [], inBand: 0, bidN: 0, bidIn: 0, bidErr: [] }).get(k)!;
-    x.n++;
-    if (fc.winRate && r[8] > 50 && r[8] <= 110) { x.rateN++; x.rateErr.push(Math.abs(fc.winRate.value - r[8])); }
-    if (fc.bidders && r[10] > 0) {
-      x.bidN++;
-      const [lo, mid, hi] = fc.bidders.q;
-      if (r[10] >= lo && r[10] <= hi) x.bidIn++;
-      x.bidErr.push(Math.abs(mid - r[10]) / Math.max(1, r[10]));
+    const rows = ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]];
+    const pair = { old: analyzeBid(target, rows, ix.similar.groups, range, { legacy: true }), now: analyzeBid(target, rows, ix.similar.groups, range) };
+    for (const kind of ["old", "now"] as const) {
+      const a = pair[kind];
+      const fc = forecast(a, { contractMethod: target.contractMethod, lowerLimitRate: r[22] || undefined });
+      const k = `${r[4]} ${METHOD_NAME[m]}`;
+      const x = accs[kind].get(k) ?? accs[kind].set(k, { n: 0, rateN: 0, rateErr: [], inBand: 0, bidN: 0, bidIn: 0, bidErr: [], prior: 0, priorNear: 0, priorErr: [], hist: 0, maybe: 0, maybeN: 0, exN: 0 }).get(k)!;
+      x.n++;
+      x.hist += a.history.length;
+      if (a.maybe?.length) { x.maybe++; x.maybeN += a.maybe.length; }
+      if (a.similar?.stat.ex?.length) x.exN++;
+      if (a.prior) {
+        x.prior++;
+        const amt = a.prior.base || a.prior.amount, tb = target.baseAmount;
+        if (amt > 0 && tb > 0 && Math.max(amt, tb) / Math.min(amt, tb) <= 2) x.priorNear++;
+        if (a.prior.rate > 50 && a.prior.rate <= 110 && r[8] > 50 && r[8] <= 110) x.priorErr.push(Math.abs(a.prior.rate - r[8]));
+      }
+      if (fc.winRate && r[8] > 50 && r[8] <= 110) { x.rateN++; x.rateErr.push(Math.abs(fc.winRate.value - r[8])); }
+      if (fc.bidders && r[10] > 0) {
+        x.bidN++;
+        const [lo, mid, hi] = fc.bidders.q;
+        if (r[10] >= lo && r[10] <= hi) x.bidIn++;
+        x.bidErr.push(Math.abs(mid - r[10]) / Math.max(1, r[10]));
+      }
+    }
+    if (pair.now.maybe?.length && trial.length < 40 && seen % 11 === 0) trial.push({ a: pair.now, actual: { winner: r[1] } });
+    if (diffs.length < 40 && pair.old.prior && pair.old.prior.no !== pair.now.prior?.no && seen % 7 === 0) {
+      diffs.push(`PRIOR_DIFF ${r[4]} | ${r[5]} | ${fmtWon(target.baseAmount)} || 전: ${pair.old.prior.title} (${pair.old.prior.date}, ${fmtWon(pair.old.prior.base || pair.old.prior.amount)}) || 후: ${pair.now.prior ? `${pair.now.prior.title} (${pair.now.prior.date}, ${fmtWon(pair.now.prior.base || pair.now.prior.amount)})` : "없음"}${pair.now.maybe?.length ? ` || 애매 ${pair.now.maybe.length}건: ${pair.now.maybe.slice(0, 3).map((x) => x.title).join(" / ")}` : ""}`);
     }
   }
   const med = (v: number[]) => (v.length ? r3(quantile(v.sort((a, b) => a - b), 0.5)) : 0);
-  for (const [k, x] of [...acc].sort((a, b) => b[1].n - a[1].n)) {
-    console.log(`BACKTEST ${k}: 공고 ${x.n.toLocaleString()}건 · 낙찰률 예측 ${x.rateN.toLocaleString()}건, 오차 중앙값 ${med(x.rateErr)}%p, 1%p 안 ${Math.round((x.rateErr.filter((e) => e <= 1).length / Math.max(1, x.rateN)) * 100)}% · 참가업체 예측 ${x.bidN.toLocaleString()}건, 예상 범위 안 ${Math.round((x.bidIn / Math.max(1, x.bidN)) * 100)}%, 오차 중앙값 ${Math.round(med(x.bidErr) * 100)}%`);
+  const pc = (a: number, b: number) => `${Math.round((a / Math.max(1, b)) * 100)}%`;
+  for (const kind of ["old", "now"] as const) {
+    for (const [k, x] of [...accs[kind]].sort((a, b) => b[1].n - a[1].n)) {
+      console.log(`BACKTEST${kind === "old" ? "_OLD" : ""} ${k}: 공고 ${x.n.toLocaleString()}건 · 낙찰률 예측 ${x.rateN.toLocaleString()}건, 오차 중앙값 ${med(x.rateErr)}%p, 1%p 안 ${pc(x.rateErr.filter((e) => e <= 1).length, x.rateN)} · 참가업체 예상 범위 안 ${pc(x.bidIn, x.bidN)}, 오차 중앙값 ${Math.round(med(x.bidErr) * 100)}% · 전년도 찾음 ${pc(x.prior, x.n)}, 그중 금액 2배 안 ${pc(x.priorNear, x.prior)}, 전년도 낙찰률과 실제 차이 중앙값 ${med(x.priorErr)}%p · 같은 사업 평균 ${(x.hist / Math.max(1, x.n)).toFixed(1)}건 · 애매 후보 있는 공고 ${pc(x.maybe, x.n)} (평균 ${(x.maybeN / Math.max(1, x.maybe)).toFixed(1)}건) · 비슷한 공고 예 있음 ${pc(x.exN, x.n)}`);
+    }
   }
+  for (const d of diffs) console.log(d);
+  return trial;
+}
+
+/** 애매한 후보 확인 시험: RELATE_TRIAL 건만큼 실제로 Claude에 물어 토큰과 판단을 찍는다 (ANTHROPIC_API_KEY 가 있을 때만) */
+async function relateTrial(trial: { a: AwardAnalysis; actual: { winner: string } }[]) {
+  const n = Number(process.env.RELATE_TRIAL || 0);
+  if (!n || !process.env.ANTHROPIC_API_KEY || !trial.length) return;
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const { relateWithAI } = await import("../../src/lib/awards/relate");
+  const client = new Anthropic({ maxRetries: 2 });
+  let tin = 0, tout = 0, done = 0, same = 0, cands = 0;
+  for (const { a } of trial.slice(0, n)) {
+    if (!a.subject) continue;
+    try {
+      const r = await relateWithAI(client, a.subject, a);
+      done++; cands += a.maybe?.length ?? 0; same += r.same.length;
+      tin += r.usage?.input ?? 0; tout += r.usage?.output ?? 0;
+      console.log(`RELATE_TRIAL ${a.subject.title} | 후보 ${a.maybe?.length}건, 같음 ${r.same.length}건 | 입력 ${r.usage?.input} 출력 ${r.usage?.output} | ${r.reason ?? r.status}`);
+    } catch (e) {
+      console.log(`RELATE_TRIAL 실패: ${(e as Error).message.slice(0, 200)}`);
+    }
+  }
+  if (done) console.log(`RELATE_TRIAL 합계: ${done}건, 후보 ${cands}건 중 같음 ${same}건, 공고당 입력 ${Math.round(tin / done)} 출력 ${Math.round(tout / done)} 토큰`);
 }
 
 async function indexMode() {

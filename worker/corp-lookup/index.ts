@@ -14,11 +14,15 @@
  * 공고 배점표 AI 판독 (src/lib/nara/aiSheet.ts):
  * - GET /?aisheet=공고번호-차수 : 사이트가 빌드 때 만든 /ai-input/{공고}.json 본문을 Claude로 읽어 검증한 배점표를 돌려준다.
  *   결과는 R2 ai-sheets/v{버전}/{공고}-{본문 해시}.json 에 두어 같은 공고는 한 번만 부른다. 키는 Worker 비밀값 ANTHROPIC_API_KEY.
+ * - GET /?relate=공고번호-차수 : 사이트의 /award-analysis/{공고}.json 에 있는 '같은 사업인지 애매한 후보'를 Claude로 확인한다
+ *   (src/lib/awards/relate.ts). 결과는 R2 ai-relate/v{버전}/{공고}-{후보 해시}.json
  */
 import { lookupCompany, normalizeBizno, validBizno } from "../../src/lib/corpLookup";
 import { fetchNtceClasses, fetchWins, perfBizOf } from "../../src/lib/perfLookup";
 import { readAwards, type R2BucketLike } from "../../src/lib/awards/read";
 import Anthropic from "@anthropic-ai/sdk";
+import { RELATE_VERSION, relateHash, relateWithAI, type RelateResult } from "../../src/lib/awards/relate";
+import type { AwardAnalysis } from "../../src/lib/awards/analysis";
 import { AI_SHEET_VERSION, readAiInput, type AiInput, type AiSheetResult } from "../../src/lib/nara/aiSheet";
 
 interface Env {
@@ -79,6 +83,27 @@ export default {
         return json(result);
       } catch (e) {
         return json({ status: "error", reason: (e as Error).message.slice(0, 200) }, 502);
+      }
+    }
+    if (sp.has("relate")) {
+      const id = sp.get("relate") ?? "";
+      if (!/^[A-Za-z0-9-]{6,40}$/.test(id)) return json({ error: "올바른 공고번호가 아닙니다." }, 400);
+      if (!env.ANTHROPIC_API_KEY || !env.SITE_URL) return json({ status: "off", same: [] }, 503);
+      try {
+        // 후보는 사이트가 빌드 때 만든 낙찰 결과 분석 파일에서만 읽는다 (브라우저가 보낸 글은 쓰지 않는다)
+        const r = await fetch(`${env.SITE_URL.replace(/\/$/, "")}/award-analysis/${encodeURIComponent(id)}.json`, { cf: { cacheTtl: 600 } } as RequestInit);
+        if (!r.ok) return json({ status: "none", same: [] });
+        const a = (await r.json()) as AwardAnalysis | null;
+        if (!a?.maybe?.length || !a.subject) return json({ status: "none", same: [] });
+        const key = `ai-relate/v${RELATE_VERSION}/${id}-${relateHash(a)}.json`;
+        const hit = await env.AWARDS?.get(key);
+        if (hit) return json(JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())), 200, { "X-Cache": "HIT" });
+        const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 60_000 });
+        const result: RelateResult = await relateWithAI(client, a.subject, a, env.AI_SHEET_MODEL || undefined);
+        if (result.status !== "error" && env.AWARDS) ctx.waitUntil(env.AWARDS.put(key, JSON.stringify(result), { httpMetadata: { contentType: "application/json" } }));
+        return json(result);
+      } catch (e) {
+        return json({ status: "error", same: [], reason: (e as Error).message.slice(0, 200) }, 502);
       }
     }
     if (!env.DATA_GO_KR_SERVICE_KEY) return json({ error: "중계 서버에 공공데이터포털 인증키가 없습니다." }, 503);

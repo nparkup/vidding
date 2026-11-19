@@ -129,7 +129,7 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
     <section className="card min-w-0 p-6">
       <h3 className="text-lg font-bold">낙찰 결과 분석</h3>
       <p className="mt-1 text-sm text-ink-500">
-        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다. 아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.
+        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다. 권역·노선·학년 같은 대상이나 사업 종류(유지관리·구축·감리 등)가 다르거나 금액이 3배 넘게 차이 나는 공고는 같은 사업에서 뺐습니다. 아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.
       </p>
       {loading ? (
         <p className="mt-4 text-sm text-ink-300">낙찰 결과를 불러오는 중…</p>
@@ -137,7 +137,7 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
         <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 아직 낙찰 결과 분석이 없습니다. 사이트가 다시 만들어질 때(영업일 하루 세 번) 채워집니다.</p>
       ) : (
         <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-          <PriorCard prior={analysis.prior} />
+          <PriorCard prior={analysis.prior} years={analysis.cycleYears ?? 1} />
           <HistoryCard history={analysis.history} fc={fc} />
           <div className="min-w-0 lg:col-span-2">
             <SimilarCard similar={analysis.similar} bidRate={bidRate} floor={floor} isNego={isNego} />
@@ -194,17 +194,18 @@ function RankList({ top, winner, plnprc }: { top: PastAward["top"]; winner?: str
   );
 }
 
-function PriorCard({ prior }: { prior?: PastAward }) {
+function PriorCard({ prior, years }: { prior?: PastAward; years: number }) {
+  const title = years > 1 ? `직전 계약 낙찰 결과 (${years}년 계약)` : "전년도 낙찰 결과";
   if (!prior) {
     return (
-      <Box title="전년도 낙찰 결과" sub="지금 공고 8~20개월 전, 같은 수요기관의 같은 사업">
+      <Box title={title} sub={years > 1 ? `지금 공고 약 ${years}년 전, 같은 수요기관의 같은 사업` : "지금 공고 8~20개월 전, 같은 수요기관의 같은 사업"}>
         <p className="text-sm text-ink-500">이 기간에 같은 수요기관이 낸 비슷한 이름의 공고를 찾지 못했습니다. 올해 처음 발주했거나 이름이 크게 바뀐 사업일 수 있습니다.</p>
       </Box>
     );
   }
   const pre = prior.plnprc && prior.base ? (prior.plnprc / prior.base) * 100 : 0;
   return (
-    <Box title="전년도 낙찰 결과" sub={`${prior.date} 낙찰 · 공고번호 ${prior.no} · 공고명 유사도 ${Math.round(prior.similarity * 100)}%`}>
+    <Box title={title} sub={`${prior.date} 낙찰 · 공고번호 ${prior.no} · 공고명 유사도 ${Math.round(prior.similarity * 100)}%`}>
       <p className="text-sm font-semibold leading-snug">{prior.title}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Fact label="낙찰률" value={prior.rate ? pct(prior.rate) : "-"} note={prior.derived ? "낙찰금액 ÷ 예정가격으로 계산" : prior.lwlt ? `하한율 ${pct(prior.lwlt)}` : METHOD_NAME[prior.method]} />

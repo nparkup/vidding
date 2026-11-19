@@ -613,6 +613,11 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
       q[2] = Math.max(q[2], q[1]);
     }
     out.bidders = { q, basis: recent3 ? `과거 같은 사업 ${hb.length}건 (가운데 값은 최근 ${Math.min(3, hb.length)}건)` : `과거 같은 사업 ${hb.length}건` };
+  } else if (recent3 && hb.length === 1) {
+    // 같은 사업 1건: 가운데 값은 그 건, 범위는 비슷한 공고 분포로 넓힌다
+    const b = hb[0];
+    const q: [number, number, number] = st ? [Math.min(b, Math.round(st.bidders.q[0])), b, Math.max(b, Math.round(st.bidders.q[2]))] : [b, b, b];
+    out.bidders = { q, basis: st ? `과거 같은 사업 1건과 비슷한 공고 ${st.n.toLocaleString()}건` : "과거 같은 사업 1건" };
   } else if (st) {
     const q = st.bidders.q.map((n) => Math.round(n)) as [number, number, number];
     if (a.prior?.bidders) q[1] = Math.round((q[1] + a.prior.bidders) / 2);

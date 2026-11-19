@@ -22,7 +22,7 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
           <span className="chip">{bid.bizType && bid.bizType !== "용역" ? `${bid.bizType} · ` : ""}{bid.category}</span>
           <span className="chip">{bid.region === "전국" ? "전국" : `${bid.region} 제한`}</span>
           <span className="chip">{bid.contractMethod}</span>
-          {closed && <span className="chip border-coral/30 bg-coral-100/60 text-coral">{closed}</span>}
+          {closed && <span className="chip border-coral/30 bg-coral-100/60 text-coral" title={closed}>참가 불가 · {closed.split(" · ")[1]}</span>}
         </div>
         <p className="mt-2 line-clamp-2 text-[16px] font-semibold group-hover:text-mint-600 sm:line-clamp-1">
           <CloseDay iso={bid.closeAt} />

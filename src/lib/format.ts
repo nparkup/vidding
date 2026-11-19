@@ -38,3 +38,15 @@ export function isoDate(iso?: string | null): string {
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString("en-CA", tz);
 }
+
+/**
+ * 마감까지 남은 날짜를 한국 시간 달력 기준으로 센다 (오늘 마감 = 0).
+ * 마감 시각이 이미 지났으면 -1, 날짜가 없거나 잘못되면 null.
+ */
+export function calendarDaysLeft(iso?: string | null, now = new Date()): number | null {
+  const close = isoDate(iso);
+  if (!close) return null;
+  if (new Date(iso as string).getTime() < now.getTime()) return -1;
+  const today = now.toLocaleDateString("en-CA", tz);
+  return Math.round((Date.parse(close) - Date.parse(today)) / 86400000);
+}

@@ -2,19 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ScoreBar } from "@/components/Badges";
+import { CloseDdayBadge, ScoreBar } from "@/components/Badges";
 import { readDocument, UnsupportedDocError } from "@/lib/docText";
 import {
   CREDIT_GRADES, DEFAULT_COMPANY, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
-import { bidSheet, TECH_GRADES } from "@/lib/criteria";
+import { adoptable, bidSheet, TECH_GRADES } from "@/lib/criteria";
 import type { NoticeCriteria } from "@/lib/noticeCriteria";
 import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "@/lib/eligibility";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
+import { closedLabel, methodProfile } from "@/lib/bidMethod";
 import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from "@/lib/rivalRate";
 import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
@@ -25,13 +26,15 @@ import { CloseDay } from "../CloseDay";
 import { TrustPicker } from "./TrustPicker";
 import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
 
+/** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
+const MAX_MATCHES = 100;
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 /** 정적 사이트는 Cloudflare 중계 서버(worker/corp-lookup)로, 서버 배포는 자체 API로 조회한다. 정적 사이트에 중계 주소가 없으면 조회를 끈다 */
 const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium/corp";
 /** 유사 실적(나라장터 낙찰 이력) 조회: 정적 사이트는 같은 중계 서버, 서버 배포는 자체 API */
 const PERF_API = STATIC ? CORP_API : "/api/premium/perf";
 
-interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
+interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; /** AI 판독 입력이 있으면 그 본문 해시 */ ai?: string; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
 
 /** 정적 배포는 빌드 때 공고별로 만들어 둔 파일(첨부 목록 + 첨부에서 추출한 평가표)을, 서버 배포는 나라장터 첨부 목록을 바로 조회한다 */
 async function loadBidDocs(bid: Bid): Promise<BidDocs> {
@@ -42,6 +45,19 @@ async function loadBidDocs(bid: Bid): Promise<BidDocs> {
   if (!r.ok) return { files: [] };
   const j = await r.json();
   return Array.isArray(j) ? { files: j } : j;
+}
+
+type AiRead = "idle" | "reading" | "done" | "none" | "fail";
+
+/**
+ * 규칙 파서가 배점표를 못 읽은 공고: 중계 서버에 AI 판독을 부탁한다 (서버가 빌드 때 만든 본문으로 Claude를 부르고 결과를 캐시한다).
+ * 처음 읽는 공고는 10~30초 걸리고, 같은 공고는 캐시에서 바로 온다.
+ */
+async function loadAiSheet(bid: Bid): Promise<EvalSheet | null> {
+  const r = await fetch(`${CORP_API}?${new URLSearchParams({ aisheet: bid.id })}`);
+  if (!r.ok) throw new Error(`AI 판독 ${r.status}`);
+  const j = (await r.json()) as { status: string; sheet?: EvalSheet };
+  return j.status === "ok" && j.sheet ? j.sheet : null;
 }
 
 /** 전년도 낙찰률 통계: 정적 배포는 빌드 때 만든 파일, 서버 배포는 같은 경로의 라우트 */
@@ -126,8 +142,13 @@ export function ScorePredictor() {
     return bidId ? bids.find((b) => b.id === bidId) : undefined;
   }, [bids, bidId]);
 
+  // 수의시담·지명경쟁처럼 정해진 업체만 참가하는 공고는 평가점수를 예측하지 않는다
+  const profile = useMemo(() => (bid ? methodProfile(bid) : undefined), [bid]);
+  const closedBid = !!profile && !profile.open;
+
   // 공고를 고르면 첨부 목록과, 첨부에서 미리 추출해 둔 평가표를 불러온다 (없으면 표준 평가표)
   const [docs, setDocs] = useState<BidDocs | null>(null);
+  const [aiRead, setAiRead] = useState<AiRead>("idle");
   // 공고의 낙찰방법 세부·낙찰하한율·추정가격으로 그 공고에 맞는 기준표를 고른다
   const basis = docs?.qual?.basis;
   const template = useMemo(() => (bid ? templateSheet(bid, basis) : null), [bid, basis]);
@@ -158,8 +179,22 @@ export function ScorePredictor() {
     let alive = true;
     setDocs(null);
     setSheet(null);
+    setAiRead("idle");
+    if (!methodProfile(bid).open) return;
     loadBidDocs(bid)
-      .then((d) => { if (alive) setDocs(d); })
+      .then((d) => {
+        if (!alive) return;
+        setDocs(d);
+        // 원문 배점표를 쓸 수 없고 AI 판독 입력이 있으면 그 자리에서 읽는다
+        if (!d.ai || !STATIC || !CORP_API || (d.sheet && adoptable(d.sheet, d.qual?.basis))) return;
+        setAiRead("reading");
+        loadAiSheet(bid)
+          .then((s) => {
+            if (!alive) return;
+            if (s) { setDocs({ ...d, sheet: s, sheetFile: undefined }); setAiRead("done"); } else setAiRead("none");
+          })
+          .catch(() => alive && setAiRead("fail"));
+      })
       .catch(() => alive && setDocs({ files: [] }));
     return () => { alive = false; };
   }, [bid]);
@@ -236,10 +271,11 @@ export function ScorePredictor() {
     ? sheetPerfPeriod(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]), active.recognition ?? [])
     : undefined, [active]);
 
-  const matches = useMemo(() => {
-    if (!bids || !query.trim()) return [];
+  const { matches, matchTotal } = useMemo(() => {
+    if (!bids || !query.trim()) return { matches: [], matchTotal: 0 };
     const q = query.trim().toLowerCase();
-    return bids.filter((b) => b.title.toLowerCase().includes(q) || b.agency.includes(q) || b.bidNtceNo.toLowerCase().includes(q)).slice(0, 8);
+    const all = bids.filter((b) => b.title.toLowerCase().includes(q) || b.agency.includes(q) || b.bidNtceNo.toLowerCase().includes(q));
+    return { matches: all.slice(0, MAX_MATCHES), matchTotal: all.length };
   }, [bids, query]);
 
   const set = <K extends keyof CompanyInput>(k: K, v: CompanyInput[K]) => setCo((c) => ({ ...c, [k]: v }));
@@ -322,22 +358,55 @@ export function ScorePredictor() {
           <div className={`relative ${bid ? "mt-3" : "mt-4"}`}>
             <input className="input" placeholder={bid ? "다른 공고 찾기: 공고명·기관명·공고번호" : "공고명·기관명·공고번호로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} />
             {matches.length > 0 && (
-              <ul className="card absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto p-1">
-                {matches.map((m) => (
-                  <li key={m.id}>
-                    <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
-                      <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDay iso={m.closeAt} />{m.title}</span>
-                      <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="card absolute inset-x-0 top-full z-20 mt-1 overflow-hidden">
+                <p className="border-b border-ink-100 px-4 py-2 text-xs text-ink-500">
+                  {matchTotal > matches.length
+                    ? `검색 결과 ${matchTotal.toLocaleString("ko-KR")}건 중 ${matches.length}건 표시 · 검색어를 더 입력하면 좁혀집니다`
+                    : `검색 결과 ${matchTotal.toLocaleString("ko-KR")}건`}
+                </p>
+                <ul className="max-h-[min(28rem,60vh)] overflow-y-auto overscroll-contain p-1">
+                  {matches.map((m) => (
+                    <li key={m.id}>
+                      <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
+                        <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
+                        <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
   );
 
   if (error) return <p className="card p-6 text-sm text-coral">공고 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
   if (!bids) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
+
+  // 정해진 업체만 참가하는 공고: 평가표·점수 대신 까닭과 낙찰 방식을 보여 준다
+  if (bid && profile && closedBid) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <section className="card min-w-0 p-6">
+          <Step n={1} title="공고 선택" />
+          <div className="mt-4 rounded-2xl bg-paper p-4">
+            <p className="text-xs text-ink-500">{bid.bizType ?? "용역"} · {bid.category} · {bid.contractType ?? "계약방법 미상"} · {bid.awardRaw ?? bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
+            <p className="mt-1 font-bold leading-snug"><CloseDay iso={bid.closeAt} />{bid.title}</p>
+            <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}</p>
+          </div>
+          {searchBox}
+        </section>
+        <aside className="card min-w-0 p-6">
+          <p className="font-bold text-coral">평가점수 예측 대상이 아닌 공고</p>
+          <p className="mt-2 text-sm text-ink-700">{profile.closedReason}입니다. 나라장터도 이런 공고는 정보공개 차원에서 올리는 것이며 계약대상자가 아닌 업체는 참가할 수 없다고 안내합니다.</p>
+          <dl className="mt-4 space-y-2 text-sm">
+            <div><dt className="text-xs text-ink-500">참가할 수 있는 업체</dt><dd>{profile.who}</dd></div>
+            <div><dt className="text-xs text-ink-500">낙찰자 결정</dt><dd>{profile.decide}</dd></div>
+          </dl>
+          <p className="mt-4 text-xs text-ink-500">공개 경쟁 공고(일반·제한경쟁, 소액수의견적)를 골라 주세요.</p>
+        </aside>
+      </div>
+    );
+  }
 
   // 공고를 고르기 전: 검색만 보이고, 결과 자리에는 안내만 둔다
   if (!bid || !active || !result) {
@@ -370,7 +439,7 @@ export function ScorePredictor() {
           <Step n={1} title="공고 선택" />
           <div className="mt-4 rounded-2xl bg-paper p-4">
             <p className="text-xs text-ink-500">{bid.bizType ?? "용역"} · {bid.category} · {bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
-            <p className="mt-1 font-bold leading-snug"><CloseDay iso={bid.closeAt} />{bid.title}</p>
+            <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
             <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
           </div>
           {searchBox}
@@ -381,11 +450,18 @@ export function ScorePredictor() {
               <p className="text-sm text-ink-300">첨부파일 확인 중…</p>
             ) : (
               <>
-                {(docs.sheet || docs.files.length > 0) && (
+                {aiRead === "reading" ? (
+                  <div className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
+                    <p>AI가 공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 10~30초 걸립니다. 그동안은 기준표로 계산합니다.</p>
+                    <LoadingBar label="AI 배점표 판독 중" />
+                  </div>
+                ) : (docs.sheet || docs.files.length > 0) && (
                   <p className={`rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
-                    {docs.sheet
-                      ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
-                      : `이 공고의 첨부에서 평가 배점표를 찾지 못해 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}
+                    {docs.sheet?.reader?.by === "ai"
+                      ? `AI가 공고 첨부에서 평가항목 ${docs.sheet.items.length}개를 읽었습니다. 원문 문구와 배점 합계 확인을 통과해 원문 배점으로 계산합니다.`
+                      : docs.sheet
+                        ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
+                        : `이 공고의 첨부에서 평가 배점표를 ${aiRead === "fail" ? "읽지 못했습니다(AI 판독 일시 오류)" : "찾지 못했습니다"}. 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}
                   </p>
                 )}
                 {docs.files.length > 0 && (
@@ -604,10 +680,11 @@ export function ScorePredictor() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">
-            <span className="chip">{active.source === "extracted" ? `공고 원문 배점 · 신뢰도 ${active.confidence}` : active.noticeFacts?.length ? `기준표 + 공고서 기준 ${active.noticeFacts.length}가지` : "기준표"}</span>
+            <span className="chip">{active.source === "extracted" ? `공고 원문 배점${active.reader?.by === "ai" ? "(AI 판독)" : ""} · 신뢰도 ${active.confidence}` : active.noticeFacts?.length ? `기준표 + 공고서 기준 ${active.noticeFacts.length}가지` : "기준표"}</span>
             {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => setSheet(null)}>공고 기준으로 되돌리기</button>}
           </div>
         </div>
+        {active.reader?.by === "ai" && <AiReadNote />}
         <NoticeFacts sheet={active} />
         <CriteriaInfo sheet={active} />
         <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -701,6 +778,15 @@ function DetailLines({ text, className = "" }: { text: string; className?: strin
   );
 }
 
+/** AI가 첨부에서 읽은 배점표일 때 붙이는 안내 */
+function AiReadNote() {
+  return (
+    <p className="mt-2 text-xs leading-relaxed text-ink-500">
+      공고 첨부의 배점표를 AI가 읽어 정리했습니다. 항목 이름이 원문에 있는지, 배점 합계가 100점이고 나라장터에 등록된 기술·가격 배점과 맞는지 확인을 통과한 경우에만 씁니다. 제출 전 공고 원문으로 한 번 더 확인하세요.
+    </p>
+  );
+}
+
 /** 사업자번호 조회 전: 공고의 평가항목과 배점, 통과 기준만 보여 준다 */
 function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: string }) {
   const max = Math.round(sheet.items.reduce((s, i) => s + Math.max(0, i.max), 0) * 10) / 10;
@@ -708,9 +794,10 @@ function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: str
     <section className="card overflow-hidden">
       <div className="p-6">
         <p className="text-sm text-ink-500">평가 기준</p>
-        <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? "공고 첨부의 평가표" : sheet.criteria?.name ?? `${sheet.method} 기준표`} · {max}점 만점</p>
+        <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? `공고 첨부의 평가표${sheet.reader?.by === "ai" ? " (AI 판독)" : ""}` : sheet.criteria?.name ?? `${sheet.method} 기준표`} · {max}점 만점</p>
         {sheet.criteria && <p className="mt-1 text-xs text-ink-500">{sheet.criteria.status} · {sheet.criteria.source}</p>}
         {passLabel && <p className="mt-1 text-sm text-ink-500">통과 기준 {passLabel}</p>}
+        {sheet.reader?.by === "ai" && <AiReadNote />}
         <NoticeFacts sheet={sheet} />
       </div>
       <ul className="divide-y divide-ink-100 border-t border-ink-100">

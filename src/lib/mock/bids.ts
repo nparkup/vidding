@@ -74,6 +74,7 @@ const BIDDER_WIN_RATE: Record<ContractMethod, number> = {
   "협상에 의한 계약": 91.2,
   "최저가": 79.995,
   "수의계약(소액)": 88.0,
+  "수의시담": 99.0,
 };
 
 function atKst(base: Date, addDays: number, hour: number, minute = 0): string {

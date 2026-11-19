@@ -6,30 +6,44 @@ import { DdayBadge } from "@/components/Badges";
 import { ProfileScore } from "@/components/ProfileScore";
 import { Checklist } from "@/components/Checklist";
 import { bidPriceGuide, daysLeft, documentChecklist, keyPoints } from "@/lib/analysis";
-import { loadAttachments } from "@/lib/attachments";
+import { loadBidExtra } from "@/lib/attachments";
+import { BidContact, BidSummary, kstIso } from "@/components/BidSummary";
+import type { BidQual } from "@/lib/eligibility";
 import { dateTime, won, wonFull } from "@/lib/format";
 import type { Bid, BidAttachment } from "@/lib/types";
+import { methodProfile } from "@/lib/bidMethod";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
 export function BidDetailView({ bid }: { bid: Bid }) {
+  const profile = methodProfile(bid);
   const [files, setFiles] = useState<BidAttachment[]>([]);
+  const [qual, setQual] = useState<BidQual>();
   useEffect(() => {
     let alive = true;
     setFiles([]);
-    loadAttachments(bid).then((f) => alive && setFiles(f)).catch(() => {});
+    setQual(undefined);
+    loadBidExtra(bid).then((x) => { if (alive) { setFiles(x.files); setQual(x.qual); } }).catch(() => {});
     return () => { alive = false; };
   }, [bid]);
+  const info = qual?.info;
 
-  const guide = bidPriceGuide(bid);
+  // 기초금액이 공개됐으면 투찰 가이드도 그 금액으로 계산한다 (공고 목록 금액은 배정예산·추정가격)
+  const guide = bidPriceGuide(info?.base ? { ...bid, baseAmount: info.base } : bid);
   const points = keyPoints(bid);
   const docs = documentChecklist(bid);
 
+  // 일정: 공고 목록의 게시·마감·개찰에 입찰공고정보서비스의 제출 시작·자격 등록·공동수급협정·입찰보증 마감을 더해 시간순으로
+  const briefing = bid.briefingAt ?? kstIso(info?.briefingAt);
   const timeline = [
     { label: "공고 게시", at: bid.postedAt },
-    ...(bid.briefingAt ? [{ label: "현장설명회", at: bid.briefingAt }] : []),
+    ...(briefing ? [{ label: "현장설명", at: briefing, note: info?.briefingPlace }] : []),
+    ...(kstIso(info?.bidBegin) ? [{ label: "입찰서 제출 시작", at: kstIso(info?.bidBegin)! }] : []),
+    ...(kstIso(info?.registerBy ?? qual?.registerBy) ? [{ label: "참가자격 등록 마감", at: kstIso(info?.registerBy ?? qual?.registerBy)! }] : []),
+    ...(kstIso(info?.jointBy) ? [{ label: "공동수급협정 마감", at: kstIso(info?.jointBy)! }] : []),
+    ...(kstIso(info?.guaranteeBy) ? [{ label: "입찰보증서 마감", at: kstIso(info?.guaranteeBy)! }] : []),
     { label: "입찰 마감", at: bid.closeAt, strong: true },
-    { label: "개찰", at: bid.openAt },
-  ];
+    { label: "개찰", at: bid.openAt, note: info?.openPlace && !/나라장터/.test(info.openPlace) ? info.openPlace : undefined },
+  ].sort((a, b) => +new Date(a.at) - +new Date(b.at)) as { label: string; at: string; strong?: boolean; note?: string }[];
 
   return (
     <div className="container-x py-10 sm:py-14">
@@ -41,6 +55,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <DdayBadge days={daysLeft(bid.closeAt)} />
             <span className="chip">{bid.bizType ?? "용역"} · {bid.category}</span>
             <span className="chip">{bid.contractMethod}</span>
+            {!profile.open && <span className="chip border-coral/30 bg-coral-100/60 text-coral">참가 불가</span>}
             <span className="chip">공고번호 {bid.bidNtceNo}-{bid.bidNtceOrd}</span>
           </div>
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{bid.title}</h1>
@@ -57,24 +72,15 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           {/* 요약 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold">핵심 요약</h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {[
-                ["기초금액", won(bid.baseAmount)],
-                ["업무 구분", bid.bizType ?? "용역"],
-                ...((bid.bizType ?? "용역") === "용역" ? [["용역 기간", `${bid.periodMonths}개월`]] : []),
-                ["참가 지역", bid.region === "전국" ? "제한 없음" : `${(bid.regions ?? [bid.region]).join("·")} 제한`],
-                ["필요 면허", bid.licenseRaw || bid.licenses.join(", ") || "제한 없음"],
-                ["낙찰하한율", bid.lowerLimitRate ? `${bid.lowerLimitRate}%` : "해당 없음"],
-                ["공동도급", bid.jointContract ? "허용" : "불가(단독)"],
-                ["중소기업 제한", bid.smallBizOnly ? "예" : "아니오"],
-                ["유사공고 평균 참여", bid.stats ? `${bid.stats.avgBidders}개사` : "-"],
-              ].map(([k, v]) => (
-                <div key={k} className="rounded-xl bg-paper p-3">
-                  <dt className="text-xs text-ink-500">{k}</dt>
-                  <dd className="mt-1 font-bold">{v}</dd>
-                </div>
-              ))}
-            </dl>
+            <BidSummary bid={bid} qual={qual} />
+            {/* 입찰·낙찰 방식: 누가 참가하고 낙찰자를 어떻게 정하는지 */}
+            <div className={`mt-4 rounded-xl p-4 text-sm ${profile.open ? "bg-paper" : "bg-coral-100/60"}`}>
+              <p className="text-xs text-ink-500">계약방법 {bid.contractType ?? "-"} · 낙찰방법 {bid.awardRaw ?? bid.contractMethod}</p>
+              {!profile.open && <p className="mt-1 font-bold text-coral">{profile.closedReason}</p>}
+              <p className="mt-1"><span className="text-ink-500">참가 업체 </span>{profile.who}</p>
+              <p className="mt-0.5"><span className="text-ink-500">낙찰자 결정 </span>{profile.decide}</p>
+            </div>
+            <BidContact info={info} />
             {points.length > 0 && (
               <ul className="mt-5 space-y-2">
                 {points.map((p) => (
@@ -90,11 +96,12 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           {/* 일정 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold">일정</h2>
-            <ol className="mt-5 grid gap-4 sm:grid-cols-4">
+            <ol className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {timeline.map((t) => (
                 <li key={t.label} className={`rounded-xl border p-3 ${t.strong ? "border-coral bg-coral-100/50" : "border-ink-100"}`}>
                   <p className={`text-xs font-semibold ${t.strong ? "text-coral" : "text-ink-500"}`}>{t.label}</p>
                   <p className="mt-1 text-sm font-bold">{dateTime(t.at)}</p>
+                  {t.note && <p className="mt-0.5 break-words text-xs text-ink-500">{t.note}</p>}
                 </li>
               ))}
             </ol>

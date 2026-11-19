@@ -12,6 +12,27 @@ import { bidHref } from "@/lib/links";
 
 const PAGE = 50;
 
+/** 정렬 기준. 적합도순은 내 조건(면허)을 넣었을 때만 고를 수 있다 */
+const SORTS = [
+  { v: "score", label: "적합도 높은순", needsProfile: true },
+  { v: "close", label: "마감 임박순" },
+  { v: "new", label: "최신 공고순" },
+  { v: "amtDesc", label: "금액 높은순" },
+  { v: "amtAsc", label: "금액 낮은순" },
+] as const;
+type SortKey = (typeof SORTS)[number]["v"];
+
+const time = (s: string) => new Date(s).getTime() || 0;
+/** 금액이 없는(0원) 공고는 금액순 정렬에서 항상 뒤로 보낸다 */
+const byAmount = (dir: 1 | -1) => (a: Bid, b: Bid) =>
+  Number(!a.baseAmount) - Number(!b.baseAmount) || dir * (a.baseAmount - b.baseAmount);
+const COMPARE: Record<Exclude<SortKey, "score">, (a: Bid, b: Bid) => number> = {
+  close: (a, b) => time(a.closeAt) - time(b.closeAt),
+  new: (a, b) => time(b.postedAt) - time(a.postedAt) || time(a.closeAt) - time(b.closeAt),
+  amtDesc: byAmount(-1),
+  amtAsc: byAmount(1),
+};
+
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 /**
@@ -51,6 +72,8 @@ function Explorer({ bids }: { bids: Bid[] }) {
   const min = Number(get("min") || 0);
   const max = Number(get("max") || 10_000_000_000);
   const hasProfile = lic.length > 0;
+  const rawSort = get("sort") as SortKey;
+  const sort: SortKey = SORTS.some((o) => o.v === rawSort) && (rawSort !== "score" || hasProfile) ? rawSort : hasProfile ? "score" : "close";
 
   const [limit, setLimit] = useState(PAGE);
   const go = (patch: Record<string, string>) => {
@@ -68,6 +91,11 @@ function Explorer({ bids }: { bids: Bid[] }) {
     if (region) l = l.filter((b) => b.region === "전국" || (b.regions ?? [b.region]).includes(region as Region));
     if (urgent) l = l.filter((b) => daysLeft(b.closeAt) <= 3);
     const m = hasProfile ? rank(l, { licenses: lic, regions: rg, minAmount: min, maxAmount: max, pastPerformance: max }) : null;
+    if (sort !== "score") {
+      const cmp = COMPARE[sort];
+      l = [...l].sort(cmp);
+      m?.sort((a, b) => cmp(a.bid, b.bid));
+    }
     return { list: l, matches: m };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bids, sp]);
@@ -121,9 +149,24 @@ function Explorer({ bids }: { bids: Bid[] }) {
         <ProfileForm onApply={(p) => go(p)} />
       )}
 
-      <p className="mt-6 text-sm text-ink-500">
-        {(shown ?? list).length}건{matches && ` · 참가 가능 ${matches.filter((m) => m.eligible).length}건`}
-      </p>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-ink-500">
+          {(shown ?? list).length.toLocaleString()}건{matches && ` · 참가 가능 ${matches.filter((m) => m.eligible).length.toLocaleString()}건`}
+        </p>
+        <label className="flex items-center gap-2 text-sm text-ink-500">
+          <span className="whitespace-nowrap">정렬</span>
+          <select
+            value={sort}
+            onChange={(e) => go({ sort: e.target.value })}
+            className="input h-9 w-auto py-0 pr-8 text-sm"
+            aria-label="정렬 기준"
+          >
+            {SORTS.filter((o) => !("needsProfile" in o) || hasProfile).map((o) => (
+              <option key={o.v} value={o.v}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
       <div className="mt-3 space-y-3">
         {shown
           ? shown.slice(0, limit).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={bidHref(m.bid.id, profileQs)} />)

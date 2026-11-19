@@ -4,7 +4,7 @@ import { Logo } from "./Logo";
 export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-ink-100 bg-paper text-ink-500">
-      <div className="container-x grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+      <div className="container-x grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <Logo />
           <p className="mt-4 max-w-xs text-sm leading-relaxed">
@@ -24,13 +24,6 @@ export function SiteFooter() {
           <ul className="mt-4 space-y-2.5 text-sm">
             <li><Link href="/pricing" className="hover:text-ink">요금제</Link></li>
             <li><Link href="/apply" className="hover:text-ink">무료 체험 신청</Link></li>
-          </ul>
-        </div>
-        <div>
-          <p className="text-sm font-bold text-ink">고객센터</p>
-          <ul className="mt-4 space-y-2.5 text-sm">
-            <li>평일 09:00 – 18:00</li>
-            <li>hello@ipchalmatelab.kr</li>
           </ul>
         </div>
       </div>

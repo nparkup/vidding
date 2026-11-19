@@ -67,7 +67,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
                   <li key={r.key} className="min-w-0 px-3 py-1.5">
                     <div className="flex min-w-0 items-baseline justify-between gap-2">
                       <span className="min-w-0 truncate font-semibold">{r.winner}</span>
-                      <span className="shrink-0 font-bold tabular-nums">{won(r.amount)}</span>
+                      <span className="shrink-0 font-bold tabular-nums">{r.amount > 100 ? won(r.amount) : "금액 없음"}</span>
                     </div>
                     <p className="text-xs text-ink-500">
                       {[r.date, r.wr ? `개찰 ${r.wr}위` : "순위 확인 중", r.rate ? `낙찰률 ${pct(r.rate)}` : "", `${r.bidders}곳`].filter(Boolean).join(" · ")}
@@ -328,7 +328,7 @@ function ExList({ ex, title = "최근 낙찰 예" }: { ex: NonNullable<SimilarSt
         {ex.slice(0, 5).map(([no, title, agency, date, amount, rate, bidders, winner, wr, top]) => (
           <li key={no} className="min-w-0 px-3 py-2">
             <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
-            <p className="mt-0.5 text-xs text-ink-500">{date} · {agency} · 낙찰가 {won(amount)} · 낙찰률 {rate ? pct(rate) : "-"} · {bidders}곳 · {winner}{wr ? ` (개찰 ${wr}위)` : ""}</p>
+            <p className="mt-0.5 text-xs text-ink-500">{[date, agency, amount > 100 ? `낙찰가 ${won(amount)}` : "", rate ? `낙찰률 ${pct(rate)}` : "", `${bidders}곳`, `${winner}${wr ? ` (개찰 ${wr}위)` : ""}`].filter(Boolean).join(" · ")}</p>
             {top && top.length > 0 && <p className="mt-0.5 text-xs text-ink-300">1~{top.length}위: {top.map(([n, r], i) => `${i + 1}위 ${n} ${r ? pct(r) : ""}`).join(" · ")}</p>}
           </li>
         ))}

@@ -21,7 +21,7 @@ import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
 import { AwardAnalysisSection, ForecastCard, loadAwardAnalysis } from "./AwardAnalysis";
-import { forecast, winChance, withConfirmed, type AwardAnalysis } from "@/lib/awards/analysis";
+import { forecast, winChance, withConfirmed, withKind, type AwardAnalysis } from "@/lib/awards/analysis";
 import { CloseDay } from "../CloseDay";
 import { TrustPicker } from "./TrustPicker";
 import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
@@ -68,15 +68,18 @@ async function loadAiSheet(bid: Bid): Promise<EvalSheet | null> {
  * 실패하거나 8초 안에 답이 없으면 확실한 이력만 쓴다.
  */
 async function confirmRelated(bid: Bid, a: AwardAnalysis | null): Promise<AwardAnalysis | null> {
-  if (!a?.maybe?.length || !STATIC || !CORP_API) return a;
+  if ((!a?.maybe?.length && !a?.related?.rows?.length) || !STATIC || !CORP_API) return a;
   try {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 8000);
     const r = await fetch(`${CORP_API}?${new URLSearchParams({ relate: bid.id })}`, { signal: ctl.signal });
     clearTimeout(timer);
     if (!r.ok) return a;
-    const j = (await r.json()) as { status: string; same?: string[] };
-    return j.status === "ok" && j.same?.length ? withConfirmed(a, j.same, a.subject?.postedAt ?? bid.postedAt.slice(0, 10)) : a;
+    const j = (await r.json()) as { status: string; same?: string[]; kind?: string[] };
+    if (j.status !== "ok") return a;
+    let out = j.same?.length ? withConfirmed(a, j.same, a.subject?.postedAt ?? bid.postedAt.slice(0, 10)) : a;
+    if (j.kind) out = withKind(out, j.kind);
+    return out;
   } catch {
     return a;
   }

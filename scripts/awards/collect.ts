@@ -32,7 +32,7 @@ import {
 } from "../../src/lib/awards/format";
 import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
 import {
-  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, bandOfAmount, firstLic, forecast, likelyBidders, methodCode, METHOD_NAME, quantile, r3, relatedRows, relatedAwards, similarKey,
+  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, bandOfAmount, firstLic, forecast, likelyBidders, methodCode, METHOD_NAME, quantile, r3, regionalKeys, relatedRows, relatedAwards, similarKey,
   type AnalyzeTarget,
   type AgencyIndexFile,
   KW_MIN_DF, KW_ROWS, keywords, kwBucket, type KwIndexFile, type KwLookup, type KwPosting, type KwRow,
@@ -674,6 +674,8 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
     if (l) dims.push(`l:${l}`);
     const keys = new Set<string>();
     for (const d of dims) { keys.add(similarKey(r[4], m, band, d)); if (d !== "*") keys.add(similarKey(r[4], m, "*", d)); }
+    // 공사: 참가 지역(시·도)·업종 묶음 (참가업체 수 예측용, 예시는 두지 않는다)
+    if (r[4] === "공사") for (const k of regionalKeys({ title: "", id: "", bidNtceNo: "", demandAgency: "", bizType: "공사", contractMethod: METHOD_NAME[m], baseAmount: r[12] || r[20] || r[7], postedAt: "", licenseRaw: r[19], regionRaw: r[18] })) keys.add(k);
     const rate = r[8] > 50 && r[8] <= 110 ? r[8] : 0;
     const wr = winnerRank(r);
     for (const k of keys) {
@@ -689,7 +691,7 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
       }
       if (wr) { a.firstN++; if (wr === 1) a.first++; }
       if (r[21] > 0 && r[20] > 0) { const p = (r[21] / r[20]) * 100; if (p > 90 && p < 110) a.pre.push(p); }
-      if (!k.endsWith("|*") && a.ex!.length < SIMILAR_EX) a.ex!.push([r[2], r[5], r[6], r[9], r[7], r[8], r[10], r[1], wr, r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])]);
+      if (!k.endsWith("|*") && !k.includes("|r:") && a.ex!.length < SIMILAR_EX) a.ex!.push([r[2], r[5], r[6], r[9], r[7], r[8], r[10], r[1], wr, r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])]);
     }
   }
   const out: SimilarIndexFile = { v: 1, builtAt: new Date().toISOString(), from: since, to: iso(addDays(today, 6)), groups: {} };
@@ -827,7 +829,7 @@ function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { trial: Trial[
     seen++;
     const target = {
       id: r[2], bidNtceNo: r[2], title: r[5], demandAgency: r[6], bizType: r[4], contractMethod: METHOD_NAME[m], baseAmount: r[20] || r[12] || r[7],
-      postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined },
+      postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined }, regionRaw: r[18],
     };
     const rows = ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]];
     const pair = { old: analyzeBid(target, rows, ix.similar.groups, range, { legacy: true }), now: analyzeBid(target, rows, ix.similar.groups, range, { kw: ix.kw }) };

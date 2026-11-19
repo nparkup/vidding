@@ -6,11 +6,13 @@ import type { AwardAnalysis } from "./analysis";
  * Claude(Haiku)에 공고명·날짜·금액을 보여 지금 공고와 같은 사업(매년·매기 다시 발주하는 같은 계약)인지 묻는다.
  * - 빌드는 부르지 않는다. 평가점수 예측에서 공고를 고르면 중계 서버(worker/corp-lookup ?relate=)가 사이트의
  *   /award-analysis/{공고}.json 에서 후보를 읽어 한 번 부르고, 결과를 R2 ai-relate/v{버전}/{공고}-{후보 해시}.json 에 둔다.
- * - 입력은 공고명·기관·날짜·금액뿐이라 공고 하나에 입력 1~2천, 출력 수백 토큰 (약 0.3원).
+ * - 입력은 공고명·기관·날짜·금액뿐이라 공고 하나에 입력 1~2천, 출력 수백 토큰 (약 0.5원).
+ * - 핵심어로 찾은 다른 기관 낙찰(analysis.related.rows, 최대 30건)도 같은 종류의 일인지 함께 묻는다 (약 0.9원).
+ *   되짚어 보기 150건: 참가 예상 8곳에 실제 낙찰자가 든 공고 39→44건, 실제 낙찰자·개찰 상위 업체 95→107곳.
  */
 
 /** 프롬프트를 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const RELATE_VERSION = 1;
+export const RELATE_VERSION = 2;
 export const DEFAULT_RELATE_MODEL = "claude-haiku-5-5";
 
 export interface RelateResult {
@@ -21,6 +23,8 @@ export interface RelateResult {
   status: "ok" | "none" | "error";
   /** 같은 사업으로 확인된 공고번호 */
   same: string[];
+  /** 핵심어로 찾은 다른 기관 낙찰 가운데 같은 종류의 일로 확인된 공고번호 (확인하지 않았으면 없음) */
+  kind?: string[];
   reason?: string;
   usage?: { input: number; output: number };
 }
@@ -33,8 +37,8 @@ export interface RelateTarget {
 }
 
 /** 후보 목록의 해시 (캐시 키). 후보가 바뀌면 다시 묻는다 */
-export function relateHash(a: Pick<AwardAnalysis, "maybe">): string {
-  const s = (a.maybe ?? []).map((m) => m.no).join(",");
+export function relateHash(a: Pick<AwardAnalysis, "maybe" | "related">): string {
+  const s = `${(a.maybe ?? []).map((m) => m.no).join(",")}|${(a.related?.rows ?? []).map((r) => r[0]).join(",")}`;
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36);
@@ -144,4 +148,21 @@ export async function relateKindWithAI(client: Anthropic, target: RelateTarget, 
   } catch {
     return { same: [], usage, status: "error" };
   }
+}
+
+/** 애매한 같은 사업 후보와 다른 기관 핵심어 낙찰을 함께 확인한다 (중계 서버 ?relate=) */
+export async function relateAll(client: Anthropic, a: Pick<AwardAnalysis, "maybe" | "related" | "subject">, model?: string): Promise<RelateResult> {
+  const target = a.subject!;
+  const r: RelateResult = a.maybe?.length
+    ? await relateWithAI(client, target, a, model)
+    : { v: RELATE_VERSION, hash: relateHash(a), model: model || DEFAULT_RELATE_MODEL, at: new Date().toISOString(), status: "none", same: [] };
+  r.hash = relateHash(a);
+  const rows = a.related?.rows ?? [];
+  if (rows.length) {
+    const k = await relateKindWithAI(client, target, rows.map((x) => ({ no: x[0], title: x[1], agency: x[2], date: x[3], amount: x[9] || x[5] })), model);
+    if (k.status === "ok") { r.kind = k.same; if (r.status === "none") r.status = "ok"; }
+    else if (r.status === "none") r.status = k.status;
+    r.usage = { input: (r.usage?.input ?? 0) + k.usage.input, output: (r.usage?.output ?? 0) + k.usage.output };
+  }
+  return r;
 }

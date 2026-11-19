@@ -139,7 +139,11 @@ export interface Related {
   rate?: { q: [number, number, number]; n: number };
   /** 참가업체 수 [25%, 50%, 75%]와 표본 수 */
   bidders?: { q: [number, number, number]; n: number };
+  /** 찾은 낙찰 (가까운 순 최대 30건). 같은 종류의 일인지 확인해 거를 때 쓴다 */
+  rows?: KwRow[];
 }
+/** 지역·업종 묶음을 쓰는 최소 표본 */
+export const REGIONAL_MIN = 20;
 /** 비슷한 공고로 볼 핵심어 가중 Dice 하한 */
 export const RELATED_MIN = 0.35;
 
@@ -223,6 +227,8 @@ export interface AwardAnalysis {
   subject?: { title: string; agency: string; baseAmount: number; postedAt: string };
   /** 애매한 후보 중 같은 사업으로 확인되어 이력에 넣은 공고번호 */
   confirmed?: string[];
+  /** 공사: 참가 지역·업종이 같은 비슷한 공고의 참가업체 수 [25%, 50%, 75%] */
+  regional?: { label: string; n: number; q: [number, number, number] };
 }
 
 export interface AnalyzeTarget {
@@ -236,6 +242,36 @@ export interface AnalyzeTarget {
   postedAt: string;
   licenseRaw?: string;
   cls?: { no?: string; nm?: string; work?: string };
+  /** 참가가능지역 (사이트 공고: 시·도 대표값과 목록, 낙찰 원자료: 원문) */
+  region?: string;
+  regions?: string[];
+  regionRaw?: string;
+}
+
+const PROVINCES: [string, string[]][] = [
+  ["서울", ["서울"]], ["경기", ["경기"]], ["인천", ["인천"]], ["강원", ["강원"]],
+  ["충청북", ["충북"]], ["충북", ["충북"]], ["충청남", ["충남"]], ["충남", ["충남"]],
+  ["대전", ["대전"]], ["세종", ["세종"]], ["전라북", ["전북"]], ["전북", ["전북"]],
+  ["전남광주", ["광주", "전남"]], ["전라남", ["전남"]], ["전남", ["전남"]], ["광주", ["광주"]],
+  ["경상북", ["경북"]], ["경북", ["경북"]], ["경상남", ["경남"]], ["경남", ["경남"]],
+  ["대구", ["대구"]], ["울산", ["울산"]], ["부산", ["부산"]], ["제주", ["제주"]],
+];
+/** 참가가능지역 → 시·도 묶음 키 (제한 없으면 "전국") */
+export function provinceKey(x: string | string[] | undefined): string {
+  const parts = Array.isArray(x) ? x : (x ?? "").split(",");
+  const out = new Set<string>();
+  for (const part of parts) {
+    if (!part || part.includes("전국")) continue;
+    const hit = PROVINCES.find(([k]) => part.includes(k));
+    if (hit) hit[1].forEach((r) => out.add(r));
+  }
+  return out.size ? [...out].sort().join("+") : "전국";
+}
+/** 공사: 참가 지역(시·도)·업종이 같은 비슷한 공고 묶음 키 (좁은 것부터) */
+export function regionalKeys(t: AnalyzeTarget): string[] {
+  const rk = provinceKey(t.regionRaw ?? (t.regions?.length ? t.regions : t.region));
+  const m = methodCode(t.contractMethod), band = bandOfAmount(t.baseAmount), lic = firstLic(t.licenseRaw);
+  return [lic ? similarKey("공사", m, band, `l:${lic}|r:${rk}`) : "", similarKey("공사", m, band, `r:${rk}`)].filter(Boolean);
 }
 
 const BAND_KEYS: { key: string; label: string; max: number }[] = [
@@ -426,10 +462,20 @@ export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined
   const prior = pickPrior(history, posted, years);
   const out: AwardAnalysis = { v: 1, builtAt: new Date().toISOString(), range, prior, history, similar: pickSimilar(t, groups, key) };
   if (years > 1) out.cycleYears = years;
+  if (biz === "공사") {
+    const rk = provinceKey(t.regionRaw ?? (t.regions?.length ? t.regions : t.region));
+    for (const k of regionalKeys(t)) {
+      const g = groups[k];
+      if (!g || g.n < REGIONAL_MIN) continue;
+      out.regional = { label: `${rk === "전국" ? "참가 지역 제한 없는" : `참가 지역 ${rk.replace(/\+/g, "·")}`}${k.includes("|l:") ? ` · 업종 ${firstLic(t.licenseRaw)}` : ""} 공사`, n: g.n, q: g.bidders.q.map((x) => Math.round(x)) as [number, number, number] };
+      break;
+    }
+  }
   // 애매한 후보가 있으면 확인용으로 지금 공고 정보를 같이 둔다 (중계 서버가 이 파일만 읽고 묻는다)
   const rel = opts.kw ? relatedAwards(t, opts.kw) : undefined;
   if (rel) out.related = rel;
-  if (maybe.length) { out.maybe = maybe; out.subject = { title: t.title, agency: t.demandAgency, baseAmount: t.baseAmount, postedAt: posted }; }
+  if (maybe.length) out.maybe = maybe;
+  if (maybe.length || rel?.rows?.length) out.subject = { title: t.title, agency: t.demandAgency, baseAmount: t.baseAmount, postedAt: posted };
   return out;
 }
 
@@ -465,26 +511,48 @@ export function relatedRows(t: AnalyzeTarget, kw: KwLookup): { n: number; tw: Ma
 }
 
 function summarizeRelated({ n, tw, top }: NonNullable<ReturnType<typeof relatedRows>>): Related | undefined {
-  if (top.length < 3) return undefined;
+  const usedT = new Map<string, number>();
+  for (const { used } of top) for (const k of used) usedT.set(k, tw.get(k) ?? 0);
+  return relatedFromRows(n, [...usedT].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 4), top.map((x) => x.r));
+}
+
+function relatedFromRows(n: number, terms: string[], rows: KwRow[]): Related | undefined {
+  if (rows.length < 3) return undefined;
   const cnt = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
-  const wins = new Map<string, number>(), ranked = new Map<string, number>(), usedT = new Map<string, number>();
-  for (const { r, used } of top) {
+  const wins = new Map<string, number>(), ranked = new Map<string, number>();
+  for (const r of rows) {
     if (r[10]) cnt(wins, r[10]);
     for (const [name] of r[12]) if (name && name !== r[10]) cnt(ranked, name);
-    for (const k of used) usedT.set(k, tw.get(k) ?? 0);
   }
   const q3 = (v: number[]) => { const x = [...v].sort((a, b) => a - b); return [r3(quantile(x, 0.25)), r3(quantile(x, 0.5)), r3(quantile(x, 0.75))] as [number, number, number]; };
-  const rates = top.filter(({ r }) => r[7] !== 1 && r[6] > 50 && r[6] <= 110).map(({ r }) => r[6]);
-  const bids = top.filter(({ r }) => r[7] > 1).map(({ r }) => r[7]);
+  const rates = rows.filter((r) => r[7] !== 1 && r[6] > 50 && r[6] <= 110).map((r) => r[6]);
+  const bids = rows.filter((r) => r[7] > 1).map((r) => r[7]);
   const out: Related = {
     n,
-    terms: [...usedT].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 4),
-    ex: top.slice(0, 8).map(({ r }) => [r[0], r[1], r[2], r[3], r[5], r[6], r[7], r[10], r[11], r[12].map(([n, x]) => [n, x] as RankCell)]),
+    terms,
+    ex: rows.slice(0, 8).map((r) => [r[0], r[1], r[2], r[3], r[5], r[6], r[7], r[10], r[11], r[12].map(([n, x]) => [n, x] as RankCell)]),
     winners: [...wins].sort((a, b) => b[1] - a[1]).slice(0, 8),
     ranked: [...ranked].sort((a, b) => b[1] - a[1]).slice(0, 8),
+    rows,
   };
   if (rates.length >= 3) out.rate = { q: q3(rates), n: rates.length };
   if (bids.length >= 3) out.bidders = { q: q3(bids), n: bids.length };
+  return out;
+}
+
+/**
+ * 핵심어로 찾은 다른 기관 낙찰 가운데 같은 종류의 일로 확인된 것만 남긴다 (중계 서버 확인 결과).
+ * 3건이 안 남으면 핵심어 낙찰은 쓰지 않는다 (참가 예상 기업은 비슷한 공고 묶음으로)
+ */
+export function withKind(a: AwardAnalysis, nos: string[]): AwardAnalysis {
+  const rel = a.related;
+  if (!rel?.rows?.length) return a;
+  const ok = new Set(nos);
+  const kept = rel.rows.filter((r) => ok.has(r[0]));
+  if (kept.length === rel.rows.length) return a;
+  const next = relatedFromRows(kept.length, rel.terms, kept);
+  const out = { ...a };
+  if (next) out.related = next; else delete out.related;
   return out;
 }
 /** 사업 종류만 본다 (다른 기관끼리는 권역·노선 같은 구분어가 달라도 비슷한 공고다) */
@@ -604,7 +672,10 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const hbRecent = h.map((x) => x.bidders).filter((n) => n > 0);
   const hb = [...hbRecent].sort((x, y) => x - y);
   const recent3 = !(biz === "공사" && m === "Q");
-  if (hb.length >= 2) {
+  if (hb.length < 2 && a.regional) {
+    // 되짚어 보기(8주): 같은 사업 이력이 적은 공사는 참가 지역·업종이 같은 공고 분포가 훨씬 맞았다 (적격 34→15%, 최저가 2009→1100%)
+    out.bidders = { q: a.regional.q, basis: `${a.regional.label} ${a.regional.n.toLocaleString()}건` };
+  } else if (hb.length >= 2) {
     const q: [number, number, number] = [Math.round(quantile(hb, 0.25)), Math.round(quantile(hb, 0.5)), Math.round(quantile(hb, 0.75))];
     if (recent3) {
       const top = hbRecent.slice(0, 3).sort((x, y) => x - y);
@@ -639,7 +710,10 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const hr = h.map((x) => x.rate).filter((r) => r > 50 && r <= 110);
   // 되짚어 보기(8주): 용역 최저가를 빼면 가장 최근 같은 사업 낙찰률이 중앙값보다 맞았다 (공사 적격 0.174→0.145%p, 물품 적격 2.48→2.27%p, 용역 적격 0.76→0.69%p)
   const latest = !(biz === "용역" && m === "L");
-  if (latest && hr.length >= 1) out.winRate = { value: r3(hr[0]), basis: hr.length >= 2 ? `가장 최근 같은 사업 낙찰률 (과거 ${hr.length}건 중앙값 ${fmt(median(hr))}%)` : "가장 최근 같은 사업 낙찰률" };
+  // 애매한 후보에서 확인되어 들어온 건은 가장 최근 값으로 쓰지 않는다 (되짚어 보기에서 오차가 늘었다)
+  const conf = new Set(a.confirmed ?? []);
+  const sure = h.filter((x) => !conf.has(x.no)).map((x) => x.rate).filter((r) => r > 50 && r <= 110);
+  if (latest && sure.length >= 1) out.winRate = { value: r3(sure[0]), basis: hr.length >= 2 ? `가장 최근 같은 사업 낙찰률 (과거 ${hr.length}건 중앙값 ${fmt(median(hr))}%)` : "가장 최근 같은 사업 낙찰률" };
   else if (hr.length >= 2) out.winRate = { value: r3(median(hr)), basis: `과거 같은 사업 ${hr.length}건 중앙값` };
   else if (a.prior?.rate) out.winRate = { value: a.prior.rate, basis: "전년도 같은 사업" };
   else if (st?.rate) out.winRate = { value: r3(st.rate.q[2]), basis: `비슷한 공고 ${st.rate.n.toLocaleString()}건 중앙값` };

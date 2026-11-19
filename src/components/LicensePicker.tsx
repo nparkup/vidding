@@ -9,13 +9,14 @@ import { normalizeLicense } from "@/lib/licenses";
  * 보유 면허(투찰가능업종) 선택: 업종군별 칩 + 목록에 없는 업종 직접 입력.
  * - selected/onChange 를 주면 제어 컴포넌트로 동작
  * - name 을 주면 선택값을 hidden input 으로 함께 보내 폼 제출에 쓸 수 있다
+ * - 업종군은 기본으로 모두 펼쳐 둔다(openGroups 로 처음 몇 개만 펼치게 줄일 수 있음)
  */
 export function LicensePicker({
   selected,
   onChange,
   defaultSelected = [],
   name,
-  openGroups = 1,
+  openGroups = LICENSE_GROUPS.length,
 }: {
   selected?: string[];
   onChange?: (v: string[]) => void;

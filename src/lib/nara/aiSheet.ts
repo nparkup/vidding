@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 6;
+export const AI_SHEET_VERSION = 7;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -259,6 +259,7 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   // 표 합계 밖의 가감점은 배점 합에서 빼고 신뢰도 가감점(배점 0)으로 둔다
   const outside = out.items.filter((i) => i.outside_total);
   const raw = out.items.filter((i) => !i.outside_total && (i.max > 0 || i.kind === "bonus"));
+  if (raw.length === 1 && raw[0].kind === "price") return { reason: `입찰가격 ${raw[0].max}점만으로 정하는 공고 (가격 순위로 결정)` };
   if (raw.length < 2) return { reason: "평가항목이 2개 미만" };
   // 같은 평가항목이 두 번 나오는 경우를 하나로 합친다
   // - 이름·원문 문구·배점이 모두 같으면 AI가 한 칸을 두 번 읽은 것
@@ -281,7 +282,36 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
     }
     merged.push(i);
   }
-  raw.splice(0, raw.length, ...merged);
+  // 평가항목 칸에 배점이 적힌 경우("시스템안정성(10점)") 그 아래 세부 줄을 따로 읽어 배점을 여러 번 셌으면 하나로 묶는다.
+  // 공고 표는 틀리지 않으므로, 이어진 줄들의 배점 합이 칸에 적힌 배점보다 크면 칸 배점 하나로 본다
+  const headerOf = (i: AiItem) => {
+    for (const t of [i.label, i.group]) {
+      const m = /^(.*?)\(\s*(\d+(?:\.\d+)?)\s*점\s*\)/.exec(t.replace(/\s+/g, " ").trim());
+      if (m && squash(m[1])) return { key: nameKey(m[1]), n: Number(m[2]), name: m[1].trim() };
+    }
+    return undefined;
+  };
+  const grouped: AiItem[] = [];
+  for (let k = 0; k < merged.length; ) {
+    const h = headerOf(merged[k]);
+    let end = k + 1;
+    if (h) {
+      while (end < merged.length) {
+        const nh = headerOf(merged[end]);
+        const same = nh ? nh.key === h.key && nh.n === h.n : nameKey(merged[end].group) === h.key;
+        if (!same || merged[end].kind === "price") break;
+        end++;
+      }
+    }
+    const run = merged.slice(k, end);
+    const runSum = run.reduce((a, i) => a + i.max, 0);
+    if (h && run.length > 1 && runSum > h.n + 0.5) {
+      grouped.push({ ...run[0], label: h.name, max: h.n, quote: run.map((i) => i.quote).join(" / "), criteria: run.flatMap((i) => [i.label.replace(/^.*?\)\s*/, ""), ...i.criteria]).filter(Boolean), bands: run.find((i) => i.bands.length)?.bands ?? [] });
+      mergedNames.push(`${h.name}(${h.n}점) 세부 ${run.length}줄`);
+    } else grouped.push(...run);
+    k = end;
+  }
+  raw.splice(0, raw.length, ...grouped);
   const missing = raw.filter((i) => !labelInText(i.label, flat));
   if (missing.length > Math.floor(raw.length * 0.2)) return { reason: `원문에 없는 항목 이름: ${missing.map((m) => m.label).slice(0, 3).join(", ")}` };
   const items: EvalItem[] = raw.map((i) => {
@@ -332,7 +362,7 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
       source: "extracted",
       reader: { by: "ai", model },
       confidence: missing.length === 0 ? "높음" : "보통",
-      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...(outside.length ? [`합계 밖 가감점 ${outside.length}개는 배점 합에 넣지 않음`] : []), ...(mergedNames.length ? [`쪽이 넘어가며 다시 적힌 같은 평가항목을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
+      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...(outside.length ? [`합계 밖 가감점 ${outside.length}개는 배점 합에 넣지 않음`] : []), ...(mergedNames.length ? [`같은 평가항목 칸에 속한 줄을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
       ...(out.panel_rule ? { panelRule: out.panel_rule.slice(0, 120) } : {}),
     },
   };

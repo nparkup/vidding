@@ -1015,7 +1015,7 @@ async function relateKindTrial(trial: Trial[], kw: KwLookup) {
     const c = relatedRows(target, kw);
     if (!c) continue;
     try {
-      const r = await relateKindWithAI(client, { title: target.title, agency: target.demandAgency, baseAmount: target.baseAmount }, c.top.map(({ r }) => ({ no: r[0], title: r[1], agency: r[2], date: r[3], amount: r[9] || r[5] })));
+      const r = await relateKindWithAI(client, { title: target.title, agency: target.demandAgency, baseAmount: target.baseAmount }, c.top.map(({ r }) => ({ no: r[0], title: r[1], agency: r[2], date: r[3], amount: r[9] || r[5], winner: r[10] })));
       if (r.status !== "ok") continue;
       done++; cands += c.top.length; kept += r.same.length; tin += r.usage.input; tout += r.usage.output;
       const ok = new Set(r.same);

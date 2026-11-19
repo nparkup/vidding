@@ -67,6 +67,53 @@ async function randomNotices(n: number): Promise<string[]> {
 
 const summary: string[] = [];
 
+/** 입찰방식·계약방법·낙찰방법 조합이 실제로 어떻게 나오는지 최근 공고로 센다 (census, 또는 fields:공고번호) */
+async function census(ids: string[]) {
+  for (const no of ids) {
+    const f = await findNotice(no);
+    console.log(`\n=== ${no} 입찰공고정보서비스 필드`);
+    if (f) for (const [k, v] of Object.entries(f.it)) if (v && !/^ntceSpec|Url/.test(k)) console.log(`  ${k}: ${String(v).slice(0, 120)}`);
+    const d = f?.it.bidNtceDt?.slice(0, 10).replace(/-/g, "");
+    if (d) {
+      const q = new URLSearchParams({ type: "json", numOfRows: "999", pageNo: "1", bidNtceBgnDt: `${d}0000`, bidNtceEndDt: `${d}2359` });
+      for (let page = 1; page <= 10; page++) {
+        q.set("pageNo", String(page));
+        try {
+          const j = await (await fetch(`https://apis.data.go.kr/1230000/ao/PubDataOpnStdService/getDataSetOpnStdBidPblancInfo?serviceKey=${KEY}&${q}`, { signal: AbortSignal.timeout(60_000) })).json();
+          const items: Item[] = j?.response?.body?.items ?? [];
+          const hit = items.find((it) => it.bidNtceNo === no);
+          if (hit) { console.log(`=== ${no} 표준서비스 필드`); for (const [k, v] of Object.entries(hit)) if (v) console.log(`  ${k}: ${String(v).slice(0, 120)}`); break; }
+          if (items.length < 999) break;
+        } catch { break; }
+      }
+    }
+  }
+  if (ids.length) return;
+  const combo = new Map<string, { n: number; ex: string }>();
+  let total = 0;
+  for (let back = 1; back <= 5; back++) {
+    const d = new Date(Date.now() + 9 * 3600_000 - back * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
+    for (const op of ["Servc", "Cnstwk", "Thng"]) {
+      for (let page = 1; page <= 5; page++) {
+        const q = new URLSearchParams({ type: "json", numOfRows: "999", pageNo: String(page), inqryDiv: "1", inqryBgnDt: `${d}0000`, inqryEndDt: `${d}2359` });
+        try {
+          const j = await (await fetch(`https://apis.data.go.kr/1230000/ad/BidPublicInfoService02/getBidPblancListInfo${op}02?serviceKey=${KEY}&${q}`, { signal: AbortSignal.timeout(60_000) })).json();
+          const items: Item[] = j?.response?.body?.items ?? [];
+          for (const it of items) {
+            total++;
+            const k = [op, it.bidMethdNm ?? "-", it.cntrctCnclsMthdNm ?? "-", (it.sucsfbidMthdNm ?? "-").replace(/\s+/g, " ").slice(0, 40)].join(" | ");
+            const c = combo.get(k) ?? { n: 0, ex: it.bidNtceNo ?? "" };
+            c.n++; combo.set(k, c);
+          }
+          if (items.length < 999) break;
+        } catch { break; }
+      }
+    }
+  }
+  console.log(`\n=== 최근 5일 공고 ${total}건: 업무 | 입찰방식(bidMethdNm) | 계약방법(cntrctCnclsMthdNm) | 낙찰방법(sucsfbidMthdNm 앞 40자) | 건수 | 예시`);
+  for (const [k, c] of [...combo].sort((a, b) => b[1].n - a[1].n)) console.log(`${k} | ${c.n} | ${c.ex}`);
+}
+
 const fmt = (s: EvalSheet) => s.items.map((i) => `  - [${i.kind}/${i.group}] ${i.label} ${i.max}점${i.bands ? `\n      구간: ${i.bands.map((b) => `${b.cond}=${b.points}`).join(" | ")}` : ""}${i.criteria ? `\n      요소: ${i.criteria.join(" / ")}` : ""}`).join("\n");
 
 async function one(label: string, bid: Bid, files: { name: string; text: string }[], basis: EvalBasis | undefined, client: Anthropic | undefined) {
@@ -105,6 +152,7 @@ async function one(label: string, bid: Bid, files: { name: string; text: string 
 
 async function main() {
   let args = (process.argv[2] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (args[0] === "census" || args[0]?.startsWith("fields:")) return census(args[0] === "census" ? [] : [args[0].slice(7), ...args.slice(1)]);
   const rnd = /^random:(\d+)$/.exec(args[0] ?? "");
   if (rnd) args = await randomNotices(Number(rnd[1]));
   const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ maxRetries: 3, timeout: 5 * 60_000 }) : undefined;

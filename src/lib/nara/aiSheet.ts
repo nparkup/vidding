@@ -154,7 +154,7 @@ export async function readSheetWithAI(
   client: Anthropic,
   bid: Pick<Bid, "id" | "title" | "contractMethod" | "agency">,
   text: string,
-  opts: { model?: string; techRatio?: number; priceRatio?: number } = {},
+  opts: { model?: string; techRatio?: number; priceRatio?: number; onRaw?: (out: unknown) => void } = {},
 ): Promise<Omit<AiSheetResult, "hash" | "v" | "at">> {
   const model = opts.model || DEFAULT_AI_MODEL;
   const hint = [
@@ -176,6 +176,7 @@ export async function readSheetWithAI(
   const raw = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
   let out: AiOut;
   try { out = JSON.parse(raw) as AiOut; } catch { return { model, status: "error", reason: "JSON 해석 실패", usage }; }
+  opts.onRaw?.(out);
   if (!out.found) return { model, status: "none", reason: out.reason.slice(0, 200), usage };
   const r = toSheet(out, text, bid, model);
   if (!r.sheet) return { model, status: "rejected", reason: r.reason, usage };

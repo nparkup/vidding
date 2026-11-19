@@ -43,9 +43,18 @@ async function one(label: string, bid: Bid, files: { name: string; text: string 
   console.log(`--- 보낼 본문 ${ex.length}자 (원문 ${named.length}자), 배점표 신호 ${hasTableSignal(named) ? "있음" : "없음"}`);
   if (!client) { console.log("ANTHROPIC_API_KEY 없음: AI 판독 생략"); return; }
   const t0 = Date.now();
-  const r = await readSheetWithAI(client, bid, ex, { model: process.env.AI_SHEET_MODEL || DEFAULT_AI_MODEL, techRatio: basis?.techRatio, priceRatio: basis?.priceRatio });
+  let raw: unknown;
+  const r = await readSheetWithAI(client, bid, ex, { model: process.env.AI_SHEET_MODEL || DEFAULT_AI_MODEL, techRatio: basis?.techRatio, priceRatio: basis?.priceRatio, onRaw: (o) => { raw = o; } });
   const ok = r.sheet && adoptable(r.sheet, basis);
   console.log(`--- AI 판독 (${r.model}, ${((Date.now() - t0) / 1000).toFixed(0)}초, 토큰 입력 ${r.usage?.input} / 출력 ${r.usage?.output}): ${r.status}${r.reason ? ` - ${r.reason}` : ""}${r.sheet ? `, 화면 사용 ${ok ? "가능" : "불가"}` : ""}`);
+  if (!r.sheet && raw) {
+    const o = raw as { tech_total: unknown; price_total: unknown; pass: unknown; reason: string; items: { group: string; label: string; max: number; kind: string }[] };
+    console.log(`AI 원답: 기술 ${o.tech_total} 가격 ${o.price_total} 통과 ${JSON.stringify(o.pass)} | ${o.reason}`);
+    for (const i of o.items) console.log(`  - [${i.kind}/${i.group}] ${i.label} ${i.max}점`);
+    const lines = ex.split("\n");
+    const at = lines.findIndex((l) => /배\s*점/.test(l) && /(평가\s*항목|평가\s*요소|구\s*분|심사\s*항목)/.test(l));
+    console.log(`--- 본문 (배점표 머리 부근)\n${lines.slice(Math.max(0, at - 5), at + 70).map((l) => `| ${l.slice(0, 160)}`).join("\n")}`);
+  }
   if (r.sheet) console.log(`통과 ${JSON.stringify(r.sheet.pass)} | 위원 ${r.sheet.panelRule ?? "-"} | ${r.sheet.notes.join(" / ")}\n${fmt(r.sheet)}`);
 }
 

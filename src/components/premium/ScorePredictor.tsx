@@ -10,7 +10,7 @@ import {
 } from "@/lib/evalscore";
 import { adoptable, bidSheet, TECH_GRADES } from "@/lib/criteria";
 import type { NoticeCriteria } from "@/lib/noticeCriteria";
-import { won } from "@/lib/format";
+import { won, wonFull } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "@/lib/eligibility";
 import type { Bid, BidAttachment } from "@/lib/types";
@@ -599,6 +599,7 @@ export function ScorePredictor() {
               label="투찰률 (예정가격 대비)"
               value={co.bidRate}
               onChange={(v) => set("bidRate", v)}
+              base={bid?.baseAmount ?? 0}
               hint={!isNego && fc.suggestRate
                 ? `기본값 = 과거 낙찰자 투찰률 (낙찰 결과 분석). ${fc.suggestRate.basis}. 가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%.`
                 : !isNego && rivalEst ? `참고: ${rivalBasis(rivalEst)}입니다.` : undefined}
@@ -608,6 +609,7 @@ export function ScorePredictor() {
                 label="예상 최저 경쟁 투찰률"
                 value={co.rivalRate}
                 onChange={(v) => set("rivalRate", v)}
+                base={bid?.baseAmount ?? 0}
                 hint={fc.rival
                   ? `기본값 = ${fc.rival.basis} (낙찰 결과 분석). 슬라이더로 바꿀 수 있습니다.`
                   : rivalEst
@@ -1048,11 +1050,20 @@ function rivalBasis(e: RivalEstimate) {
   return `${when} ${e.scope} 낙찰 ${e.n.toLocaleString()}건의 평균 낙찰률 ${e.rate.toFixed(2)}%`;
 }
 
-function Range({ label, value, onChange, hint }: { label: string; value: number; onChange: (v: number) => void; hint?: string }) {
+/** base: 금액 환산 기준(원). 예정가격은 개찰 때 정해지므로 공고 기초금액으로 계산한다 */
+function Range({ label, value, onChange, hint, base }: { label: string; value: number; onChange: (v: number) => void; hint?: string; base?: number }) {
+  const amount = base && base > 0 ? Math.floor((base * value) / 100) : undefined;
   return (
     <div className="sm:col-span-3">
-      <div className="flex justify-between"><span className="label">{label}</span><span className="text-sm font-bold tabular-nums">{value.toFixed(2)}%</span></div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="label">{label}</span>
+        <span className="text-sm font-bold tabular-nums">
+          {value.toFixed(2)}%{amount !== undefined && <span className="ml-2 text-ink">{wonFull(amount)}</span>}
+        </span>
+      </div>
       <input type="range" min={80} max={100} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#12B886]" />
+      {amount !== undefined && <p className="mt-1 text-xs text-ink-500">금액 = 기초금액 {wonFull(base!)} × {value.toFixed(2)}% (예정가격은 개찰 때 정해지므로 기초금액 기준)</p>}
+      {base !== undefined && amount === undefined && <p className="mt-1 text-xs text-ink-500">공고에 기초금액이 없어 금액은 계산하지 않았습니다.</p>}
       {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
     </div>
   );

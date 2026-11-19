@@ -32,7 +32,7 @@ import {
 } from "../../src/lib/awards/format";
 import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
 import {
-  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, methodCode, quantile, r3, similarKey,
+  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, forecast, methodCode, METHOD_NAME, quantile, r3, similarKey,
   type AgencyIndexFile, type AgencyRow, type SimilarIndexFile, type SimilarStat,
 } from "../../src/lib/awards/analysis";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
@@ -535,6 +535,7 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
     // 색인만: 샤드·통계·수집 상태는 건드리지 않는다 (동시에 도는 수집 실행의 manifest.json 을 덮지 않게 바로 올린다)
     const ix = await buildIndexes([...shards.values()].flat(), async (key, body) => { await r2Put(key, body, "application/gzip"); writeLocal(key, body); return true; });
     printSamples(ix);
+    backtest(ix);
     return { rows, shards: keys.length };
   }
   let uploaded = 0;
@@ -727,6 +728,43 @@ function printSamples(ix: Awaited<ReturnType<typeof buildIndexes>>) {
       console.log(`SAMPLE_ANALYSIS ${JSON.stringify({ target, actual: { rate: r[8], bidders: r[10], winner: r[1], amount: r[7] }, analysis: a })}`);
       break;
     }
+  }
+}
+
+/**
+ * 되짚어 보기: 최근 8주 낙찰 공고를 '지금 공고'로 보고 그 전 자료만으로 예측한 낙찰률·참가업체 수를 실제와 비교한다
+ */
+function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>) {
+  const since = iso(addDays(mondayOf(kstNow()), -56));
+  const range = { from: "", to: "" };
+  const acc = new Map<string, { n: number; rateN: number; rateErr: number[]; inBand: number; bidN: number; bidIn: number; bidErr: number[] }>();
+  let seen = 0;
+  for (const r of ix.rows) {
+    if (r[9] < since) break;
+    if (!r[6] || seen >= 20_000) continue;
+    const m = methodCode(r[11]);
+    if (m === "O") continue;
+    seen++;
+    const target = {
+      id: r[2], bidNtceNo: r[2], title: r[5], demandAgency: r[6], bizType: r[4], contractMethod: METHOD_NAME[m], baseAmount: r[20] || r[12] || r[7],
+      postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined },
+    };
+    const a = analyzeBid(target, ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]], ix.similar.groups, range);
+    const fc = forecast(a, { contractMethod: target.contractMethod, lowerLimitRate: r[22] || undefined });
+    const k = `${r[4]} ${METHOD_NAME[m]}`;
+    const x = acc.get(k) ?? acc.set(k, { n: 0, rateN: 0, rateErr: [], inBand: 0, bidN: 0, bidIn: 0, bidErr: [] }).get(k)!;
+    x.n++;
+    if (fc.winRate && r[8] > 50 && r[8] <= 110) { x.rateN++; x.rateErr.push(Math.abs(fc.winRate.value - r[8])); }
+    if (fc.bidders && r[10] > 0) {
+      x.bidN++;
+      const [lo, mid, hi] = fc.bidders.q;
+      if (r[10] >= lo && r[10] <= hi) x.bidIn++;
+      x.bidErr.push(Math.abs(mid - r[10]) / Math.max(1, r[10]));
+    }
+  }
+  const med = (v: number[]) => (v.length ? r3(quantile(v.sort((a, b) => a - b), 0.5)) : 0);
+  for (const [k, x] of [...acc].sort((a, b) => b[1].n - a[1].n)) {
+    console.log(`BACKTEST ${k}: 공고 ${x.n.toLocaleString()}건 · 낙찰률 예측 ${x.rateN.toLocaleString()}건, 오차 중앙값 ${med(x.rateErr)}%p, 1%p 안 ${Math.round((x.rateErr.filter((e) => e <= 1).length / Math.max(1, x.rateN)) * 100)}% · 참가업체 예측 ${x.bidN.toLocaleString()}건, 예상 범위 안 ${Math.round((x.bidIn / Math.max(1, x.bidN)) * 100)}%, 오차 중앙값 ${Math.round(med(x.bidErr) * 100)}%`);
   }
 }
 

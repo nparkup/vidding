@@ -119,6 +119,8 @@ export interface PastAward {
   date: string;
   amount: number;
   rate: number;
+  /** 낙찰률이 비어 있어 낙찰금액 ÷ 예정가격(또는 기초금액)으로 계산한 값이면 true */
+  derived?: boolean;
   bidders: number;
   method: MethodCode;
   price: number;
@@ -170,8 +172,16 @@ export const bandOfAmount = (amount: number) => (BAND_KEYS.find((b) => amount < 
 const bandLabel = (k: string) => BAND_KEYS.find((b) => b.key === k)?.label ?? "";
 export const firstLic = (raw?: string) => (raw ?? "").split(/\s*,\s*/)[0]?.replace(/\/\d+$/, "").trim() ?? "";
 
+/** 낙찰률이 비어 있으면(협상계약 용역 등) 낙찰금액 ÷ 예정가격(없으면 기초금액)으로 채운다. 50~110%를 벗어나면 0 */
+function rateOf(r: AgencyRow): { rate: number; derived?: boolean } {
+  if (r[5] > 0) return { rate: r[5] };
+  const den = r[10] || r[9];
+  const v = den > 0 ? (r[4] / den) * 100 : 0;
+  return v > 50 && v <= 110 ? { rate: r3(v), derived: true } : { rate: 0 };
+}
+
 const toPast = (r: AgencyRow, s: number): PastAward => ({
-  no: r[0], title: r[1], date: r[2], amount: r[4], rate: r[5], bidders: r[6], method: r[7], price: r[8], base: r[9], plnprc: r[10],
+  no: r[0], title: r[1], date: r[2], amount: r[4], ...rateOf(r), bidders: r[6], method: r[7], price: r[8], base: r[9], plnprc: r[10],
   lwlt: r[11], winner: r[12], wr: r[13], top: r[14], similarity: Math.round(s * 100) / 100,
 });
 
@@ -193,6 +203,8 @@ export function similarCandidates(t: AnalyzeTarget): { key: string; label: strin
   return out;
 }
 
+const KEY_MEMO = new WeakMap<AgencyRow[], string[]>();
+
 /** 비슷한 공고 통계로 쓰려면 이만큼은 있어야 한다 */
 const SIMILAR_USE = 10;
 
@@ -200,9 +212,15 @@ export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined
   const biz = t.bizType === "공사" || t.bizType === "물품" ? t.bizType : "용역";
   const key = titleKey(t.title);
   const posted = t.postedAt.slice(0, 10);
-  const hits = (agencyRows ?? [])
-    .filter((r) => r[3] === biz && r[0] !== t.bidNtceNo && r[2] < posted)
-    .map((r) => ({ r, s: similarity(key, titleKey(r[1])) }))
+  const rows = agencyRows ?? [];
+  // 같은 기관 공고를 여러 번 비교하므로 공고명 키를 한 번만 만든다
+  let keys = KEY_MEMO.get(rows);
+  if (!keys) { keys = rows.map((r) => titleKey(r[1])); KEY_MEMO.set(rows, keys); }
+  const ks = keys;
+  const hits = rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r[3] === biz && r[0] !== t.bidNtceNo && r[2] < posted)
+    .map(({ r, i }) => ({ r, s: similarity(key, ks[i]) }))
     .filter((x) => x.s >= SAME_PROJECT);
   // 같은 공고번호(재입찰 등)는 한 번만
   const byNo = new Map<string, { r: AgencyRow; s: number }>();
@@ -302,6 +320,17 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
     else if (st?.gap && st.gap.n >= SIMILAR_USE) { q = st.gap.q; basis = `비슷한 공고 ${st.gap.n.toLocaleString()}건`; }
     else if (gaps.length) { q = [gaps[0], median(gaps), gaps[gaps.length - 1]]; basis = `과거 같은 사업 ${gaps.length}건`; }
     if (q) out.suggestRate = { value: r3(lw + q[1]), low: r3(lw + q[0]), high: r3(lw + q[2]), basis: `${basis}에서 낙찰자가 하한율보다 ${fmt(q[1])}%p 높게 썼습니다` };
+    else {
+      // 과거 공고의 하한율 자료가 없으면 과거 낙찰률 분포 (지금 하한율 아래는 하한율로)
+      const wr = h.map((x) => x.rate).filter((r) => r > 50 && r <= 110).sort((x, y) => x - y);
+      let qq: [number, number, number] | undefined;
+      if (wr.length >= 3) { qq = [quantile(wr, 0.25), quantile(wr, 0.5), quantile(wr, 0.75)]; basis = `과거 같은 사업 ${wr.length}건`; }
+      else if (st?.rate && st.rate.n >= SIMILAR_USE) { qq = [st.rate.q[1], st.rate.q[2], st.rate.q[3]]; basis = `비슷한 공고 ${st.rate.n.toLocaleString()}건`; }
+      if (qq) {
+        const [a, b, c] = qq.map((v) => r3(Math.max(lw, v)));
+        out.suggestRate = { value: b, low: a, high: c, basis: `${basis}의 낙찰률 중앙값 ${fmt(qq[1])}%${qq[1] < lw ? `가 이 공고 하한율보다 낮아 하한율로 맞췄습니다` : "입니다"}` };
+      }
+    }
   }
 
   // 예정가격 ÷ 기초금액

@@ -495,7 +495,7 @@ export function ScorePredictor() {
               value={co.bidRate}
               onChange={(v) => set("bidRate", v)}
               hint={!isNego && fc.suggestRate
-                ? `기본값 = 이 공고 하한율 + 과거 낙찰자가 하한율보다 높게 쓴 폭. ${fc.suggestRate.basis} (가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%).`
+                ? `기본값 = 과거 낙찰자 투찰률 (낙찰 결과 분석). ${fc.suggestRate.basis}. 가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%.`
                 : !isNego && rivalEst ? `참고: ${rivalBasis(rivalEst)}입니다.` : undefined}
             />
             {isNego && (

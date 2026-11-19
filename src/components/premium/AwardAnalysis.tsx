@@ -157,7 +157,7 @@ function PriorCard({ prior }: { prior?: PastAward }) {
     <Box title="전년도 낙찰 결과" sub={`${prior.date} 낙찰 · 공고번호 ${prior.no} · 공고명 유사도 ${Math.round(prior.similarity * 100)}%`}>
       <p className="text-sm font-semibold leading-snug">{prior.title}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Fact label="낙찰률" value={prior.rate ? pct(prior.rate) : "-"} note={prior.lwlt ? `하한율 ${pct(prior.lwlt)}` : METHOD_NAME[prior.method]} />
+        <Fact label="낙찰률" value={prior.rate ? pct(prior.rate) : "-"} note={prior.derived ? "낙찰금액 ÷ 예정가격으로 계산" : prior.lwlt ? `하한율 ${pct(prior.lwlt)}` : METHOD_NAME[prior.method]} />
         <Fact label="참가업체" value={prior.bidders ? `${prior.bidders.toLocaleString()}곳` : "-"} />
         <Fact label="낙찰금액" value={eok(prior.amount)} note={prior.base ? `기초금액 ${eok(prior.base)}` : undefined} />
         <Fact label="낙찰업체" value={<span className="block truncate">{prior.winner}</span>} note={prior.wr ? `개찰 ${prior.wr}위` : undefined} />

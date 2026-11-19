@@ -29,6 +29,44 @@ async function findNotice(no: string): Promise<{ it: Item; biz: string } | undef
   return undefined;
 }
 
+/** 최근 영업일 공고에서 업무별로 무작위로 고른다 (첨부가 있는 공고만) */
+async function randomNotices(n: number): Promise<string[]> {
+  const pool: Record<string, Item[]> = { Servc: [], Cnstwk: [], Thng: [] };
+  for (let back = 1; back <= 6; back++) {
+    const d = new Date(Date.now() + 9 * 3600_000 - back * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
+    for (const op of Object.keys(pool)) {
+      const q = new URLSearchParams({ type: "json", numOfRows: "200", pageNo: "1", inqryDiv: "1", inqryBgnDt: `${d}0000`, inqryEndDt: `${d}2359` });
+      try {
+        const j = await (await fetch(`https://apis.data.go.kr/1230000/ad/BidPublicInfoService02/getBidPblancListInfo${op}02?serviceKey=${KEY}&${q}`, { signal: AbortSignal.timeout(60_000) })).json();
+        const items: Item[] = j?.response?.body?.items ?? [];
+        pool[op].push(...items.filter((it) => it.ntceSpecDocUrl1 && it.bidNtceNo));
+      } catch { /* 다음 */ }
+    }
+  }
+  const share: Record<string, number> = { Servc: Math.ceil(n * 0.4), Cnstwk: Math.round(n * 0.3), Thng: 0 };
+  share.Thng = n - share.Servc - share.Cnstwk;
+  const out: string[] = [];
+  for (const [op, k] of Object.entries(share)) {
+    const uniq = [...new Map(pool[op].map((it) => [it.bidNtceNo!, it])).values()];
+    // 협상·적격심사 등 낙찰방법이 고루 섞이도록 낙찰방법별로 돌아가며 뽑는다
+    const byMethod = new Map<string, Item[]>();
+    for (const it of uniq.sort(() => Math.random() - 0.5)) {
+      const m = (it.sucsfbidMthdNm ?? "").slice(0, 8);
+      byMethod.set(m, [...(byMethod.get(m) ?? []), it]);
+    }
+    const lists = [...byMethod.values()];
+    for (let i = 0, got = 0; got < k && lists.some((l) => l.length); i++) {
+      const l = lists[i % lists.length];
+      const it = l.shift();
+      if (it) { out.push(it.bidNtceNo!); got++; }
+    }
+  }
+  console.log(`무작위 공고 ${out.length}건 (용역 ${share.Servc}, 공사 ${share.Cnstwk}, 물품 ${share.Thng} 목표; 후보 용역 ${pool.Servc.length}, 공사 ${pool.Cnstwk.length}, 물품 ${pool.Thng.length})`);
+  return out;
+}
+
+const summary: string[] = [];
+
 const fmt = (s: EvalSheet) => s.items.map((i) => `  - [${i.kind}/${i.group}] ${i.label} ${i.max}점${i.bands ? `\n      구간: ${i.bands.map((b) => `${b.cond}=${b.points}`).join(" | ")}` : ""}${i.criteria ? `\n      요소: ${i.criteria.join(" / ")}` : ""}`).join("\n");
 
 async function one(label: string, bid: Bid, files: { name: string; text: string }[], basis: EvalBasis | undefined, client: Anthropic | undefined) {
@@ -39,6 +77,12 @@ async function one(label: string, bid: Bid, files: { name: string; text: string 
   const rule = extractSheet(all, templateSheet(bid, basis));
   console.log(`--- 규칙 파서: ${rule ? `${rule.items.length}개 항목, 화면 사용 ${adoptable(rule, basis) ? "가능" : "불가"}` : "없음"}`);
   if (rule) console.log(fmt(rule));
+  const ruleOk = !!rule && adoptable(rule, basis);
+  const signal = hasTableSignal(named);
+  const tag = `${label.split(" ")[0]} | ${bid.bizType ?? ""} | ${(bid as unknown as { method?: string }).method ?? bid.contractMethod} | ${bid.title.slice(0, 40)}`;
+  if (ruleOk) { summary.push(`원문(규칙) | ${tag}`); console.log("--- 규칙 파서로 화면 사용 가능: AI 생략"); return; }
+  if (!files.length) { summary.push(`추정 | ${tag} | 첨부를 받지 못함`); return; }
+  if (!signal) { summary.push(`추정 | ${tag} | 첨부에 배점표 신호 없음`); console.log("--- 배점표 신호 없음: AI 생략"); return; }
   const ex = excerpt(named);
   console.log(`--- 보낼 본문 ${ex.length}자 (원문 ${named.length}자), 배점표 신호 ${hasTableSignal(named) ? "있음" : "없음"}`);
   if (!client) { console.log("ANTHROPIC_API_KEY 없음: AI 판독 생략"); return; }
@@ -46,6 +90,7 @@ async function one(label: string, bid: Bid, files: { name: string; text: string 
   let raw: unknown;
   const r = await readSheetWithAI(client, bid, ex, { model: process.env.AI_SHEET_MODEL || DEFAULT_AI_MODEL, techRatio: basis?.techRatio, priceRatio: basis?.priceRatio, onRaw: (o) => { raw = o; } });
   const ok = r.sheet && adoptable(r.sheet, basis);
+  summary.push(`${ok ? "원문(AI)" : "추정"} | ${tag}${ok ? "" : ` | AI ${r.status}: ${r.reason ?? ""}`} | 토큰 ${r.usage?.input}/${r.usage?.output}`);
   console.log(`--- AI 판독 (${r.model}, ${((Date.now() - t0) / 1000).toFixed(0)}초, 토큰 입력 ${r.usage?.input} / 출력 ${r.usage?.output}): ${r.status}${r.reason ? ` - ${r.reason}` : ""}${r.sheet ? `, 화면 사용 ${ok ? "가능" : "불가"}` : ""}`);
   if (!r.sheet && raw) {
     const o = raw as { tech_total: unknown; price_total: unknown; pass: unknown; reason: string; items: { group: string; label: string; max: number; kind: string }[] };
@@ -59,7 +104,9 @@ async function one(label: string, bid: Bid, files: { name: string; text: string 
 }
 
 async function main() {
-  const args = (process.argv[2] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  let args = (process.argv[2] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const rnd = /^random:(\d+)$/.exec(args[0] ?? "");
+  if (rnd) args = await randomNotices(Number(rnd[1]));
   const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ maxRetries: 3, timeout: 5 * 60_000 }) : undefined;
   for (const a of args) {
     if (existsSync(a)) {
@@ -78,8 +125,9 @@ async function main() {
       try { const b = await download(f.url, 30_000); if (b) files.push({ name: f.name, text: await textOf(f, b) }); } catch (e) { console.log(`받기 실패 ${f.name}: ${e instanceof Error ? e.message : e}`); }
     }
     const nego = /^협상/.test(it.sucsfbidMthdNm ?? "");
-    const bid = { id: `${it.bidNtceNo}-${it.bidNtceOrd ?? "000"}`, title: it.bidNtceNm ?? a, agency: it.ntceInsttNm ?? "", contractMethod: nego ? "협상에 의한 계약" : "적격심사", bizType: biz, baseAmount: Number(it.asignBdgtAmt || it.presmptPrce || 0), category: "기타 용역", lowerLimitRate: Number(it.sucsfbidLwltRate || 0) } as unknown as Bid;
-    await one(`${bid.id} ${it.ntceInsttNm} (${it.sucsfbidMthdNm})`, bid, files, evalBasisOf(it), client);
+    const bid = { id: `${it.bidNtceNo}-${it.bidNtceOrd ?? "000"}`, method: it.sucsfbidMthdNm ?? "", title: it.bidNtceNm ?? a, agency: it.ntceInsttNm ?? "", contractMethod: nego ? "협상에 의한 계약" : "적격심사", bizType: biz, baseAmount: Number(it.asignBdgtAmt || it.presmptPrce || 0), category: "기타 용역", lowerLimitRate: Number(it.sucsfbidLwltRate || 0) } as unknown as Bid;
+    try { await one(`${bid.id} ${it.ntceInsttNm} (${it.sucsfbidMthdNm})`, bid, files, evalBasisOf(it), client); } catch (e) { summary.push(`오류 | ${bid.id} | ${e instanceof Error ? e.message : e}`); }
   }
+  console.log(`\n==================== 요약 ${summary.length}건\n${summary.join("\n")}`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

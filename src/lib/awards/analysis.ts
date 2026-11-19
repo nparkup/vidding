@@ -587,9 +587,21 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const rel = a.related;
 
   // 참가업체 수: 같은 사업 이력이 2건 이상이면 그 분포, 아니면 비슷한 공고 분포. 전년도 값이 있으면 근거에 같이 적는다
-  const hb = h.map((x) => x.bidders).filter((n) => n > 0).sort((x, y) => x - y);
+  // 되짚어 보기(8주): 공사 적격심사를 빼면 가운데 값은 최근 3건 중앙값이 전체 중앙값보다 맞았다 (물품 적격 40→33%, 용역 적격 38→33%)
+  const biz = a.similar?.key.split("|")[0];
+  const m = methodCode(bid.contractMethod);
+  const hbRecent = h.map((x) => x.bidders).filter((n) => n > 0);
+  const hb = [...hbRecent].sort((x, y) => x - y);
+  const recent3 = !(biz === "공사" && m === "Q");
   if (hb.length >= 2) {
-    out.bidders = { q: [Math.round(quantile(hb, 0.25)), Math.round(quantile(hb, 0.5)), Math.round(quantile(hb, 0.75))], basis: `과거 같은 사업 ${hb.length}건` };
+    const q: [number, number, number] = [Math.round(quantile(hb, 0.25)), Math.round(quantile(hb, 0.5)), Math.round(quantile(hb, 0.75))];
+    if (recent3) {
+      const top = hbRecent.slice(0, 3).sort((x, y) => x - y);
+      q[1] = Math.round(quantile(top, 0.5));
+      q[0] = Math.min(q[0], q[1]);
+      q[2] = Math.max(q[2], q[1]);
+    }
+    out.bidders = { q, basis: recent3 ? `과거 같은 사업 ${hb.length}건 (가운데 값은 최근 ${Math.min(3, hb.length)}건)` : `과거 같은 사업 ${hb.length}건` };
   } else if (st) {
     const q = st.bidders.q.map((n) => Math.round(n)) as [number, number, number];
     if (a.prior?.bidders) q[1] = Math.round((q[1] + a.prior.bidders) / 2);
@@ -609,12 +621,14 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
 
   // 과거 낙찰률
   const hr = h.map((x) => x.rate).filter((r) => r > 50 && r <= 110);
-  if (hr.length >= 2) out.winRate = { value: r3(median(hr)), basis: `과거 같은 사업 ${hr.length}건 중앙값` };
+  // 되짚어 보기(8주): 용역 최저가를 빼면 가장 최근 같은 사업 낙찰률이 중앙값보다 맞았다 (공사 적격 0.174→0.145%p, 물품 적격 2.48→2.27%p, 용역 적격 0.76→0.69%p)
+  const latest = !(biz === "용역" && m === "L");
+  if (latest && hr.length >= 1) out.winRate = { value: r3(hr[0]), basis: hr.length >= 2 ? `가장 최근 같은 사업 낙찰률 (과거 ${hr.length}건 중앙값 ${fmt(median(hr))}%)` : "가장 최근 같은 사업 낙찰률" };
+  else if (hr.length >= 2) out.winRate = { value: r3(median(hr)), basis: `과거 같은 사업 ${hr.length}건 중앙값` };
   else if (a.prior?.rate) out.winRate = { value: a.prior.rate, basis: "전년도 같은 사업" };
   else if (st?.rate) out.winRate = { value: r3(st.rate.q[2]), basis: `비슷한 공고 ${st.rate.n.toLocaleString()}건 중앙값` };
 
   // 협상: 개찰 1위(가장 낮은) 투찰률. 같은 사업 이력 > 전년도 > 비슷한 공고 > 낙찰률
-  const m = methodCode(bid.contractMethod);
   if (m === "N") {
     const firsts = h.map((x) => x.top[0]?.[1] ?? 0).filter((r) => r > 50 && r <= 110);
     if (firsts.length >= 2) out.rival = { value: r3(median(firsts)), basis: `과거 같은 사업 ${firsts.length}건의 개찰 1위 투찰률 중앙값` };

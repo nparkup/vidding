@@ -12,7 +12,7 @@ import type { AwardAnalysis } from "./analysis";
  */
 
 /** 프롬프트를 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const RELATE_VERSION = 2;
+export const RELATE_VERSION = 3;
 export const DEFAULT_RELATE_MODEL = "claude-haiku-5-5";
 
 export interface RelateResult {
@@ -112,12 +112,14 @@ export async function relateWithAI(client: Anthropic, target: RelateTarget, a: P
 const KIND_SYSTEM = `당신은 한국 공공조달(나라장터) 낙찰 자료를 정리하는 분석가입니다.
 '지금 공고'와 여러 기관의 과거 낙찰 공고 후보들이 주어집니다. 각 후보가 지금 공고와 같은 종류의 일인지 판단하세요.
 같은 종류의 일이란: 기관은 달라도 같은 업체들이 참가해 겨룰 만한 계약입니다. 대상의 종류와 업무 종류가 같아야 합니다.
-- 같은 종류: 다른 기관의 같은 업무(예: 다른 공사의 "선택적복지제도 복지카드 사업자 선정"), 지역·연도·규모만 다른 같은 업무.
+- 같은 종류: 다른 기관의 같은 업무(예: 다른 공사의 "선택적복지제도 시스템 운영사 선정"), 지역·연도·규모만 다른 같은 업무.
 - 다른 종류: 낱말만 겹치고 업무가 다른 공고(예: "복지관 청소"와 "복지포인트 운영"), 업무 종류가 다른 공고(유지관리와 구축·감리·설계), 대상 종류가 다른 공고(초음파진단기와 내시경).
+- 지금 공고가 여러 업무를 묶어 뽑는 경우(예: "위탁운영사 및 복지카드 발급사업자 선정")에는 주된 업무로 판단하세요. 주된 업무는 공고명 앞쪽에 나오고 계약 상대가 실제로 맡아 운영하는 일입니다. 후보가 그 일부(예: 복지카드 발급사만 뽑는 공고)만 다루면 다른 종류입니다.
+- 후보의 낙찰업체가 지금 공고의 주된 업무를 하는 업체가 아니면 다른 종류입니다(예: 복지포인트 위탁운영 공고에 카드사·은행이 낙찰받은 후보는 운영과 카드를 함께 뽑은 공고라도 다른 종류).
 - 애매하면 다른 종류로 판단하세요.
 각 후보마다 판단과 열 단어 안쪽의 이유를 답하세요.`;
 
-export interface KindCandidate { no: string; title: string; agency: string; date: string; amount: number }
+export interface KindCandidate { no: string; title: string; agency: string; date: string; amount: number; winner?: string }
 
 /** 핵심어로 찾은 다른 기관 낙찰 가운데 같은 종류의 일만 고른다 (참가 예상 기업을 거르는 데 쓴다) */
 export async function relateKindWithAI(client: Anthropic, target: RelateTarget, cands: KindCandidate[], model?: string): Promise<{ same: string[]; usage: { input: number; output: number }; status: RelateResult["status"] }> {
@@ -128,8 +130,8 @@ export async function relateKindWithAI(client: Anthropic, target: RelateTarget, 
     `수요기관: ${target.agency}`,
     target.baseAmount ? `금액: ${won(target.baseAmount)}` : "",
     "",
-    "과거 낙찰 후보 (공고번호 | 기관 | 낙찰일 | 공고명 | 금액):",
-    cands.map((c) => `- ${c.no} | ${c.agency} | ${c.date} | ${c.title} | ${won(c.amount)}`).join("\n"),
+    "과거 낙찰 후보 (공고번호 | 기관 | 낙찰일 | 공고명 | 금액 | 낙찰업체):",
+    cands.map((c) => `- ${c.no} | ${c.agency} | ${c.date} | ${c.title} | ${won(c.amount)} | ${c.winner || "?"}`).join("\n"),
   ].filter((x) => x !== "").join("\n");
   const msg = await client.messages.create({
     model: m,
@@ -159,7 +161,7 @@ export async function relateAll(client: Anthropic, a: Pick<AwardAnalysis, "maybe
   r.hash = relateHash(a);
   const rows = a.related?.rows ?? [];
   if (rows.length) {
-    const k = await relateKindWithAI(client, target, rows.map((x) => ({ no: x[0], title: x[1], agency: x[2], date: x[3], amount: x[9] || x[5] })), model);
+    const k = await relateKindWithAI(client, target, rows.map((x) => ({ no: x[0], title: x[1], agency: x[2], date: x[3], amount: x[9] || x[5], winner: x[10] })), model);
     if (k.status === "ok") { r.kind = k.same; if (r.status === "none") r.status = "ok"; }
     else if (r.status === "none") r.status = k.status;
     r.usage = { input: (r.usage?.input ?? 0) + k.usage.input, output: (r.usage?.output ?? 0) + k.usage.output };

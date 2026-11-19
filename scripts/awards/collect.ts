@@ -977,6 +977,25 @@ async function checkNotices(ix: Awaited<ReturnType<typeof buildIndexes>>) {
       if (kind === "now") console.log(`SAMPLE_ANALYSIS ${JSON.stringify({ target: b, analysis: a })}`);
       console.log(`CHECK ${kind === "old" ? "전" : "후"} ${no} ${b.title} (${b.demandAgency}) | 전년도: ${a.prior?.title ?? "없음"} | 같은 사업 ${a.history.length}건 | 비슷한 공고: ${a.related ? `핵심어 ${a.related.terms.join("·")} ${a.related.n}건` : a.similar?.label ?? "없음"} | 참가 예상: ${(fc.likely ?? []).slice(0, 6).map((x) => x.name).join(", ")} | 최근 낙찰 예: ${ex.slice(0, 4).map((e) => `${e[1]}(${e[7]})`).join(" / ")}`);
     }
+    // 중계 서버와 같은 확인을 거친 뒤의 참가 예상 기업
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        const { default: Anthropic } = await import("@anthropic-ai/sdk");
+        const { relateAll } = await import("../../src/lib/awards/relate");
+        const { withConfirmed, withKind } = await import("../../src/lib/awards/analysis");
+        const a = analyzeBid(b, rows, ix.similar.groups, range, { kw: ix.kw });
+        if (a.subject) {
+          const r = await relateAll(new Anthropic({ maxRetries: 2 }), a);
+          let x = r.same.length ? withConfirmed(a, r.same, a.subject.postedAt) : a;
+          if (r.kind) x = withKind(x, r.kind);
+          const fc = forecast(x, b);
+          const kept = new Set(r.kind ?? []);
+          console.log(`CHECK 확인후 ${no} | 같은 종류 ${r.kind?.length ?? "-"}/${a.related?.rows?.length ?? 0}건 (뺀 것: ${(a.related?.rows ?? []).filter((y) => !kept.has(y[0])).map((y) => `${y[1]}(${y[10]})`).join(" / ").slice(0, 500)}) | 참가 예상: ${(fc.likely ?? []).slice(0, 6).map((y) => y.name).join(", ")}`);
+        }
+      } catch (e) {
+        console.log(`CHECK 확인 실패: ${(e as Error).message.slice(0, 200)}`);
+      }
+    }
   }
 }
 
@@ -996,7 +1015,7 @@ async function relateKindTrial(trial: Trial[], kw: KwLookup) {
     const c = relatedRows(target, kw);
     if (!c) continue;
     try {
-      const r = await relateKindWithAI(client, { title: target.title, agency: target.demandAgency, baseAmount: target.baseAmount }, c.top.map(({ r }) => ({ no: r[0], title: r[1], agency: r[2], date: r[3], amount: r[9] || r[5] })));
+      const r = await relateKindWithAI(client, { title: target.title, agency: target.demandAgency, baseAmount: target.baseAmount }, c.top.map(({ r }) => ({ no: r[0], title: r[1], agency: r[2], date: r[3], amount: r[9] || r[5], winner: r[10] })));
       if (r.status !== "ok") continue;
       done++; cands += c.top.length; kept += r.same.length; tin += r.usage.input; tout += r.usage.output;
       const ok = new Set(r.same);

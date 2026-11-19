@@ -5,6 +5,7 @@ import { call, COLLECT_DAYS, mapLimit, recentDays } from "./client";
 import { NARA_APIS } from "./endpoints";
 import type { BidQual, LicenseReq } from "../eligibility";
 import { evalBasisOf } from "../criteria";
+import { baseAmountOf, noticeInfoOf } from "../noticeInfo";
 
 /**
  * 공고별 입찰 참가자격 자료 (업종 제한·참가지역 제한) 수집.
@@ -53,8 +54,12 @@ export function groupLicenses(rows: Item[]): LicenseReq[][] {
   return [...groups.values()].map((g) => [...g.values()]).filter((g) => g.length);
 }
 
-/** 목록 원본 + 면허제한 행 + 지역 행 → BidQual. 자료를 못 받은 쪽은 null(모름) */
-export function buildQual(it: Item, licRows: Item[] | null, rgnRows: Item[] | null): BidQual {
+/** 용역·공사·물품별 기초금액 오퍼레이션 */
+const BASE_OPS = ["getBidPblancListInfoServcBsisAmount02", "getBidPblancListInfoCnstwkBsisAmount02", "getBidPblancListInfoThngBsisAmount02"];
+const baseOpOf = (bizType: string) => BASE_OPS[bizType === "공사" ? 1 : bizType === "물품" ? 2 : 0];
+
+/** 목록 원본 + 면허제한 행 + 지역 행 (+ 기초금액 행) → BidQual. 자료를 못 받은 쪽은 null(모름) */
+export function buildQual(it: Item, licRows: Item[] | null, rgnRows: Item[] | null, baseRows: Item[] = []): BidQual {
   const groups = licRows ? groupLicenses(licRows) : [];
   // 용역·공사는 목록에 업종제한 여부(Y/N)가 있다. 물품은 비어 있어 면허제한 행이 있는지로 본다
   const flag = it.indstrytyLmtYn;
@@ -68,7 +73,13 @@ export function buildQual(it: Item, licRows: Item[] | null, rgnRows: Item[] | nu
     regionBasis: it.rgnLmtBidLocplcJdgmBssNm?.trim() || undefined,
     registerBy: it.bidQlfctRgstDt?.trim() || undefined,
     basis: evalBasisOf(it),
+    info: withBase(noticeInfoOf(it), baseRows),
   };
+}
+
+function withBase(info: ReturnType<typeof noticeInfoOf>, rows: Item[]) {
+  const b = baseAmountOf(rows);
+  return b ? { ...info, ...b } : info;
 }
 
 async function fetchDay(op: string, day: string): Promise<Item[]> {
@@ -81,7 +92,7 @@ async function fetchDay(op: string, day: string): Promise<Item[]> {
 }
 
 /** 필요한 필드만 남겨 캐시 크기를 줄인다 */
-const KEEP = ["bidNtceNo", "bidNtceOrd", "lmtGrpNo", "lmtSno", "lcnsLmtNm", "permsnIndstrytyList", "prtcptPsblRgnNm"];
+const KEEP = ["bidNtceNo", "bidNtceOrd", "lmtGrpNo", "lmtSno", "lcnsLmtNm", "permsnIndstrytyList", "prtcptPsblRgnNm", "bidClsfcNo", "bssamt", "rsrvtnPrceRngBgnRate", "rsrvtnPrceRngEndRate"];
 const slim = (it: Item): Item => Object.fromEntries(KEEP.filter((k) => it[k]).map((k) => [k, it[k]]));
 
 /**
@@ -131,25 +142,40 @@ async function collectRows(op: string, days: string[], cacheDir?: string): Promi
 export async function fetchQualBulk(
   listItems: Map<string, { item: Item; day: string }>,
   opts: { days?: number; cacheDir?: string } = {},
-): Promise<{ quals: Record<string, BidQual>; stats: { bids: number; licenseLimited: number; regionLimited: number; unknown: number; fetched: number; failedDays: number } }> {
+): Promise<{ quals: Record<string, BidQual>; stats: { bids: number; licenseLimited: number; regionLimited: number; unknown: number; withBase: number; fetched: number; failedDays: number; baseFailedDays: number } }> {
   const days = recentDays(opts.days ?? COLLECT_DAYS);
   const [lic, rgn] = await Promise.all([
     collectRows(OPS.license, days, opts.cacheDir && join(opts.cacheDir, "license")),
     collectRows(OPS.region, days, opts.cacheDir && join(opts.cacheDir, "region")),
   ]);
+  // 기초금액은 공고 뒤에 따로 공개되고 바뀔 수 있어 캐시하지 않고 매번 받는다 (하루 용역·공사·물품 각 1~2쪽). 실패한 날은 기초금액만 빠진다
+  const bases = await Promise.all(BASE_OPS.map((op) => collectRows(op, days)));
+  // 공고번호 → [차수, 행] (정정공고로 차수가 올라가기 전에 공개된 기초금액도 찾도록)
+  const baseByNo = new Map<string, [string, Item[]][]>();
+  for (const b of bases) for (const [id, rows] of b.rows) {
+    const [no, ord = "000"] = id.split("-");
+    (baseByNo.get(no) ?? baseByNo.set(no, []).get(no)!).push([ord, rows]);
+  }
+  const baseRows = (id: string): Item[] => {
+    const [no, ord = "000"] = id.split("-");
+    const cand = (baseByNo.get(no) ?? []).filter(([o]) => o <= ord).sort(([a], [c]) => c.localeCompare(a));
+    return cand[0]?.[1] ?? [];
+  };
   const quals: Record<string, BidQual> = {};
-  const stats = { bids: 0, licenseLimited: 0, regionLimited: 0, unknown: 0, fetched: lic.fetched + rgn.fetched, failedDays: lic.failedDays.size + rgn.failedDays.size };
+  const stats = { bids: 0, licenseLimited: 0, regionLimited: 0, unknown: 0, withBase: 0, fetched: lic.fetched + rgn.fetched, failedDays: lic.failedDays.size + rgn.failedDays.size, baseFailedDays: bases.reduce((a, b) => a + b.failedDays.size, 0) };
   for (const [id, { item, day }] of listItems) {
     const q = buildQual(
       item,
       lic.rows.get(id) ?? (lic.failedDays.has(day) ? null : []),
       rgn.rows.get(id) ?? (rgn.failedDays.has(day) ? null : []),
+      baseRows(id),
     );
     quals[id] = q;
     stats.bids++;
     if (q.licenseLimited) stats.licenseLimited++;
     if (q.regionLimited) stats.regionLimited++;
     if (q.licenseLimited === null || q.regionLimited === null) stats.unknown++;
+    if (q.info?.base) stats.withBase++;
   }
   return { quals, stats };
 }
@@ -158,13 +184,14 @@ export async function fetchQualBulk(
 export async function bidQualification(bidNtceNo: string, bidNtceOrd = "000", bizType = "용역"): Promise<BidQual | undefined> {
   const listOp = bizType === "공사" ? OPS.constructionList : bizType === "물품" ? OPS.goodsList : OPS.serviceList;
   const byNo = { inqryDiv: "2", bidNtceNo, bidNtceOrd, numOfRows: "100" };
-  const [list, lic, rgn] = await Promise.all([
+  const [list, lic, rgn, base] = await Promise.all([
     call(BID.path, listOp, { inqryDiv: "2", bidNtceNo, numOfRows: "10" }),
     call(BID.path, OPS.license, byNo).catch(() => null),
     call(BID.path, OPS.region, byNo).catch(() => null),
+    call(BID.path, baseOpOf(bizType), byNo).catch(() => null),
   ]);
   const it = list.items.find((i) => (i.bidNtceOrd ?? "000") === bidNtceOrd);
   if (!it) return undefined;
   const same = (rows: Item[]) => rows.filter((r) => r.bidNtceNo === bidNtceNo && (r.bidNtceOrd ?? "000") === bidNtceOrd);
-  return buildQual(it, lic ? same(lic.items) : null, rgn ? same(rgn.items) : null);
+  return buildQual(it, lic ? same(lic.items) : null, rgn ? same(rgn.items) : null, base ? same(base.items) : []);
 }

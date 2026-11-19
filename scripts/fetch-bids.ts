@@ -11,8 +11,10 @@ import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
+import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
 import { awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
+import { makeAiInputs } from "./aiSheets";
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -39,7 +41,7 @@ async function main() {
     console.warn("첨부파일 목록 수집 건너뜀:", e instanceof Error ? e.message : e);
   }
   // 입찰 참가자격(업종 제한·참가지역): 사업자번호 조회 때 공고별로 가능/불가/확인 필요를 판정하는 데 쓴다. 실패해도 배포는 계속
-  let quals = {};
+  let quals: Awaited<ReturnType<typeof fetchQualBulk>>["quals"] = {};
   if (listItems.size) {
     try {
       const r = await fetchQualBulk(listItems, { cacheDir: process.env.AWARD_CACHE_DIR ? `${process.env.AWARD_CACHE_DIR}/qual` : ".cache/award/qual" });
@@ -53,19 +55,31 @@ async function main() {
         if (v !== undefined && bid.lowerLimitRate !== v) { bid.lowerLimitRate = v; fixed++; }
       }
       console.log(`낙찰하한율: 공고 값으로 ${fixed}건 바꿈`);
+      // 공동도급: 개방표준의 공동계약 여부(cmmnCntrctYn)는 '공동수급불허' 공고에도 Y 로 오는 일이 있어 공동수급 방식으로 바로잡는다
+      let joint = 0;
+      for (const bid of items) {
+        const ok = jointAllowed(r.quals[bid.id]?.info?.jointMethod);
+        if (ok !== undefined && bid.jointContract !== ok) { bid.jointContract = ok; joint++; }
+      }
+      console.log(`공동도급: 공동수급 방식으로 ${joint}건 바꿈, 기초금액 공개 ${s.withBase}건${s.baseFailedDays ? ` (기초금액 조회 실패 ${s.baseFailedDays}일분)` : ""}`);
     } catch (e) {
       console.warn("참가자격 수집 건너뜀:", e instanceof Error ? e.message : e);
     }
   }
   // 첨부를 내려받아 평가표를 미리 추출 (평가점수 예측이 공고 선택만으로 원문 배점을 쓰도록). 실패해도 배포는 계속
-  let sheets = {};
+  let sheets: Awaited<ReturnType<typeof extractSheetsForBids>>["sheets"] = {};
+  // 규칙 파서가 쓸 수 있는 배점표를 못 읽은 공고는 평가 관련 본문을 AI 판독 입력으로 남긴다 (공고를 고를 때 중계 서버가 읽는다)
+  const ai = makeAiInputs(quals);
   try {
-    const r = await extractSheetsForBids(items, attachments);
+    const r = await extractSheetsForBids(items, attachments, { collect: ai.collect });
     sheets = r.sheets;
     console.log(`평가표 추출: 대상 ${r.stats.bids}건, 파일 ${r.stats.files}개(실패 ${r.stats.downloadFailed}), 배점표 ${r.stats.found}건, 공고 기준 문장 ${r.stats.notice}건${r.stats.timedOut ? ", 시간 한도로 일부만 처리" : ""}`);
   } catch (e) {
     console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);
   }
+  for (const [id, input] of Object.entries(ai.inputs)) sheets[id] = { ...sheets[id], ai: input };
+  const aiChars = Object.values(ai.inputs).reduce((a, i) => a + i.text.length, 0);
+  console.log(`AI 판독 입력: ${Object.keys(ai.inputs).length}건 (본문 합계 ${aiChars.toLocaleString()}자)`);
   // 예상 최저 경쟁 투찰률 통계. 낙찰 저장소(R2)에 최근 1년치가 있으면 그것을 쓰고(조달청 호출 없음),
   // 아직 수집 중이면 예전처럼 전년도 낙찰을 조금씩 받아 GitHub Actions 캐시에 쌓는다. 실패해도 배포는 계속
   let awardStats;

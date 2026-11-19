@@ -1,4 +1,5 @@
 import type { Bid, ClientProfile, ContractMethod, License, Region } from "./types";
+import { closedLabel } from "./bidMethod";
 import { FACILITY_CATEGORIES } from "./types";
 import { hasAnyLicense } from "./licenses";
 
@@ -56,6 +57,9 @@ export function evaluate(bid: Bid, c: MatchCriteria, now = new Date()): MatchRes
   const blockers: string[] = [];
   const factors: Factor[] = [];
   const left = daysLeft(bid.closeAt, now);
+  // 수의시담·지명경쟁: 정해진 업체만 참가하는 공고라 자격이 맞아도 참가할 수 없다
+  const closed = closedLabel(bid);
+  if (closed) blockers.push(closed);
 
   const licenseOk = bid.licenses.length === 0 ? !bid.licenseRaw : hasAnyLicense(c.licenses, bid.licenses);
   // 업종 제한이 없는 공고는 누구나 참가할 수 있지만, 보유 면허와 직접 맞는 공고를 더 위에 둔다
@@ -190,6 +194,7 @@ export function documentChecklist(bid: Bid): { group: string; items: { name: str
       { name: "산출내역서", required: true },
       { name: "입찰금액 적정성 자료", note: "저가 투찰 시 요구", required: false },
     ],
+    "수의시담": [],
     "수의계약(소액)": [
       { name: "견적서", required: true },
       { name: "수의계약 각서", required: true },

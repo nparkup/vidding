@@ -12,6 +12,7 @@
  */
 import type { EvalBasis } from "./criteria";
 import type { CorpLookup } from "./corpLookup";
+import type { NoticeInfo } from "./noticeInfo";
 
 export interface LicenseReq {
   name: string;
@@ -35,6 +36,8 @@ export interface BidQual {
   registerBy?: string;
   /** 평가 기준을 고르는 공고 값 (낙찰방법 세부, 낙찰하한율, 추정가격, 협상 배점 비율) */
   basis?: EvalBasis;
+  /** 공고 상세 '핵심 요약'용 공고 항목 (입찰방식·금액·담당자 등, lib/noticeInfo) */
+  info?: NoticeInfo;
 }
 
 export type Verdict = "가능" | "불가" | "확인 필요";

@@ -545,7 +545,9 @@ export function tableCheck(bid: Pick<Bid, "bizType" | "baseAmount" | "category">
  */
 export function adoptable(ex: EvalSheet, b?: EvalBasis): boolean {
   const price = ex.items.filter((i) => i.kind === "price");
-  if (ex.items.length < 3 || price.length > 1) return false;
+  // AI 판독은 원문 문구 확인을 거쳤으므로 "사업수행능력 + 입찰가격" 같은 두 항목 표도 받는다
+  const enough = ex.reader?.by === "ai" && price.length === 1 ? ex.items.filter((i) => i.max > 0).length >= 2 : ex.items.length >= 3;
+  if (!enough || price.length > 1) return false;
   // 가격평가가 없는 공고(기술 100점, 비예산 사업 등): 나라장터에 가격 배점이 없고 항목 합이 100점이어야 한다
   if (price.length === 0) {
     if ((b?.priceRatio ?? 0) > 0) return false;

@@ -23,7 +23,7 @@ export function makeAiInputs(quals: Record<string, { basis?: EvalBasis } | undef
       v: AI_SHEET_VERSION,
       hash: hashOf(`${AI_SHEET_VERSION}\n${body}`),
       text: body,
-      bid: { id: bid.id, title: bid.title, contractMethod: bid.contractMethod, agency: bid.agency },
+      bid: { id: bid.id, title: bid.title, contractMethod: bid.contractMethod, agency: bid.agency, baseAmount: bid.baseAmount || undefined },
       techRatio: basis?.techRatio,
       priceRatio: basis?.priceRatio,
     };

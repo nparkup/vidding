@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 5;
+export const AI_SHEET_VERSION = 6;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -22,7 +22,7 @@ export interface AiInput {
   /** text 의 해시 (캐시 키) */
   hash: string;
   text: string;
-  bid: Pick<Bid, "id" | "title" | "contractMethod" | "agency">;
+  bid: Pick<Bid, "id" | "title" | "contractMethod" | "agency"> & { baseAmount?: number };
   techRatio?: number;
   priceRatio?: number;
 }
@@ -84,9 +84,10 @@ const nullable = (t: string) => ({ type: [t, "null"] });
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["found", "reason", "table_quote", "stated_total", "tech_total", "price_total", "pass", "panel_rule", "items"],
+  required: ["found", "decides_award", "reason", "table_quote", "stated_total", "tech_total", "price_total", "pass", "panel_rule", "items"],
   properties: {
     found: { type: "boolean", description: "이 공고에 적용되는 배점표(평가항목별 배점)가 본문에 있으면 true" },
+    decides_award: { type: "boolean", description: "이 배점표로 낙찰자(또는 협상적격자·적격자·선정 대상)를 정하면 true. 계약 뒤 착공 전 안전수준 평가, 계약이행 실적평가처럼 낙찰 이후에 쓰는 표면 false" },
     reason: { type: "string", description: "판단 근거 한두 문장. 못 찾았으면 그 이유" },
     table_quote: { type: "string", description: "배점표 제목이나 머리글 줄을 원문 그대로" },
     stated_total: { ...nullable("number"), description: "배점표의 합계·총점 줄에 적힌 숫자 그대로 (항목을 더한 값이 아님). 합계 줄이 없으면 null" },
@@ -109,13 +110,14 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["group", "label", "max", "kind", "quote", "bands", "criteria"],
+        required: ["group", "label", "max", "kind", "quote", "outside_total", "bands", "criteria"],
         properties: {
           group: { type: "string", description: "상위 구분 (예: 정량평가, 정성평가, 입찰가격, 경영상태, 수행능력)" },
           label: { type: "string", description: "평가항목 이름을 원문 낱말 그대로" },
           max: { type: "number", description: "배점 (감점만 있는 항목은 0)" },
           kind: { type: "string", enum: KINDS as unknown as string[] },
           quote: { type: "string", description: "이 항목의 배점이 적힌 원문 줄 그대로" },
+          outside_total: { type: "boolean", description: "표 합계(예: 100점) 밖에서 더하거나 빼는 가감점이면 true. 이때 max 는 가점 한도" },
           bands: {
             type: "array",
             description: "구간별 점수 (신용등급별, 실적 비율·건수별, 인원·업력별). 없으면 빈 배열",
@@ -153,11 +155,15 @@ const SYSTEM = `당신은 한국 공공조달(나라장터) 입찰공고의 첨�
 - 표의 합계 줄과 항목 배점의 합이 다르면 고치거나 항목을 빼서 맞추지 말고 읽은 그대로 쓰고, 합계 줄의 숫자는 stated_total 에 적고, reason 에 그 차이를 적습니다.
 - 표가 다음 쪽으로 이어지면서 같은 평가항목 칸(예: "부가서비스(20점)")과 배점이 다시 적히면 한 항목입니다. 배점은 한 번만 쓰고 양쪽 세부 기준을 criteria 에 모두 적습니다. 판단이 어려우면 표에 적힌 순서대로 두 줄을 그대로 씁니다.
 - 이름이 같아도 사이에 다른 항목이 있는 별개 구역(예: 운영사별 항목)이면 따로 씁니다.
-- 공고서·제안요청서·평가기준이 서로 다르면 공고에 첨부된 이 사업의 평가표를 따릅니다.`;
+- 공고서·제안요청서·평가기준이 서로 다르면 공고에 첨부된 이 사업의 평가표를 따릅니다.
+- 공고와 표는 틀리지 않는다고 보고, 표의 합계와 항목 배점의 합이 맞도록 읽습니다. 맞지 않으면 쪽 넘김으로 다시 적힌 칸, 소계 줄, 합계 밖 가감점을 항목으로 잘못 넣지 않았는지 다시 봅니다.
+- "(+10)/(-10)", "가감점", "가점·감점"처럼 합계 밖에서 더하고 빼는 항목은 outside_total=true 로 적습니다. 합계 안에 배점이 있는 신인도 항목은 false 입니다.
+- 낙찰자를 정하는 표를 고릅니다. 여러 단계 표(1차 서류평가, 최종 평가)가 있으면 최종 낙찰자를 정하는 표를 고르고, 앞 단계 통과 기준은 pass 에 적습니다. 계약 뒤 안전수준 평가처럼 낙찰과 무관한 표만 있으면 decides_award=false 입니다.
+- 금액 구간별로 표가 나뉘어 있으면(예: 1억 원 이상, 1억 원 미만) 사업 금액에 맞는 구간의 표를 고르고, 금액을 모르면 reason 에 그렇게 적습니다.`;
 
 export async function readSheetWithAI(
   client: Anthropic,
-  bid: Pick<Bid, "id" | "title" | "contractMethod" | "agency">,
+  bid: Pick<Bid, "id" | "title" | "contractMethod" | "agency"> & { baseAmount?: number },
   text: string,
   opts: { model?: string; techRatio?: number; priceRatio?: number; onRaw?: (out: unknown) => void } = {},
 ): Promise<Omit<AiSheetResult, "hash" | "v" | "at">> {
@@ -166,6 +172,7 @@ export async function readSheetWithAI(
     `공고명: ${bid.title}`,
     `계약방법: ${bid.contractMethod ?? "모름"}`,
     bid.agency ? `공고기관: ${bid.agency}` : "",
+    bid.baseAmount ? `사업 금액(배정예산 또는 추정가격): ${Math.round(bid.baseAmount).toLocaleString("ko-KR")}원` : "",
     opts.techRatio !== undefined ? `나라장터에 등록된 기술:가격 배점 = ${opts.techRatio}:${opts.priceRatio ?? "?"}` : "",
   ].filter(Boolean).join("\n");
   const msg = await client.messages.stream({
@@ -183,6 +190,7 @@ export async function readSheetWithAI(
   try { out = JSON.parse(raw) as AiOut; } catch { return { model, status: "error", reason: "JSON 해석 실패", usage }; }
   opts.onRaw?.(out);
   if (!out.found) return { model, status: "none", reason: out.reason.slice(0, 200), usage };
+  if (!out.decides_award) return { model, status: "none", reason: `낙찰자 결정용 평가표가 아님: ${out.reason}`.slice(0, 200), usage };
   const r = toSheet(out, text, bid, model);
   if (!r.sheet) return { model, status: "rejected", reason: r.reason, usage };
   // 나라장터에 등록된 기술·가격 배점과도 맞아야 화면에서 쓴다
@@ -199,9 +207,10 @@ export async function readAiInput(client: Anthropic, input: AiInput, model?: str
 /* ---------- 검증 ---------- */
 
 interface AiBand { cond: string; points: number; unit: (typeof UNITS)[number]; min: number | null; best_grade: string | null; worst_grade: string | null }
-interface AiItem { group: string; label: string; max: number; kind: (typeof KINDS)[number]; quote: string; bands: AiBand[]; criteria: string[] }
+interface AiItem { group: string; label: string; max: number; kind: (typeof KINDS)[number]; quote: string; outside_total?: boolean; bands: AiBand[]; criteria: string[] }
 export interface AiOut {
   found: boolean;
+  decides_award: boolean;
   reason: string;
   table_quote: string;
   stated_total: number | null;
@@ -247,7 +256,9 @@ let seq = 0;
 
 export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod">, model: string): { sheet?: EvalSheet; reason?: string } {
   const flat = squash(text);
-  const raw = out.items.filter((i) => i.max > 0 || i.kind === "bonus");
+  // 표 합계 밖의 가감점은 배점 합에서 빼고 신뢰도 가감점(배점 0)으로 둔다
+  const outside = out.items.filter((i) => i.outside_total);
+  const raw = out.items.filter((i) => !i.outside_total && (i.max > 0 || i.kind === "bonus"));
   if (raw.length < 2) return { reason: "평가항목이 2개 미만" };
   // 같은 평가항목이 두 번 나오는 경우를 하나로 합친다
   // - 이름·원문 문구·배점이 모두 같으면 AI가 한 칸을 두 번 읽은 것
@@ -288,6 +299,10 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
       ...(i.criteria.length ? { criteria: i.criteria.slice(0, 8).map((c) => c.slice(0, 90)) } : {}),
     };
   });
+  for (const o of outside) {
+    if (!labelInText(o.label, flat)) continue;
+    items.push({ id: `ai${++seq}`, group: o.group.slice(0, 20) || "가감점", label: o.label.replace(/\s+/g, " ").trim().slice(0, 40), max: 0, kind: "bonus", basis: `합계 밖 가감점: ${o.quote.replace(/\s+/g, " ").trim().slice(0, 80)}`, ...(o.criteria.length ? { criteria: o.criteria.slice(0, 8).map((c) => c.slice(0, 90)) } : {}) });
+  }
   // 입찰가격 배점이 항목에 없고 따로 적혀 있으면 넣는다
   if (!items.some((i) => i.kind === "price") && out.price_total && out.price_total > 0) {
     items.push({ id: `ai${++seq}`, group: "입찰가격", label: "입찰가격", max: out.price_total, kind: "price", basis: `입찰가격 평가 ${out.price_total}점` });
@@ -317,7 +332,7 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
       source: "extracted",
       reader: { by: "ai", model },
       confidence: missing.length === 0 ? "높음" : "보통",
-      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...(mergedNames.length ? [`쪽이 넘어가며 다시 적힌 같은 평가항목을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
+      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...(outside.length ? [`합계 밖 가감점 ${outside.length}개는 배점 합에 넣지 않음`] : []), ...(mergedNames.length ? [`쪽이 넘어가며 다시 적힌 같은 평가항목을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
       ...(out.panel_rule ? { panelRule: out.panel_rule.slice(0, 120) } : {}),
     },
   };

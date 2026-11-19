@@ -11,6 +11,7 @@ import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
+import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
 import { awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
 import { makeAiInputs } from "./aiSheets";
@@ -54,6 +55,13 @@ async function main() {
         if (v !== undefined && bid.lowerLimitRate !== v) { bid.lowerLimitRate = v; fixed++; }
       }
       console.log(`낙찰하한율: 공고 값으로 ${fixed}건 바꿈`);
+      // 공동도급: 개방표준의 공동계약 여부(cmmnCntrctYn)는 '공동수급불허' 공고에도 Y 로 오는 일이 있어 공동수급 방식으로 바로잡는다
+      let joint = 0;
+      for (const bid of items) {
+        const ok = jointAllowed(r.quals[bid.id]?.info?.jointMethod);
+        if (ok !== undefined && bid.jointContract !== ok) { bid.jointContract = ok; joint++; }
+      }
+      console.log(`공동도급: 공동수급 방식으로 ${joint}건 바꿈, 기초금액 공개 ${s.withBase}건${s.baseFailedDays ? ` (기초금액 조회 실패 ${s.baseFailedDays}일분)` : ""}`);
     } catch (e) {
       console.warn("참가자격 수집 건너뜀:", e instanceof Error ? e.message : e);
     }

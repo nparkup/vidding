@@ -434,7 +434,7 @@ export function ScorePredictor() {
 
   return (
     <div className="space-y-6">
-    {/* 입력과 결과: 결과 패널의 sticky 범위를 이 두 칸으로 한정해 아래 평가표를 덮지 않게 한다 */}
+    {/* 입력과 결과: 결과 패널은 스크롤을 따라다니지 않고 제자리에 둔다 */}
     <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
       <div className="min-w-0 space-y-6">
         {/* 1. 공고 */}
@@ -594,7 +594,7 @@ export function ScorePredictor() {
       </div>
 
       {/* 결과: 사업자번호 조회 전에는 평가 기준만, 조회 후 참가 가능하면 예상 점수, 불가면 사유 */}
-      <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
+      <aside className="min-w-0 lg:self-start">
         {scoreStage === "criteria" && <CriteriaPanel sheet={active} passLabel={result.passLabel} />}
         {scoreStage === "checking" && (
           <section className="card p-6">

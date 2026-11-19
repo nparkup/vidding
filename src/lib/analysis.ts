@@ -190,6 +190,18 @@ export function documentChecklist(bid: Bid): { group: string; items: { name: str
       { name: "가격제안서", note: "별도 봉인 또는 전자 제출", required: true },
       { name: "청렴서약서·보안각서", required: true },
     ],
+    "규격가격동시입찰": [
+      { name: "규격서(제안서)·기술 증빙", note: "규격 적합 판정을 받아야 가격 개찰 대상", required: true },
+      { name: "산출내역서", required: true },
+    ],
+    "2단계경쟁": [
+      { name: "규격(기술)입찰서", note: "1단계 통과 업체만 가격입찰", required: true },
+      { name: "가격입찰서·산출내역서", required: true },
+    ],
+    "제한적최저가": [
+      { name: "산출내역서", required: true },
+      { name: "입찰금액 적정성 자료", note: "낙찰하한율 근처 투찰 시 요구될 수 있음", required: false },
+    ],
     "최저가": [
       { name: "산출내역서", required: true },
       { name: "입찰금액 적정성 자료", note: "저가 투찰 시 요구", required: false },
@@ -224,6 +236,9 @@ export function keyPoints(bid: Bid): string[] {
   if (bid.briefingAt) pts.push("현장설명회 참석이 필요할 수 있습니다. 일정을 확인하세요.");
   if (bid.contractMethod === "협상에 의한 계약") pts.push("제안서 평가 비중이 높아 준비 기간을 충분히 확보해야 합니다.");
   if (bid.contractMethod === "적격심사") pts.push(`적격심사 통과(통상 85점 이상) 후 낙찰하한율 ${bid.lowerLimitRate ?? 87.745}% 이상 최저가 순으로 결정됩니다.`);
+  if (bid.contractMethod === "규격가격동시입찰") pts.push("규격서 심사에서 적합 판정을 받은 업체만 가격 개찰 대상이 되고, 그중 예정가격 이하 최저가로 결정됩니다.");
+  if (bid.contractMethod === "2단계경쟁") pts.push("1단계 규격(기술)입찰을 통과한 업체만 2단계 가격입찰에 참가해 예정가격 이하 최저가로 결정됩니다.");
+  if (bid.contractMethod === "제한적최저가") pts.push(`평가 없이 낙찰하한율 ${bid.lowerLimitRate ?? 87.745}% 이상 투찰 중 가장 낮은 금액으로 결정됩니다.`);
   if (bid.category === "청소" || bid.category === "경비") pts.push("용역근로자 근로조건 보호지침 적용 대상: 노무비 산정 기준을 확인하세요.");
   return pts;
 }

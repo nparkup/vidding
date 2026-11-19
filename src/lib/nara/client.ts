@@ -99,7 +99,11 @@ function mapMethod(s?: string): ContractMethod {
   // 수의시담·수의시담(2인 이상)은 지정 업체와만 계약하는 건이라 소액수의견적과 따로 둔다
   if (s.includes("시담")) return "수의시담";
   if (s.includes("협상")) return "협상에 의한 계약";
-  if (s.includes("최저가") && !s.includes("제한적")) return "최저가";
+  // 아래 셋은 평가 배점표가 없고 가격(규격 적합 여부 포함)으로 정한다. 예전엔 적격심사로 섞였다
+  if (/규격\s*가격|규격.*동시/.test(s)) return "규격가격동시입찰";
+  if (s.includes("2단계")) return "2단계경쟁";
+  if (s.includes("제한적") && s.includes("최저가")) return "제한적최저가";
+  if (s.includes("최저가")) return "최저가";
   if (s.includes("수의")) return "수의계약(소액)";
   return "적격심사";
 }

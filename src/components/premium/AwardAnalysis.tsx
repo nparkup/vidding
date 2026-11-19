@@ -1,7 +1,7 @@
 "use client";
 
 import { won } from "@/lib/format";
-import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PastAward, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
+import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PastAward, type Related, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 
@@ -30,7 +30,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
   // 최근 낙찰 결과: 같은 사업 이력이 있으면 그것, 없으면 비슷한 공고의 최근 낙찰
   const recent: { key: string; date: string; winner: string; wr: number; amount: number; rate: number; bidders: number; title?: string }[] = analysis?.history.length
     ? analysis.history.slice(0, 3).map((h) => ({ key: h.no, date: h.date, winner: h.winner, wr: h.wr, amount: h.amount, rate: h.rate, bidders: h.bidders }))
-    : (analysis?.similar?.stat.ex ?? []).slice(0, 3).map(([no, title, , date, amount, rate, bidders, winner, wr]) => ({ key: no, date, winner, wr: wr ?? 0, amount, rate, bidders, title }));
+    : (analysis?.related?.ex ?? analysis?.similar?.stat.ex ?? []).slice(0, 3).map(([no, title, , date, amount, rate, bidders, winner, wr]) => ({ key: no, date, winner, wr: wr ?? 0, amount, rate, bidders, title }));
   return (
     <section className="card mt-4 p-6">
       <h3 className="font-bold">낙찰 결과로 본 예측</h3>
@@ -53,7 +53,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 비슷한 공고에 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
+                <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 공고명이 비슷한 다른 낙찰에서 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
               </dd>
             )}
           </div>
@@ -67,7 +67,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
                   <li key={r.key} className="min-w-0 px-3 py-1.5">
                     <div className="flex min-w-0 items-baseline justify-between gap-2">
                       <span className="min-w-0 truncate font-semibold">{r.winner}</span>
-                      <span className="shrink-0 font-bold tabular-nums">{won(r.amount)}</span>
+                      <span className="shrink-0 font-bold tabular-nums">{r.amount > 100 ? won(r.amount) : "금액 없음"}</span>
                     </div>
                     <p className="text-xs text-ink-500">
                       {[r.date, r.wr ? `개찰 ${r.wr}위` : "순위 확인 중", r.rate ? `낙찰률 ${pct(r.rate)}` : "", `${r.bidders}곳`].filter(Boolean).join(" · ")}
@@ -129,7 +129,7 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
     <section className="card min-w-0 p-6">
       <h3 className="text-lg font-bold">낙찰 결과 분석</h3>
       <p className="mt-1 text-sm text-ink-500">
-        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다. 아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.
+        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다. 권역·노선·학년 같은 대상이나 사업 종류(유지관리·구축·감리 등)가 다르거나 금액이 3배 넘게 차이 나는 공고는 같은 사업에서 뺐습니다. 아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.
       </p>
       {loading ? (
         <p className="mt-4 text-sm text-ink-300">낙찰 결과를 불러오는 중…</p>
@@ -137,10 +137,15 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
         <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 아직 낙찰 결과 분석이 없습니다. 사이트가 다시 만들어질 때(영업일 하루 세 번) 채워집니다.</p>
       ) : (
         <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-          <PriorCard prior={analysis.prior} />
+          <PriorCard prior={analysis.prior} years={analysis.cycleYears ?? 1} />
           <HistoryCard history={analysis.history} fc={fc} />
+          {analysis.related && (
+            <div className="min-w-0 lg:col-span-2">
+              <RelatedCard related={analysis.related} />
+            </div>
+          )}
           <div className="min-w-0 lg:col-span-2">
-            <SimilarCard similar={analysis.similar} bidRate={bidRate} floor={floor} isNego={isNego} />
+            <SimilarCard similar={analysis.similar} bidRate={bidRate} floor={floor} isNego={isNego} related={!!analysis.related} />
           </div>
         </div>
       )}
@@ -194,17 +199,18 @@ function RankList({ top, winner, plnprc }: { top: PastAward["top"]; winner?: str
   );
 }
 
-function PriorCard({ prior }: { prior?: PastAward }) {
+function PriorCard({ prior, years }: { prior?: PastAward; years: number }) {
+  const title = years > 1 ? `직전 계약 낙찰 결과 (${years}년 계약)` : "전년도 낙찰 결과";
   if (!prior) {
     return (
-      <Box title="전년도 낙찰 결과" sub="지금 공고 8~20개월 전, 같은 수요기관의 같은 사업">
+      <Box title={title} sub={years > 1 ? `지금 공고 약 ${years}년 전, 같은 수요기관의 같은 사업` : "지금 공고 8~20개월 전, 같은 수요기관의 같은 사업"}>
         <p className="text-sm text-ink-500">이 기간에 같은 수요기관이 낸 비슷한 이름의 공고를 찾지 못했습니다. 올해 처음 발주했거나 이름이 크게 바뀐 사업일 수 있습니다.</p>
       </Box>
     );
   }
   const pre = prior.plnprc && prior.base ? (prior.plnprc / prior.base) * 100 : 0;
   return (
-    <Box title="전년도 낙찰 결과" sub={`${prior.date} 낙찰 · 공고번호 ${prior.no} · 공고명 유사도 ${Math.round(prior.similarity * 100)}%`}>
+    <Box title={title} sub={`${prior.date} 낙찰 · 공고번호 ${prior.no} · 공고명 유사도 ${Math.round(prior.similarity * 100)}%`}>
       <p className="text-sm font-semibold leading-snug">{prior.title}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Fact label="낙찰률" value={prior.rate ? pct(prior.rate) : "-"} note={prior.derived ? "낙찰금액 ÷ 예정가격으로 계산" : prior.lwlt ? `하한율 ${pct(prior.lwlt)}` : METHOD_NAME[prior.method]} />
@@ -259,7 +265,7 @@ function HistoryCard({ history, fc }: { history: PastAward[]; fc: Forecast }) {
   );
 }
 
-function SimilarCard({ similar, bidRate, floor, isNego }: { similar?: AwardAnalysis["similar"]; bidRate: number; floor?: number; isNego: boolean }) {
+function SimilarCard({ similar, bidRate, floor, isNego, related }: { similar?: AwardAnalysis["similar"]; bidRate: number; floor?: number; isNego: boolean; related?: boolean }) {
   if (!similar) {
     return (
       <Box title="비슷한 공고 낙찰 결과" sub="최근 3년, 같은 업무·계약방법·금액대·분류">
@@ -288,7 +294,7 @@ function SimilarCard({ similar, bidRate, floor, isNego }: { similar?: AwardAnaly
             </ol>
           </div>
         )}
-        {s.winners.length > 0 && (
+        {!related && s.winners.length > 0 && (
           <div className="min-w-0">
             <p className="mb-2 text-xs font-semibold text-ink-500">자주 낙찰받은 업체</p>
             <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
@@ -298,7 +304,7 @@ function SimilarCard({ similar, bidRate, floor, isNego }: { similar?: AwardAnaly
             </ol>
           </div>
         )}
-        {s.ranked && s.ranked.length > 0 && (
+        {!related && s.ranked && s.ranked.length > 0 && (
           <div className="min-w-0">
             <p className="mb-2 text-xs font-semibold text-ink-500">개찰 1~5위에 자주 든 업체</p>
             <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
@@ -309,20 +315,55 @@ function SimilarCard({ similar, bidRate, floor, isNego }: { similar?: AwardAnaly
           </div>
         )}
       </div>
-      {s.ex && s.ex.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-semibold text-ink-500">최근 낙찰 예</p>
-          <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
-            {s.ex.map(([no, title, agency, date, amount, rate, bidders, winner, wr, top]) => (
-              <li key={no} className="min-w-0 px-3 py-2">
-                <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
-                <p className="mt-0.5 text-xs text-ink-500">{date} · {agency} · 낙찰가 {won(amount)} · 낙찰률 {rate ? pct(rate) : "-"} · {bidders}곳 · {winner}{wr ? ` (개찰 ${wr}위)` : ""}</p>
-                {top && top.length > 0 && <p className="mt-0.5 text-xs text-ink-300">1~{top.length}위: {top.map(([n, r], i) => `${i + 1}위 ${n} ${r ? pct(r) : ""}`).join(" · ")}</p>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {!related && s.ex && s.ex.length > 0 && <ExList ex={s.ex} />}
+    </Box>
+  );
+}
+
+function ExList({ ex, title = "최근 낙찰 예" }: { ex: NonNullable<SimilarStat["ex"]>; title?: string }) {
+  return (
+    <div className="mt-4">
+      <p className="mb-2 text-xs font-semibold text-ink-500">{title}</p>
+      <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
+        {ex.slice(0, 5).map(([no, title, agency, date, amount, rate, bidders, winner, wr, top]) => (
+          <li key={no} className="min-w-0 px-3 py-2">
+            <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
+            <p className="mt-0.5 text-xs text-ink-500">{[date, agency, amount > 100 ? `낙찰가 ${won(amount)}` : "", rate ? `낙찰률 ${pct(rate)}` : "", `${bidders}곳`, `${winner}${wr ? ` (개찰 ${wr}위)` : ""}`].filter(Boolean).join(" · ")}</p>
+            {top && top.length > 0 && <p className="mt-0.5 text-xs text-ink-300">1~{top.length}위: {top.map(([n, r], i) => `${i + 1}위 ${n} ${r ? pct(r) : ""}`).join(" · ")}</p>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function NameCounts({ title, rows, unit }: { title: string; rows: [string, number][]; unit: string }) {
+  if (!rows.length) return null;
+  return (
+    <div className="min-w-0">
+      <p className="mb-2 text-xs font-semibold text-ink-500">{title}</p>
+      <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
+        {rows.slice(0, 6).map(([name, c]) => (
+          <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0 truncate">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}{unit}</span></li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** 공고명 핵심어가 같은 다른 낙찰 (기관 무관, 최근 3년) */
+function RelatedCard({ related: r }: { related: Related }) {
+  return (
+    <Box title="공고명이 비슷한 낙찰 결과" sub={`최근 3년, 다른 기관 포함 ${r.n.toLocaleString()}건 · 핵심어 ${r.terms.join(", ")}`}>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <Fact label="낙찰률 중앙값" value={r.rate ? pct(r.rate.q[1]) : "-"} note={r.rate ? `가운데 절반 ${pct(r.rate.q[0], 2)} ~ ${pct(r.rate.q[2], 2)}` : "낙찰률 자료 부족"} />
+        <Fact label="참가업체 수" value={r.bidders ? `${Math.round(r.bidders.q[1])}곳` : "-"} note={r.bidders ? `보통 ${Math.round(r.bidders.q[0])} ~ ${Math.round(r.bidders.q[2])}곳` : undefined} />
+      </div>
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+        <NameCounts title="자주 낙찰받은 업체" rows={r.winners} unit="건" />
+        <NameCounts title="개찰 1~5위에 자주 든 업체" rows={r.ranked} unit="회" />
+      </div>
+      <ExList ex={r.ex} title="공고명이 가장 비슷한 낙찰" />
     </Box>
   );
 }

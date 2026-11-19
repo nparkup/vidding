@@ -53,6 +53,12 @@ jobs:
       MAX_MINUTES: ${{ inputs.max_minutes || (github.event.schedule == '40 15 * * *' && '300') || '100' }}
       RANK_DRY: ${{ inputs.rank_dry && '1' || '' }}
       NODE_OPTIONS: --max-old-space-size=11264
+      # 색인만 다시 만들 때 '같은 사업' 확인을 실제로 몇 건 시험해 토큰을 찍는다 (공고당 약 0.3원)
+      ANTHROPIC_API_KEY: ${{ inputs.mode == 'index' && secrets.ANTHROPIC_API_KEY || '' }}
+      RELATE_TRIAL: ${{ inputs.mode == 'index' && '200' || '' }}
+      # 색인만 다시 만들 때 사이트의 이 공고들을 고치기 전·후로 분석해 찍는다
+      CHECK_NOTICES: ${{ inputs.mode == 'index' && 'R26BK01838632' || '' }}
+      SITE_URL: https://nparkup.github.io/vidding
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

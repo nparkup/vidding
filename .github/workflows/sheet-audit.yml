@@ -35,6 +35,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           AI_SHEET_MODEL: ${{ vars.AI_SHEET_MODEL }}
           IDS: ${{ inputs.ids }}
+          DUMP_TEXT: "1"
         run: npx tsx --conditions=react-server scripts/score/ai-sheet-try.ts "$IDS"
       - name: 대조
         if: inputs.days != '' || inputs.ids == ''

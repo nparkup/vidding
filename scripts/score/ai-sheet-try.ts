@@ -122,6 +122,7 @@ async function one(label: string, bid: Bid, files: { name: string; text: string 
   const all = files.map((f) => f.text).join("\n");
   console.log(`\n==================== ${label}\n${bid.title} | ${bid.contractMethod} | 기술:가격 ${basis?.techRatio ?? "-"}:${basis?.priceRatio ?? "-"}`);
   for (const f of files) console.log(`파일: ${f.name} (${f.text.length}자)`);
+  if (process.env.DUMP_TEXT) for (const f of files) console.log(`\n##### 원문 ${f.name}\n${f.text}\n##### 끝 ${f.name}`);
   const rule = extractSheet(all, templateSheet(bid, basis));
   console.log(`--- 규칙 파서: ${rule ? `${rule.items.length}개 항목, 화면 사용 ${adoptable(rule, basis) ? "가능" : "불가"}` : "없음"}`);
   if (rule) console.log(fmt(rule));

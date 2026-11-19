@@ -41,7 +41,11 @@ export const CATEGORIES: ServiceCategory[] = Object.values(CATEGORY_GROUPS).flat
 export const FACILITY_CATEGORIES: ServiceCategory[] = ["청소", "시설관리", "경비", "방역·소독", "통합관리"];
 
 /** 수의시담: 계약상대자를 정해 두고 가격만 협의하는 건 (정보공개용 공고, 지정 업체 외 참가 불가) */
-export type ContractMethod = "적격심사" | "협상에 의한 계약" | "최저가" | "수의계약(소액)" | "수의시담";
+/**
+ * 규격가격동시입찰: 규격 적합 업체 중 예정가격 이하 최저가 / 2단계경쟁: 규격(기술)입찰 통과자만 가격입찰 /
+ * 제한적최저가: 낙찰하한율 이상 최저가, 평가 없음
+ */
+export type ContractMethod = "적격심사" | "협상에 의한 계약" | "규격가격동시입찰" | "2단계경쟁" | "제한적최저가" | "최저가" | "수의계약(소액)" | "수의시담";
 
 export interface Bid {
   id: string;               // bidNtceNo-bidNtceOrd

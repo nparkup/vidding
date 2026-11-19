@@ -99,6 +99,16 @@ const FAMILY: { family: MethodFamily; re: RegExp; who: string; decide: string; s
   },
 ];
 
+const FALLBACK_FAMILY: Partial<Record<Bid["contractMethod"], MethodFamily>> = {
+  "적격심사": "적격심사",
+  "협상에 의한 계약": "협상에 의한 계약",
+  "규격가격동시입찰": "규격가격동시입찰",
+  "2단계경쟁": "2단계경쟁",
+  "제한적최저가": "제한적최저가",
+  "최저가": "최저가",
+  "수의계약(소액)": "소액수의견적",
+};
+
 /** 계약방법(일반·제한·지명경쟁, 수의계약)에 따른 참가 범위 */
 function contractWho(contract?: string): string | undefined {
   if (!contract) return undefined;
@@ -117,7 +127,7 @@ export function methodProfile(bid: Pick<Bid, "contractMethod" | "awardRaw" | "co
     : bid.contractMethod === "수의시담"
       ? { family: "수의시담", open: false, closedReason: FAMILY[0].closed, who: FAMILY[0].who, decide: FAMILY[0].decide, scoring: "none" }
       : {
-          family: bid.contractMethod === "협상에 의한 계약" ? "협상에 의한 계약" : bid.contractMethod === "최저가" ? "최저가" : bid.contractMethod === "수의계약(소액)" ? "소액수의견적" : bid.contractMethod === "적격심사" ? "적격심사" : "기타",
+          family: FALLBACK_FAMILY[bid.contractMethod] ?? "기타",
           open: true,
           who: "공고의 참가자격을 갖춘 업체",
           decide: "공고서의 낙찰자 결정 방법에 따름",

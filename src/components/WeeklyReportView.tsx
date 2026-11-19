@@ -302,7 +302,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
 function LeadAnalysis({ r }: { r: MatchResult }) {
   const b = r.bid;
   const guide = bidPriceGuide(b);
-  const priceBased = b.contractMethod === "적격심사" || b.contractMethod === "최저가";
+  const priceBased = b.contractMethod === "적격심사" || b.contractMethod === "최저가" || b.contractMethod === "제한적최저가" || b.contractMethod === "규격가격동시입찰" || b.contractMethod === "2단계경쟁";
   const points = keyPoints(b);
   const timeline: [string, string | undefined][] = [
     ["공고 게시", b.postedAt],

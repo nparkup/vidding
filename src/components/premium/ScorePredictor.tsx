@@ -55,9 +55,12 @@ type AiRead = "idle" | "reading" | "done" | "none" | "fail";
  */
 async function loadAiSheet(bid: Bid): Promise<EvalSheet | null> {
   const r = await fetch(`${CORP_API}?${new URLSearchParams({ aisheet: bid.id })}`);
-  if (!r.ok) throw new Error(`AI 판독 ${r.status}`);
+  if (!r.ok) throw new Error(`배점표 판독 ${r.status}`);
   const j = (await r.json()) as { status: string; sheet?: EvalSheet };
-  return j.status === "ok" && j.sheet ? j.sheet : null;
+  if (j.status !== "ok" || !j.sheet) return null;
+  // 예전에 저장된 판독 결과의 제목·메모에 남은 'AI 판독' 표기를 지운다
+  const clean = (s: string) => s.replace(/\s*\(AI 판독\)/g, "").replace(/^AI 판독:\s*/, "배점표 원문: ");
+  return { ...j.sheet, title: clean(j.sheet.title), notes: j.sheet.notes.map(clean) };
 }
 
 /** 전년도 낙찰률 통계: 정적 배포는 빌드 때 만든 파일, 서버 배포는 같은 경로의 라우트 */
@@ -452,16 +455,16 @@ export function ScorePredictor() {
               <>
                 {aiRead === "reading" ? (
                   <div className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
-                    <p>AI가 공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 10~30초 걸립니다. 그동안은 기준표로 계산합니다.</p>
-                    <LoadingBar label="AI 배점표 판독 중" />
+                    <p>공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 10~30초 걸립니다. 그동안은 기준표로 계산합니다.</p>
+                    <LoadingBar label="배점표 판독 중" />
                   </div>
                 ) : (docs.sheet || docs.files.length > 0) && (
                   <p className={`rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
                     {docs.sheet?.reader?.by === "ai"
-                      ? `AI가 공고 첨부에서 평가항목 ${docs.sheet.items.length}개를 읽었습니다. 원문 문구와 배점 합계 확인을 통과해 원문 배점으로 계산합니다.`
+                      ? `공고 첨부의 배점표에서 평가항목 ${docs.sheet.items.length}개를 읽었습니다. 원문 문구와 배점 합계 확인을 통과해 원문 배점으로 계산합니다.`
                       : docs.sheet
                         ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
-                        : `이 공고의 첨부에서 평가 배점표를 ${aiRead === "fail" ? "읽지 못했습니다(AI 판독 일시 오류)" : "찾지 못했습니다"}. 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}
+                        : `이 공고의 첨부에서 평가 배점표를 ${aiRead === "fail" ? "읽지 못했습니다(판독 일시 오류)" : "찾지 못했습니다"}. 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}
                   </p>
                 )}
                 {docs.files.length > 0 && (
@@ -680,7 +683,7 @@ export function ScorePredictor() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">
-            <span className="chip">{active.source === "extracted" ? `공고 원문 배점${active.reader?.by === "ai" ? "(AI 판독)" : ""} · 신뢰도 ${active.confidence}` : active.noticeFacts?.length ? `기준표 + 공고서 기준 ${active.noticeFacts.length}가지` : "기준표"}</span>
+            <span className="chip">{active.source === "extracted" ? `공고 원문 배점 · 신뢰도 ${active.confidence}` : active.noticeFacts?.length ? `기준표 + 공고서 기준 ${active.noticeFacts.length}가지` : "기준표"}</span>
             {sheet && <button type="button" className="text-xs font-semibold text-ink-500 hover:text-ink" onClick={() => setSheet(null)}>공고 기준으로 되돌리기</button>}
           </div>
         </div>
@@ -782,7 +785,7 @@ function DetailLines({ text, className = "" }: { text: string; className?: strin
 function AiReadNote() {
   return (
     <p className="mt-2 text-xs leading-relaxed text-ink-500">
-      공고 첨부의 배점표를 AI가 읽어 정리했습니다. 항목 이름이 원문에 있는지, 배점 합계가 100점이고 나라장터에 등록된 기술·가격 배점과 맞는지 확인을 통과한 경우에만 씁니다. 제출 전 공고 원문으로 한 번 더 확인하세요.
+      공고 첨부의 배점표를 읽어 정리했습니다. 항목 이름이 원문에 있는지, 배점 합계가 100점이고 나라장터에 등록된 기술·가격 배점과 맞는지 확인을 통과한 경우에만 씁니다. 제출 전 공고 원문으로 한 번 더 확인하세요.
     </p>
   );
 }
@@ -794,7 +797,7 @@ function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: str
     <section className="card overflow-hidden">
       <div className="p-6">
         <p className="text-sm text-ink-500">평가 기준</p>
-        <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? `공고 첨부의 평가표${sheet.reader?.by === "ai" ? " (AI 판독)" : ""}` : sheet.criteria?.name ?? `${sheet.method} 기준표`} · {max}점 만점</p>
+        <p className="mt-1 text-lg font-bold">{sheet.source === "extracted" ? "공고 첨부의 평가표" : sheet.criteria?.name ?? `${sheet.method} 기준표`} · {max}점 만점</p>
         {sheet.criteria && <p className="mt-1 text-xs text-ink-500">{sheet.criteria.status} · {sheet.criteria.source}</p>}
         {passLabel && <p className="mt-1 text-sm text-ink-500">통과 기준 {passLabel}</p>}
         {sheet.reader?.by === "ai" && <AiReadNote />}

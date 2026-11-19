@@ -16,5 +16,5 @@ export async function generateStaticParams() {
 export async function GET(_req: Request, { params }: { params: Promise<{ file: string }> }) {
   const id = (await params).file.replace(/\.json$/, "");
   const extracted = (await getExtractedSheets())[id];
-  return Response.json({ files: (await getAttachments())[id] ?? [], sheet: extracted?.sheet, sheetFile: extracted?.file, notice: extracted?.notice, quant: extracted?.quant, qual: (await getQualifications())[id] });
+  return Response.json({ files: (await getAttachments())[id] ?? [], sheet: extracted?.sheet, sheetFile: extracted?.file, notice: extracted?.notice, quant: extracted?.quant, ai: extracted?.ai ? extracted.ai.hash : undefined, qual: (await getQualifications())[id] });
 }

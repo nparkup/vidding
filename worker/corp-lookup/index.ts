@@ -10,15 +10,27 @@
  * 낙찰 저장소 (R2 버킷 bidmate-awards, scripts/awards/collect.ts 가 매일 채운다):
  * - GET /?awards=사업자번호&biz=용역 : 그 업체의 최근 3년 낙찰을 공고 분류와 함께. 조달청 API를 부르지 않는다 (6시간 캐시)
  * - GET /?awardmeta=1 : 저장소 수집 범위·완료 여부
+ *
+ * 공고 배점표 AI 판독 (src/lib/nara/aiSheet.ts):
+ * - GET /?aisheet=공고번호-차수 : 사이트가 빌드 때 만든 /ai-input/{공고}.json 본문을 Claude로 읽어 검증한 배점표를 돌려준다.
+ *   결과는 R2 ai-sheets/v{버전}/{공고}-{본문 해시}.json 에 두어 같은 공고는 한 번만 부른다. 키는 Worker 비밀값 ANTHROPIC_API_KEY.
  */
 import { lookupCompany, normalizeBizno, validBizno } from "../../src/lib/corpLookup";
 import { fetchNtceClasses, fetchWins, perfBizOf } from "../../src/lib/perfLookup";
 import { readAwards, type R2BucketLike } from "../../src/lib/awards/read";
+import Anthropic from "@anthropic-ai/sdk";
+import { AI_SHEET_VERSION, readAiInput, type AiInput, type AiSheetResult } from "../../src/lib/nara/aiSheet";
 
 interface Env {
   DATA_GO_KR_SERVICE_KEY: string;
   /** 낙찰 저장소 (wrangler.toml r2_buckets). 없으면 ?awards 는 ready:false */
-  AWARDS?: R2BucketLike;
+  AWARDS?: R2BucketLike & { put(key: string, value: string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown> };
+  /** 공고 배점표 AI 판독용 Anthropic API 키 (Worker 비밀값). 없으면 ?aisheet 는 503 */
+  ANTHROPIC_API_KEY?: string;
+  /** AI 판독 모델 (기본 claude-haiku-5-5) */
+  AI_SHEET_MODEL?: string;
+  /** AI 판독 입력을 읽어 올 사이트 주소, 예: https://nparkup.github.io/vidding */
+  SITE_URL?: string;
   /** 쉼표로 구분한 허용 Origin, 예: https://nparkup.github.io,http://localhost:3000 */
   ALLOWED_ORIGINS?: string;
 }
@@ -45,6 +57,28 @@ export default {
         return json(r, 200, { "Cache-Control": "public, max-age=3600" });
       } catch (e) {
         return json({ error: (e as Error).message, ready: false }, 400);
+      }
+    }
+    if (sp.has("aisheet")) {
+      const id = sp.get("aisheet") ?? "";
+      if (!/^[A-Za-z0-9-]{6,40}$/.test(id)) return json({ error: "올바른 공고번호가 아닙니다." }, 400);
+      if (!env.ANTHROPIC_API_KEY || !env.SITE_URL) return json({ status: "off" }, 503);
+      try {
+        // 본문은 사이트가 만든 파일에서만 읽는다 (브라우저가 보낸 글은 쓰지 않는다)
+        const r = await fetch(`${env.SITE_URL.replace(/\/$/, "")}/ai-input/${encodeURIComponent(id)}.json`, { cf: { cacheTtl: 600 } } as RequestInit);
+        if (!r.ok) return json({ status: "none", reason: "판독할 본문 없음" });
+        const input = (await r.json()) as AiInput & { none?: boolean };
+        if (input.none || !input.text || input.v !== AI_SHEET_VERSION) return json({ status: "none", reason: "판독할 본문 없음" });
+        const key = `ai-sheets/v${AI_SHEET_VERSION}/${id}-${input.hash}.json`;
+        const hit = await env.AWARDS?.get(key);
+        if (hit) return json(JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())), 200, { "X-Cache": "HIT" });
+        const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 120_000 });
+        const result: AiSheetResult = await readAiInput(client, input, env.AI_SHEET_MODEL || undefined);
+        // 일시 오류는 캐시하지 않는다. 표 없음·검증 탈락은 다시 불러도 같으므로 캐시해 비용을 막는다
+        if (result.status !== "error" && env.AWARDS) ctx.waitUntil(env.AWARDS.put(key, JSON.stringify(result), { httpMetadata: { contentType: "application/json" } }));
+        return json(result);
+      } catch (e) {
+        return json({ status: "error", reason: (e as Error).message.slice(0, 200) }, 502);
       }
     }
     if (!env.DATA_GO_KR_SERVICE_KEY) return json({ error: "중계 서버에 공공데이터포털 인증키가 없습니다." }, 503);

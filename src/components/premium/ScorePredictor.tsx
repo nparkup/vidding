@@ -8,7 +8,7 @@ import {
   CREDIT_GRADES, DEFAULT_COMPANY, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
-import { bidSheet, TECH_GRADES } from "@/lib/criteria";
+import { adoptable, bidSheet, TECH_GRADES } from "@/lib/criteria";
 import type { NoticeCriteria } from "@/lib/noticeCriteria";
 import { won } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
@@ -29,7 +29,7 @@ const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium
 /** 유사 실적(나라장터 낙찰 이력) 조회: 정적 사이트는 같은 중계 서버, 서버 배포는 자체 API */
 const PERF_API = STATIC ? CORP_API : "/api/premium/perf";
 
-interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
+interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; /** AI 판독 입력이 있으면 그 본문 해시 */ ai?: string; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
 
 /** 정적 배포는 빌드 때 공고별로 만들어 둔 파일(첨부 목록 + 첨부에서 추출한 평가표)을, 서버 배포는 나라장터 첨부 목록을 바로 조회한다 */
 async function loadBidDocs(bid: Bid): Promise<BidDocs> {
@@ -40,6 +40,19 @@ async function loadBidDocs(bid: Bid): Promise<BidDocs> {
   if (!r.ok) return { files: [] };
   const j = await r.json();
   return Array.isArray(j) ? { files: j } : j;
+}
+
+type AiRead = "idle" | "reading" | "done" | "none" | "fail";
+
+/**
+ * 규칙 파서가 배점표를 못 읽은 공고: 중계 서버에 AI 판독을 부탁한다 (서버가 빌드 때 만든 본문으로 Claude를 부르고 결과를 캐시한다).
+ * 처음 읽는 공고는 10~30초 걸리고, 같은 공고는 캐시에서 바로 온다.
+ */
+async function loadAiSheet(bid: Bid): Promise<EvalSheet | null> {
+  const r = await fetch(`${CORP_API}?${new URLSearchParams({ aisheet: bid.id })}`);
+  if (!r.ok) throw new Error(`AI 판독 ${r.status}`);
+  const j = (await r.json()) as { status: string; sheet?: EvalSheet };
+  return j.status === "ok" && j.sheet ? j.sheet : null;
 }
 
 /** 전년도 낙찰률 통계: 정적 배포는 빌드 때 만든 파일, 서버 배포는 같은 경로의 라우트 */
@@ -126,6 +139,7 @@ export function ScorePredictor() {
 
   // 공고를 고르면 첨부 목록과, 첨부에서 미리 추출해 둔 평가표를 불러온다 (없으면 표준 평가표)
   const [docs, setDocs] = useState<BidDocs | null>(null);
+  const [aiRead, setAiRead] = useState<AiRead>("idle");
   // 공고의 낙찰방법 세부·낙찰하한율·추정가격으로 그 공고에 맞는 기준표를 고른다
   const basis = docs?.qual?.basis;
   const template = useMemo(() => (bid ? templateSheet(bid, basis) : null), [bid, basis]);
@@ -156,8 +170,21 @@ export function ScorePredictor() {
     let alive = true;
     setDocs(null);
     setSheet(null);
+    setAiRead("idle");
     loadBidDocs(bid)
-      .then((d) => { if (alive) setDocs(d); })
+      .then((d) => {
+        if (!alive) return;
+        setDocs(d);
+        // 원문 배점표를 쓸 수 없고 AI 판독 입력이 있으면 그 자리에서 읽는다
+        if (!d.ai || !STATIC || !CORP_API || (d.sheet && adoptable(d.sheet, d.qual?.basis))) return;
+        setAiRead("reading");
+        loadAiSheet(bid)
+          .then((s) => {
+            if (!alive) return;
+            if (s) { setDocs({ ...d, sheet: s, sheetFile: undefined }); setAiRead("done"); } else setAiRead("none");
+          })
+          .catch(() => alive && setAiRead("fail"));
+      })
       .catch(() => alive && setDocs({ files: [] }));
     return () => { alive = false; };
   }, [bid]);
@@ -347,11 +374,18 @@ export function ScorePredictor() {
               <p className="text-sm text-ink-300">첨부파일 확인 중…</p>
             ) : (
               <>
-                {(docs.sheet || docs.files.length > 0) && (
+                {aiRead === "reading" ? (
+                  <div className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
+                    <p>AI가 공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 10~30초 걸립니다. 그동안은 기준표로 계산합니다.</p>
+                    <LoadingBar label="AI 배점표 판독 중" />
+                  </div>
+                ) : (docs.sheet || docs.files.length > 0) && (
                   <p className={`rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
-                    {docs.sheet
-                      ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
-                      : `이 공고의 첨부에서 평가 배점표를 찾지 못해 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}
+                    {docs.sheet?.reader?.by === "ai"
+                      ? `AI가 공고 첨부에서 평가항목 ${docs.sheet.items.length}개를 읽었습니다. 원문 문구와 배점 합계 확인을 통과해 원문 배점으로 계산합니다.`
+                      : docs.sheet
+                        ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
+                        : `이 공고의 첨부에서 평가 배점표를 ${aiRead === "fail" ? "읽지 못했습니다(AI 판독 일시 오류)" : "찾지 못했습니다"}. 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}
                   </p>
                 )}
                 {docs.files.length > 0 && (

@@ -3,6 +3,7 @@ import { inflateRawSync } from "zlib";
 import type { Bid, BidAttachment } from "../types";
 import { extractQuantBlock, extractSheet, templateSheet, type EvalItem, type EvalSheet } from "../evalscore";
 import { readNoticeCriteria, type NoticeCriteria } from "../noticeCriteria";
+import type { AiInput } from "./aiSheet";
 import { hwpText } from "./hwpText";
 
 /**
@@ -22,6 +23,8 @@ export interface ExtractedSheet {
   notice?: NoticeCriteria;
   /** 협상 제안요청서의 정량평가 표 */
   quant?: { items: EvalItem[]; total: number; quote: string };
+  /** 규칙 파서가 배점표를 못 읽은 공고의 AI 판독 입력 (/ai-input/{공고}.json 으로 나간다) */
+  ai?: AiInput;
 }
 
 const LIKELY = /(평가|심사|제안요청|과업|공고문|입찰공고|규격)/;

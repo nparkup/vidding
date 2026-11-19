@@ -1,21 +1,31 @@
-import "server-only";
-import { createHash } from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Bid } from "../types";
+import { adoptable } from "../criteria";
 import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type ScoreBand } from "../evalscore";
 
 /**
- * 규칙 파서가 배점표를 못 읽은 공고의 첨부 본문을 Claude에 보내 그 공고의 배점표를 읽는다 (배포 빌드 때만).
- * - 키(ANTHROPIC_API_KEY)는 GitHub Actions secret 으로만 받는다. 없으면 이 단계는 건너뛴다.
- * - 문서 전체가 아니라 배점·평가 관련 부분만 잘라 보낸다 (excerpt).
- * - 답은 그대로 쓰지 않는다: 항목 이름이 원문에 있는지, 배점 합계가 100점(기술+가격)과 맞는지 확인해
- *   통과한 것만 평가표로 돌려준다 (toSheet). 화면에서는 다시 criteria.ts adoptable 로 공고 기술·가격 비율과 대조한다.
- * - 결과(못 읽은 경우 포함)는 본문 해시와 함께 캐시해 같은 공고를 다시 보내지 않는다 (fetch-bids.ts).
+ * 규칙 파서가 배점표를 못 읽은 공고의 첨부 본문을 Claude에 보내 그 공고의 배점표를 읽는다.
+ * - 빌드는 AI를 부르지 않는다: 후보 공고의 평가 관련 본문만 잘라(excerpt) /ai-input/{공고}.json 으로 내보낸다.
+ * - 평가점수 예측에서 그 공고를 고르면 중계 서버(worker/corp-lookup ?aisheet=)가 그 본문으로 한 번 부르고 결과를 R2에 캐시한다.
+ *   키(ANTHROPIC_API_KEY)는 Worker 비밀값에만 있다. 본문은 사이트가 만든 것만 쓰므로 아무 글이나 보내 키를 쓸 수는 없다.
+ * - 답은 그대로 쓰지 않는다: 항목 이름이 원문에 있는지, 배점 합계가 100점(기술+가격)과 맞는지, 나라장터 기술·가격 배점과
+ *   맞는지(criteria.ts adoptable) 확인해 통과한 것만 평가표로 돌려준다.
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
 export const AI_SHEET_VERSION = 1;
-export const DEFAULT_AI_MODEL = "claude-opus-5-5";
+export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
+
+/** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
+export interface AiInput {
+  v: number;
+  /** text 의 해시 (캐시 키) */
+  hash: string;
+  text: string;
+  bid: Pick<Bid, "id" | "title" | "contractMethod" | "agency">;
+  techRatio?: number;
+  priceRatio?: number;
+}
 
 export interface AiSheetResult {
   v: number;
@@ -64,8 +74,6 @@ export function excerpt(text: string): string {
   }
   return out.join("\n");
 }
-
-export const hashOf = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 16);
 
 /* ---------- Claude 호출 ---------- */
 
@@ -144,7 +152,7 @@ const SYSTEM = `당신은 한국 공공조달(나라장터) 입찰공고의 첨�
 
 export async function readSheetWithAI(
   client: Anthropic,
-  bid: Pick<Bid, "id" | "title" | "contractMethod" | "bizType" | "agency">,
+  bid: Pick<Bid, "id" | "title" | "contractMethod" | "agency">,
   text: string,
   opts: { model?: string; techRatio?: number; priceRatio?: number } = {},
 ): Promise<Omit<AiSheetResult, "hash" | "v" | "at">> {
@@ -155,11 +163,9 @@ export async function readSheetWithAI(
     bid.agency ? `공고기관: ${bid.agency}` : "",
     opts.techRatio !== undefined ? `나라장터에 등록된 기술:가격 배점 = ${opts.techRatio}:${opts.priceRatio ?? "?"}` : "",
   ].filter(Boolean).join("\n");
-  const msg = await client.beta.messages.stream({
+  const msg = await client.messages.stream({
     model,
     max_tokens: 32000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA as unknown as Record<string, unknown> } },
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: `${hint}\n\n다음은 이 공고 첨부 문서에서 평가 관련 부분을 뽑은 본문입니다.\n<document>\n${text}\n</document>` }],
@@ -172,7 +178,16 @@ export async function readSheetWithAI(
   try { out = JSON.parse(raw) as AiOut; } catch { return { model, status: "error", reason: "JSON 해석 실패", usage }; }
   if (!out.found) return { model, status: "none", reason: out.reason.slice(0, 200), usage };
   const r = toSheet(out, text, bid, model);
-  return r.sheet ? { model, status: "ok", sheet: r.sheet, usage } : { model, status: "rejected", reason: r.reason, usage };
+  if (!r.sheet) return { model, status: "rejected", reason: r.reason, usage };
+  // 나라장터에 등록된 기술·가격 배점과도 맞아야 화면에서 쓴다
+  if (!adoptable(r.sheet, { techRatio: opts.techRatio, priceRatio: opts.priceRatio })) return { model, status: "rejected", reason: "나라장터 기술·가격 배점과 다름", usage };
+  return { model, status: "ok", sheet: r.sheet, usage };
+}
+
+/** 중계 서버가 쓰는 진입점: 빌드가 만든 입력 하나를 읽는다 */
+export async function readAiInput(client: Anthropic, input: AiInput, model?: string): Promise<AiSheetResult> {
+  const r = await readSheetWithAI(client, input.bid, input.text, { model, techRatio: input.techRatio, priceRatio: input.priceRatio });
+  return { ...r, v: AI_SHEET_VERSION, hash: input.hash, at: new Date().toISOString() };
 }
 
 /* ---------- 검증 ---------- */

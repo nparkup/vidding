@@ -6,6 +6,9 @@ workers_dev = true
 
 [vars]
 ALLOWED_ORIGINS = "https://nparkup.github.io,http://localhost:3000"
+# 공고 배점표 AI 판독: 입력 파일(/ai-input/{공고}.json)을 읽어 올 사이트와 모델. 키는 비밀값 ANTHROPIC_API_KEY
+SITE_URL = "https://nparkup.github.io/vidding"
+AI_SHEET_MODEL = "claude-haiku-5-5"
 
 # 낙찰 3년치 저장소. scripts/awards/collect.ts (.github/workflows/awards.yml) 가 채운다
 [[r2_buckets]]

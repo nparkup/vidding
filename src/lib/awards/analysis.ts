@@ -580,15 +580,13 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const all = a.history;
   const h = all.filter((x) => x.bidders !== 1);
   const st = a.similar?.stat;
+  // 공고명이 비슷한 다른 기관 낙찰은 참가 예상 기업과 예시에만 쓴다 (되짚어 보기에서 낙찰률·참가업체 수 예측은 업무·금액대 묶음이 더 맞았다)
   const rel = a.related;
 
   // 참가업체 수: 같은 사업 이력이 2건 이상이면 그 분포, 아니면 비슷한 공고 분포. 전년도 값이 있으면 근거에 같이 적는다
   const hb = h.map((x) => x.bidders).filter((n) => n > 0).sort((x, y) => x - y);
   if (hb.length >= 2) {
     out.bidders = { q: [Math.round(quantile(hb, 0.25)), Math.round(quantile(hb, 0.5)), Math.round(quantile(hb, 0.75))], basis: `과거 같은 사업 ${hb.length}건` };
-  } else if (rel?.bidders && rel.bidders.n >= 5) {
-    const q = [...rel.bidders.q].map((n) => Math.round(n)) as [number, number, number];
-    out.bidders = { q, basis: `공고명이 비슷한 낙찰 ${rel.bidders.n}건` };
   } else if (st) {
     const q = st.bidders.q.map((n) => Math.round(n)) as [number, number, number];
     if (a.prior?.bidders) q[1] = Math.round((q[1] + a.prior.bidders) / 2);
@@ -610,7 +608,6 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const hr = h.map((x) => x.rate).filter((r) => r > 50 && r <= 110);
   if (hr.length >= 2) out.winRate = { value: r3(median(hr)), basis: `과거 같은 사업 ${hr.length}건 중앙값` };
   else if (a.prior?.rate) out.winRate = { value: a.prior.rate, basis: "전년도 같은 사업" };
-  else if (rel?.rate && rel.rate.n >= 5) out.winRate = { value: rel.rate.q[1], basis: `공고명이 비슷한 낙찰 ${rel.rate.n}건 중앙값` };
   else if (st?.rate) out.winRate = { value: r3(st.rate.q[2]), basis: `비슷한 공고 ${st.rate.n.toLocaleString()}건 중앙값` };
 
   // 협상: 개찰 1위(가장 낮은) 투찰률. 같은 사업 이력 > 전년도 > 비슷한 공고 > 낙찰률

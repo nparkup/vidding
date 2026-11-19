@@ -843,7 +843,8 @@ async function checkNotices(ix: Awaited<ReturnType<typeof buildIndexes>>) {
   let items: Record<string, unknown>[] = [];
   try {
     const r = await fetch(`${site.replace(/\/$/, "")}/bids-data.json`);
-    items = ((await r.json()) as { items: Record<string, unknown>[] }).items;
+    const j = (await r.json()) as Record<string, unknown>[] | { items: Record<string, unknown>[] };
+    items = Array.isArray(j) ? j : j.items ?? [];
   } catch (e) {
     console.log(`CHECK 사이트 공고를 읽지 못함: ${(e as Error).message}`);
     return;

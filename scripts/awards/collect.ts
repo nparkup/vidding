@@ -34,6 +34,7 @@ import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
 import {
   AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, forecast, methodCode, METHOD_NAME, quantile, r3, similarKey,
   type AgencyIndexFile,
+  KW_MIN_DF, KW_ROWS, keywords, kwBucket, type KwIndexFile, type KwLookup, type KwPosting, type KwRow,
   type AwardAnalysis, type AgencyRow, type SimilarIndexFile, type SimilarStat,
 } from "../../src/lib/awards/analysis";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
@@ -537,6 +538,7 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
     const ix = await buildIndexes([...shards.values()].flat(), async (key, body) => { await r2Put(key, body, "application/gzip"); writeLocal(key, body); return true; });
     printSamples(ix);
     const trial = backtest(ix);
+    await checkNotices(ix);
     await relateTrial(trial);
     return { rows, shards: keys.length };
   }
@@ -626,7 +628,7 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
 /** 비슷한 공고 묶음마다 저장하는 최근 낙찰 예 수 (화면은 지금 공고명과 겹치는 5건만 고른다) */
 const SIMILAR_EX = 15;
 
-async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer) => Promise<boolean>): Promise<{ rows: ShardRow[]; buckets: AgencyIndexFile[]; similar: SimilarIndexFile }> {
+async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer) => Promise<boolean>): Promise<{ rows: ShardRow[]; buckets: AgencyIndexFile[]; similar: SimilarIndexFile; kw: KwLookup }> {
   // 공고 1건당 1줄: 같은 공고번호는 낙찰금액이 가장 큰 줄 (분류가 여럿인 공고)
   const byNo = new Map<string, ShardRow>();
   for (const r of all) {
@@ -709,7 +711,38 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
   const body = gz(out);
   await upload("idx/similar.json.gz", body);
   console.log(`분석 색인: 비슷한 공고 묶음 ${Object.keys(out.groups).length.toLocaleString()}개 (${since}~, ${fmtGB(body.length)})`);
-  return { rows, buckets, similar: out };
+
+  // 3. 공고명 핵심어 색인 (최근 SIMILAR_YEARS 년, 기관 무관)
+  const df = new Map<string, number>();
+  const post = new Map<string, KwRow[]>();
+  let kwN = 0;
+  for (const r of rows) {
+    if (r[9] < since) break;
+    kwN++;
+    const kr: KwRow = [r[2], r[5], r[6], r[9], r[4], r[7], r[8] > 50 && r[8] <= 110 ? r[8] : 0, r[10], methodCode(r[11]), r[20], r[1], winnerRank(r),
+      r[25].slice(0, 5).map((x) => [x[2], x[4]] as [string, number])];
+    for (const k of keywords(r[5])) {
+      df.set(k, (df.get(k) ?? 0) + 1);
+      const p = post.get(k) ?? post.set(k, []).get(k)!;
+      if (p.length < KW_ROWS) p.push(kr);
+    }
+  }
+  const kwFiles: KwIndexFile[] = Array.from({ length: AGENCY_BUCKETS }, () => ({ v: 1, n: kwN, kw: {} }));
+  let kwCount = 0;
+  for (const [k, d] of df) {
+    if (d < KW_MIN_DF) continue;
+    kwFiles[Number(kwBucket(k))].kw[k] = { df: d, rows: post.get(k)! };
+    kwCount++;
+  }
+  let kwBytes = 0;
+  for (let i = 0; i < kwFiles.length; i++) {
+    const b = gz(kwFiles[i]);
+    kwBytes += b.length;
+    await upload(`idx/kw/${String(i).padStart(2, "0")}.json.gz`, b);
+  }
+  console.log(`분석 색인: 공고명 핵심어 ${kwCount.toLocaleString()}개 (공고 ${kwN.toLocaleString()}건, ${fmtGB(kwBytes)})`);
+  const kw: KwLookup = { n: kwN, get: (k: string): KwPosting | undefined => kwFiles[Number(kwBucket(k))].kw[k] };
+  return { rows, buckets, similar: out, kw };
 }
 
 /**
@@ -729,7 +762,7 @@ function printSamples(ix: Awaited<ReturnType<typeof buildIndexes>>) {
         postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined },
         lowerLimitRate: r[22] || undefined,
       };
-      const a = analyzeBid(target, ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]], ix.similar.groups, range);
+      const a = analyzeBid(target, ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]], ix.similar.groups, range, { kw: ix.kw });
       if (a.history.length < 3 || !a.prior || !a.similar) continue;
       used.add(r[2]); used.add(r[6]);
       console.log(`SAMPLE_ANALYSIS ${JSON.stringify({ target, actual: { rate: r[8], bidders: r[10], winner: r[1], amount: r[7] }, analysis: a })}`);
@@ -762,7 +795,7 @@ function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { a: AwardAnaly
       postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined },
     };
     const rows = ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]];
-    const pair = { old: analyzeBid(target, rows, ix.similar.groups, range, { legacy: true }), now: analyzeBid(target, rows, ix.similar.groups, range) };
+    const pair = { old: analyzeBid(target, rows, ix.similar.groups, range, { legacy: true }), now: analyzeBid(target, rows, ix.similar.groups, range, { kw: ix.kw }) };
     for (const kind of ["old", "now"] as const) {
       const a = pair[kind];
       const fc = forecast(a, { contractMethod: target.contractMethod, lowerLimitRate: r[22] || undefined });
@@ -800,6 +833,33 @@ function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { a: AwardAnaly
   }
   for (const d of diffs) console.log(d);
   return trial;
+}
+
+/** 지금 사이트에 있는 공고 몇 건(CHECK_NOTICES)을 고치기 전·후로 분석해 찍는다 */
+async function checkNotices(ix: Awaited<ReturnType<typeof buildIndexes>>) {
+  const nos = (process.env.CHECK_NOTICES || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const site = process.env.SITE_URL;
+  if (!nos.length || !site) return;
+  let items: Record<string, unknown>[] = [];
+  try {
+    const r = await fetch(`${site.replace(/\/$/, "")}/bids-data.json`);
+    items = ((await r.json()) as { items: Record<string, unknown>[] }).items;
+  } catch (e) {
+    console.log(`CHECK 사이트 공고를 읽지 못함: ${(e as Error).message}`);
+    return;
+  }
+  const range = { from: "", to: "" };
+  for (const no of nos) {
+    const b = items.find((x) => x.bidNtceNo === no) as unknown as Parameters<typeof analyzeBid>[0] & { lowerLimitRate?: number } | undefined;
+    if (!b) { console.log(`CHECK ${no}: 사이트에 없음`); continue; }
+    const rows = ix.buckets[Number(agencyBucket(b.demandAgency))].agencies[b.demandAgency];
+    for (const kind of ["old", "now"] as const) {
+      const a = analyzeBid(b, rows, ix.similar.groups, range, kind === "old" ? { legacy: true } : { kw: ix.kw });
+      const fc = forecast(a, b);
+      const ex = a.related?.ex ?? a.similar?.stat.ex ?? [];
+      console.log(`CHECK ${kind === "old" ? "전" : "후"} ${no} ${b.title} (${b.demandAgency}) | 전년도: ${a.prior?.title ?? "없음"} | 같은 사업 ${a.history.length}건 | 비슷한 공고: ${a.related ? `핵심어 ${a.related.terms.join("·")} ${a.related.n}건` : a.similar?.label ?? "없음"} | 참가 예상: ${(fc.likely ?? []).slice(0, 6).map((x) => x.name).join(", ")} | 최근 낙찰 예: ${ex.slice(0, 4).map((e) => `${e[1]}(${e[7]})`).join(" / ")}`);
+    }
+  }
 }
 
 /** 애매한 후보 확인 시험: RELATE_TRIAL 건만큼 실제로 Claude에 물어 토큰과 판단을 찍는다 (ANTHROPIC_API_KEY 가 있을 때만) */

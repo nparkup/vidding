@@ -10,7 +10,7 @@ import { similarity, titleKey, type PriorTarget } from "../../src/lib/nara/award
 import type { AwardStats, PriorMatch, RateStat } from "../../src/lib/rivalRate";
 import type { Bid } from "../../src/lib/types";
 import { r2Get } from "./r2";
-import { agencyBucket, analyzeBid, type AgencyIndexFile, type AwardAnalysis, type SimilarIndexFile } from "../../src/lib/awards/analysis";
+import { agencyBucket, analyzeBid, keywords, kwBucket, type AgencyIndexFile, type AwardAnalysis, type KwIndexFile, type KwLookup, type SimilarIndexFile } from "../../src/lib/awards/analysis";
 
 const canUse = () => !!process.env.R2_LOCAL_DIR || (!!process.env.CLOUDFLARE_API_TOKEN && !!process.env.CLOUDFLARE_ACCOUNT_ID);
 
@@ -93,6 +93,14 @@ export async function awardAnalysesFromR2(items: Bid[]): Promise<Record<string, 
     (need.get(k) ?? need.set(k, []).get(k)!).push(b);
   }
   const range = { from: "", to: similar.to };
+  // 공고명 핵심어 색인: 지금 공고들의 핵심어가 든 파일만 받는다 (색인이 아직 없으면 핵심어 비교 없이 간다)
+  const kwFiles = new Map<string, KwIndexFile>();
+  for (const k of new Set(items.flatMap((b) => keywords(b.title).map(kwBucket)))) {
+    const gz = await r2Get(`idx/kw/${k}.json.gz`).catch(() => null);
+    if (gz) kwFiles.set(k, JSON.parse(gunzipSync(gz).toString("utf8")) as KwIndexFile);
+  }
+  const anyKw = [...kwFiles.values()][0];
+  const kw: KwLookup | undefined = anyKw ? { n: anyKw.n, get: (k) => kwFiles.get(kwBucket(k))?.kw[k] } : undefined;
   const out: Record<string, AwardAnalysis> = {};
   for (const [k, bids] of need) {
     const gz = await r2Get(`idx/agency/${k}.json.gz`).catch(() => null);
@@ -100,7 +108,7 @@ export async function awardAnalysesFromR2(items: Bid[]): Promise<Record<string, 
     for (const b of bids) {
       const rows = file?.agencies[b.demandAgency];
       if (rows?.length && (!range.from || rows[rows.length - 1][2] < range.from)) range.from = rows[rows.length - 1][2];
-      out[b.id] = analyzeBid(b, rows, similar.groups, range);
+      out[b.id] = analyzeBid(b, rows, similar.groups, range, { kw });
     }
   }
   return out;

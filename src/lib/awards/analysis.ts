@@ -77,6 +77,72 @@ export const SIMILAR_YEARS = 3;
 /** 이보다 적은 묶음은 통계를 내지 않는다 */
 export const SIMILAR_MIN = 5;
 
+/* ---------- 공고명 핵심어 색인 ---------- */
+
+/**
+ * 핵심어 색인 한 줄 (최근 3년 낙찰 공고 1건): 기관과 상관없이 공고명 핵심어가 같은 공고를 찾는다.
+ * idx/kw/{00~63}.json.gz : 핵심어 해시로 나눈 파일. 핵심어마다 df(그 핵심어가 든 공고 수)와 최근 공고 KW_ROWS건
+ */
+export type KwRow = [
+  no: string, title: string, agency: string, date: string, biz: AwardBiz, amount: number, rate: number, bidders: number,
+  method: MethodCode, base: number, winner: string, wr: number, top: [name: string, rate: number][],
+];
+export interface KwPosting { df: number; rows: KwRow[] }
+export interface KwIndexFile { v: 1; /** 전체 공고 수 */ n: number; kw: Record<string, KwPosting> }
+export const KW_ROWS = 20;
+/** 이보다 적은 공고에만 나온 핵심어는 색인하지 않는다 */
+export const KW_MIN_DF = 2;
+export const kwBucket = (k: string) => agencyBucket(`kw:${k}`);
+
+/** 핵심어로 치지 않는 흔한 말 */
+const KW_STOP = new Set([
+  "용역", "사업", "운영", "위탁", "구매", "공고", "입찰", "재공고", "긴급", "변경", "정정", "관리", "제작", "설치", "공사", "물품", "대행", "지원",
+  "선정", "업체", "업체선정", "추진", "단가", "계약", "연간", "및", "등", "외", "년", "년도", "학년도", "소액수의", "견적", "협상", "제안", "수의",
+  "일반", "제한", "경쟁", "개소", "관련", "신규", "기타", "추가", "분", "차", "회", "월", "월분", "상반기", "하반기", "분기", "위한", "의", "를", "에",
+  "위탁운영", "운영위탁", "용역사업", "사업자", "사업수행", "수행", "통합", "제", "호", "건", "식", "개", "종", "기", "구입", "임차", "보수", "정비",
+]);
+/** 핵심어 끝에 붙는 흔한 말: 떼어 낸 앞부분도 핵심어로 넣는다 (예: 선택적복지제도 → 선택적복지) */
+const KW_SUFFIX = ["용역", "사업", "운영", "위탁", "대행", "구매", "관리", "제도", "업무", "서비스", "공사", "지원", "구축", "개발", "설치", "제작", "물품", "사업자"];
+export function keywords(title: string): string[] {
+  const t = title
+    .replace(/\(?(긴급|재공고|재입찰|변경|정정)\)?/g, " ")
+    .replace(/(19|20)\d{2}\s*(학년도|년도|년)?/g, " ")
+    .replace(/\d+/g, " ");
+  const out = new Set<string>();
+  for (let tok of t.split(/[^가-힣A-Za-z]+/)) {
+    if (tok.length < 2) continue;
+    tok = tok.toUpperCase();
+    if (!KW_STOP.has(tok)) out.add(tok);
+    // 뒤에 붙은 흔한 말을 떼어 낸다 (여러 번)
+    for (let i = 0; i < 3; i++) {
+      const suf = KW_SUFFIX.find((x) => tok.endsWith(x) && tok.length - x.length >= 2);
+      if (!suf) break;
+      tok = tok.slice(0, -suf.length);
+      if (!KW_STOP.has(tok)) out.add(tok);
+    }
+  }
+  return [...out];
+}
+
+/** 공고명이 비슷한 다른 낙찰 (기관 무관, 최근 3년) */
+export interface Related {
+  /** 찾은 공고 수 */
+  n: number;
+  /** 겹친 핵심어 (무거운 순) */
+  terms: string[];
+  /** 공고명이 가장 비슷한 낙찰 (최대 8건). SimilarStat.ex 와 같은 꼴 */
+  ex: NonNullable<SimilarStat["ex"]>;
+  /** 자주 낙찰받은 업체, 개찰 1~5위에 자주 든 업체 (낙찰 제외) */
+  winners: [string, number][];
+  ranked: [string, number][];
+  /** 낙찰률 [25%, 50%, 75%]와 표본 수 (1곳 수의계약 제외) */
+  rate?: { q: [number, number, number]; n: number };
+  /** 참가업체 수 [25%, 50%, 75%]와 표본 수 */
+  bidders?: { q: [number, number, number]; n: number };
+}
+/** 비슷한 공고로 볼 핵심어 가중 Dice 하한 */
+export const RELATED_MIN = 0.35;
+
 /* ---------- 통계 도구 ---------- */
 
 export const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -151,6 +217,8 @@ export interface AwardAnalysis {
   cycleYears?: number;
   /** 같은 사업인지 애매한 후보 (최대 10건). 화면에서 확인을 거쳐 이력에 넣는다 */
   maybe?: PastAward[];
+  /** 공고명 핵심어가 같은 다른 낙찰 (기관 무관) */
+  related?: Related;
   /** 애매한 후보 확인용 지금 공고 정보 */
   subject?: { title: string; agency: string; baseAmount: number; postedAt: string };
   /** 애매한 후보 중 같은 사업으로 확인되어 이력에 넣은 공고번호 */
@@ -317,7 +385,7 @@ function dedupeBatches<T extends { r: AgencyRow; s: number }>(xs: T[]): T[] {
   return kept;
 }
 
-export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined, groups: Record<string, SimilarStat>, range: { from: string; to: string }, opts: { legacy?: boolean } = {}): AwardAnalysis {
+export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined, groups: Record<string, SimilarStat>, range: { from: string; to: string }, opts: { legacy?: boolean; kw?: KwLookup } = {}): AwardAnalysis {
   const biz = t.bizType === "공사" || t.bizType === "물품" ? t.bizType : "용역";
   const key = titleKey(t.title);
   const posted = t.postedAt.slice(0, 10);
@@ -356,8 +424,60 @@ export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined
   const out: AwardAnalysis = { v: 1, builtAt: new Date().toISOString(), range, prior, history, similar: pickSimilar(t, groups, key) };
   if (years > 1) out.cycleYears = years;
   // 애매한 후보가 있으면 확인용으로 지금 공고 정보를 같이 둔다 (중계 서버가 이 파일만 읽고 묻는다)
+  const rel = opts.kw ? relatedAwards(t, opts.kw) : undefined;
+  if (rel) out.related = rel;
   if (maybe.length) { out.maybe = maybe; out.subject = { title: t.title, agency: t.demandAgency, baseAmount: t.baseAmount, postedAt: posted }; }
   return out;
+}
+
+export interface KwLookup { n: number; get(k: string): KwPosting | undefined }
+
+/** 공고명 핵심어가 같은 다른 낙찰: 핵심어마다 흔한 정도(df)로 무게를 매겨 가중 Dice가 RELATED_MIN 이상인 것 */
+export function relatedAwards(t: AnalyzeTarget, kw: KwLookup): Related | undefined {
+  const biz = t.bizType === "공사" || t.bizType === "물품" ? t.bizType : "용역";
+  const posted = t.postedAt.slice(0, 10);
+  const terms = keywords(t.title);
+  const w = (k: string) => { const p = kw.get(k); return p ? Math.log((kw.n + 1) / (p.df + 1)) : Math.log(kw.n + 1); };
+  const tw = new Map(terms.map((k) => [k, w(k)]));
+  const tSum = [...tw.values()].reduce((a, b) => a + b, 0);
+  const seen = new Map<string, KwRow>();
+  for (const k of terms) for (const r of kw.get(k)?.rows ?? []) if (r[4] === biz && r[0] !== t.bidNtceNo && r[3] < posted) seen.set(r[0], r);
+  const scored = [...seen.values()].map((r) => {
+    const rk = keywords(r[1]);
+    let common = 0, rSum = 0;
+    const used: string[] = [];
+    for (const k of rk) { const x = tw.get(k) ?? w(k); rSum += x; if (tw.has(k)) { common += x; used.push(k); } }
+    return { r, s: tSum + rSum > 0 ? (2 * common) / (tSum + rSum) : 0, used };
+  }).filter((x) => x.s >= RELATED_MIN && !kindsDiffer(t.title, x.r[1]));
+  if (scored.length < 3) return undefined;
+  scored.sort((a, b) => b.s - a.s || b.r[3].localeCompare(a.r[3]));
+  const top = scored.slice(0, 30);
+  const cnt = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+  const wins = new Map<string, number>(), ranked = new Map<string, number>(), usedT = new Map<string, number>();
+  for (const { r, used } of top) {
+    if (r[10]) cnt(wins, r[10]);
+    for (const [name] of r[12]) if (name && name !== r[10]) cnt(ranked, name);
+    for (const k of used) usedT.set(k, tw.get(k) ?? 0);
+  }
+  const q3 = (v: number[]) => { const x = [...v].sort((a, b) => a - b); return [r3(quantile(x, 0.25)), r3(quantile(x, 0.5)), r3(quantile(x, 0.75))] as [number, number, number]; };
+  const rates = top.filter(({ r }) => r[7] !== 1 && r[6] > 50 && r[6] <= 110).map(({ r }) => r[6]);
+  const bids = top.filter(({ r }) => r[7] > 1).map(({ r }) => r[7]);
+  const out: Related = {
+    n: scored.length,
+    terms: [...usedT].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 4),
+    ex: top.slice(0, 8).map(({ r }) => [r[0], r[1], r[2], r[3], r[5], r[6], r[7], r[10], r[11], r[12].map(([n, x]) => [n, x] as RankCell)]),
+    winners: [...wins].sort((a, b) => b[1] - a[1]).slice(0, 8),
+    ranked: [...ranked].sort((a, b) => b[1] - a[1]).slice(0, 8),
+  };
+  if (rates.length >= 3) out.rate = { q: q3(rates), n: rates.length };
+  if (bids.length >= 3) out.bidders = { q: q3(bids), n: bids.length };
+  return out;
+}
+/** 사업 종류만 본다 (다른 기관끼리는 권역·노선 같은 구분어가 달라도 비슷한 공고다) */
+function kindsDiffer(a: string, b: string): boolean {
+  for (const [, re] of EXCLUSIVE) if (re.test(a) !== re.test(b)) return true;
+  const ka = kinds(a), kb = kinds(b);
+  return ka.size > 0 && kb.size > 0 && ![...ka].some((k) => kb.has(k));
 }
 
 /** 비슷한 공고 묶음 고르기. 최근 낙찰 예는 공고명이 조금이라도 겹치는 것만 (가까운 순 5건) */
@@ -429,7 +549,7 @@ export interface LikelyBidder {
 }
 
 /** 참가 예상 기업 (최대 n곳) */
-export function likelyBidders(h: PastAward[], st: SimilarStat | undefined, n = 8): LikelyBidder[] {
+export function likelyBidders(h: PastAward[], st: Pick<SimilarStat, "winners" | "ranked"> | undefined, n = 8): LikelyBidder[] {
   const m = new Map<string, LikelyBidder>();
   const get = (name: string, from: LikelyBidder["from"]) => m.get(name) ?? m.set(name, { name, wins: 0, top: 0, from }).get(name)!;
   for (const x of h) {
@@ -460,11 +580,15 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const all = a.history;
   const h = all.filter((x) => x.bidders !== 1);
   const st = a.similar?.stat;
+  const rel = a.related;
 
   // 참가업체 수: 같은 사업 이력이 2건 이상이면 그 분포, 아니면 비슷한 공고 분포. 전년도 값이 있으면 근거에 같이 적는다
   const hb = h.map((x) => x.bidders).filter((n) => n > 0).sort((x, y) => x - y);
   if (hb.length >= 2) {
     out.bidders = { q: [Math.round(quantile(hb, 0.25)), Math.round(quantile(hb, 0.5)), Math.round(quantile(hb, 0.75))], basis: `과거 같은 사업 ${hb.length}건` };
+  } else if (rel?.bidders && rel.bidders.n >= 5) {
+    const q = [...rel.bidders.q].map((n) => Math.round(n)) as [number, number, number];
+    out.bidders = { q, basis: `공고명이 비슷한 낙찰 ${rel.bidders.n}건` };
   } else if (st) {
     const q = st.bidders.q.map((n) => Math.round(n)) as [number, number, number];
     if (a.prior?.bidders) q[1] = Math.round((q[1] + a.prior.bidders) / 2);
@@ -486,6 +610,7 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const hr = h.map((x) => x.rate).filter((r) => r > 50 && r <= 110);
   if (hr.length >= 2) out.winRate = { value: r3(median(hr)), basis: `과거 같은 사업 ${hr.length}건 중앙값` };
   else if (a.prior?.rate) out.winRate = { value: a.prior.rate, basis: "전년도 같은 사업" };
+  else if (rel?.rate && rel.rate.n >= 5) out.winRate = { value: rel.rate.q[1], basis: `공고명이 비슷한 낙찰 ${rel.rate.n}건 중앙값` };
   else if (st?.rate) out.winRate = { value: r3(st.rate.q[2]), basis: `비슷한 공고 ${st.rate.n.toLocaleString()}건 중앙값` };
 
   // 협상: 개찰 1위(가장 낮은) 투찰률. 같은 사업 이력 > 전년도 > 비슷한 공고 > 낙찰률
@@ -540,7 +665,8 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
     const [name, count] = [...c].sort((x, y) => y[1] - x[1])[0] ?? ["", 0];
     if (count >= 2) out.incumbent = { name, count, total: all.length };
   }
-  const likely = likelyBidders(all, st);
+  // 비슷한 공고는 공고명 핵심어로 찾은 것 우선. 업무·금액대만 같은 넓은 묶음의 업체는 쓰지 않는다
+  const likely = likelyBidders(all, rel ? { winners: rel.winners, ranked: rel.ranked } : a.similar && !a.similar.key.endsWith("|*") ? st : undefined);
   if (likely.length) out.likely = likely;
   return out;
 }

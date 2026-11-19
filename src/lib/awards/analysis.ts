@@ -410,14 +410,17 @@ export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined
   const scored = base.map(({ r, i }) => {
     const plain = similarity(key, ks[i]);
     const w = plain >= MAYBE_PLAIN ? weightedSimilarity(key, ks[i], idf) : 0;
-    const hard = plain >= MAYBE_PLAIN ? (differentProject(t.title, r[1]) ?? (amountFar(t.baseAmount, r) ? "금액" : undefined)) : "유사도";
-    return { r, s: Math.min(plain, w), plain, w, hard };
+    const hard = plain >= MAYBE_PLAIN ? differentProject(t.title, r[1]) : "유사도";
+    // 금액이 3배 넘게 차이 나면 확실한 같은 사업에서는 빼고 애매한 후보로 넘긴다 (단가·총액 표기가 섞인 공고가 있어서)
+    const far = plain >= MAYBE_PLAIN && amountFar(t.baseAmount, r);
+    return { r, s: Math.min(plain, w), plain, w, hard, far };
   }).filter((x) => !x.hard);
-  const sure = dedupeBatches(once(scored.filter((x) => x.plain >= SAME_PROJECT && x.w >= SAME_WEIGHTED)));
+  const isSure = (x: (typeof scored)[number]) => !x.far && x.plain >= SAME_PROJECT && x.w >= SAME_WEIGHTED;
+  const sure = dedupeBatches(once(scored.filter(isSure)));
   const history = sortRecent(sure).slice(0, 10).map(({ r, s }) => toPast(r, s));
   // 애매한 후보: 확실한 것과 같은 묶음(형제 공고)이 아닌 것만, 최근 10건
   const near = (r: AgencyRow) => sure.some((k) => Math.abs(Date.parse(k.r[2]) - Date.parse(r[2])) <= BATCH_DAYS * 86400e3);
-  const maybe = sortRecent(dedupeBatches(once(scored.filter((x) => !(x.plain >= SAME_PROJECT && x.w >= SAME_WEIGHTED) && x.w >= MAYBE_WEIGHTED && !near(x.r)))))
+  const maybe = sortRecent(dedupeBatches(once(scored.filter((x) => !isSure(x) && (x.w >= MAYBE_WEIGHTED || x.far) && !near(x.r)))))
     .slice(0, 10).map(({ r, s }) => toPast(r, s));
   const years = contractYears(t.title);
   const prior = pickPrior(history, posted, years);

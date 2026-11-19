@@ -858,6 +858,7 @@ async function checkNotices(ix: Awaited<ReturnType<typeof buildIndexes>>) {
       const a = analyzeBid(b, rows, ix.similar.groups, range, kind === "old" ? { legacy: true } : { kw: ix.kw });
       const fc = forecast(a, b);
       const ex = a.related?.ex ?? a.similar?.stat.ex ?? [];
+      if (kind === "now") console.log(`SAMPLE_ANALYSIS ${JSON.stringify({ target: b, analysis: a })}`);
       console.log(`CHECK ${kind === "old" ? "전" : "후"} ${no} ${b.title} (${b.demandAgency}) | 전년도: ${a.prior?.title ?? "없음"} | 같은 사업 ${a.history.length}건 | 비슷한 공고: ${a.related ? `핵심어 ${a.related.terms.join("·")} ${a.related.n}건` : a.similar?.label ?? "없음"} | 참가 예상: ${(fc.likely ?? []).slice(0, 6).map((x) => x.name).join(", ")} | 최근 낙찰 예: ${ex.slice(0, 4).map((e) => `${e[1]}(${e[7]})`).join(" / ")}`);
     }
   }

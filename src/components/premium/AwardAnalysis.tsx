@@ -28,13 +28,34 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
   if (!fc.competition && !fc.winRate) return null;
   const prePrice = fc.pre && baseAmount ? Math.round((baseAmount * fc.pre.value) / 100) : 0;
   // 최근 낙찰 결과: 같은 사업 이력이 있으면 그것, 없으면 비슷한 공고의 최근 낙찰
+  const prior = analysis?.prior;
+  const years = analysis?.cycleYears ?? 1;
   const recent: { key: string; date: string; winner: string; wr: number; amount: number; rate: number; bidders: number; title?: string }[] = analysis?.history.length
-    ? analysis.history.slice(0, 3).map((h) => ({ key: h.no, date: h.date, winner: h.winner, wr: h.wr, amount: h.amount, rate: h.rate, bidders: h.bidders }))
+    ? analysis.history.filter((h) => h.no !== prior?.no).slice(0, 3).map((h) => ({ key: h.no, date: h.date, winner: h.winner, wr: h.wr, amount: h.amount, rate: h.rate, bidders: h.bidders }))
     : (analysis?.related?.ex ?? analysis?.similar?.stat.ex ?? []).slice(0, 3).map(([no, title, , date, amount, rate, bidders, winner, wr]) => ({ key: no, date, winner, wr: wr ?? 0, amount, rate, bidders, title }));
   return (
     <section className="card mt-4 p-6">
       <h3 className="font-bold">낙찰 결과로 본 예측</h3>
       <dl className="mt-3 space-y-3 text-sm">
+        {analysis && (
+          <div>
+            <dt className="text-ink-500">{years > 1 ? `직전 계약 낙찰 (${years}년 계약)` : "전년도 낙찰"}</dt>
+            {prior ? (
+              <dd className="mt-1 rounded-xl border border-ink-100 bg-ink-50 px-3 py-2">
+                <div className="flex min-w-0 items-baseline justify-between gap-2">
+                  <span className="min-w-0 truncate text-base font-bold">{prior.winner || "업체명 없음"}</span>
+                  <span className="shrink-0 text-base font-bold tabular-nums">{prior.amount > 100 ? won(prior.amount) : "금액 없음"}</span>
+                </div>
+                <p className="mt-0.5 text-xs text-ink-500">
+                  {[prior.date, prior.wr ? `개찰 ${prior.wr}위` : "", prior.rate ? `낙찰률 ${pct(prior.rate)}` : "", prior.bidders ? `${prior.bidders.toLocaleString()}곳 참가` : ""].filter(Boolean).join(" · ")}
+                </p>
+                <p className="truncate text-xs text-ink-300">{prior.title}</p>
+              </dd>
+            ) : (
+              <dd className="mt-0.5 text-xs text-ink-500">같은 수요기관의 같은 사업 낙찰 기록을 찾지 못했습니다.</dd>
+            )}
+          </div>
+        )}
         {fc.competition && (
           <div>
             <dt className="flex items-center justify-between gap-2">

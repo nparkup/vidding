@@ -2,7 +2,7 @@
  * AI 배점표 판독 시험: 공고번호(또는 로컬 PDF·HWP 파일)를 받아 규칙 파서 결과와 AI 판독 결과를 나란히 출력한다. 배포는 하지 않는다.
  * 사용: ANTHROPIC_API_KEY=... DATA_GO_KR_SERVICE_KEY=... npx tsx --conditions=react-server scripts/score/ai-sheet-try.ts R26BK01826659[,공고번호…]
  *       ANTHROPIC_API_KEY=... npx tsx --conditions=react-server scripts/score/ai-sheet-try.ts ./공고.pdf
- * 나라장터 첨부 서버(g2b.go.kr)는 GitHub Actions 에서만 닿는다 (sheet-audit.yml 의 ids 입력).
+ * 나라장터 첨부 서버(g2b.go.kr)는 GitHub Actions 에서만 닿는다 (sheet-audit.yml 의 ids 입력). DUMP_TEXT=1 이면 첨부 원문 전체를 출력한다.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { existsSync, readFileSync } from "fs";
@@ -122,6 +122,7 @@ async function one(label: string, bid: Bid, files: { name: string; text: string 
   const all = files.map((f) => f.text).join("\n");
   console.log(`\n==================== ${label}\n${bid.title} | ${bid.contractMethod} | 기술:가격 ${basis?.techRatio ?? "-"}:${basis?.priceRatio ?? "-"}`);
   for (const f of files) console.log(`파일: ${f.name} (${f.text.length}자)`);
+  if (process.env.DUMP_TEXT) for (const f of files) console.log(`\n##### 원문 ${f.name}\n${f.text}\n##### 끝 ${f.name}`);
   const rule = extractSheet(all, templateSheet(bid, basis));
   console.log(`--- 규칙 파서: ${rule ? `${rule.items.length}개 항목, 화면 사용 ${adoptable(rule, basis) ? "가능" : "불가"}` : "없음"}`);
   if (rule) console.log(fmt(rule));

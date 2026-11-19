@@ -14,6 +14,8 @@
  * 공고 배점표 AI 판독 (src/lib/nara/aiSheet.ts):
  * - GET /?aisheet=공고번호-차수 : 사이트가 빌드 때 만든 /ai-input/{공고}.json 본문을 Claude로 읽어 검증한 배점표를 돌려준다.
  *   결과는 R2 ai-sheets/v{버전}/{공고}-{본문 해시}.json 에 두어 같은 공고는 한 번만 부른다. 키는 Worker 비밀값 ANTHROPIC_API_KEY.
+ *   빌드가 첨부를 다 읽지 못한 공고(/attachments/{공고}.json 에 read 가 없음)는 여기서 첨부를 모두 받아 읽는다
+ *   (src/lib/nara/liveSheet.ts, 같은 파일명은 하나만, 나라장터 주소만). 결과는 R2 ai-sheets/v{버전}/{공고}-live-{첨부 해시}.json
  * - GET /?relate=공고번호-차수 : 사이트의 /award-analysis/{공고}.json 에 있는 '같은 사업인지 애매한 후보'와 '핵심어로 찾은 다른 기관 낙찰'을 Claude로 확인한다
  *   (src/lib/awards/relate.ts). 결과는 R2 ai-relate/v{버전}/{공고}-{후보 해시}.json
  */
@@ -24,6 +26,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { RELATE_VERSION, relateAll, relateHash, type RelateResult } from "../../src/lib/awards/relate";
 import type { AwardAnalysis } from "../../src/lib/awards/analysis";
 import { AI_SHEET_VERSION, readAiInput, type AiInput, type AiSheetResult } from "../../src/lib/nara/aiSheet";
+import { liveKey, readSheetLive, type LiveDocs } from "../../src/lib/nara/liveSheet";
 
 interface Env {
   DATA_GO_KR_SERVICE_KEY: string;
@@ -35,6 +38,8 @@ interface Env {
   AI_SHEET_MODEL?: string;
   /** AI 판독 입력을 읽어 올 사이트 주소, 예: https://nparkup.github.io/vidding */
   SITE_URL?: string;
+  /** 그 자리에서 첨부를 받을 때 허용하는 호스트 (쉼표 구분, 기본 www.g2b.go.kr) */
+  ATTACH_HOSTS?: string;
   /** 쉼표로 구분한 허용 Origin, 예: https://nparkup.github.io,http://localhost:3000 */
   ALLOWED_ORIGINS?: string;
 }
@@ -69,10 +74,26 @@ export default {
       if (!env.ANTHROPIC_API_KEY || !env.SITE_URL) return json({ status: "off" }, 503);
       try {
         // 본문은 사이트가 만든 파일에서만 읽는다 (브라우저가 보낸 글은 쓰지 않는다)
-        const r = await fetch(`${env.SITE_URL.replace(/\/$/, "")}/ai-input/${encodeURIComponent(id)}.json`, { cf: { cacheTtl: 600 } } as RequestInit);
-        if (!r.ok) return json({ status: "none", reason: "판독할 본문 없음" });
-        const input = (await r.json()) as AiInput & { none?: boolean };
-        if (input.none || !input.text || input.v !== AI_SHEET_VERSION) return json({ status: "none", reason: "판독할 본문 없음" });
+        const site = env.SITE_URL.replace(/\/$/, "");
+        const r = await fetch(`${site}/ai-input/${encodeURIComponent(id)}.json`, { cf: { cacheTtl: 600 } } as RequestInit);
+        const input = r.ok ? ((await r.json()) as AiInput & { none?: boolean }) : undefined;
+        if (!input || input.none || !input.text || input.v !== AI_SHEET_VERSION) {
+          // 빌드가 첨부를 다 읽지 못한 공고는 여기서 첨부를 모두 받아 읽는다 (첨부 목록은 사이트 파일에서만)
+          const d = await fetch(`${site}/attachments/${encodeURIComponent(id)}.json`, { cf: { cacheTtl: 600 } } as RequestInit);
+          if (!d.ok) return json({ status: "none", reason: "판독할 본문 없음" });
+          const docs = (await d.json()) as LiveDocs;
+          if (docs.read || !docs.files?.length) return json({ status: "none", reason: "첨부를 모두 읽었으나 배점표 없음" });
+          const lkey = `ai-sheets/v${AI_SHEET_VERSION}/${id}-live-${liveKey(docs)}.json`;
+          const lhit = await env.AWARDS?.get(lkey);
+          if (lhit) return json(JSON.parse(new TextDecoder().decode(await lhit.arrayBuffer())), 200, { "X-Cache": "HIT" });
+          const hosts = (env.ATTACH_HOSTS ?? "www.g2b.go.kr").split(",").map((h) => h.trim());
+          const allowUrl = (u: string) => { try { const x = new URL(u); return (x.protocol === "https:" || x.protocol === "http:") && hosts.includes(x.hostname); } catch { return false; } };
+          const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 120_000 });
+          const live = await readSheetLive(client, docs, { id, model: env.AI_SHEET_MODEL || undefined, allowUrl });
+          // 일시 오류, 받지 못한 첨부, 공고 정보가 없는 예전 사이트 파일이면 캐시하지 않는다 (다음에 고를 때 다시 읽는다)
+          if (live.status !== "error" && !live.failed.length && docs.bid && env.AWARDS) ctx.waitUntil(env.AWARDS.put(lkey, JSON.stringify(live), { httpMetadata: { contentType: "application/json" } }));
+          return json(live);
+        }
         const key = `ai-sheets/v${AI_SHEET_VERSION}/${id}-${input.hash}.json`;
         const hit = await env.AWARDS?.get(key);
         if (hit) return json(JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())), 200, { "X-Cache": "HIT" });

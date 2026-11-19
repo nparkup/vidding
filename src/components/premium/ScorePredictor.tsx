@@ -34,7 +34,7 @@ const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium
 /** 유사 실적(나라장터 낙찰 이력) 조회: 정적 사이트는 같은 중계 서버, 서버 배포는 자체 API */
 const PERF_API = STATIC ? CORP_API : "/api/premium/perf";
 
-interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; /** AI 판독 입력이 있으면 그 본문 해시 */ ai?: string; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
+interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; /** AI 판독 입력이 있으면 그 본문 해시 */ ai?: string; /** 빌드가 첨부를 모두 읽었으면 읽은 파일 이름 */ read?: string[]; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
 
 /** 정적 배포는 빌드 때 공고별로 만들어 둔 파일(첨부 목록 + 첨부에서 추출한 평가표)을, 서버 배포는 나라장터 첨부 목록을 바로 조회한다 */
 async function loadBidDocs(bid: Bid): Promise<BidDocs> {
@@ -210,8 +210,9 @@ export function ScorePredictor() {
       .then((d) => {
         if (!alive) return;
         setDocs(d);
-        // 원문 배점표를 쓸 수 없고 AI 판독 입력이 있으면 그 자리에서 읽는다
-        if (!d.ai || !STATIC || !CORP_API || (d.sheet && adoptable(d.sheet, d.qual?.basis))) return;
+        // 원문 배점표를 쓸 수 없으면 그 자리에서 읽는다: 판독 입력이 있으면 그 본문으로, 빌드가 첨부를 다 읽지 못했으면 중계 서버가 첨부를 받아서
+        if (!STATIC || !CORP_API || (d.sheet && adoptable(d.sheet, d.qual?.basis))) return;
+        if (!d.ai && (d.read || !d.files.length)) return;
         setAiRead("reading");
         loadAiSheet(bid)
           .then((s) => {
@@ -478,13 +479,15 @@ export function ScorePredictor() {
               <>
                 {aiRead === "reading" ? (
                   <div className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
-                    <p>공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 10~30초 걸립니다. 그동안은 기준표로 계산합니다.</p>
+                    <p>공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 첨부를 모두 받아 읽느라 10초~1분 걸립니다. 그동안은 기준표로 계산합니다.</p>
                     <LoadingBar label="배점표 판독 중" />
                   </div>
                 ) : (docs.sheet || docs.files.length > 0) && (
                   <p className={`rounded-xl px-3 py-2 text-sm ${docs.sheet ? "bg-mint-50 text-mint-700" : "bg-paper text-ink-500"}`}>
                     {docs.sheet?.reader?.by === "ai"
                       ? `공고 첨부의 배점표에서 평가항목 ${docs.sheet.items.length}개를 읽었습니다. 원문 문구와 배점 합계 확인을 통과해 원문 배점으로 계산합니다.`
+                      : docs.sheet && !docs.sheetFile
+                        ? `공고 첨부에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
                       : docs.sheet
                         ? `첨부 '${docs.sheetFile}'에서 평가항목 ${docs.sheet.items.length}개를 읽어 원문 배점으로 계산합니다.`
                         : `이 공고의 첨부에서 평가 배점표를 ${aiRead === "fail" ? "읽지 못했습니다(판독 일시 오류)" : "찾지 못했습니다"}. 공고의 낙찰방법·금액에 맞는 기준표(${template?.criteria?.name ?? bid.contractMethod})로 계산합니다.`}

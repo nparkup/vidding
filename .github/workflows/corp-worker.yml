@@ -12,6 +12,9 @@ on:
       - "src/lib/perfLookup.ts"
       - "src/lib/awards/**"
       - "src/lib/nara/aiSheet.ts"
+      - "src/lib/nara/liveSheet.ts"
+      - "src/lib/nara/attachText.ts"
+      - "src/lib/nara/hwpText.ts"
       - "src/lib/criteria.ts"
       - "src/lib/evalscore.ts"
       - "src/lib/trustscore.ts"
@@ -24,6 +27,9 @@ on:
       - "src/lib/perfLookup.ts"
       - "src/lib/awards/**"
       - "src/lib/nara/aiSheet.ts"
+      - "src/lib/nara/liveSheet.ts"
+      - "src/lib/nara/attachText.ts"
+      - "src/lib/nara/hwpText.ts"
       - "src/lib/criteria.ts"
       - "src/lib/evalscore.ts"
       - "src/lib/trustscore.ts"
@@ -78,13 +84,13 @@ jobs:
       - name: Worker 배포
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup
-        run: npx --yes wrangler@3 deploy
+        run: npx --yes wrangler@4.40.0 deploy
       - name: 서비스키를 Worker 비밀값으로 저장
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
-        run: printf '%s' "$DATA_GO_KR_SERVICE_KEY" | npx --yes wrangler@3 secret put DATA_GO_KR_SERVICE_KEY
+        run: printf '%s' "$DATA_GO_KR_SERVICE_KEY" | npx --yes wrangler@4.40.0 secret put DATA_GO_KR_SERVICE_KEY
       - name: Anthropic API 키를 Worker 비밀값으로 저장
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup
@@ -92,4 +98,4 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then echo "ANTHROPIC_API_KEY 없음: AI 판독은 꺼진 채로 둡니다"; exit 0; fi
-          printf '%s' "$ANTHROPIC_API_KEY" | npx --yes wrangler@3 secret put ANTHROPIC_API_KEY
+          printf '%s' "$ANTHROPIC_API_KEY" | npx --yes wrangler@4.40.0 secret put ANTHROPIC_API_KEY

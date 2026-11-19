@@ -9,3 +9,6 @@ data/
 out
 .static-build
 .cache/
+# 로컬 Worker 실행(wrangler dev) 자료
+worker/corp-lookup/.wrangler/
+worker/corp-lookup/.dev.vars

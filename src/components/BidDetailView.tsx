@@ -57,9 +57,14 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           {/* 요약 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold">핵심 요약</h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
               {[
-                ["기초금액", won(bid.baseAmount)],
+                ["기초금액", bid.baseAmount >= 10_000 ? (
+                  <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    <span>{won(bid.baseAmount)}</span>
+                    <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-ink-500">{wonFull(bid.baseAmount)}</span>
+                  </span>
+                ) : won(bid.baseAmount)],
                 ["업무 구분", bid.bizType ?? "용역"],
                 ...((bid.bizType ?? "용역") === "용역" ? [["용역 기간", `${bid.periodMonths}개월`]] : []),
                 ["참가 지역", bid.region === "전국" ? "제한 없음" : `${(bid.regions ?? [bid.region]).join("·")} 제한`],
@@ -69,7 +74,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
                 ["중소기업 제한", bid.smallBizOnly ? "예" : "아니오"],
                 ["유사공고 평균 참여", bid.stats ? `${bid.stats.avgBidders}개사` : "-"],
               ].map(([k, v]) => (
-                <div key={k} className="rounded-xl bg-paper p-3">
+                <div key={k as string} className={`min-w-0 rounded-xl bg-paper p-3${k === "기초금액" && bid.baseAmount >= 10_000 ? " col-span-2" : ""}`}>
                   <dt className="text-xs text-ink-500">{k}</dt>
                   <dd className="mt-1 font-bold">{v}</dd>
                 </div>

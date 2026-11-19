@@ -41,6 +41,15 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
     <section className="card mt-4 p-6">
       <h3 className="font-bold">낙찰 결과로 본 예측</h3>
       <dl className="mt-3 space-y-3 text-sm">
+        {fc.competition && (
+          <div>
+            <dt className="flex items-center justify-between gap-2">
+              <span className="text-ink-500">경쟁 강도</span>
+              <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${LEVEL_TONE[fc.competition.level]}`}>{fc.competition.level}</span>
+            </dt>
+            <dd className="mt-0.5 text-xs text-ink-500">{fc.competition.text}</dd>
+          </div>
+        )}
         {analysis && (
           <div>
             <dt className="text-ink-500">{years > 1 ? `직전 계약 낙찰 (${years}년 계약)` : "전년도 낙찰"}</dt>
@@ -60,27 +69,38 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
             )}
           </div>
         )}
-        {fc.competition && (
+        {fc.winRate && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="shrink-0 text-ink-500">과거 낙찰률</dt>
+            <dd className="text-right"><b className="tabular-nums">{pct(fc.winRate.value)}{amountOf(fc.winRate.value)}</b> <span className="block text-xs text-ink-300">{fc.winRate.basis}{!isNego && fc.suggestRate ? " (당시 하한율 기준)" : ""}{baseAmount > 0 ? " · 금액은 기초금액 기준" : ""}</span></dd>
+          </div>
+        )}
+        {isNego && fc.rival && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="shrink-0 text-ink-500">예상 최저 경쟁 투찰률</dt>
+            <dd className="text-right"><b className="tabular-nums">{pct(fc.rival.value)}{amountOf(fc.rival.value)}</b> <span className="block text-xs text-ink-300">가격점수에 반영{baseAmount > 0 ? " · 금액은 기초금액 기준" : ""}</span></dd>
+          </div>
+        )}
+        {!isNego && fc.suggestRate && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="shrink-0 text-ink-500">과거 낙찰자 투찰률</dt>
+            <dd className="text-right"><b className="tabular-nums">{pct(fc.suggestRate.value)}{amountOf(fc.suggestRate.value)}</b> <span className="block text-xs text-ink-300">{pct(fc.suggestRate.low)} ~ {pct(fc.suggestRate.high)} · 투찰률 기본값</span></dd>
+          </div>
+        )}
+        {fc.likely && fc.likely.length > 0 && (
           <div>
-            <dt className="flex items-center justify-between gap-2">
-              <span className="text-ink-500">경쟁 강도</span>
-              <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${LEVEL_TONE[fc.competition.level]}`}>{fc.competition.level}</span>
-            </dt>
-            <dd className="mt-0.5 text-xs text-ink-500">{fc.competition.text}</dd>
-            {fc.likely && fc.likely.length > 0 && (
-              <dd className="mt-2">
-                <p className="text-xs font-semibold text-ink-500">참가 예상 기업</p>
-                <ul className="mt-1 divide-y divide-ink-100 rounded-xl border border-ink-100">
-                  {fc.likely.slice(0, 6).map((b) => (
-                    <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
-                      <span className="min-w-0 truncate font-semibold">{b.name}</span>
-                      <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 공고명이 비슷한 다른 낙찰에서 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
-              </dd>
-            )}
+            <dt className="text-ink-500">참가 예상 기업</dt>
+            <dd className="mt-1">
+              <ul className="mt-1 divide-y divide-ink-100 rounded-xl border border-ink-100">
+                {fc.likely.slice(0, 6).map((b) => (
+                  <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
+                    <span className="min-w-0 truncate font-semibold">{b.name}</span>
+                    <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 공고명이 비슷한 다른 낙찰에서 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
+            </dd>
           </div>
         )}
         {recent.length > 0 && (
@@ -114,24 +134,6 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
               </span>
             </dt>
             <dd className="mt-0.5 space-y-0.5 text-xs text-ink-500">{chance.basis.map((b) => <p key={b}>{b}</p>)}</dd>
-          </div>
-        )}
-        {fc.winRate && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-ink-500">과거 낙찰률</dt>
-            <dd className="text-right"><b className="tabular-nums">{pct(fc.winRate.value)}{amountOf(fc.winRate.value)}</b> <span className="block text-xs text-ink-300">{fc.winRate.basis}{!isNego && fc.suggestRate ? " (당시 하한율 기준)" : ""}{baseAmount > 0 ? " · 금액은 기초금액 기준" : ""}</span></dd>
-          </div>
-        )}
-        {isNego && fc.rival && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-ink-500">예상 최저 경쟁 투찰률</dt>
-            <dd className="text-right"><b className="tabular-nums">{pct(fc.rival.value)}{amountOf(fc.rival.value)}</b> <span className="block text-xs text-ink-300">가격점수에 반영{baseAmount > 0 ? " · 금액은 기초금액 기준" : ""}</span></dd>
-          </div>
-        )}
-        {!isNego && fc.suggestRate && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-ink-500">과거 낙찰자 투찰률</dt>
-            <dd className="text-right"><b className="tabular-nums">{pct(fc.suggestRate.value)}{amountOf(fc.suggestRate.value)}</b> <span className="block text-xs text-ink-300">{pct(fc.suggestRate.low)} ~ {pct(fc.suggestRate.high)} · 투찰률 기본값</span></dd>
           </div>
         )}
         {prePrice > 0 && (

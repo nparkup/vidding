@@ -20,6 +20,8 @@ import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from 
 import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
+import { AwardAnalysisSection, ForecastCard, loadAwardAnalysis } from "./AwardAnalysis";
+import { forecast, winChance, type AwardAnalysis } from "@/lib/awards/analysis";
 import { CloseDay } from "../CloseDay";
 import { TrustPicker } from "./TrustPicker";
 import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
@@ -205,9 +207,33 @@ export function ScorePredictor() {
     return () => { alive = false; };
   }, []);
   const rivalEst = useMemo(() => (bid ? estimateRival(awardStats, bid) : undefined), [awardStats, bid]);
+
+  // 낙찰 결과 분석 (전년도 같은 사업, 과거 같은 사업 추이, 비슷한 공고): 가격점수 기본값·경쟁 강도·낙찰 가능성에 반영한다
+  const [analysis, setAnalysis] = useState<AwardAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   useEffect(() => {
-    setCo((c) => ({ ...c, rivalRate: rivalEst ? Math.min(100, Math.max(80, Math.round(rivalEst.rate * 100) / 100)) : DEFAULT_COMPANY.rivalRate }));
-  }, [rivalEst]);
+    if (!bid) return;
+    let alive = true;
+    setAnalysis(null);
+    setAnalysisLoading(true);
+    loadAwardAnalysis(bid.id)
+      .then((a) => alive && setAnalysis(a))
+      .catch(() => undefined)
+      .finally(() => alive && setAnalysisLoading(false));
+    return () => { alive = false; };
+  }, [bid]);
+  const fc = useMemo(() => (bid ? forecast(analysis, bid, floorRate) : {}), [analysis, bid, floorRate]);
+  // 협상: 예상 최저 경쟁 투찰률 = 과거 같은 사업·비슷한 공고의 개찰 1위 투찰률 > 같은 기관 유사 공고·같은 조건 평균 낙찰률 > 기본값
+  const rivalDefault = fc.rival?.value ?? rivalEst?.rate;
+  useEffect(() => {
+    setCo((c) => ({ ...c, rivalRate: rivalDefault ? Math.min(100, Math.max(80, Math.round(rivalDefault * 100) / 100)) : DEFAULT_COMPANY.rivalRate }));
+  }, [rivalDefault]);
+  // 적격: 투찰률 기본값 = 이 공고 하한율 + 과거 낙찰자가 하한율보다 높게 쓴 폭 (중앙값)
+  const suggestRate = fc.suggestRate?.value;
+  useEffect(() => {
+    if (suggestRate === undefined) return;
+    setCo((c) => ({ ...c, bidRate: Math.min(100, Math.round(Math.max(floorRate ?? 0, suggestRate) * 1000) / 1000) }));
+  }, [suggestRate, floorRate]);
 
   // 실적 = 나라장터에서 찾은 유사 낙찰(추정) + 직접 입력(수의계약·민간·하도급 등)
   const coEff = useMemo<CompanyInput>(() => ({
@@ -216,6 +242,14 @@ export function ScorePredictor() {
     perfSource: autoPerf.count ? `나라장터 낙찰 ${autoPerf.count}건 추정${manualPerf ? " + 직접 입력" : ""}` : undefined,
   }), [co, autoPerf, manualPerf]);
   const result = useMemo(() => (active && bid ? predict(active, bid, coEff) : null), [active, bid, coEff]);
+  const chance = useMemo(() => {
+    if (!bid || !analysis || !result) return undefined;
+    const price = result.items.find((i) => i.kind === "price");
+    return winChance({
+      method: bid.contractMethod, fc, similar: analysis.similar?.stat, history: analysis.history, bidRate: co.bidRate,
+      floor: active?.lowerLimit ?? bid.lowerLimitRate, passed: result.passed, proposal: co.proposal, priceRatio: price ? price.ratio : undefined,
+    });
+  }, [bid, analysis, result, fc, co.bidRate, co.proposal, active]);
   // 참가자격 판정: 사업자번호를 조회하고 공고 자료가 오면 판정한다. 불가면 예상 점수 대신 사유를 보여 준다
   const eligibility = useMemo(() => (corp && docs && bid ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역", new Date(), { itemNo: bid.cls?.no, itemName: bid.cls?.nm, smallBizOnly: bid.smallBizOnly }) : null), [corp, docs, bid]);
   /** 예상 점수를 보여 줄 단계: 조회 기능이 없는 미리보기는 직접 입력값으로 바로 계산한다 */
@@ -536,14 +570,18 @@ export function ScorePredictor() {
               label="투찰률 (예정가격 대비)"
               value={co.bidRate}
               onChange={(v) => set("bidRate", v)}
-              hint={!isNego && rivalEst ? `참고: ${rivalBasis(rivalEst)}입니다.` : undefined}
+              hint={!isNego && fc.suggestRate
+                ? `기본값 = 과거 낙찰자 투찰률 (낙찰 결과 분석). ${fc.suggestRate.basis}. 가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%.`
+                : !isNego && rivalEst ? `참고: ${rivalBasis(rivalEst)}입니다.` : undefined}
             />
             {isNego && (
               <Range
                 label="예상 최저 경쟁 투찰률"
                 value={co.rivalRate}
                 onChange={(v) => set("rivalRate", v)}
-                hint={rivalEst
+                hint={fc.rival
+                  ? `기본값 = ${fc.rival.basis} (낙찰 결과 분석). 슬라이더로 바꿀 수 있습니다.`
+                  : rivalEst
                   ? `기본값 = ${rivalBasis(rivalEst)}${!rivalEst.prior && awardStats && awardStats.coverage.weeks < awardStats.coverage.totalWeeks ? ` (연간 ${awardStats.coverage.totalWeeks}주 중 ${awardStats.coverage.weeks}주 자료)` : ""}. 슬라이더로 바꿀 수 있습니다.`
                   : `같은 수요기관의 과거 유사 공고가 없고 같은 조건 낙찰 표본도 ${MIN_SAMPLES}건 미만이라 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`}
               />
@@ -631,6 +669,9 @@ export function ScorePredictor() {
           </p>
           {validation && <ValidationNote v={validation} />}
         </>)}
+        {(scoreStage === "criteria" || scoreStage === "score") && (
+          <ForecastCard fc={fc} chance={scoreStage === "score" ? chance : undefined} isNego={isNego} bidRate={co.bidRate} baseAmount={bid.baseAmount} />
+        )}
       </aside>
     </div>
 
@@ -670,6 +711,9 @@ export function ScorePredictor() {
           {active.notes.map((n) => <li key={n}>{n}</li>)}
         </ul>
       </section>
+
+    {/* 평가 기준 아래: 전년도·과거 같은 사업·비슷한 공고의 낙찰 결과 */}
+    <AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} />
     </div>
   );
 }

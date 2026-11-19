@@ -5,6 +5,7 @@
  *   npx tsx scripts/awards/collect.ts check      토큰의 R2 읽기·쓰기 권한만 확인
  *   npx tsx scripts/awards/collect.ts raw        원자료만 받고 샤드·통계는 그대로 둔다 (배포 전 코드로 미리 채울 때)
  *   npx tsx scripts/awards/collect.ts rank       개찰 순위 1~5위만 받는다 (수집과 따로, 매일 하루 호출 한도 안에서)
+ *   npx tsx scripts/awards/collect.ts index      받아 둔 원자료로 낙찰 결과 분석 색인(idx/)만 다시 만든다 (API를 부르지 않는다)
  *
  * 1. 한 주(월~일) 단위로 받는다. 낙찰정보·입찰공고정보 API는 한 번에 7일까지만 조회된다(2026-11-10 공지).
  *    - 낙찰: 낙찰정보서비스 getScsbidListSttus{Servc,Cnstwk,Thng} (최종낙찰자 목록, 등록일 기준)
@@ -30,6 +31,10 @@ import {
   firstLicense, shardOf, weeksBetween, ymd, type AwardBiz, type AwardMeta, type ShardFile, type ShardRow, type TopBidder,
 } from "../../src/lib/awards/format";
 import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
+import {
+  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, forecast, methodCode, METHOD_NAME, quantile, r3, similarKey,
+  type AgencyIndexFile, type AgencyRow, type SimilarIndexFile, type SimilarStat,
+} from "../../src/lib/awards/analysis";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 
 const NARA = "https://apis.data.go.kr/1230000";
@@ -426,7 +431,7 @@ async function readRank(key: string): Promise<RankEntry[]> {
 
 interface NoticeInfo { method: string; price: number; clsNo: string; clsNm: string; mid: string; lrg: string; work: string; site: string; lwlt: number }
 
-async function build(awardWeeks: string[], leadWeeks: string[]) {
+async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnly?: boolean } = {}) {
   // 공고: 공고번호 → 마지막 차수 정보
   const notices = new Map<string, NoticeInfo & { ord: string }>();
   const region = new Map<string, Set<string>>();
@@ -525,8 +530,15 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
   }
   console.log(`낙찰 ${rows.toLocaleString()}건 (공고 정보 붙은 건 ${matched.toLocaleString()}건, 기초금액 ${withBase.toLocaleString()}건, 예정가격 ${withPlan.toLocaleString()}건, 개찰 순위 ${withTop.toLocaleString()}건), 공고 ${notices.size.toLocaleString()}건`);
 
-  let uploaded = 0;
   const keys = [...shards.keys()].sort();
+  if (opts.indexOnly) {
+    // 색인만: 샤드·통계·수집 상태는 건드리지 않는다 (동시에 도는 수집 실행의 manifest.json 을 덮지 않게 바로 올린다)
+    const ix = await buildIndexes([...shards.values()].flat(), async (key, body) => { await r2Put(key, body, "application/gzip"); writeLocal(key, body); return true; });
+    printSamples(ix);
+    backtest(ix);
+    return { rows, shards: keys.length };
+  }
+  let uploaded = 0;
   let next = 0;
   // 올리는 속도는 r2.ts 가 Cloudflare API 한도에 맞춘다. 중간에 끊겨도 다음 실행이 이미 올린 샤드를 건너뛰게 상태를 자주 저장한다
   let lastSave = Date.now();
@@ -602,7 +614,168 @@ async function build(awardWeeks: string[], leadWeeks: string[]) {
   await put("stats/prearng.json.gz", gz({ builtAt: new Date().toISOString(), agencies: prearngStats }));
   console.log(`예정가격 경향: 수요기관 ${Object.keys(prearngStats).length.toLocaleString()}곳`);
 
+  await buildIndexes(all, (key, body) => put(key, body));
+
   return { rows, shards: keys.length };
+}
+
+/* ---------- 낙찰 결과 분석 색인 (src/lib/awards/analysis.ts) ---------- */
+
+async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer) => Promise<boolean>): Promise<{ rows: ShardRow[]; buckets: AgencyIndexFile[]; similar: SimilarIndexFile }> {
+  // 공고 1건당 1줄: 같은 공고번호는 낙찰금액이 가장 큰 줄 (분류가 여럿인 공고)
+  const byNo = new Map<string, ShardRow>();
+  for (const r of all) {
+    const p = byNo.get(r[2]);
+    if (!p || p[3] < r[3] || (p[3] === r[3] && p[7] < r[7])) byNo.set(r[2], r);
+  }
+  const rows = [...byNo.values()].sort((a, b) => b[9].localeCompare(a[9]));
+  const winnerRank = (r: ShardRow) => r[25].find((x) => x[1] === r[0])?.[0] ?? 0;
+
+  // 1. 수요기관별 과거 낙찰 (저장 기간 전체)
+  const buckets: AgencyIndexFile[] = Array.from({ length: AGENCY_BUCKETS }, () => ({ v: 1, cols: AGENCY_COLS, agencies: {} }));
+  for (const r of rows) {
+    if (!r[6]) continue;
+    const row: AgencyRow = [r[2], r[5], r[9], r[4], r[7], r[8], r[10], methodCode(r[11]), r[12], r[20], r[21], r[22], r[1], winnerRank(r),
+      r[25].map((x) => [x[2], x[4]] as [string, number])];
+    (buckets[Number(agencyBucket(r[6]))].agencies[r[6]] ??= []).push(row);
+  }
+  let up = 0;
+  let bytes = 0;
+  for (let i = 0; i < buckets.length; i++) {
+    const body = gz(buckets[i]);
+    bytes += body.length;
+    if (await upload(`idx/agency/${String(i).padStart(2, "0")}.json.gz`, body)) up++;
+  }
+  console.log(`분석 색인: 수요기관 ${buckets.reduce((s, b) => s + Object.keys(b.agencies).length, 0).toLocaleString()}곳, 공고 ${rows.length.toLocaleString()}건, 파일 ${buckets.length}개 중 ${up}개 올림 (${fmtGB(bytes)})`);
+
+  // 2. 비슷한 공고 통계 (최근 SIMILAR_YEARS 년)
+  const today = mondayOf(kstNow());
+  const since = iso(addDays(today, -365 * SIMILAR_YEARS));
+  interface Acc { n: number; rates: number[]; gaps: number[]; bidders: number[]; winners: Map<string, number>; rk: number[][]; rkn: number; first: number; firstN: number; pre: number[]; ex: SimilarStat["ex"] }
+  const groups = new Map<string, Acc>();
+  const acc = (k: string) => groups.get(k) ?? groups.set(k, { n: 0, rates: [], gaps: [], bidders: [], winners: new Map(), rk: [[], [], [], [], []], rkn: 0, first: 0, firstN: 0, pre: [], ex: [] }).get(k)!;
+  for (const r of rows) {
+    if (r[9] < since) break;
+    const m = methodCode(r[11]);
+    const band = bandOf(r[12] || r[20] || r[7]);
+    const dims = ["*"];
+    if (r[13]) dims.push(`c:${r[13]}`);
+    if (r[17]) dims.push(`w:${r[17]}`);
+    const l = firstLicense(r[19]);
+    if (l) dims.push(`l:${l}`);
+    const keys = new Set<string>();
+    for (const d of dims) { keys.add(similarKey(r[4], m, band, d)); if (d !== "*") keys.add(similarKey(r[4], m, "*", d)); }
+    const rate = r[8] > 50 && r[8] <= 110 ? r[8] : 0;
+    const wr = winnerRank(r);
+    for (const k of keys) {
+      const a = acc(k);
+      a.n++;
+      if (rate) a.rates.push(rate);
+      if (rate && r[22] > 0 && rate >= r[22] && rate - r[22] < 10) a.gaps.push(rate - r[22]);
+      if (r[10] > 0) a.bidders.push(r[10]);
+      a.winners.set(r[1], (a.winners.get(r[1]) ?? 0) + 1);
+      if (r[25].length) {
+        a.rkn++;
+        r[25].slice(0, 5).forEach((x, i) => { if (x[4] > 50 && x[4] <= 110) a.rk[i].push(x[4]); });
+      }
+      if (wr) { a.firstN++; if (wr === 1) a.first++; }
+      if (r[21] > 0 && r[20] > 0) { const p = (r[21] / r[20]) * 100; if (p > 90 && p < 110) a.pre.push(p); }
+      if (!k.endsWith("|*") && a.ex!.length < 5) a.ex!.push([r[2], r[5], r[6], r[9], r[7], r[8], r[10], r[1]]);
+    }
+  }
+  const out: SimilarIndexFile = { v: 1, builtAt: new Date().toISOString(), from: since, to: iso(addDays(today, 6)), groups: {} };
+  const qs = <N extends number>(v: number[], ps: number[]) => { const s = v.sort((a, b) => a - b); return ps.map((p) => r3(quantile(s, p))) as number[] & { length: N }; };
+  for (const [k, a] of groups) {
+    if (a.n < SIMILAR_MIN) continue;
+    const st: SimilarStat = {
+      n: a.n,
+      bidders: { q: qs<3>(a.bidders, [0.25, 0.5, 0.75]) as [number, number, number], mean: r3(a.bidders.reduce((s, x) => s + x, 0) / Math.max(1, a.bidders.length)) },
+      winners: [...a.winners].sort((x, y) => y[1] - x[1]).slice(0, 5).filter(([, c]) => c >= 2),
+    };
+    if (a.rates.length >= SIMILAR_MIN) st.rate = { q: qs<5>(a.rates, [0.1, 0.25, 0.5, 0.75, 0.9]) as [number, number, number, number, number], mean: r3(a.rates.reduce((s, x) => s + x, 0) / a.rates.length), n: a.rates.length };
+    if (a.gaps.length >= SIMILAR_MIN) st.gap = { q: qs<3>(a.gaps, [0.25, 0.5, 0.75]) as [number, number, number], n: a.gaps.length };
+    if (a.rkn >= SIMILAR_MIN) st.ranks = { mean: a.rk.map((v) => (v.length ? r3(v.reduce((s, x) => s + x, 0) / v.length) : 0)), n: a.rkn, winnerFirst: a.firstN ? r3(a.first / a.firstN) : 0 };
+    if (a.pre.length >= SIMILAR_MIN) st.pre = { q: qs<3>(a.pre, [0.25, 0.5, 0.75]) as [number, number, number], n: a.pre.length };
+    if (a.ex?.length) st.ex = a.ex;
+    out.groups[k] = st;
+  }
+  const body = gz(out);
+  await upload("idx/similar.json.gz", body);
+  console.log(`분석 색인: 비슷한 공고 묶음 ${Object.keys(out.groups).length.toLocaleString()}개 (${since}~, ${fmtGB(body.length)})`);
+  return { rows, buckets, similar: out };
+}
+
+/**
+ * 색인 확인용: 최근 낙찰 공고 몇 건을 '지금 공고'로 보고 분석을 만들어 로그에 한 줄씩 찍는다 (SAMPLE_ANALYSIS {...}).
+ * 업무·계약방법이 다른 공고를 고르고, 과거 같은 사업이 3건 이상인 것을 우선한다
+ */
+function printSamples(ix: Awaited<ReturnType<typeof buildIndexes>>) {
+  const want: [AwardBiz, string][] = [["용역", "Q"], ["용역", "N"], ["공사", "Q"], ["물품", "Q"], ["물품", "L"], ["용역", "Q"], ["공사", "Q"], ["용역", "N"]];
+  const used = new Set<string>();
+  const range = { from: ix.rows[ix.rows.length - 1]?.[9] ?? "", to: ix.rows[0]?.[9] ?? "" };
+  for (const [biz, m] of want) {
+    for (const r of ix.rows.slice(0, 60_000)) {
+      if (r[4] !== biz || methodCode(r[11]) !== m || used.has(r[2]) || !r[6] || used.has(r[6])) continue;
+      const target = {
+        id: `${r[2]}-${r[3]}`, bidNtceNo: r[2], title: r[5], demandAgency: r[6], bizType: biz,
+        contractMethod: m === "Q" ? "적격심사" : m === "N" ? "협상에 의한 계약" : "최저가", baseAmount: r[20] || r[12] || r[7],
+        postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined },
+        lowerLimitRate: r[22] || undefined,
+      };
+      const a = analyzeBid(target, ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]], ix.similar.groups, range);
+      if (a.history.length < 3 || !a.prior || !a.similar) continue;
+      used.add(r[2]); used.add(r[6]);
+      console.log(`SAMPLE_ANALYSIS ${JSON.stringify({ target, actual: { rate: r[8], bidders: r[10], winner: r[1], amount: r[7] }, analysis: a })}`);
+      break;
+    }
+  }
+}
+
+/**
+ * 되짚어 보기: 최근 8주 낙찰 공고를 '지금 공고'로 보고 그 전 자료만으로 예측한 낙찰률·참가업체 수를 실제와 비교한다
+ */
+function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>) {
+  const since = iso(addDays(mondayOf(kstNow()), -56));
+  const range = { from: "", to: "" };
+  const acc = new Map<string, { n: number; rateN: number; rateErr: number[]; inBand: number; bidN: number; bidIn: number; bidErr: number[] }>();
+  let seen = 0;
+  for (const r of ix.rows) {
+    if (r[9] < since) break;
+    if (!r[6] || seen >= 20_000) continue;
+    const m = methodCode(r[11]);
+    if (m === "O") continue;
+    seen++;
+    const target = {
+      id: r[2], bidNtceNo: r[2], title: r[5], demandAgency: r[6], bizType: r[4], contractMethod: METHOD_NAME[m], baseAmount: r[20] || r[12] || r[7],
+      postedAt: `${r[9]}T00:00:00+09:00`, licenseRaw: r[19], cls: { no: r[13] || undefined, nm: r[14] || undefined, work: r[17] || undefined },
+    };
+    const a = analyzeBid(target, ix.buckets[Number(agencyBucket(r[6]))].agencies[r[6]], ix.similar.groups, range);
+    const fc = forecast(a, { contractMethod: target.contractMethod, lowerLimitRate: r[22] || undefined });
+    const k = `${r[4]} ${METHOD_NAME[m]}`;
+    const x = acc.get(k) ?? acc.set(k, { n: 0, rateN: 0, rateErr: [], inBand: 0, bidN: 0, bidIn: 0, bidErr: [] }).get(k)!;
+    x.n++;
+    if (fc.winRate && r[8] > 50 && r[8] <= 110) { x.rateN++; x.rateErr.push(Math.abs(fc.winRate.value - r[8])); }
+    if (fc.bidders && r[10] > 0) {
+      x.bidN++;
+      const [lo, mid, hi] = fc.bidders.q;
+      if (r[10] >= lo && r[10] <= hi) x.bidIn++;
+      x.bidErr.push(Math.abs(mid - r[10]) / Math.max(1, r[10]));
+    }
+  }
+  const med = (v: number[]) => (v.length ? r3(quantile(v.sort((a, b) => a - b), 0.5)) : 0);
+  for (const [k, x] of [...acc].sort((a, b) => b[1].n - a[1].n)) {
+    console.log(`BACKTEST ${k}: 공고 ${x.n.toLocaleString()}건 · 낙찰률 예측 ${x.rateN.toLocaleString()}건, 오차 중앙값 ${med(x.rateErr)}%p, 1%p 안 ${Math.round((x.rateErr.filter((e) => e <= 1).length / Math.max(1, x.rateN)) * 100)}% · 참가업체 예측 ${x.bidN.toLocaleString()}건, 예상 범위 안 ${Math.round((x.bidIn / Math.max(1, x.bidN)) * 100)}%, 오차 중앙값 ${Math.round(med(x.bidErr) * 100)}%`);
+  }
+}
+
+async function indexMode() {
+  const m = await r2Get("manifest.json");
+  if (m) manifest = JSON.parse(m.toString()) as Manifest;
+  const rs = await r2Get("rank-state.json");
+  if (rs) rankState = JSON.parse(rs.toString()) as RankState;
+  const { awardWeeks, leadWeeks } = plan(kstNow());
+  const r = await build(awardWeeks, leadWeeks, { indexOnly: true });
+  console.log(`색인만 다시 만듦: 낙찰 ${r.rows.toLocaleString()}건`);
 }
 
 /* ---------- 실행 ---------- */
@@ -623,6 +796,7 @@ async function check() {
 async function main() {
   if (process.argv[2] === "check") return check();
   if (process.argv[2] === "rank") return rankMode();
+  if (process.argv[2] === "index") return indexMode();
 
   const m = await r2Get("manifest.json");
   if (m) manifest = JSON.parse(m.toString()) as Manifest;

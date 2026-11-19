@@ -4,6 +4,7 @@ import type { AppSettings, Bid, BidAttachment, ClientProfile, Inquiry, MailLog, 
 import { adapter } from "./db";
 import type { ExtractedSheet } from "./nara/docExtract";
 import type { AwardStats } from "./rivalRate";
+import type { AwardAnalysis } from "./awards/analysis";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
 import { fetchAllBids, hasServiceKey } from "./nara/client";
@@ -40,7 +41,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -89,6 +90,14 @@ export async function getAwardStats(): Promise<AwardStats | null> {
   if (!process.env.BIDS_FILE) return null;
   if (awardMemo === undefined) awardMemo = fileBids()?.awardStats ?? null;
   return awardMemo;
+}
+
+let analysisMemo: Record<string, AwardAnalysis> | null = null;
+/** 빌드 때 만든 공고별 낙찰 결과 분석 (전년도·과거 같은 사업·비슷한 공고) */
+export async function getAwardAnalyses(): Promise<Record<string, AwardAnalysis>> {
+  if (!process.env.BIDS_FILE) return {};
+  analysisMemo ??= fileBids()?.analyses ?? {};
+  return analysisMemo;
 }
 
 let qualMemo: Record<string, BidQual> | null = null;

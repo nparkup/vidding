@@ -52,7 +52,7 @@ jobs:
             echo "=== $id"
             s=$(date +%s); curl -s -m 170 "http://127.0.0.1:8787/?aisheet=$id" > out.json; echo "($(( $(date +%s) - s ))초)"
             node -e 'const d=require("./out.json"); console.log(JSON.stringify({status:d.status,reason:d.reason,by:d.by,read:d.read,failed:d.failed,usage:d.usage,title:d.sheet?.title,pass:d.sheet?.pass,items:d.sheet?.items?.map(i=>`${i.label} ${i.max}`)},null,1))'
-            s=$(date +%s); curl -s -m 60 -o /dev/null -D - "http://127.0.0.1:8787/?aisheet=$id" | grep -i x-cache; echo "(다시 부름 $(( $(date +%s) - s ))초)"
+            s=$(date +%s); curl -s -m 60 -o /dev/null -D - "http://127.0.0.1:8787/?aisheet=$id" | grep -i x-cache || true; echo "(다시 부름 $(( $(date +%s) - s ))초)"
           done
           grep -i "error" ../../wd.log | head -20 || true
       - name: 대조

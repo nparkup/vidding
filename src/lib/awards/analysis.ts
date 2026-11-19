@@ -26,8 +26,8 @@ export function methodCode(method?: string): MethodCode {
   return "O";
 }
 
-/** 개찰 순위 한 칸: [업체명, 투찰률(%)] */
-export type RankCell = [name: string, rate: number];
+/** 개찰 순위 한 칸: [업체명, 투찰률(%), 투찰금액(원, 2026-11-19 이전 색인은 없음)] */
+export type RankCell = [name: string, rate: number, amount?: number];
 
 /** 수요기관 색인 한 줄 (공고 1건) */
 export type AgencyRow = [
@@ -59,12 +59,14 @@ export interface SimilarStat {
   bidders: { q: [number, number, number]; mean: number };
   /** 자주 낙찰받은 업체 [업체명, 건수] (많은 순 5곳) */
   winners: [string, number][];
+  /** 개찰 1~5위에 자주 든 업체 [업체명, 횟수] (많은 순 8곳, 2026-11-19 이후 색인) */
+  ranked?: [string, number][];
   /** 개찰 1~5위 평균 투찰률(%)과 표본 수. 낙찰자가 1위였던 비율 */
   ranks?: { mean: number[]; n: number; winnerFirst: number };
   /** 예정가격 ÷ 기초금액 (%) [25%, 50%, 75%] */
   pre?: { q: [number, number, number]; n: number };
-  /** 최근 낙찰 예 (최대 5건): [공고번호, 공고명, 수요기관, 낙찰일, 낙찰금액, 낙찰률, 참가업체 수, 낙찰업체] */
-  ex?: [string, string, string, string, number, number, number, string][];
+  /** 최근 낙찰 예 (최대 5건): [공고번호, 공고명, 수요기관, 낙찰일, 낙찰금액, 낙찰률, 참가업체 수, 낙찰업체, 낙찰자 개찰 순위(모르면 0), 개찰 1~5위] */
+  ex?: [string, string, string, string, number, number, number, string, number?, RankCell[]?][];
 }
 
 /** 비슷한 공고 묶음 키: 업무|계약방법|금액대|분류. 분류는 c:세부품명번호, w:주공종, l:업종, * 전체 */
@@ -262,6 +264,44 @@ export interface Forecast {
   trend?: { first: number; last: number; years: number; text: string };
   /** 같은 업체가 연속 낙찰한 경우 */
   incumbent?: { name: string; count: number; total: number };
+  /** 참가 예상 기업: 과거 같은 사업에서 낙찰받거나 개찰 1~5위에 든 업체, 모자라면 비슷한 공고에 자주 낙찰·상위에 든 업체 */
+  likely?: LikelyBidder[];
+}
+
+export interface LikelyBidder {
+  name: string;
+  /** 과거 같은 사업에서 낙찰 / 개찰 1~5위 횟수 */
+  wins: number;
+  top: number;
+  /** 같은 사업 이력에서 나왔으면 "same", 비슷한 공고 통계에서 나왔으면 "similar" */
+  from: "same" | "similar";
+  /** 비슷한 공고에서의 낙찰·상위 횟수 */
+  simWins?: number;
+  simTop?: number;
+  /** 같은 사업에서 마지막으로 나온 날 */
+  last?: string;
+}
+
+/** 참가 예상 기업 (최대 n곳) */
+export function likelyBidders(h: PastAward[], st: SimilarStat | undefined, n = 8): LikelyBidder[] {
+  const m = new Map<string, LikelyBidder>();
+  const get = (name: string, from: LikelyBidder["from"]) => m.get(name) ?? m.set(name, { name, wins: 0, top: 0, from }).get(name)!;
+  for (const x of h) {
+    if (x.winner) { const b = get(x.winner, "same"); b.wins++; if (!b.last || b.last < x.date) b.last = x.date; }
+    for (const [name] of x.top) { if (!name) continue; const b = get(name, "same"); if (name !== x.winner) b.top++; if (!b.last || b.last < x.date) b.last = x.date; }
+  }
+  // 같은 사업: 낙찰 2점, 상위 1점, 최근일수록 앞에
+  const same = [...m.values()].sort((a, b) => b.wins * 2 + b.top - (a.wins * 2 + a.top) || (b.last ?? "").localeCompare(a.last ?? ""));
+  const out = same.slice(0, n);
+  if (st && out.length < n) {
+    const sim = new Map<string, { w: number; t: number }>();
+    for (const [name, c] of st.winners) sim.set(name, { w: c, t: 0 });
+    for (const [name, c] of st.ranked ?? []) sim.set(name, { w: sim.get(name)?.w ?? 0, t: c });
+    for (const b of out) { const s = sim.get(b.name); if (s) { b.simWins = s.w; b.simTop = s.t; } }
+    const rest = [...sim].filter(([name]) => !m.has(name)).sort((a, b) => b[1].w * 2 + b[1].t - (a[1].w * 2 + a[1].t));
+    for (const [name, s] of rest) { if (out.length >= n) break; out.push({ name, wins: 0, top: 0, from: "similar", simWins: s.w, simTop: s.t }); }
+  }
+  return out;
 }
 
 const fmt = (n: number, d = 3) => String(Math.round(n * 10 ** d) / 10 ** d);
@@ -352,6 +392,8 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
     const [name, count] = [...c].sort((x, y) => y[1] - x[1])[0] ?? ["", 0];
     if (count >= 2) out.incumbent = { name, count, total: h.length };
   }
+  const likely = likelyBidders(h, st);
+  if (likely.length) out.likely = likely;
   return out;
 }
 

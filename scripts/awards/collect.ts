@@ -636,7 +636,7 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
   for (const r of rows) {
     if (!r[6]) continue;
     const row: AgencyRow = [r[2], r[5], r[9], r[4], r[7], r[8], r[10], methodCode(r[11]), r[12], r[20], r[21], r[22], r[1], winnerRank(r),
-      r[25].map((x) => [x[2], x[4]] as [string, number])];
+      r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])];
     (buckets[Number(agencyBucket(r[6]))].agencies[r[6]] ??= []).push(row);
   }
   let up = 0;
@@ -651,9 +651,9 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
   // 2. 비슷한 공고 통계 (최근 SIMILAR_YEARS 년)
   const today = mondayOf(kstNow());
   const since = iso(addDays(today, -365 * SIMILAR_YEARS));
-  interface Acc { n: number; rates: number[]; gaps: number[]; bidders: number[]; winners: Map<string, number>; rk: number[][]; rkn: number; first: number; firstN: number; pre: number[]; ex: SimilarStat["ex"] }
+  interface Acc { n: number; rates: number[]; gaps: number[]; bidders: number[]; winners: Map<string, number>; ranked: Map<string, number>; rk: number[][]; rkn: number; first: number; firstN: number; pre: number[]; ex: SimilarStat["ex"] }
   const groups = new Map<string, Acc>();
-  const acc = (k: string) => groups.get(k) ?? groups.set(k, { n: 0, rates: [], gaps: [], bidders: [], winners: new Map(), rk: [[], [], [], [], []], rkn: 0, first: 0, firstN: 0, pre: [], ex: [] }).get(k)!;
+  const acc = (k: string) => groups.get(k) ?? groups.set(k, { n: 0, rates: [], gaps: [], bidders: [], winners: new Map(), ranked: new Map(), rk: [[], [], [], [], []], rkn: 0, first: 0, firstN: 0, pre: [], ex: [] }).get(k)!;
   for (const r of rows) {
     if (r[9] < since) break;
     const m = methodCode(r[11]);
@@ -676,11 +676,11 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
       a.winners.set(r[1], (a.winners.get(r[1]) ?? 0) + 1);
       if (r[25].length) {
         a.rkn++;
-        r[25].slice(0, 5).forEach((x, i) => { if (x[4] > 50 && x[4] <= 110) a.rk[i].push(x[4]); });
+        r[25].slice(0, 5).forEach((x, i) => { if (x[4] > 50 && x[4] <= 110) a.rk[i].push(x[4]); if (x[2]) a.ranked.set(x[2], (a.ranked.get(x[2]) ?? 0) + 1); });
       }
       if (wr) { a.firstN++; if (wr === 1) a.first++; }
       if (r[21] > 0 && r[20] > 0) { const p = (r[21] / r[20]) * 100; if (p > 90 && p < 110) a.pre.push(p); }
-      if (!k.endsWith("|*") && a.ex!.length < 5) a.ex!.push([r[2], r[5], r[6], r[9], r[7], r[8], r[10], r[1]]);
+      if (!k.endsWith("|*") && a.ex!.length < 5) a.ex!.push([r[2], r[5], r[6], r[9], r[7], r[8], r[10], r[1], wr, r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])]);
     }
   }
   const out: SimilarIndexFile = { v: 1, builtAt: new Date().toISOString(), from: since, to: iso(addDays(today, 6)), groups: {} };
@@ -692,6 +692,8 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
       bidders: { q: qs<3>(a.bidders, [0.25, 0.5, 0.75]) as [number, number, number], mean: r3(a.bidders.reduce((s, x) => s + x, 0) / Math.max(1, a.bidders.length)) },
       winners: [...a.winners].sort((x, y) => y[1] - x[1]).slice(0, 5).filter(([, c]) => c >= 2),
     };
+    const ranked = [...a.ranked].sort((x, y) => y[1] - x[1]).slice(0, 8).filter(([, c]) => c >= 2);
+    if (ranked.length) st.ranked = ranked;
     if (a.rates.length >= SIMILAR_MIN) st.rate = { q: qs<5>(a.rates, [0.1, 0.25, 0.5, 0.75, 0.9]) as [number, number, number, number, number], mean: r3(a.rates.reduce((s, x) => s + x, 0) / a.rates.length), n: a.rates.length };
     if (a.gaps.length >= SIMILAR_MIN) st.gap = { q: qs<3>(a.gaps, [0.25, 0.5, 0.75]) as [number, number, number], n: a.gaps.length };
     if (a.rkn >= SIMILAR_MIN) st.ranks = { mean: a.rk.map((v) => (v.length ? r3(v.reduce((s, x) => s + x, 0) / v.length) : 0)), n: a.rkn, winnerFirst: a.firstN ? r3(a.first / a.firstN) : 0 };

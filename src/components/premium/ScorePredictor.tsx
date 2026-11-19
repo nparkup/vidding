@@ -670,7 +670,7 @@ export function ScorePredictor() {
           {validation && <ValidationNote v={validation} />}
         </>)}
         {(scoreStage === "criteria" || scoreStage === "score") && (
-          <ForecastCard fc={fc} chance={scoreStage === "score" ? chance : undefined} isNego={isNego} bidRate={co.bidRate} baseAmount={bid.baseAmount} />
+          <ForecastCard fc={fc} chance={scoreStage === "score" ? chance : undefined} isNego={isNego} bidRate={co.bidRate} baseAmount={bid.baseAmount} analysis={analysis} />
         )}
       </aside>
     </div>

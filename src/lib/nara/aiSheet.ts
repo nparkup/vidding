@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 3;
+export const AI_SHEET_VERSION = 4;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -151,7 +151,8 @@ const SYSTEM = `당신은 한국 공공조달(나라장터) 입찰공고의 첨�
 - 입찰가격 배점은 price 항목 하나로 넣습니다. 입찰 보증금·계약 조항의 숫자(예: 100분의 5, 제39조)는 배점이 아닙니다.
 - "가격평가를 하지 않음", "비예산 사업으로 가격평가점수 미포함"처럼 가격평가가 없으면 price 항목을 넣지 않고 price_total 은 0 으로 둡니다.
 - 표의 합계 줄과 항목 배점의 합이 다르면 고치거나 항목을 빼서 맞추지 말고 읽은 그대로 쓰고, 합계 줄의 숫자는 stated_total 에 적고, reason 에 그 차이를 적습니다.
-- 이름이 같은 항목이 표에 실제로 두 줄 있으면(세부 기준이 다름) 둘 다 쓰고, quote 와 criteria 로 구분되게 적습니다.
+- 표가 다음 쪽으로 이어지면서 같은 평가항목 칸(예: "부가서비스(20점)")과 배점이 다시 적히면 한 항목입니다. 배점은 한 번만 쓰고 양쪽 세부 기준을 criteria 에 모두 적습니다. 판단이 어려우면 표에 적힌 순서대로 두 줄을 그대로 씁니다.
+- 이름이 같아도 사이에 다른 항목이 있는 별개 구역(예: 운영사별 항목)이면 따로 씁니다.
 - 공고서·제안요청서·평가기준이 서로 다르면 공고에 첨부된 이 사업의 평가표를 따릅니다.`;
 
 export async function readSheetWithAI(
@@ -248,16 +249,28 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   const flat = squash(text);
   const raw = out.items.filter((i) => i.max > 0 || i.kind === "bonus");
   if (raw.length < 2) return { reason: "평가항목이 2개 미만" };
-  // 같은 이름·같은 원문 문구가 두 번 나오면 AI가 한 칸을 두 번 읽은 것으로 보고 하나만 쓴다
+  // 같은 평가항목이 두 번 나오는 경우를 하나로 합친다
+  // - 이름·원문 문구·배점이 모두 같으면 AI가 한 칸을 두 번 읽은 것
+  // - 이름·배점이 같은 항목이 바로 이어서 나오면, 표가 다음 쪽으로 넘어가며 항목 칸("부가서비스(20점)")이 다시 찍힌 것.
+  //   세부 기준만 이어 붙이고 배점은 한 번만 센다. 사이에 다른 항목이 끼어 있으면 별개 항목으로 둔다(운영사별 시스템안정성 등)
+  const nameKey = (l: string) => squash(l.replace(/\(\s*\d+(?:\.\d+)?\s*점?\s*\)/g, "").replace(/^(?:[①-⑳□■◦○▪•※-]|\(?\d{1,2}[.)]|[가-하][.)])\s*/, ""));
   const seen = new Set<string>();
-  const dedup = raw.filter((i) => {
+  const merged: AiItem[] = [];
+  const mergedNames: string[] = [];
+  let dropped = 0;
+  for (const i of raw) {
     const k = `${squash(i.label)}|${squash(i.quote)}|${i.max}`;
-    if (seen.has(k)) return false;
+    if (seen.has(k)) { dropped++; continue; }
     seen.add(k);
-    return true;
-  });
-  const dropped = raw.length - dedup.length;
-  raw.splice(0, raw.length, ...dedup);
+    const prev = merged[merged.length - 1];
+    if (prev && nameKey(prev.label) && nameKey(prev.label) === nameKey(i.label) && prev.max === i.max && prev.kind === i.kind) {
+      merged[merged.length - 1] = { ...prev, quote: `${prev.quote} / ${i.quote}`, criteria: [...prev.criteria, ...i.criteria], bands: prev.bands.length ? prev.bands : i.bands };
+      mergedNames.push(prev.label.replace(/\s+/g, " ").trim());
+      continue;
+    }
+    merged.push(i);
+  }
+  raw.splice(0, raw.length, ...merged);
   const missing = raw.filter((i) => !labelInText(i.label, flat));
   if (missing.length > Math.floor(raw.length * 0.2)) return { reason: `원문에 없는 항목 이름: ${missing.map((m) => m.label).slice(0, 3).join(", ")}` };
   const items: EvalItem[] = raw.map((i) => {
@@ -316,8 +329,8 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
       pass,
       source: "extracted",
       reader: { by: "ai", model },
-      confidence: missing.length === 0 && !scaleNotes.length && !dropped ? "높음" : "보통",
-      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...scaleNotes, ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
+      confidence: missing.length === 0 && !scaleNotes.length ? "높음" : "보통",
+      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...scaleNotes, ...(mergedNames.length ? [`쪽이 넘어가며 다시 적힌 같은 평가항목을 하나로 합침: ${[...new Set(mergedNames)].join(", ")}`] : []), ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
       ...(out.panel_rule ? { panelRule: out.panel_rule.slice(0, 120) } : {}),
     },
   };

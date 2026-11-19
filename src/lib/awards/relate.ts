@@ -104,3 +104,44 @@ export async function relateWithAI(client: Anthropic, target: RelateTarget, a: P
   const same = out.items.filter((i) => i.same && known.has(i.no)).map((i) => i.no);
   return { ...base, status: "ok", same, reason: out.items.map((i) => `${i.no} ${i.same ? "같음" : "다름"}: ${i.why}`).join(" / ").slice(0, 600), usage };
 }
+
+const KIND_SYSTEM = `당신은 한국 공공조달(나라장터) 낙찰 자료를 정리하는 분석가입니다.
+'지금 공고'와 여러 기관의 과거 낙찰 공고 후보들이 주어집니다. 각 후보가 지금 공고와 같은 종류의 일인지 판단하세요.
+같은 종류의 일이란: 기관은 달라도 같은 업체들이 참가해 겨룰 만한 계약입니다. 대상의 종류와 업무 종류가 같아야 합니다.
+- 같은 종류: 다른 기관의 같은 업무(예: 다른 공사의 "선택적복지제도 복지카드 사업자 선정"), 지역·연도·규모만 다른 같은 업무.
+- 다른 종류: 낱말만 겹치고 업무가 다른 공고(예: "복지관 청소"와 "복지포인트 운영"), 업무 종류가 다른 공고(유지관리와 구축·감리·설계), 대상 종류가 다른 공고(초음파진단기와 내시경).
+- 애매하면 다른 종류로 판단하세요.
+각 후보마다 판단과 열 단어 안쪽의 이유를 답하세요.`;
+
+export interface KindCandidate { no: string; title: string; agency: string; date: string; amount: number }
+
+/** 핵심어로 찾은 다른 기관 낙찰 가운데 같은 종류의 일만 고른다 (참가 예상 기업을 거르는 데 쓴다) */
+export async function relateKindWithAI(client: Anthropic, target: RelateTarget, cands: KindCandidate[], model?: string): Promise<{ same: string[]; usage: { input: number; output: number }; status: RelateResult["status"] }> {
+  const m = model || DEFAULT_RELATE_MODEL;
+  if (!cands.length) return { same: [], usage: { input: 0, output: 0 }, status: "none" };
+  const user = [
+    `지금 공고: ${target.title}`,
+    `수요기관: ${target.agency}`,
+    target.baseAmount ? `금액: ${won(target.baseAmount)}` : "",
+    "",
+    "과거 낙찰 후보 (공고번호 | 기관 | 낙찰일 | 공고명 | 금액):",
+    cands.map((c) => `- ${c.no} | ${c.agency} | ${c.date} | ${c.title} | ${won(c.amount)}`).join("\n"),
+  ].filter((x) => x !== "").join("\n");
+  const msg = await client.messages.create({
+    model: m,
+    max_tokens: 4000,
+    output_config: { format: { type: "json_schema", schema: SCHEMA as unknown as Record<string, unknown> } },
+    system: KIND_SYSTEM,
+    messages: [{ role: "user", content: user }],
+  } as Anthropic.MessageCreateParamsNonStreaming);
+  const usage = { input: msg.usage.input_tokens, output: msg.usage.output_tokens };
+  if (msg.stop_reason === "refusal" || msg.stop_reason === "max_tokens") return { same: [], usage, status: "error" };
+  const raw = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
+  try {
+    const out = JSON.parse(raw) as { items: { no: string; same: boolean }[] };
+    const known = new Set(cands.map((c) => c.no));
+    return { same: out.items.filter((i) => i.same && known.has(i.no)).map((i) => i.no), usage, status: "ok" };
+  } catch {
+    return { same: [], usage, status: "error" };
+  }
+}

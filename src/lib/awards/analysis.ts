@@ -436,7 +436,14 @@ export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined
 export interface KwLookup { n: number; get(k: string): KwPosting | undefined }
 
 /** 공고명 핵심어가 같은 다른 낙찰: 핵심어마다 흔한 정도(df)로 무게를 매겨 가중 Dice가 RELATED_MIN 이상인 것 */
-export function relatedAwards(t: AnalyzeTarget, kw: KwLookup): Related | undefined {
+export function relatedAwards(t: AnalyzeTarget, kw: KwLookup, keep?: (r: KwRow) => boolean): Related | undefined {
+  const c = relatedRows(t, kw);
+  if (!c) return undefined;
+  return summarizeRelated(keep ? { ...c, top: c.top.filter((x) => keep(x.r)) } : c);
+}
+
+/** 핵심어가 겹치는 다른 낙찰 (가까운 순 최대 30건). 3건이 안 되면 없음 */
+export function relatedRows(t: AnalyzeTarget, kw: KwLookup): { n: number; tw: Map<string, number>; top: { r: KwRow; s: number; used: string[] }[] } | undefined {
   const biz = t.bizType === "공사" || t.bizType === "물품" ? t.bizType : "용역";
   const posted = t.postedAt.slice(0, 10);
   const terms = keywords(t.title);
@@ -454,7 +461,11 @@ export function relatedAwards(t: AnalyzeTarget, kw: KwLookup): Related | undefin
   }).filter((x) => x.s >= RELATED_MIN && !kindsDiffer(t.title, x.r[1]));
   if (scored.length < 3) return undefined;
   scored.sort((a, b) => b.s - a.s || b.r[3].localeCompare(a.r[3]));
-  const top = scored.slice(0, 30);
+  return { n: scored.length, tw, top: scored.slice(0, 30) };
+}
+
+function summarizeRelated({ n, tw, top }: NonNullable<ReturnType<typeof relatedRows>>): Related | undefined {
+  if (top.length < 3) return undefined;
   const cnt = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
   const wins = new Map<string, number>(), ranked = new Map<string, number>(), usedT = new Map<string, number>();
   for (const { r, used } of top) {
@@ -466,7 +477,7 @@ export function relatedAwards(t: AnalyzeTarget, kw: KwLookup): Related | undefin
   const rates = top.filter(({ r }) => r[7] !== 1 && r[6] > 50 && r[6] <= 110).map(({ r }) => r[6]);
   const bids = top.filter(({ r }) => r[7] > 1).map(({ r }) => r[7]);
   const out: Related = {
-    n: scored.length,
+    n,
     terms: [...usedT].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 4),
     ex: top.slice(0, 8).map(({ r }) => [r[0], r[1], r[2], r[3], r[5], r[6], r[7], r[10], r[11], r[12].map(([n, x]) => [n, x] as RankCell)]),
     winners: [...wins].sort((a, b) => b[1] - a[1]).slice(0, 8),

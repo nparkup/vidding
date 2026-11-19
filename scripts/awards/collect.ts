@@ -32,7 +32,8 @@ import {
 } from "../../src/lib/awards/format";
 import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
 import {
-  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, forecast, methodCode, METHOD_NAME, quantile, r3, similarKey,
+  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, bandOfAmount, firstLic, forecast, likelyBidders, methodCode, METHOD_NAME, quantile, r3, relatedRows, relatedAwards, similarKey,
+  type AnalyzeTarget,
   type AgencyIndexFile,
   KW_MIN_DF, KW_ROWS, keywords, kwBucket, type KwIndexFile, type KwLookup, type KwPosting, type KwRow,
   type AwardAnalysis, type AgencyRow, type SimilarIndexFile, type SimilarStat,
@@ -537,9 +538,10 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
     // 색인만: 샤드·통계·수집 상태는 건드리지 않는다 (동시에 도는 수집 실행의 manifest.json 을 덮지 않게 바로 올린다)
     const ix = await buildIndexes([...shards.values()].flat(), async (key, body) => { await r2Put(key, body, "application/gzip"); writeLocal(key, body); return true; });
     printSamples(ix);
-    const trial = backtest(ix);
+    const { trial, relTrial } = backtest(ix);
     await checkNotices(ix);
     await relateTrial(trial);
+    await relateKindTrial(relTrial, ix.kw);
     return { rows, shards: keys.length };
   }
   let uploaded = 0;
@@ -776,13 +778,44 @@ function printSamples(ix: Awaited<ReturnType<typeof buildIndexes>>) {
  */
 const fmtWon = (n: number) => (n >= 1e8 ? `${(n / 1e8).toFixed(1)}억` : n >= 1e4 ? `${Math.round(n / 1e4).toLocaleString()}만` : `${n}`);
 
-function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { a: AwardAnalysis; actual: Actual }[] {
+type Trial = { a: AwardAnalysis; actual: Actual; target: AnalyzeTarget };
+const regionKey = (raw: string) => (raw ? raw.split(/\s*,\s*/).filter(Boolean).sort().join(",") : "전국");
+
+function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { trial: Trial[]; relTrial: Trial[] } {
   const since = iso(addDays(mondayOf(kstNow()), -56));
+  // 참가 지역·업종 묶음별 참가업체 수 (되짚어 보는 8주보다 앞선 3년만)
+  const from3 = iso(addDays(mondayOf(kstNow()), -56 - 365 * 3));
+  const rg = new Map<string, number[]>();
+  for (const r of ix.rows) {
+    if (r[9] >= since) continue;
+    if (r[9] < from3) break;
+    if (!(r[10] > 0)) continue;
+    const m = methodCode(r[11]);
+    const band = bandOfAmount(r[20] || r[12] || r[7]);
+    const reg = regionKey(r[18]);
+    const lic = firstLic(r[19]);
+    const ks = [`${r[4]}|${m}|${band}|r:${reg}`];
+    if (lic) ks.push(`${r[4]}|${m}|${band}|l:${lic}|r:${reg}`);
+    for (const k of ks) (rg.get(k) ?? rg.set(k, []).get(k)!).push(r[10]);
+  }
+  const rgMed = new Map<string, number>();
+  const regionBidders = (biz: string, m: string, base: number, region: string, licRaw: string): number | undefined => {
+    const band = bandOfAmount(base), reg = regionKey(region), lic = firstLic(licRaw);
+    for (const k of [lic ? `${biz}|${m}|${band}|l:${lic}|r:${reg}` : "", `${biz}|${m}|${band}|r:${reg}`]) {
+      if (!k) continue;
+      const v = rg.get(k);
+      if (!v || v.length < 20) continue;
+      if (!rgMed.has(k)) rgMed.set(k, quantile([...v].sort((a, b) => a - b), 0.5));
+      return rgMed.get(k);
+    }
+    return undefined;
+  };
+  const relTrial: Trial[] = [];
   const range = { from: "", to: "" };
   type Acc = { n: number; rateN: number; rateErr: number[]; inBand: number; bidN: number; bidIn: number; bidErr: number[]; prior: number; priorNear: number; priorErr: number[]; hist: number; maybe: number; maybeN: number; exN: number };
   const accs = { old: new Map<string, Acc>(), now: new Map<string, Acc>() };
   const diffs: string[] = [];
-  const trial: { a: AwardAnalysis; actual: Actual }[] = [];
+  const trial: Trial[] = [];
   const exp = new Map<string, Map<string, number[]>>();
   const put = (k: string, v: string, e: number) => { const m = exp.get(k) ?? exp.set(k, new Map()).get(k)!; (m.get(v) ?? m.set(v, []).get(v)!).push(e); };
   let seen = 0;
@@ -821,8 +854,10 @@ function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { a: AwardAnaly
         x.bidErr.push(Math.abs(mid - r[10]) / Math.max(1, r[10]));
       }
     }
-    if (pair.now.maybe?.length && trial.length < 200 && seen % 23 === 0) trial.push({ a: pair.now, actual: { winner: r[1], rate: r[8], bidders: r[10], lwlt: r[22], method: target.contractMethod } });
-    experiments(`${r[4]} ${METHOD_NAME[m]}`, pair.now, { rate: r[8], bidders: r[10], lwlt: r[22], method: target.contractMethod }, put);
+    const actual: Actual = { winner: r[1], rate: r[8], bidders: r[10], lwlt: r[22], method: target.contractMethod, top: r[25].map((x) => x[2]).filter(Boolean) };
+    if (pair.now.maybe?.length && trial.length < 200 && seen % 23 === 0) trial.push({ a: pair.now, actual, target });
+    if (pair.now.related && relTrial.length < 150 && seen % 29 === 0) relTrial.push({ a: pair.now, actual, target });
+    experiments(`${r[4]} ${METHOD_NAME[m]}`, pair.now, actual, put, regionBidders(r[4], m, target.baseAmount, r[18], r[19]));
     if (diffs.length < 40 && pair.old.prior && pair.old.prior.no !== pair.now.prior?.no && seen % 7 === 0) {
       diffs.push(`PRIOR_DIFF ${r[4]} | ${r[5]} | ${fmtWon(target.baseAmount)} || 전: ${pair.old.prior.title} (${pair.old.prior.date}, ${fmtWon(pair.old.prior.base || pair.old.prior.amount)}) || 후: ${pair.now.prior ? `${pair.now.prior.title} (${pair.now.prior.date}, ${fmtWon(pair.now.prior.base || pair.now.prior.amount)})` : "없음"}${pair.now.maybe?.length ? ` || 애매 ${pair.now.maybe.length}건: ${pair.now.maybe.slice(0, 3).map((x) => x.title).join(" / ")}` : ""}`);
     }
@@ -836,17 +871,17 @@ function backtest(ix: Awaited<ReturnType<typeof buildIndexes>>): { a: AwardAnaly
   }
   for (const d of diffs) console.log(d);
   for (const [k, m] of [...exp].sort()) {
-    console.log(`EXP ${k}: ${[...m].map(([v, e]) => `${v} ${e.length}건 ${v.startsWith("B") ? `${Math.round(med(e) * 100)}%` : `${med(e)}%p (1%p 안 ${pc(e.filter((x) => x <= 1).length, e.length)})`}`).join(" | ")}`);
+    console.log(`EXP ${k}: ${[...m].map(([v, e]) => `${v} ${e.length}건 ${v.startsWith("L") || v.startsWith("C") ? `${pc(e.reduce((x, y) => x + y, 0), e.length)}` : v.startsWith("W") ? `${med(e)}%p` : v.startsWith("B") ? `${Math.round(med(e) * 100)}%` : `${med(e)}%p (1%p 안 ${pc(e.filter((x) => x <= 1).length, e.length)})`}`).join(" | ")}`);
   }
-  return trial;
+  return { trial, relTrial };
 }
 
-type Actual = { winner?: string; rate: number; bidders: number; lwlt: number; method: string };
+type Actual = { winner?: string; rate: number; bidders: number; lwlt: number; method: string; top?: string[] };
 /**
  * 정확도 실험: 같은 공고에 여러 예측 방법을 적용해 실제와의 오차를 모은다 (R = 낙찰률 %p, B = 참가업체 수 상대 오차)
  * 모든 방법은 같은 표본(그 방법이 값을 내는 공고)에서 비교하도록, 값을 못 내면 R0/B0 값을 쓴다
  */
-function experiments(k: string, a: AwardAnalysis, act: Actual, put: (k: string, v: string, e: number) => void) {
+function experiments(k: string, a: AwardAnalysis, act: Actual, put: (k: string, v: string, e: number) => void, regB?: number) {
   const fc = forecast(a, { contractMethod: act.method, lowerLimitRate: act.lwlt || undefined });
   const okRate = act.rate > 50 && act.rate <= 110;
   const h = a.history.filter((x) => x.bidders !== 1);
@@ -886,6 +921,31 @@ function experiments(k: string, a: AwardAnalysis, act: Actual, put: (k: string, 
     // B4: 같은 사업 최근 3건과 비슷한 공고를 기하평균으로 (참가 수는 곱셈적으로 퍼진다)
     const b4 = hb.length && gb ? Math.sqrt(medOf(hb.slice(0, 3)) * gb) : b0;
     put(k, "B4 기하평균", rel(b4));
+    // B5: 같은 사업 이력이 2건 미만이면 비슷한 공고 대신 같은 참가 지역·업종 묶음 중앙값
+    const b5 = hb.length < 2 && regB ? regB : b0;
+    put(k, "B5 지역업종", rel(b5));
+    // B6: 같은 사업 이력이 2건 미만이면 비슷한 공고와 지역·업종 묶음의 기하평균
+    const b6 = hb.length < 2 && regB ? Math.sqrt(b0 * regB) : b0;
+    put(k, "B6 지역업종섞기", rel(b6));
+    // B7: 늘 지금 값과 지역·업종 묶음의 기하평균
+    put(k, "B7 늘섞기", rel(regB ? Math.sqrt(b0 * regB) : b0));
+    // 참가업체 예상 범위가 실제를 담은 비율과 범위 폭
+    const [lo, , hi] = fc.bidders.q;
+    put(k, "C1 참가범위안", act.bidders >= lo && act.bidders <= hi ? 1 : 0);
+  }
+  // 낙찰률 범위: 같은 사업 25~75% (2건 이상), 없으면 비슷한 공고 25~75%. 실제를 담은 비율과 폭
+  if (okRate) {
+    const hr = h.map((x) => x.rate).filter((x) => x > 50 && x <= 110).sort((x, y) => x - y);
+    const q = hr.length >= 2 ? [quantile(hr, 0.25), quantile(hr, 0.75)] : st?.rate ? [st.rate.q[1], st.rate.q[3]] : undefined;
+    if (q) { put(k, "C2 낙찰률범위안", act.rate >= q[0] && act.rate <= q[1] ? 1 : 0); put(k, "W2 범위폭", q[1] - q[0]); }
+    const q9 = hr.length >= 3 ? [hr[0], hr[hr.length - 1]] : st?.rate ? [st.rate.q[0], st.rate.q[4]] : undefined;
+    if (q9) { put(k, "C3 넓은범위안", act.rate >= q9[0] && act.rate <= q9[1] ? 1 : 0); put(k, "W3 넓은폭", q9[1] - q9[0]); }
+  }
+  // 참가 예상 기업: 실제 낙찰자가 들어 있는 비율 (L0 지금, L1 다른 기관 핵심어 낙찰을 빼고)
+  if (act.winner) {
+    const has = (l?: { name: string }[]) => (l ?? []).some((x) => x.name === act.winner) ? 1 : 0;
+    put(k, "L0 낙찰자포함", has(fc.likely));
+    put(k, "L1 핵심어빼고", has(likelyBidders(a.history, a.similar && !a.similar.key.endsWith("|*") ? st : undefined)));
   }
 }
 
@@ -922,7 +982,40 @@ async function checkNotices(ix: Awaited<ReturnType<typeof buildIndexes>>) {
  * 애매한 후보 확인 시험: RELATE_TRIAL 건만큼 실제로 Claude에 물어, 확인 전·후의 전년도 찾음 비율과 낙찰률·참가업체 오차를 비교한다
  * (ANTHROPIC_API_KEY 가 있을 때만)
  */
-async function relateTrial(trial: { a: AwardAnalysis; actual: Actual }[]) {
+/** 핵심어로 찾은 다른 기관 낙찰을 같은 종류의 일인지 확인해 거른 뒤, 참가 예상 기업에 실제 낙찰자·상위 업체가 드는지 전후 비교 */
+async function relateKindTrial(trial: Trial[], kw: KwLookup) {
+  const n = Number(process.env.RELATE_TRIAL || 0);
+  if (!n || !process.env.ANTHROPIC_API_KEY || !trial.length) return;
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const { relateKindWithAI } = await import("../../src/lib/awards/relate");
+  const client = new Anthropic({ maxRetries: 2 });
+  let done = 0, tin = 0, tout = 0, cands = 0, kept = 0, winB = 0, winA = 0, topB = 0, topA = 0, gone = 0;
+  for (const { a, actual, target } of trial.slice(0, n)) {
+    const c = relatedRows(target, kw);
+    if (!c) continue;
+    try {
+      const r = await relateKindWithAI(client, { title: target.title, agency: target.demandAgency, baseAmount: target.baseAmount }, c.top.map(({ r }) => ({ no: r[0], title: r[1], agency: r[2], date: r[3], amount: r[9] || r[5] })));
+      if (r.status !== "ok") continue;
+      done++; cands += c.top.length; kept += r.same.length; tin += r.usage.input; tout += r.usage.output;
+      const ok = new Set(r.same);
+      const after = relatedAwards(target, kw, (x) => ok.has(x[0]));
+      const sim = a.similar && !a.similar.key.endsWith("|*") ? a.similar.stat : undefined;
+      const lb = likelyBidders(a.history, a.related ? { winners: a.related.winners, ranked: a.related.ranked } : sim);
+      const la = likelyBidders(a.history, after ? { winners: after.winners, ranked: after.ranked } : sim);
+      if (!after) gone++;
+      const real = new Set([actual.winner, ...(actual.top ?? [])].filter(Boolean) as string[]);
+      const hitW = (l: { name: string }[]) => (l.some((x) => x.name === actual.winner) ? 1 : 0);
+      const hitT = (l: { name: string }[]) => l.filter((x) => real.has(x.name)).length;
+      winB += hitW(lb); winA += hitW(la); topB += hitT(lb); topA += hitT(la);
+      if (done <= 6) console.log(`KIND_TRIAL ${target.title} | 후보 ${c.top.length}건 중 같은 종류 ${r.same.length}건 | 전: ${lb.slice(0, 5).map((x) => x.name).join(", ")} | 후: ${la.slice(0, 5).map((x) => x.name).join(", ")} | 실제: ${[...real].slice(0, 4).join(", ")}`.slice(0, 900));
+    } catch (e) {
+      console.log(`KIND_TRIAL 실패: ${(e as Error).message.slice(0, 200)}`);
+    }
+  }
+  if (done) console.log(`KIND_EVAL ${done}건 · 후보 ${cands}건 중 같은 종류 ${kept}건 · 다 걸러져 핵심어 낙찰이 없어진 공고 ${gone}건 · 참가 예상 8곳에 실제 낙찰자 ${winB}→${winA}건 · 실제 낙찰자·개찰 상위 업체가 든 수 ${topB}→${topA} · 공고당 입력 ${Math.round(tin / done)} 출력 ${Math.round(tout / done)} 토큰`);
+}
+
+async function relateTrial(trial: Trial[]) {
   const n = Number(process.env.RELATE_TRIAL || 0);
   if (!n || !process.env.ANTHROPIC_API_KEY || !trial.length) return;
   const { default: Anthropic } = await import("@anthropic-ai/sdk");

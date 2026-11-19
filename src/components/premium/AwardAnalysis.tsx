@@ -70,7 +70,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
                       <span className="shrink-0 font-bold tabular-nums">{won(r.amount)}</span>
                     </div>
                     <p className="text-xs text-ink-500">
-                      {r.date} · {r.wr ? `개찰 ${r.wr}위` : "순위 확인 중"} · 낙찰률 {r.rate ? pct(r.rate) : "-"} · {r.bidders}곳
+                      {[r.date, r.wr ? `개찰 ${r.wr}위` : "순위 확인 중", r.rate ? `낙찰률 ${pct(r.rate)}` : "", `${r.bidders}곳`].filter(Boolean).join(" · ")}
                     </p>
                     {r.title && <p className="truncate text-xs text-ink-300">{r.title}</p>}
                   </li>

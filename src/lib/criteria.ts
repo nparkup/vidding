@@ -545,7 +545,13 @@ export function tableCheck(bid: Pick<Bid, "bizType" | "baseAmount" | "category">
  */
 export function adoptable(ex: EvalSheet, b?: EvalBasis): boolean {
   const price = ex.items.filter((i) => i.kind === "price");
-  if (ex.items.length < 3 || price.length !== 1) return false;
+  if (ex.items.length < 3 || price.length > 1) return false;
+  // 가격평가가 없는 공고(기술 100점, 비예산 사업 등): 나라장터에 가격 배점이 없고 항목 합이 100점이어야 한다
+  if (price.length === 0) {
+    if ((b?.priceRatio ?? 0) > 0) return false;
+    if (b?.techRatio !== undefined && Math.abs(b.techRatio - 100) > 0.5) return false;
+    return Math.abs(ex.items.reduce((a, i) => a + i.max, 0) - 100) <= 0.5;
+  }
   // 산식·등급 줄을 항목으로 잘못 읽은 경우
   if (ex.items.some((i) => /[=＝]|^평점|^[o□■①-⑳]\s/.test(i.label))) return false;
   // 협상계약은 공고의 기술·가격 배점(나라장터 목록 값)과 맞아야 한다

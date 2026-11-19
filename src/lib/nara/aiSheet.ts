@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 1;
+export const AI_SHEET_VERSION = 3;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -84,12 +84,13 @@ const nullable = (t: string) => ({ type: [t, "null"] });
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["found", "reason", "table_quote", "tech_total", "price_total", "pass", "panel_rule", "items"],
+  required: ["found", "reason", "table_quote", "stated_total", "tech_total", "price_total", "pass", "panel_rule", "items"],
   properties: {
     found: { type: "boolean", description: "이 공고에 적용되는 배점표(평가항목별 배점)가 본문에 있으면 true" },
     reason: { type: "string", description: "판단 근거 한두 문장. 못 찾았으면 그 이유" },
     table_quote: { type: "string", description: "배점표 제목이나 머리글 줄을 원문 그대로" },
-    tech_total: { ...nullable("number"), description: "기술(능력) 평가 배점 합계. 없으면 null" },
+    stated_total: { ...nullable("number"), description: "배점표의 합계·총점 줄에 적힌 숫자 그대로 (항목을 더한 값이 아님). 합계 줄이 없으면 null" },
+    tech_total: { ...nullable("number"), description: "기술(능력) 평가 배점 합계. 표 합계 줄이나 공고 문장에 적힌 값. 없으면 null" },
     price_total: { ...nullable("number"), description: "입찰가격 평가 배점. 없으면 null" },
     pass: {
       type: "object",
@@ -148,6 +149,9 @@ const SYSTEM = `당신은 한국 공공조달(나라장터) 입찰공고의 첨�
 - 정량 항목(신용평가등급, 수행실적, 인력, 업력 등)의 구간별 점수는 bands 에 모두 적습니다.
 - kind: performance 실적, credit 신용평가·경영상태 등급, finance 재무비율, price 입찰가격, staff 기술인력, years 업력, bonus 신인도·가감점, qualitative 제안서·정성 평가, capability PQ 점수 환산, plan 이행계획서 제출, techGrade 물품 기술등급, other 그 밖.
 - 입찰가격 배점은 price 항목 하나로 넣습니다. 입찰 보증금·계약 조항의 숫자(예: 100분의 5, 제39조)는 배점이 아닙니다.
+- "가격평가를 하지 않음", "비예산 사업으로 가격평가점수 미포함"처럼 가격평가가 없으면 price 항목을 넣지 않고 price_total 은 0 으로 둡니다.
+- 표의 합계 줄과 항목 배점의 합이 다르면 고치거나 항목을 빼서 맞추지 말고 읽은 그대로 쓰고, 합계 줄의 숫자는 stated_total 에 적고, reason 에 그 차이를 적습니다.
+- 이름이 같은 항목이 표에 실제로 두 줄 있으면(세부 기준이 다름) 둘 다 쓰고, quote 와 criteria 로 구분되게 적습니다.
 - 공고서·제안요청서·평가기준이 서로 다르면 공고에 첨부된 이 사업의 평가표를 따릅니다.`;
 
 export async function readSheetWithAI(
@@ -199,6 +203,7 @@ export interface AiOut {
   found: boolean;
   reason: string;
   table_quote: string;
+  stated_total: number | null;
   tech_total: number | null;
   price_total: number | null;
   pass: { kind: "total" | "techRatio" | "none"; value: number | null; quote: string };
@@ -243,6 +248,16 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   const flat = squash(text);
   const raw = out.items.filter((i) => i.max > 0 || i.kind === "bonus");
   if (raw.length < 2) return { reason: "평가항목이 2개 미만" };
+  // 같은 이름·같은 원문 문구가 두 번 나오면 AI가 한 칸을 두 번 읽은 것으로 보고 하나만 쓴다
+  const seen = new Set<string>();
+  const dedup = raw.filter((i) => {
+    const k = `${squash(i.label)}|${squash(i.quote)}|${i.max}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const dropped = raw.length - dedup.length;
+  raw.splice(0, raw.length, ...dedup);
   const missing = raw.filter((i) => !labelInText(i.label, flat));
   if (missing.length > Math.floor(raw.length * 0.2)) return { reason: `원문에 없는 항목 이름: ${missing.map((m) => m.label).slice(0, 3).join(", ")}` };
   const items: EvalItem[] = raw.map((i) => {
@@ -263,11 +278,30 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   if (!items.some((i) => i.kind === "price") && out.price_total && out.price_total > 0) {
     items.push({ id: `ai${++seq}`, group: "입찰가격", label: "입찰가격", max: out.price_total, kind: "price", basis: `입찰가격 평가 ${out.price_total}점` });
   }
-  if (items.filter((i) => i.kind === "price").length !== 1) return { reason: "입찰가격 항목이 하나가 아님" };
-  const sum = Math.round(items.reduce((a, i) => a + i.max, 0) * 100) / 100;
-  if (Math.abs(sum - 100) > 0.5) return { reason: `배점 합계 ${sum}점` };
-  const price = items.find((i) => i.kind === "price")!.max;
-  if (out.tech_total !== null && out.price_total !== null && Math.abs(out.tech_total + price - 100) > 0.5) return { reason: `기술 ${out.tech_total} + 가격 ${price} ≠ 100` };
+  const prices = items.filter((i) => i.kind === "price");
+  // 가격평가가 없는 공고(기술 100점)는 가격 항목 없이 받는다. 가격 배점이 적혀 있는데 항목이 없거나 둘 이상이면 탈락
+  if (prices.length > 1 || (prices.length === 0 && (out.price_total ?? 0) > 0)) return { reason: "입찰가격 항목을 하나로 정하지 못함" };
+  const price = prices[0]?.max ?? 0;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const sum = round2(items.reduce((a, i) => a + i.max, 0));
+  const scaleNotes: string[] = [];
+  if (Math.abs(sum - 100) > 0.5) {
+    // 표 합계 줄이 우선: 원문에 "합계 100"처럼 적힌 합계가 있으면 기술 항목을 그 합계에 맞게 비율로 환산한다
+    const stated = out.stated_total;
+    const techSum = sum - price;
+    const target = 100 - price;
+    const statedOk = stated !== null && (Math.abs(stated - 100) <= 0.5 || Math.abs(stated - target) <= 0.5)
+      && new RegExp(`(합계|총계|총점|계)${String(stated).replace(".", "\\.")}(?!\\d)`).test(flat);
+    const f = techSum > 0 ? target / techSum : 0;
+    if (!statedOk || f < 0.5 || f > 2) return { reason: `항목 배점을 더하면 ${sum}점이라 100점과 맞지 않음` };
+    for (const it of items) {
+      if (it.kind === "price") continue;
+      it.max = round2(it.max * f);
+      if (it.bands) it.bands = it.bands.map((b) => ({ ...b, points: round2(b.points * f) }));
+    }
+    scaleNotes.push(`표 합계 ${stated}점 기준: 항목을 더하면 ${sum}점이라 각 항목을 ${stated}점에 맞게 비율 환산(x${f.toFixed(3)})`);
+  }
+  if (out.tech_total !== null && Math.abs(out.tech_total + price - 100) > 0.5) return { reason: `기술 ${out.tech_total}점 + 가격 ${price}점이 100점이 아님` };
   const pass: EvalSheet["pass"] =
     out.pass.kind === "total" && out.pass.value && out.pass.value > 0 && out.pass.value <= 100 ? { kind: "total", score: out.pass.value }
       : out.pass.kind === "techRatio" && out.pass.value && out.pass.value > 0 && out.pass.value < 1 ? { kind: "techRatio", ratio: out.pass.value }
@@ -281,8 +315,8 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
       pass,
       source: "extracted",
       reader: { by: "ai", model },
-      confidence: missing.length === 0 ? "높음" : "보통",
-      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, out.reason.slice(0, 160)],
+      confidence: missing.length === 0 && !scaleNotes.length && !dropped ? "높음" : "보통",
+      notes: [`AI 판독: ${out.table_quote.replace(/\s+/g, " ").slice(0, 80)}`, ...scaleNotes, ...(dropped ? [`같은 항목을 두 번 읽은 ${dropped}건 제외`] : []), ...(price ? [] : ["가격평가 없음 (기술 100점)"]), out.reason.slice(0, 160)],
       ...(out.panel_rule ? { panelRule: out.panel_rule.slice(0, 120) } : {}),
     },
   };

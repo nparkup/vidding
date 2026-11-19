@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 7;
+export const AI_SHEET_VERSION = 8;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -311,7 +311,26 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
     } else grouped.push(...run);
     k = end;
   }
-  raw.splice(0, raw.length, ...grouped);
+  // 그래도 표 합계(100점)와 맞지 않으면, 괄호 속 설명만 다르고 이름·배점이 같은 항목이 바로 이어진 경우도
+  // 쪽 넘김으로 다시 적힌 한 칸으로 본다. 합이 100점으로 맞을 때만 받아들인다
+  const total = (l: AiItem[]) => l.reduce((a, i) => a + i.max, 0);
+  let final = grouped;
+  if (Math.abs(total(grouped) - 100) > 0.5) {
+    const baseName = (l: string) => l.replace(/\(.*?\)/g, "").replace(/\s+/g, " ").trim();
+    const loose: AiItem[] = [];
+    const looseNames: string[] = [];
+    for (const i of grouped) {
+      const prev = loose[loose.length - 1];
+      if (prev && squash(baseName(prev.label)) && squash(baseName(prev.label)) === squash(baseName(i.label)) && prev.max === i.max && prev.kind === i.kind) {
+        loose[loose.length - 1] = { ...prev, label: baseName(prev.label), quote: `${prev.quote} / ${i.quote}`, criteria: [...prev.criteria, i.label, ...i.criteria], bands: prev.bands.length ? prev.bands : i.bands };
+        looseNames.push(baseName(prev.label));
+        continue;
+      }
+      loose.push(i);
+    }
+    if (Math.abs(total(loose) - 100) <= 0.5) { final = loose; mergedNames.push(...looseNames); }
+  }
+  raw.splice(0, raw.length, ...final);
   const missing = raw.filter((i) => !labelInText(i.label, flat));
   if (missing.length > Math.floor(raw.length * 0.2)) return { reason: `원문에 없는 항목 이름: ${missing.map((m) => m.label).slice(0, 3).join(", ")}` };
   const items: EvalItem[] = raw.map((i) => {

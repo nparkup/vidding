@@ -96,6 +96,8 @@ export function mapRegions(s?: string): Region[] {
 
 function mapMethod(s?: string): ContractMethod {
   if (!s) return "적격심사";
+  // 수의시담·수의시담(2인 이상)은 지정 업체와만 계약하는 건이라 소액수의견적과 따로 둔다
+  if (s.includes("시담")) return "수의시담";
   if (s.includes("협상")) return "협상에 의한 계약";
   if (s.includes("최저가") && !s.includes("제한적")) return "최저가";
   if (s.includes("수의")) return "수의계약(소액)";
@@ -239,6 +241,8 @@ export function mapStdItem(it: Item): Bid | null {
     licenseRaw: splitLicenses(it.bidprcPsblIndstrytyNm).join(", ") || undefined,
     baseAmount: amount,
     contractMethod: method,
+    awardRaw: it.bidwinrDcsnMthdNm?.trim() || undefined,
+    contractType: it.cntrctCnclsMthdNm?.trim() || undefined,
     lowerLimitRate: rate,
     jointContract: it.cmmnCntrctYn === "Y",
     smallBizOnly: false,

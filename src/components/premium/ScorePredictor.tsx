@@ -15,6 +15,7 @@ import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
 import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "@/lib/eligibility";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
+import { closedLabel, methodProfile } from "@/lib/bidMethod";
 import { estimateRival, MIN_SAMPLES, type AwardStats, type RivalEstimate } from "@/lib/rivalRate";
 import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
@@ -137,6 +138,10 @@ export function ScorePredictor() {
     return bidId ? bids.find((b) => b.id === bidId) : undefined;
   }, [bids, bidId]);
 
+  // 수의시담·지명경쟁처럼 정해진 업체만 참가하는 공고는 평가점수를 예측하지 않는다
+  const profile = useMemo(() => (bid ? methodProfile(bid) : undefined), [bid]);
+  const closedBid = !!profile && !profile.open;
+
   // 공고를 고르면 첨부 목록과, 첨부에서 미리 추출해 둔 평가표를 불러온다 (없으면 표준 평가표)
   const [docs, setDocs] = useState<BidDocs | null>(null);
   const [aiRead, setAiRead] = useState<AiRead>("idle");
@@ -171,6 +176,7 @@ export function ScorePredictor() {
     setDocs(null);
     setSheet(null);
     setAiRead("idle");
+    if (!methodProfile(bid).open) return;
     loadBidDocs(bid)
       .then((d) => {
         if (!alive) return;
@@ -320,7 +326,7 @@ export function ScorePredictor() {
                   <li key={m.id}>
                     <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
                       <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDay iso={m.closeAt} />{m.title}</span>
-                      <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
+                      <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
                     </button>
                   </li>
                 ))}
@@ -331,6 +337,32 @@ export function ScorePredictor() {
 
   if (error) return <p className="card p-6 text-sm text-coral">공고 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
   if (!bids) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
+
+  // 정해진 업체만 참가하는 공고: 평가표·점수 대신 까닭과 낙찰 방식을 보여 준다
+  if (bid && profile && closedBid) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <section className="card min-w-0 p-6">
+          <Step n={1} title="공고 선택" />
+          <div className="mt-4 rounded-2xl bg-paper p-4">
+            <p className="text-xs text-ink-500">{bid.bizType ?? "용역"} · {bid.category} · {bid.contractType ?? "계약방법 미상"} · {bid.awardRaw ?? bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
+            <p className="mt-1 font-bold leading-snug"><CloseDay iso={bid.closeAt} />{bid.title}</p>
+            <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}</p>
+          </div>
+          {searchBox}
+        </section>
+        <aside className="card min-w-0 p-6">
+          <p className="font-bold text-coral">평가점수 예측 대상이 아닌 공고</p>
+          <p className="mt-2 text-sm text-ink-700">{profile.closedReason}입니다. 나라장터도 이런 공고는 정보공개 차원에서 올리는 것이며 계약대상자가 아닌 업체는 참가할 수 없다고 안내합니다.</p>
+          <dl className="mt-4 space-y-2 text-sm">
+            <div><dt className="text-xs text-ink-500">참가할 수 있는 업체</dt><dd>{profile.who}</dd></div>
+            <div><dt className="text-xs text-ink-500">낙찰자 결정</dt><dd>{profile.decide}</dd></div>
+          </dl>
+          <p className="mt-4 text-xs text-ink-500">공개 경쟁 공고(일반·제한경쟁, 소액수의견적)를 골라 주세요.</p>
+        </aside>
+      </div>
+    );
+  }
 
   // 공고를 고르기 전: 검색만 보이고, 결과 자리에는 안내만 둔다
   if (!bid || !active || !result) {

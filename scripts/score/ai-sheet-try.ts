@@ -11,6 +11,7 @@ import type { Bid, BidAttachment } from "../../src/lib/types";
 import { adoptable, evalBasisOf, type EvalBasis } from "../../src/lib/criteria";
 import { extractSheet, templateSheet, type EvalSheet } from "../../src/lib/evalscore";
 import { download, rankFiles, textOf } from "../../src/lib/nara/docExtract";
+import { methodProfile } from "../../src/lib/bidMethod";
 import { DEFAULT_AI_MODEL, excerpt, hasTableSignal, readSheetWithAI } from "../../src/lib/nara/aiSheet";
 
 type Item = Record<string, string | undefined>;
@@ -166,6 +167,8 @@ async function main() {
     const found = await findNotice(a);
     if (!found) { console.log(`\n${a}: 공고를 찾지 못함`); continue; }
     const { it, biz } = found;
+    const prof = methodProfile({ contractMethod: "적격심사", awardRaw: it.sucsfbidMthdNm, contractType: it.cntrctCnclsMthdNm });
+    if (!prof.open) { console.log(`\n${a}: ${prof.closedReason} (${it.bidMethdNm} / ${it.cntrctCnclsMthdNm} / ${it.sucsfbidMthdNm}) → 평가점수 예측·AI 판독 제외`); summary.push(`제외 | ${a} | ${prof.closedReason}`); continue; }
     const att: BidAttachment[] = [];
     for (let n = 1; n <= 10; n++) if (it[`ntceSpecDocUrl${n}`]) att.push({ name: it[`ntceSpecFileNm${n}`] || `첨부 ${n}`, url: it[`ntceSpecDocUrl${n}`]!, kind: "규격서·기타" });
     const files: { name: string; text: string }[] = [];

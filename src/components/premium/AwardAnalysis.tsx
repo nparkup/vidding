@@ -1,7 +1,7 @@
 "use client";
 
 import { won } from "@/lib/format";
-import { METHOD_NAME, type AwardAnalysis, type Forecast, type PastAward, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
+import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PastAward, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 
@@ -24,9 +24,13 @@ const LEVEL_TONE: Record<string, string> = {
 };
 
 /** 결과 패널 옆: 낙찰 결과로 본 경쟁 강도·낙찰 가능성·가격 기준 */
-export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount }: { fc: Forecast; chance?: WinChance; isNego: boolean; bidRate: number; baseAmount: number }) {
+export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis }: { fc: Forecast; chance?: WinChance; isNego: boolean; bidRate: number; baseAmount: number; analysis?: AwardAnalysis | null }) {
   if (!fc.competition && !fc.winRate) return null;
   const prePrice = fc.pre && baseAmount ? Math.round((baseAmount * fc.pre.value) / 100) : 0;
+  // 최근 낙찰 결과: 같은 사업 이력이 있으면 그것, 없으면 비슷한 공고의 최근 낙찰
+  const recent: { key: string; date: string; winner: string; wr: number; amount: number; rate: number; bidders: number; title?: string }[] = analysis?.history.length
+    ? analysis.history.slice(0, 3).map((h) => ({ key: h.no, date: h.date, winner: h.winner, wr: h.wr, amount: h.amount, rate: h.rate, bidders: h.bidders }))
+    : (analysis?.similar?.stat.ex ?? []).slice(0, 3).map(([no, title, , date, amount, rate, bidders, winner, wr]) => ({ key: no, date, winner, wr: wr ?? 0, amount, rate, bidders, title }));
   return (
     <section className="card mt-4 p-6">
       <h3 className="font-bold">낙찰 결과로 본 예측</h3>
@@ -38,6 +42,41 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount }: { fc: 
               <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${LEVEL_TONE[fc.competition.level]}`}>{fc.competition.level}</span>
             </dt>
             <dd className="mt-0.5 text-xs text-ink-500">{fc.competition.text}</dd>
+            {fc.likely && fc.likely.length > 0 && (
+              <dd className="mt-2">
+                <p className="text-xs font-semibold text-ink-500">참가 예상 기업</p>
+                <ul className="mt-1 divide-y divide-ink-100 rounded-xl border border-ink-100">
+                  {fc.likely.slice(0, 6).map((b) => (
+                    <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
+                      <span className="min-w-0 truncate font-semibold">{b.name}</span>
+                      <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 비슷한 공고에 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
+              </dd>
+            )}
+          </div>
+        )}
+        {recent.length > 0 && (
+          <div>
+            <dt className="text-ink-500">{analysis?.history.length ? "같은 사업 최근 낙찰" : "비슷한 공고 최근 낙찰"}</dt>
+            <dd className="mt-1">
+              <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
+                {recent.map((r) => (
+                  <li key={r.key} className="min-w-0 px-3 py-1.5">
+                    <div className="flex min-w-0 items-baseline justify-between gap-2">
+                      <span className="min-w-0 truncate font-semibold">{r.winner}</span>
+                      <span className="shrink-0 font-bold tabular-nums">{won(r.amount)}</span>
+                    </div>
+                    <p className="text-xs text-ink-500">
+                      {r.date} · {r.wr ? `개찰 ${r.wr}위` : "순위 확인 중"} · 낙찰률 {r.rate ? pct(r.rate) : "-"} · {r.bidders}곳
+                    </p>
+                    {r.title && <p className="truncate text-xs text-ink-300">{r.title}</p>}
+                  </li>
+                ))}
+              </ul>
+            </dd>
           </div>
         )}
         {chance && (
@@ -129,18 +168,26 @@ function Fact({ label, value, note }: { label: string; value: React.ReactNode; n
   );
 }
 
-function RankList({ top, winner }: { top: PastAward["top"]; winner?: string }) {
+function likelyText(b: LikelyBidder) {
+  if (b.from === "same") return [b.wins ? `낙찰 ${b.wins}회` : "", b.top ? `상위 5위 ${b.top}회` : ""].filter(Boolean).join(" · ") + " (같은 사업)";
+  return [b.simWins ? `낙찰 ${b.simWins}회` : "", b.simTop ? `상위 5위 ${b.simTop}회` : ""].filter(Boolean).join(" · ") + " (비슷한 공고)";
+}
+
+function RankList({ top, winner, plnprc }: { top: PastAward["top"]; winner?: string; plnprc?: number }) {
   if (!top.length) return <p className="text-xs text-ink-300">개찰 순위는 아직 받는 중입니다.</p>;
   return (
     <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
-      {top.map(([name, rate], i) => (
+      {top.map(([name, rate, amount], i) => (
         <li key={`${i}-${name}`} className="flex min-w-0 items-center justify-between gap-3 px-3 py-1.5">
           <span className="flex min-w-0 items-center gap-2">
             <span className="w-8 shrink-0 text-xs text-ink-300 tabular-nums">{i + 1}위</span>
             <span className={`min-w-0 truncate ${name === winner ? "font-bold" : ""}`}>{name}</span>
             {name === winner && <span className="shrink-0 rounded bg-mint-50 px-1.5 text-xs font-semibold text-mint-700">낙찰</span>}
           </span>
-          <span className="shrink-0 tabular-nums text-ink-500">{rate ? pct(rate) : "-"}</span>
+          <span className="shrink-0 text-right tabular-nums text-ink-500">
+            {rate ? pct(rate) : "-"}
+            {(amount || (plnprc && rate)) ? <span className="block text-xs text-ink-300">{won(amount || Math.round(((plnprc ?? 0) * rate) / 100))}{amount ? "" : " 추정"}</span> : null}
+          </span>
         </li>
       ))}
     </ol>
@@ -167,7 +214,7 @@ function PriorCard({ prior }: { prior?: PastAward }) {
         {pre > 0 && <Fact label="예정가격 ÷ 기초금액" value={pct(pre)} note={`예정가격 ${eok(prior.plnprc)}`} />}
       </div>
       <p className="mb-2 mt-4 text-xs font-semibold text-ink-500">개찰 순위 1~5위</p>
-      <RankList top={prior.top} winner={prior.winner} />
+      <RankList top={prior.top} winner={prior.winner} plnprc={prior.plnprc} />
     </Box>
   );
 }
@@ -251,15 +298,26 @@ function SimilarCard({ similar, bidRate, floor, isNego }: { similar?: AwardAnaly
             </ol>
           </div>
         )}
+        {s.ranked && s.ranked.length > 0 && (
+          <div className="min-w-0">
+            <p className="mb-2 text-xs font-semibold text-ink-500">개찰 1~5위에 자주 든 업체</p>
+            <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
+              {s.ranked.map(([name, c]) => (
+                <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0 truncate">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}회</span></li>
+              ))}
+            </ol>
+          </div>
+        )}
       </div>
       {s.ex && s.ex.length > 0 && (
         <div className="mt-4">
           <p className="mb-2 text-xs font-semibold text-ink-500">최근 낙찰 예</p>
           <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
-            {s.ex.map(([no, title, agency, date, amount, rate, bidders, winner]) => (
+            {s.ex.map(([no, title, agency, date, amount, rate, bidders, winner, wr, top]) => (
               <li key={no} className="min-w-0 px-3 py-2">
                 <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
-                <p className="mt-0.5 text-xs text-ink-500">{date} · {agency} · {eok(amount)} · 낙찰률 {rate ? pct(rate) : "-"} · {bidders}곳 · {winner}</p>
+                <p className="mt-0.5 text-xs text-ink-500">{date} · {agency} · 낙찰가 {won(amount)} · 낙찰률 {rate ? pct(rate) : "-"} · {bidders}곳 · {winner}{wr ? ` (개찰 ${wr}위)` : ""}</p>
+                {top && top.length > 0 && <p className="mt-0.5 text-xs text-ink-300">1~{top.length}위: {top.map(([n, r], i) => `${i + 1}위 ${n} ${r ? pct(r) : ""}`).join(" · ")}</p>}
               </li>
             ))}
           </ul>

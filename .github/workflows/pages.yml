@@ -36,6 +36,13 @@ jobs:
           path: .cache/award
           key: award-stats-${{ github.run_id }}
           restore-keys: award-stats-
+      # 첨부 본문은 한 번 읽으면 바뀌지 않으므로 캐시에 두고 다음 빌드는 새 첨부만 받는다 (scripts/attachCache.ts)
+      - name: 첨부 본문 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/attach-text
+          key: attach-text-${{ github.run_id }}
+          restore-keys: attach-text-
       - name: 나라장터 공고 수집
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
@@ -49,6 +56,12 @@ jobs:
         with:
           path: .cache/award
           key: award-stats-${{ github.run_id }}
+      - name: 첨부 본문 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/attach-text
+          key: attach-text-${{ github.run_id }}
       - name: 기업 정보 중계 서버 주소 확인
         id: corp
         env:

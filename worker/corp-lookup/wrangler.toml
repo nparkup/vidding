@@ -2,6 +2,8 @@
 name = "bidmate-corp-lookup"
 main = "index.ts"
 compatibility_date = "2026-10-01"
+# 첨부 읽기(src/lib/nara/attachText.ts)가 Buffer·zlib·crypto 를 쓴다
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 [vars]

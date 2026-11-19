@@ -314,7 +314,7 @@ function SimilarCard({ similar, bidRate, floor, isNego }: { similar?: AwardAnaly
         <div className="mt-4">
           <p className="mb-2 text-xs font-semibold text-ink-500">최근 낙찰 예</p>
           <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
-            {s.ex.map(([no, title, agency, date, amount, rate, bidders, winner, wr, top]) => (
+            {s.ex.slice(0, 5).map(([no, title, agency, date, amount, rate, bidders, winner, wr, top]) => (
               <li key={no} className="min-w-0 px-3 py-2">
                 <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
                 <p className="mt-0.5 text-xs text-ink-500">{date} · {agency} · 낙찰가 {won(amount)} · 낙찰률 {rate ? pct(rate) : "-"} · {bidders}곳 · {winner}{wr ? ` (개찰 ${wr}위)` : ""}</p>

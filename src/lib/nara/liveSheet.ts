@@ -36,13 +36,18 @@ export const liveKey = (docs: LiveDocs) => createHash("sha1").update(`${AI_SHEET
 export async function readSheetLive(
   client: Anthropic | undefined,
   docs: LiveDocs,
-  opts: { model?: string; allowUrl: (url: string) => boolean; timeoutMs?: number },
+  opts: { id: string; model?: string; allowUrl: (url: string) => boolean; timeoutMs?: number },
 ): Promise<LiveResult> {
   const base = { v: AI_SHEET_VERSION, hash: liveKey(docs), at: new Date().toISOString(), model: opts.model ?? "" };
-  const bid = docs.bid;
   const basis = docs.qual?.basis;
+  // 공고 정보가 없는 예전 사이트 파일이면 참가자격 자료(낙찰방법·추정가격)로 채운다
+  const bid = docs.bid ?? (basis?.method ? {
+    id: opts.id, title: "", agency: basis.agency ?? "", bizType: basis.srvceDiv ? "용역" : undefined, category: "기타 용역",
+    contractMethod: /^협상/.test(basis.method) ? "협상에 의한 계약" : "적격심사", baseAmount: basis.presmpt, lowerLimitRate: basis.lwlt,
+  } as unknown as NonNullable<LiveDocs["bid"]> : undefined);
   const files = rankFiles(docs.files).filter((f) => opts.allowUrl(f.url));
-  if (!bid || !files.length) return { ...base, status: "none", reason: "읽을 첨부 없음", read: [], failed: [] };
+  if (!files.length) return { ...base, status: "none", reason: "읽을 첨부 없음", read: [], failed: [] };
+  if (!bid) return { ...base, status: "error", reason: "공고 정보 없음", read: [], failed: [] };
   // 동시에 3개씩 받는다
   const got: ({ name: string; text: string } | null)[] = new Array(files.length).fill(null);
   const why: string[] = new Array(files.length).fill("받지 못함");

@@ -89,9 +89,9 @@ export default {
           const hosts = (env.ATTACH_HOSTS ?? "www.g2b.go.kr").split(",").map((h) => h.trim());
           const allowUrl = (u: string) => { try { const x = new URL(u); return (x.protocol === "https:" || x.protocol === "http:") && hosts.includes(x.hostname); } catch { return false; } };
           const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 120_000 });
-          const live = await readSheetLive(client, docs, { model: env.AI_SHEET_MODEL || undefined, allowUrl });
-          // 일시 오류나 받지 못한 첨부가 있으면 캐시하지 않는다 (다음에 고를 때 다시 읽는다)
-          if (live.status !== "error" && !live.failed.length && env.AWARDS) ctx.waitUntil(env.AWARDS.put(lkey, JSON.stringify(live), { httpMetadata: { contentType: "application/json" } }));
+          const live = await readSheetLive(client, docs, { id, model: env.AI_SHEET_MODEL || undefined, allowUrl });
+          // 일시 오류, 받지 못한 첨부, 공고 정보가 없는 예전 사이트 파일이면 캐시하지 않는다 (다음에 고를 때 다시 읽는다)
+          if (live.status !== "error" && !live.failed.length && docs.bid && env.AWARDS) ctx.waitUntil(env.AWARDS.put(lkey, JSON.stringify(live), { httpMetadata: { contentType: "application/json" } }));
           return json(live);
         }
         const key = `ai-sheets/v${AI_SHEET_VERSION}/${id}-${input.hash}.json`;

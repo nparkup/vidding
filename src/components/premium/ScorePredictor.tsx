@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ScoreBar } from "@/components/Badges";
+import { CloseDdayBadge, ScoreBar } from "@/components/Badges";
 import { readDocument, UnsupportedDocError } from "@/lib/docText";
 import {
   CREDIT_GRADES, DEFAULT_COMPANY, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
@@ -24,6 +24,8 @@ import { CloseDay } from "../CloseDay";
 import { TrustPicker } from "./TrustPicker";
 import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
 
+/** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
+const MAX_MATCHES = 100;
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 /** 정적 사이트는 Cloudflare 중계 서버(worker/corp-lookup)로, 서버 배포는 자체 API로 조회한다. 정적 사이트에 중계 주소가 없으면 조회를 끈다 */
 const CORP_API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium/corp";
@@ -235,10 +237,11 @@ export function ScorePredictor() {
     ? sheetPerfPeriod(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]), active.recognition ?? [])
     : undefined, [active]);
 
-  const matches = useMemo(() => {
-    if (!bids || !query.trim()) return [];
+  const { matches, matchTotal } = useMemo(() => {
+    if (!bids || !query.trim()) return { matches: [], matchTotal: 0 };
     const q = query.trim().toLowerCase();
-    return bids.filter((b) => b.title.toLowerCase().includes(q) || b.agency.includes(q) || b.bidNtceNo.toLowerCase().includes(q)).slice(0, 8);
+    const all = bids.filter((b) => b.title.toLowerCase().includes(q) || b.agency.includes(q) || b.bidNtceNo.toLowerCase().includes(q));
+    return { matches: all.slice(0, MAX_MATCHES), matchTotal: all.length };
   }, [bids, query]);
 
   const set = <K extends keyof CompanyInput>(k: K, v: CompanyInput[K]) => setCo((c) => ({ ...c, [k]: v }));
@@ -321,16 +324,23 @@ export function ScorePredictor() {
           <div className={`relative ${bid ? "mt-3" : "mt-4"}`}>
             <input className="input" placeholder={bid ? "다른 공고 찾기: 공고명·기관명·공고번호" : "공고명·기관명·공고번호로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} />
             {matches.length > 0 && (
-              <ul className="card absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto p-1">
-                {matches.map((m) => (
-                  <li key={m.id}>
-                    <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
-                      <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDay iso={m.closeAt} />{m.title}</span>
-                      <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="card absolute inset-x-0 top-full z-20 mt-1 overflow-hidden">
+                <p className="border-b border-ink-100 px-4 py-2 text-xs text-ink-500">
+                  {matchTotal > matches.length
+                    ? `검색 결과 ${matchTotal.toLocaleString("ko-KR")}건 중 ${matches.length}건 표시 · 검색어를 더 입력하면 좁혀집니다`
+                    : `검색 결과 ${matchTotal.toLocaleString("ko-KR")}건`}
+                </p>
+                <ul className="max-h-[min(28rem,60vh)] overflow-y-auto overscroll-contain p-1">
+                  {matches.map((m) => (
+                    <li key={m.id}>
+                      <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
+                        <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
+                        <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
   );
@@ -395,7 +405,7 @@ export function ScorePredictor() {
           <Step n={1} title="공고 선택" />
           <div className="mt-4 rounded-2xl bg-paper p-4">
             <p className="text-xs text-ink-500">{bid.bizType ?? "용역"} · {bid.category} · {bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
-            <p className="mt-1 font-bold leading-snug"><CloseDay iso={bid.closeAt} />{bid.title}</p>
+            <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
             <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
           </div>
           {searchBox}

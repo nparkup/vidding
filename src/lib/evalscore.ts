@@ -108,6 +108,8 @@ export interface EvalSheet {
   /** 통과 기준: 총점 기준 또는 기술점수 비율 기준 */
   pass?: { kind: "total"; score: number } | { kind: "techRatio"; ratio: number };
   source: "extracted" | "template";
+  /** 원문 배점표를 누가 읽었는지 (없으면 규칙 파서). AI 판독은 원문 문구·합계 검증을 통과한 경우만 */
+  reader?: { by: "ai"; model: string };
   /** 추출 신뢰도 (배점 합계가 100에 가까운지 등) */
   confidence: "높음" | "보통" | "낮음";
   notes: string[];

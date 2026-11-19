@@ -9,9 +9,11 @@ import { bidPriceGuide, daysLeft, documentChecklist, keyPoints } from "@/lib/ana
 import { loadAttachments } from "@/lib/attachments";
 import { dateTime, won, wonFull } from "@/lib/format";
 import type { Bid, BidAttachment } from "@/lib/types";
+import { methodProfile } from "@/lib/bidMethod";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
 export function BidDetailView({ bid }: { bid: Bid }) {
+  const profile = methodProfile(bid);
   const [files, setFiles] = useState<BidAttachment[]>([]);
   useEffect(() => {
     let alive = true;
@@ -41,6 +43,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <DdayBadge days={daysLeft(bid.closeAt)} />
             <span className="chip">{bid.bizType ?? "용역"} · {bid.category}</span>
             <span className="chip">{bid.contractMethod}</span>
+            {!profile.open && <span className="chip border-coral/30 bg-coral-100/60 text-coral">참가 불가</span>}
             <span className="chip">공고번호 {bid.bidNtceNo}-{bid.bidNtceOrd}</span>
           </div>
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{bid.title}</h1>
@@ -75,6 +78,13 @@ export function BidDetailView({ bid }: { bid: Bid }) {
                 </div>
               ))}
             </dl>
+            {/* 입찰·낙찰 방식: 누가 참가하고 낙찰자를 어떻게 정하는지 */}
+            <div className={`mt-4 rounded-xl p-4 text-sm ${profile.open ? "bg-paper" : "bg-coral-100/60"}`}>
+              <p className="text-xs text-ink-500">계약방법 {bid.contractType ?? "-"} · 낙찰방법 {bid.awardRaw ?? bid.contractMethod}</p>
+              {!profile.open && <p className="mt-1 font-bold text-coral">{profile.closedReason}</p>}
+              <p className="mt-1"><span className="text-ink-500">참가 업체 </span>{profile.who}</p>
+              <p className="mt-0.5"><span className="text-ink-500">낙찰자 결정 </span>{profile.decide}</p>
+            </div>
             {points.length > 0 && (
               <ul className="mt-5 space-y-2">
                 {points.map((p) => (

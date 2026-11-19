@@ -40,7 +40,8 @@ export const CATEGORIES: ServiceCategory[] = Object.values(CATEGORY_GROUPS).flat
 /** 청소·시설관리 계열 업종 (용역근로자 보호지침 등 전용 분석 대상) */
 export const FACILITY_CATEGORIES: ServiceCategory[] = ["청소", "시설관리", "경비", "방역·소독", "통합관리"];
 
-export type ContractMethod = "적격심사" | "협상에 의한 계약" | "최저가" | "수의계약(소액)";
+/** 수의시담: 계약상대자를 정해 두고 가격만 협의하는 건 (정보공개용 공고, 지정 업체 외 참가 불가) */
+export type ContractMethod = "적격심사" | "협상에 의한 계약" | "최저가" | "수의계약(소액)" | "수의시담";
 
 export interface Bid {
   id: string;               // bidNtceNo-bidNtceOrd
@@ -57,6 +58,10 @@ export interface Bid {
   licenseRaw?: string;      // 나라장터 원문 투찰가능업종 (목록에 없는 업종 포함)
   baseAmount: number;       // 기초금액(원) / 추정가격
   contractMethod: ContractMethod;
+  /** 낙찰방법 원문 (예: 수의시담, 소액수의견적, 적격심사제-…). 참가 가능 여부·낙찰 결정 방식 판단에 쓴다 (lib/bidMethod) */
+  awardRaw?: string;
+  /** 계약방법 원문 (일반경쟁·제한경쟁·지명경쟁·수의계약) */
+  contractType?: string;
   lowerLimitRate?: number;  // 낙찰하한율(%)
   jointContract: boolean;   // 공동도급 허용
   smallBizOnly: boolean;    // 중소기업 제한

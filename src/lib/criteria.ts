@@ -545,7 +545,15 @@ export function tableCheck(bid: Pick<Bid, "bizType" | "baseAmount" | "category">
  */
 export function adoptable(ex: EvalSheet, b?: EvalBasis): boolean {
   const price = ex.items.filter((i) => i.kind === "price");
-  if (ex.items.length < 3 || price.length !== 1) return false;
+  // AI 판독은 원문 문구 확인을 거쳤으므로 "사업수행능력 + 입찰가격" 같은 두 항목 표도 받는다
+  const enough = ex.reader?.by === "ai" && price.length === 1 ? ex.items.filter((i) => i.max > 0).length >= 2 : ex.items.length >= 3;
+  if (!enough || price.length > 1) return false;
+  // 가격평가가 없는 공고(기술 100점, 비예산 사업 등): 나라장터에 가격 배점이 없고 항목 합이 100점이어야 한다
+  if (price.length === 0) {
+    if ((b?.priceRatio ?? 0) > 0) return false;
+    if (b?.techRatio !== undefined && Math.abs(b.techRatio - 100) > 0.5) return false;
+    return Math.abs(ex.items.reduce((a, i) => a + i.max, 0) - 100) <= 0.5;
+  }
   // 산식·등급 줄을 항목으로 잘못 읽은 경우
   if (ex.items.some((i) => /[=＝]|^평점|^[o□■①-⑳]\s/.test(i.label))) return false;
   // 협상계약은 공고의 기술·가격 배점(나라장터 목록 값)과 맞아야 한다
@@ -575,7 +583,7 @@ export function bidSheet(
   if (extracted && adoptable(extracted, b)) {
     sheet = enrichSheet(extracted, tpl);
     sheet.pass = notice?.pass?.value ?? extracted.pass ?? tpl.pass;
-    facts.push({ label: "평가항목·배점", value: `공고 원문 배점표 ${extracted.items.length}개 항목`, quote: extracted.notes[0] ?? "" });
+    facts.push({ label: "평가항목·배점", value: `공고 원문 배점표 ${extracted.items.length}개 항목${extracted.reader?.by === "ai" ? " (AI 판독)" : ""}`, quote: extracted.notes[0] ?? "" });
   } else if (quant && tpl.method === "협상에 의한 계약") {
     const price = tpl.items.find((i) => i.kind === "price");
     const techMax = 100 - (price?.max ?? 0);

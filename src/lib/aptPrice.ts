@@ -3,8 +3,9 @@
  *
  * K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 예측할 수 없다.
  * 대신 같은 단지·같은 분야의 직전 계약(낙찰 또는 수의계약)과 그다음 낙찰을 짝지어,
- * 월 환산 금액이 얼마나 오르내렸는지(다음 낙찰 ÷ 직전 계약)를 분야·낙찰방법별로 모은다.
- * 새 공고의 예상 낙찰금액 = 직전 계약 월 환산 금액 × 그 비율 (가운데값, 20~80% 구간).
+ * 금액이 얼마나 오르내렸는지(다음 낙찰 ÷ 직전 계약)를 분야·낙찰방법별로 모은다. 낙찰은 계약기간이 빈 건이 대부분이라
+ * 총액끼리 비교하고, 두 건 모두 기간이 있을 때만 같은 기간으로 맞춘다.
+ * 새 공고의 예상 낙찰금액 = 직전 계약금액 × 그 비율 (가운데값, 20~80% 구간).
  * 빌드 때 지난해까지의 짝으로 비율을 만들고 올해 낙찰에 맞춰 본 적중률을 함께 낸다.
  */
 import type { AptPrior } from "./apt";
@@ -12,7 +13,7 @@ import type { AptPrior } from "./apt";
 export interface AptPriceStat {
   /** 짝 수 */
   n: number;
-  /** 다음 낙찰 ÷ 직전 계약 (월 환산) 가운데값 */
+  /** 다음 낙찰 ÷ 직전 계약 가운데값 */
   median: number;
   p20: number;
   p80: number;
@@ -78,11 +79,11 @@ export interface AptPriceForecast {
 
 /** 직전 계약과 분야·낙찰방법으로 예상 낙찰금액을 낸다. months 를 주면 그 계약기간으로 환산한다 */
 export function forecastAptPrice(model: AptPriceModel, category: string, award: string | undefined, prior: Pick<AptPrior, "amount" | "start" | "end">, months?: number): AptPriceForecast | undefined {
-  const pm = contractMonths(prior.start, prior.end);
   if (!(prior.amount > 0)) return undefined;
-  const base = months ?? pm ?? 12;
+  const pm = contractMonths(prior.start, prior.end);
   // 계약기간을 모르면 직전 계약과 같은 기간이라고 보고 총액끼리 비교한다
-  const prevMonthly = pm ? prior.amount / pm : prior.amount / base;
+  const base = months ?? pm ?? 12;
+  const prevMonthly = prior.amount / (pm ?? base);
   const ca = award ? model.byCatAward[`${category}|${award}`] : undefined;
   const c = model.byCat[category];
   const [stat, basis] = ca && ca.n >= MIN_PAIRS ? [ca, `${category}·${award}`] : c && c.n >= MIN_PAIRS ? [c, category] : [model.all, "전체 분야"];
@@ -144,9 +145,10 @@ function pairsOf(records: AptPriceRecord[]): Pair[] {
       if (b.prior.via !== "낙찰") continue;
       // 재공고·분할 발주처럼 넉 달 안에 다시 나온 건은 같은 계약의 반복으로 보고 넘긴다
       if (Date.parse(b.prior.closedAt!) - Date.parse(a.prior.closedAt!) < 120 * 86_400_000) continue;
-      const pa = monthly(a.prior), pb = monthly(b.prior);
-      if (!pa || !pb) continue;
-      const ratio = pb / pa;
+      if (!(a.prior.amount > 0) || !(b.prior.amount > 0)) continue;
+      // K-apt 낙찰은 계약기간이 빈 건이 대부분이라 총액끼리 비교하고, 두 건 모두 기간이 있으면 같은 기간으로 맞춘다
+      const ma = contractMonths(a.prior.start, a.prior.end), mb = contractMonths(b.prior.start, b.prior.end);
+      const ratio = (b.prior.amount / a.prior.amount) * (ma && mb ? ma / mb : 1);
       // 세 배 넘게 차이 나면 범위가 바뀐 다른 일로 본다
       if (ratio < 1 / 3 || ratio > 3) continue;
       out.push({ cat, award: b.award, ratio, prev: a.prior.amount, next: b.prior.amount, at: b.prior.closedAt! });

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { BidsExplorer, BidsExplorerFallback } from "@/components/BidsExplorer";
+import { BidSourceTabs } from "@/components/BidSourceTabs";
 import { dateTime } from "@/lib/format";
 import { getBids, getSyncInfo } from "@/lib/store";
 
@@ -23,6 +24,7 @@ export default async function BidsPage() {
           {sync.source === "g2b" ? "나라장터 연동" : "데모 데이터"} · 갱신 {dateTime(sync.syncedAt)}
         </p>
       </div>
+      <BidSourceTabs active="g2b" />
       <Suspense fallback={<BidsExplorerFallback />}>
         <BidsExplorer />
       </Suspense>

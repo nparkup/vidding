@@ -17,6 +17,8 @@ import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, 
 import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
+import { attachPriors, fetchAptAwards, fetchAptNotices } from "../src/lib/kapt/client";
+import type { AptBidsFile } from "../src/lib/apt";
 import { makeTextCache } from "./attachCache";
 import type { BidAttachment } from "../src/lib/types";
 
@@ -157,6 +159,24 @@ async function main() {
   } catch (e) {
     console.warn("사전규격 건너뜀:", e instanceof Error ? e.message : e);
   }
+  // 공동주택(아파트) 입찰 (/apt-bids): 국토교통부 공동주택 입찰공고·입찰결과공지. 실패해도 배포는 계속
+  let aptBids: AptBidsFile | undefined;
+  try {
+    const items = await fetchAptNotices();
+    let awards = 0, priors = 0;
+    try {
+      const a = await fetchAptAwards();
+      awards = a.length;
+      priors = attachPriors(items, a);
+    } catch (e) {
+      console.warn("공동주택 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
+    }
+    aptBids = { builtAt: new Date().toISOString(), items, awards };
+    const by = (k: string) => items.filter((b) => b.category === k).length;
+    console.log(`공동주택 입찰: 진행 중 ${items.length.toLocaleString()}건 (청소 ${by("청소")}, 경비 ${by("경비")}, 소독 ${by("소독")}, 위탁관리 ${by("주택관리(위탁)")}, 공사 ${by("공사")}), 낙찰 ${awards.toLocaleString()}건 중 직전 낙찰 붙인 공고 ${priors}건`);
+  } catch (e) {
+    console.warn("공동주택 입찰 건너뜀:", e instanceof Error ? e.message : e);
+  }
   // 메인 상단 현황 줄의 '낙찰정보 N건' (낙찰 저장소에 쌓인 낙찰 건수)
   let awardCount: { rows: number; builtAt: string } | undefined;
   try {
@@ -177,7 +197,7 @@ async function main() {
     rateTable = { builtAt: new Date().toISOString(), source: "진행 중 공고", notices: inputs.filter((x) => x.method && x.lwlt).length, rows: buildRateRows(inputs) };
   }
   console.log(`하한율 기준표: ${rateTable.source} 공고 ${rateTable.notices.toLocaleString()}건, 기준 ${rateTable.rows.length}개`);
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, awardCount, changes, rateTable, syncedAt, source: "g2b" }));
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, aptBids, awardCount, changes, rateTable, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

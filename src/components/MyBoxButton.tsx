@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { addToMyBox, inMyBox, MYBOX_EVENT, removeFromMyBox } from "@/lib/mybox";
+import { addToMyBox, inMyBox, MYBOX_ENABLED, MYBOX_EVENT, removeFromMyBox } from "@/lib/mybox";
 import type { Bid } from "@/lib/types";
 
 /** 공고를 관심공고 서류함에 담기 / 빼기 */
@@ -14,6 +14,7 @@ export function MyBoxButton({ bid, className = "btn-ghost btn-sm" }: { bid: Bid;
     window.addEventListener("storage", sync);
     return () => { window.removeEventListener(MYBOX_EVENT, sync); window.removeEventListener("storage", sync); };
   }, [bid.bidNtceNo]);
+  if (!MYBOX_ENABLED) return null;
   return (
     <button type="button" aria-pressed={on} className={`${className} ${on ? "border-mint bg-mint-50 text-mint-700" : ""}`}
       onClick={() => (on ? removeFromMyBox(bid.bidNtceNo) : addToMyBox(bid))}>

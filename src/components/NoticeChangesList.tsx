@@ -6,6 +6,7 @@ import { bidHref } from "@/lib/links";
 import { dateTime, won } from "@/lib/format";
 import { KEY_FIELDS, changeSummary, type NoticeChange } from "@/lib/noticeChanges";
 import { useMyBoxNos, useNoticeChanges } from "@/lib/useSiteJson";
+import { MYBOX_ENABLED } from "@/lib/mybox";
 
 type Kind = "" | "정정" | "취소";
 type Scope = "all" | "key" | "mine";
@@ -45,7 +46,7 @@ export function NoticeChangesList() {
             <button key={l} type="button" onClick={() => { setKind(k); setShown(30); }} className={btn(kind === k)}>{l}</button>
           ))}
           <span className="mx-1 hidden w-px bg-ink-100 sm:block" />
-          {([["all", "모든 정정"], ["key", "금액·마감·자격 변경만"], ["mine", `관심공고만${mine.size ? ` (${mine.size})` : ""}`]] as [Scope, string][]).map(([k, l]) => (
+          {([["all", "모든 정정"], ["key", "금액·마감·자격 변경만"], ["mine", `관심공고만${mine.size ? ` (${mine.size})` : ""}`]] as [Scope, string][]).filter(([k]) => MYBOX_ENABLED || k !== "mine").map(([k, l]) => (
             <button key={k} type="button" onClick={() => { setScope(k); setShown(30); }} className={btn(scope === k)}>{l}</button>
           ))}
         </div>

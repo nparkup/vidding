@@ -4,6 +4,7 @@
  * 공고별 파일(/attachments/{id}.json 의 qual.info)에 둔다. 공고 목록 파일(bids-data.json)은 커지지 않게 손대지 않는다.
  * 필드 이름은 2026-11-19 실제 응답(용역·공사·물품 6건)으로 확인했다. 값이 비어 있으면 넣지 않고, 화면은 있는 항목만 보여 준다.
  */
+import type { AValueParts } from "./awards/assess";
 export interface NoticeInfo {
   /** 공고 종류: 등록공고 / 변경공고 / 재공고 / 취소공고 등 (ntceKindNm) */
   kind?: string;
@@ -29,6 +30,8 @@ export interface NoticeInfo {
   base?: number;
   /** 복수예비가격 범위 (%, 예: [-2, 2]) */
   baseRange?: [number, number];
+  /** 공사 A값 항목(원). A값 적용 공고만 (bidPrceCalclAYn) */
+  aParts?: AValueParts;
   /** 예정가격 결정: 복수예가 / 단일예가 / 비예가 (prearngPrceDcsnMthdNm) */
   priceMethod?: string;
   /** 복수예가 수와 추첨 수 (보통 15개 중 4개) */
@@ -147,13 +150,24 @@ export function noticeInfoOf(it: Item): NoticeInfo | undefined {
  * 기초금액 줄(…BsisAmount02, 분류마다 한 줄) → 기초금액·예가 범위.
  * 분류(bidClsfcNo)가 여럿이고 금액이 서로 다르면 한 금액으로 말할 수 없어 넣지 않는다.
  */
-export function baseAmountOf(rows: Item[]): Pick<NoticeInfo, "base" | "baseRange"> | undefined {
-  const vals = rows.map((r) => ({ base: num(r.bssamt), a: r.rsrvtnPrceRngBgnRate, b: r.rsrvtnPrceRngEndRate })).filter((r) => r.base);
+export function baseAmountOf(rows: Item[]): Pick<NoticeInfo, "base" | "baseRange" | "aParts"> | undefined {
+  const vals = rows.map((r) => ({ base: num(r.bssamt), a: r.rsrvtnPrceRngBgnRate, b: r.rsrvtnPrceRngEndRate, r })).filter((r) => r.base);
   if (!vals.length || new Set(vals.map((v) => v.base)).size > 1) return undefined;
-  const { base, a, b } = vals[0];
+  const { base, a, b, r } = vals[0];
   const lo = Number(a);
   const hi = Number(b);
-  return { base, baseRange: a && b && Number.isFinite(lo) && Number.isFinite(hi) ? [lo, hi] : undefined };
+  return { base, baseRange: a && b && Number.isFinite(lo) && Number.isFinite(hi) ? [lo, hi] : undefined, aParts: aPartsOf(r) };
+}
+
+/** 공사 기초금액 행의 A값 항목 (A값 적용 공고만, 금액이 있는 항목만) */
+function aPartsOf(r: Item): AValueParts | undefined {
+  if (r.bidPrceCalclAYn?.trim() !== "Y") return undefined;
+  const p: AValueParts = {
+    health: num(r.mrfnHealthInsrprm), pension: num(r.npnInsrprm), care: num(r.odsnLngtrmrcprInsrprm), retire: num(r.rtrfundNon),
+    safety: num(r.sftyMngcst), safetyCheck: num(r.sftyChckMngcst), quality: r.qltyMngcstAObjYn?.trim() === "N" ? 0 : num(r.qltyMngcst),
+  };
+  const kept = Object.fromEntries(Object.entries(p).filter(([, v]) => (v ?? 0) > 0)) as AValueParts;
+  return Object.keys(kept).length ? kept : undefined;
 }
 
 /** 공동수급 방식 원문 → 허용 여부 (모르면 undefined) */

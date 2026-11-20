@@ -12,12 +12,25 @@ import type { BidQual } from "@/lib/eligibility";
 import { dateTime, won, wonFull } from "@/lib/format";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { methodProfile } from "@/lib/bidMethod";
+import { BidPriceAnalysis } from "@/components/BidPriceAnalysis";
+import { loadAwardAnalysis } from "@/components/premium/AwardAnalysis";
+import type { AwardAnalysis } from "@/lib/awards/analysis";
+import { usesAssess } from "@/lib/awards/assess";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
 export function BidDetailView({ bid }: { bid: Bid }) {
   const profile = methodProfile(bid);
   const [files, setFiles] = useState<BidAttachment[]>([]);
   const [qual, setQual] = useState<BidQual>();
+  // 낙찰 결과 분석 파일 (사정율 표본). undefined = 불러오는 중, null = 없음
+  const [award, setAward] = useState<AwardAnalysis | null>();
+  const priceBid = usesAssess(bid.contractMethod) && profile.open;
+  useEffect(() => {
+    let alive = true;
+    setAward(undefined);
+    if (priceBid) loadAwardAnalysis(bid.id).then((a) => { if (alive) setAward(a); }).catch(() => { if (alive) setAward(null); });
+    return () => { alive = false; };
+  }, [bid.id, priceBid]);
   useEffect(() => {
     let alive = true;
     setFiles([]);
@@ -107,6 +120,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             </ol>
           </section>
 
+          {priceBid && <BidPriceAnalysis bid={bid} info={info} analysis={award} />}
+
           {files.length > 0 && (
             <section className="card p-6">
               <div className="flex items-center justify-between">
@@ -147,8 +162,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             </Suspense>
           </section>
 
-          {/* 투찰 가이드 */}
-          <section className="card p-6">
+          {/* 투찰 가이드: 가격 경쟁 공고는 왼쪽 사정율 분석·투찰금액이 대신한다 */}
+          {!priceBid && <section className="card p-6">
             <h2 className="text-lg font-bold">투찰 금액 가이드</h2>
             <p className="mt-1 text-sm text-ink-500">기초금액 × 예정가격 범위(±2%) × 낙찰하한율 {guide.rate.toFixed(3)}%</p>
             <div className="mt-4 rounded-xl bg-ink p-4 text-white">
@@ -157,9 +172,9 @@ export function BidDetailView({ bid }: { bid: Bid }) {
               <p className="mt-2 text-xs text-ink-300">예상 범위 {won(guide.low)} ~ {won(guide.high)}</p>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-ink-300">
-              참고용 추정치입니다. 실제 예정가격은 복수예비가격 추첨으로 결정되며, 낙찰정보 연동 시 발주기관별 사정률 분포를 반영합니다.
+              참고용 추정치입니다. 실제 예정가격은 복수예비가격 추첨으로 결정됩니다.
             </p>
-          </section>
+          </section>}
 
           <section className="card p-6">
             <p className="text-xs font-semibold text-mint-600">프리미엄</p>

@@ -12,6 +12,7 @@
  * 이 파일은 Node 전용 모듈을 쓰지 않는다 (빌드·화면이 같이 쓴다).
  */
 import type { AwardBiz } from "./format";
+import { assessSamples, usesAssess, type AssessData } from "./assess";
 
 /* ---------- 색인 형식 ---------- */
 
@@ -229,6 +230,8 @@ export interface AwardAnalysis {
   confirmed?: string[];
   /** 공사: 참가 지역·업종이 같은 비슷한 공고의 참가업체 수 [25%, 50%, 75%] */
   regional?: { label: string; n: number; q: [number, number, number] };
+  /** 사정율 분석 표본: 같은 수요기관 최근 4년 낙찰의 예정가격 ÷ 기초금액 (가격 경쟁 공고만). src/lib/awards/assess.ts */
+  assess?: AssessData;
 }
 
 export interface AnalyzeTarget {
@@ -462,6 +465,10 @@ export function analyzeBid(t: AnalyzeTarget, agencyRows: AgencyRow[] | undefined
   const prior = pickPrior(history, posted, years);
   const out: AwardAnalysis = { v: 1, builtAt: new Date().toISOString(), range, prior, history, similar: pickSimilar(t, groups, key) };
   if (years > 1) out.cycleYears = years;
+  if (usesAssess(t.contractMethod)) {
+    const as = assessSamples(rows, biz, t.bidNtceNo, posted);
+    if (as) out.assess = as;
+  }
   if (biz === "공사") {
     const rk = provinceKey(t.regionRaw ?? (t.regions?.length ? t.regions : t.region));
     for (const k of regionalKeys(t)) {

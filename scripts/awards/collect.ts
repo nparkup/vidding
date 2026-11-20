@@ -38,6 +38,7 @@ import {
   KW_MIN_DF, KW_ROWS, keywords, kwBucket, type KwIndexFile, type KwLookup, type KwPosting, type KwRow,
   type AwardAnalysis, type AgencyRow, type SimilarIndexFile, type SimilarStat,
 } from "../../src/lib/awards/analysis";
+import { assessHit, assessSamples, assessStats } from "../../src/lib/awards/assess";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 
 const NARA = "https://apis.data.go.kr/1230000";
@@ -538,6 +539,8 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
     // 색인만: 샤드·통계·수집 상태는 건드리지 않는다 (동시에 도는 수집 실행의 manifest.json 을 덮지 않게 바로 올린다)
     const ix = await buildIndexes([...shards.values()].flat(), async (key, body) => { await r2Put(key, body, "application/gzip"); writeLocal(key, body); return true; });
     printSamples(ix);
+    assessBacktest(ix);
+    if (process.env.SKIP_TRIALS) return { rows, shards: keys.length };
     const { trial, relTrial } = backtest(ix);
     await checkNotices(ix);
     await relateTrial(trial);
@@ -772,6 +775,44 @@ function printSamples(ix: Awaited<ReturnType<typeof buildIndexes>>) {
       console.log(`SAMPLE_ANALYSIS ${JSON.stringify({ target, actual: { rate: r[8], bidders: r[10], winner: r[1], amount: r[7] }, analysis: a })}`);
       break;
     }
+  }
+}
+
+/**
+ * 사정율 되짚어 보기: 최근 8주 낙찰(예정가격·기초금액 있는 가격 경쟁 공고)을 '지금 공고'로 보고 그 전 자료로 만든 추천 구간에
+ * 실제 사정율이 들었는지 본다. 비교: 아무 구간이나 골랐을 때(폭 ÷ 범위), 100% 가운데 구간(99.9~100.1)
+ */
+function assessBacktest(ix: Awaited<ReturnType<typeof buildIndexes>>) {
+  const since = iso(addDays(mondayOf(kstNow()), -56));
+  type Acc = { n: number; top1: number; top3: number; base: number; mid: number; err: number[]; err100: number[]; noData: number };
+  const acc = new Map<string, Acc>();
+  const get = (k: string) => acc.get(k) ?? acc.set(k, { n: 0, top1: 0, top3: 0, base: 0, mid: 0, err: [], err100: [], noData: 0 }).get(k)!;
+  const seen = new Set<string>();
+  for (const r of ix.rows) {
+    if (r[9] < since) break;
+    const [, , no, , biz, , agency, , , date, , method, , , , , , , , , base, plnprc, , rng] = r;
+    if (!(base > 0 && plnprc > 0) || methodCode(method) === "N" || seen.has(no)) continue;
+    const actual = (plnprc / base) * 100;
+    if (!(actual > 90 && actual < 110)) continue;
+    seen.add(no);
+    const m = rng.match(/^([+-]?\d+(?:\.\d+)?)~([+-]?\d+(?:\.\d+)?)$/);
+    const range = m ? ([Number(m[1]), Number(m[2])] as [number, number]) : undefined;
+    const rows = ix.buckets[Number(agencyBucket(agency))].agencies[agency];
+    for (const k of [biz, "전체"]) {
+      const a = get(k);
+      const st = assessStats(assessSamples(rows, biz, no, date), range, date);
+      if (!st) { a.noData++; continue; }
+      const h = assessHit(st, actual);
+      a.n++; if (h.top1) a.top1++; if (h.top3) a.top3++;
+      a.base += st.baseline;
+      if (actual >= 99.9 && actual < 100.1) a.mid++;
+      a.err.push(h.medianErr); a.err100.push(Math.abs(actual - 100));
+    }
+  }
+  const pc = (x: number, n: number) => `${n ? Math.round((x / n) * 1000) / 10 : 0}%`;
+  const med = (v: number[]) => r3(quantile([...v].sort((a, b) => a - b), 0.5));
+  for (const [k, a] of acc) {
+    console.log(`BACKTEST_ASSESS ${k}: 공고 ${a.n.toLocaleString()}건 (표본 부족 ${a.noData.toLocaleString()}건) · 1순위 구간 적중 ${pc(a.top1, a.n)} · 3개 구간 적중 ${pc(a.top3, a.n)} · 아무 구간 1개 ${pc(a.base, a.n)} · 100% 가운데 구간 ${pc(a.mid, a.n)} · 가운데 값 오차 중앙값 ${med(a.err)}%p (100% 기준 ${med(a.err100)}%p)`);
   }
 }
 

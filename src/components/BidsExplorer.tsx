@@ -9,6 +9,8 @@ import { daysLeft, rank } from "@/lib/analysis";
 import { BIZ_TYPES, CATEGORY_GROUPS, REGIONS, type Bid, type License, type Region } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 import { bidHref } from "@/lib/links";
+import { perfCapOf } from "@/lib/perfCap";
+import { won } from "@/lib/format";
 
 const PAGE = 50;
 
@@ -72,6 +74,10 @@ function Explorer({ bids }: { bids: Bid[] }) {
   const min = Number(get("min") || 0);
   const max = Number(get("max") || 10_000_000_000);
   const hasProfile = lic.length > 0;
+  // 최근 3년·5년 유사 실적 (원). 있으면 실적 만점 가능 금액으로 거를 수 있다 (perfCap.ts)
+  const p3 = Number(get("p3") || 0);
+  const p5 = Number(get("p5") || 0);
+  const perfOnly = get("perf") === "1" && (p3 > 0 || p5 > 0);
   const rawSort = get("sort") as SortKey;
   const sort: SortKey = SORTS.some((o) => o.v === rawSort) && (rawSort !== "score" || hasProfile) ? rawSort : hasProfile ? "score" : "close";
 
@@ -90,7 +96,8 @@ function Explorer({ bids }: { bids: Bid[] }) {
     if (cat) l = l.filter((b) => b.category === cat);
     if (region) l = l.filter((b) => b.region === "전국" || (b.regions ?? [b.region]).includes(region as Region));
     if (urgent) l = l.filter((b) => daysLeft(b.closeAt) <= 3);
-    const m = hasProfile ? rank(l, { licenses: lic, regions: rg, minAmount: min, maxAmount: max, pastPerformance: max }) : null;
+    if (perfOnly) l = l.filter((b) => b.baseAmount <= perfCapOf(b.bizType, { y3: p3, y5: p5 }));
+    const m = hasProfile ? rank(l, { licenses: lic, regions: rg, minAmount: min, maxAmount: max, pastPerformance: p3 || p5 || max }) : null;
     if (sort !== "score") {
       const cmp = COMPARE[sort];
       l = [...l].sort(cmp);
@@ -101,7 +108,7 @@ function Explorer({ bids }: { bids: Bid[] }) {
   }, [bids, sp]);
 
   const shown = matches ? (onlyOk ? matches.filter((m) => m.eligible) : matches) : null;
-  const profileQs = new URLSearchParams({ lic: lic.join(","), rg: rg.join(","), min: String(min), max: String(max) }).toString();
+  const profileQs = new URLSearchParams({ lic: lic.join(","), rg: rg.join(","), min: String(min), max: String(max), ...(p3 ? { p3: String(p3) } : {}), ...(p5 ? { p5: String(p5) } : {}) }).toString();
 
   return (
     <>
@@ -139,10 +146,11 @@ function Explorer({ bids }: { bids: Bid[] }) {
 
       {hasProfile ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-mint-100 bg-mint-50 p-4 text-sm">
-          <p className="min-w-0"><b>내 조건 적용 중</b> · 면허 {lic.length > 4 ? `${lic.slice(0, 4).join(", ")} 외 ${lic.length - 4}개` : lic.join(", ")} · 지역 {rg.join(", ") || "미지정"}</p>
+          <p className="min-w-0"><b>내 조건 적용 중</b> · 면허 {lic.length > 4 ? `${lic.slice(0, 4).join(", ")} 외 ${lic.length - 4}개` : lic.join(", ")} · 지역 {rg.join(", ") || "미지정"}{(p3 > 0 || p5 > 0) && ` · 실적 ${[p3 ? `3년 ${won(p3)}` : "", p5 ? `5년 ${won(p5)}` : ""].filter(Boolean).join(", ")}`}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => go({ ok: onlyOk ? "" : "1" })} className="btn-ghost btn-sm">{onlyOk ? "전체 보기" : "참가 가능만 보기"}</button>
-            <button type="button" onClick={() => go({ lic: "", rg: "", min: "", max: "", ok: "" })} className="btn-ghost btn-sm">조건 해제</button>
+            {(p3 > 0 || p5 > 0) && <button type="button" onClick={() => go({ perf: perfOnly ? "" : "1" })} className="btn-ghost btn-sm">{perfOnly ? "실적 거르기 해제" : "실적 만점 공고만"}</button>}
+            <button type="button" onClick={() => go({ lic: "", rg: "", min: "", max: "", ok: "", p3: "", p5: "", perf: "" })} className="btn-ghost btn-sm">조건 해제</button>
           </div>
         </div>
       ) : (
@@ -196,7 +204,8 @@ function ProfileForm({ onApply }: { onApply: (p: Record<string, string>) => void
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
-          onApply({ lic: lic.join(","), rg: rg.join(","), min: String(Number(f.get("min") || 0) * 10000), max: String(Number(f.get("max") || 50000) * 10000) });
+          const p3 = Number(f.get("p3") || 0) * 10000, p5 = Number(f.get("p5") || 0) * 10000;
+          onApply({ lic: lic.join(","), rg: rg.join(","), min: String(Number(f.get("min") || 0) * 10000), max: String(Number(f.get("max") || 50000) * 10000), p3: p3 ? String(p3) : "", p5: p5 ? String(p5) : "", perf: f.get("perf") && (p3 || p5) ? "1" : "" });
         }}
       >
         <div>
@@ -214,7 +223,13 @@ function ProfileForm({ onApply }: { onApply: (p: Record<string, string>) => void
         <div className="grid gap-4 sm:grid-cols-2">
           <div><p className="label">최소 규모 (만원)</p><input name="min" type="number" defaultValue={0} className="input" /></div>
           <div><p className="label">최대 규모 (만원)</p><input name="max" type="number" defaultValue={50000} className="input" /></div>
+          <div><p className="label">최근 3년 유사 실적 (만원)</p><input name="p3" type="number" placeholder="용역·물품 기준" className="input" /></div>
+          <div><p className="label">최근 5년 유사 실적 (만원)</p><input name="p5" type="number" placeholder="공사 기준" className="input" /></div>
         </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="perf" value="1" className="mt-1 h-4 w-4 accent-[#0FA37F]" />
+          <span>실적으로 만점 받을 수 있는 공고만 보기<span className="block text-xs text-ink-500">용역·물품은 3년, 공사는 5년 실적이 공고 금액의 1배 이상인 공고. 공고별 정확한 기준은 평가점수 예측에서 계산합니다.</span></span>
+        </label>
         <button className="btn-mint w-full" disabled={lic.length === 0}>조건 적용</button>
       </form>
     </details>

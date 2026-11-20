@@ -37,6 +37,7 @@
   }
   .mask-fade { mask-image: radial-gradient(ellipse at center, #000 40%, transparent 75%); }
   .input { @apply w-full rounded-xl border border-ink-100 bg-white px-3.5 py-2.5 text-[15px] outline-none transition focus:border-mint focus:ring-4 focus:ring-mint-100; }
+  .calc-input { @apply w-full min-w-0 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-[15px] tabular-nums text-white outline-none transition focus:border-mint; }
   .label { @apply mb-1.5 block text-sm font-semibold text-ink-700; }
   .table-x { @apply w-full text-left text-sm; }
   .table-x th { @apply border-b border-ink-100 px-3 py-3 sm:px-4 text-xs font-semibold uppercase tracking-wide text-ink-300; }

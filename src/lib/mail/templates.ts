@@ -52,8 +52,13 @@ ${stat(d.newToday, "신규 적합 공고", C.mint, C.mintBg)}${stat(d.closingSoo
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px">
 ${d.recommended.length ? d.recommended.map((r, i) => bidRow(r, i, qs)).join("") : `<tr><td style="padding:16px 0;color:${C.sub}">오늘은 조건에 맞는 신규 공고가 없습니다.</td></tr>`}
 </table>
+${d.preSpecs.length ? `<h2 style="font-size:16px;margin:24px 0 4px">새로 공개된 사전규격 ${d.preSpecs.length}건</h2>
+<p style="margin:0 0 8px;font-size:12px;color:${C.sub}">본공고 전 단계입니다. 규격서를 미리 보고 준비를 시작하세요.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${d.preSpecs.map((p) => `<tr><td style="padding:8px 0;border-top:1px solid #E5E9F0"><div style="font-weight:700;font-size:14px">${esc(p.title)}</div><div style="font-size:12px;color:${C.sub}">${esc(p.demand)}${p.budget ? ` · 배정예산 ${won(p.budget)}` : ""}${p.opinionBy ? ` · 의견 마감 ${esc(p.opinionBy.slice(0, 10))}` : ""}</div></td></tr>`).join("")}</table>
+<p style="margin:8px 0 0;font-size:13px"><a href="${siteUrl()}/prespecs" style="color:${C.mint}">사전규격 전체 보기</a></p>` : ""}
 <p style="margin:20px 0 0"><a href="${siteUrl()}/bids?${qs}&ok=1" style="display:inline-block;background:${C.ink};color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:10px">전체 추천 공고 보기</a></p>`;
-  const text = [subject, "", ...d.recommended.map((r, i) => `${i + 1}. ${r.bid.title} / ${won(r.bid.baseAmount)} / ${r.grade}등급 / 마감 ${dday(r.daysLeft)}\n   ${siteUrl()}/bids/${r.bid.id}?${qs}`)].join("\n");
+  const text = [subject, "", ...d.recommended.map((r, i) => `${i + 1}. ${r.bid.title} / ${won(r.bid.baseAmount)} / ${r.grade}등급 / 마감 ${dday(r.daysLeft)}\n   ${siteUrl()}/bids/${r.bid.id}?${qs}`),
+    ...(d.preSpecs.length ? ["", `새로 공개된 사전규격 ${d.preSpecs.length}건`, ...d.preSpecs.map((p) => `- ${p.title} / ${p.demand}${p.budget ? ` / ${won(p.budget)}` : ""}`), `${siteUrl()}/prespecs`] : [])].join("\n");
   return { subject, html: shell(subject, body), text };
 }
 

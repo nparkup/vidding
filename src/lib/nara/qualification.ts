@@ -92,7 +92,9 @@ async function fetchDay(op: string, day: string): Promise<Item[]> {
 }
 
 /** 필요한 필드만 남겨 캐시 크기를 줄인다 */
-const KEEP = ["bidNtceNo", "bidNtceOrd", "lmtGrpNo", "lmtSno", "lcnsLmtNm", "permsnIndstrytyList", "prtcptPsblRgnNm", "bidClsfcNo", "bssamt", "rsrvtnPrceRngBgnRate", "rsrvtnPrceRngEndRate"];
+const KEEP = ["bidNtceNo", "bidNtceOrd", "lmtGrpNo", "lmtSno", "lcnsLmtNm", "permsnIndstrytyList", "prtcptPsblRgnNm", "bidClsfcNo", "bssamt", "rsrvtnPrceRngBgnRate", "rsrvtnPrceRngEndRate",
+  // 공사 A값 (투찰금액 계산에서 깎지 않는 금액)
+  "bidPrceCalclAYn", "mrfnHealthInsrprm", "npnInsrprm", "odsnLngtrmrcprInsrprm", "rtrfundNon", "sftyMngcst", "sftyChckMngcst", "qltyMngcst", "qltyMngcstAObjYn"];
 const slim = (it: Item): Item => Object.fromEntries(KEEP.filter((k) => it[k]).map((k) => [k, it[k]]));
 
 /**

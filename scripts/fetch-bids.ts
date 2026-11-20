@@ -15,6 +15,7 @@ import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
 import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, agencySummariesFromR2 } from "./awards/forBuild";
 import { makeAiInputs } from "./aiSheets";
+import { fetchPreSpecs } from "../src/lib/nara/preSpec";
 import { makeTextCache } from "./attachCache";
 import type { BidAttachment } from "../src/lib/types";
 
@@ -133,6 +134,14 @@ async function main() {
   } catch (e) {
     console.warn("발주처 분석 건너뜀:", e instanceof Error ? e.message : e);
   }
+  // 사전규격 미리보기 (/prespecs): 최근 2주 등록분. 실패해도 배포는 계속
+  let preSpecs;
+  try {
+    preSpecs = await fetchPreSpecs();
+    console.log(`사전규격: ${preSpecs.length.toLocaleString()}건 (본공고 나온 것 ${preSpecs.filter((p) => p.bidNos.length).length.toLocaleString()}건)`);
+  } catch (e) {
+    console.warn("사전규격 건너뜀:", e instanceof Error ? e.message : e);
+  }
   // 메인 상단 현황 줄의 '낙찰정보 N건' (낙찰 저장소에 쌓인 낙찰 건수)
   let awardCount: { rows: number; builtAt: string } | undefined;
   try {
@@ -141,7 +150,7 @@ async function main() {
   } catch (e) {
     console.warn("낙찰 저장소 건수 읽기 실패:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, awardCount, syncedAt, source: "g2b" }));
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, awardCount, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

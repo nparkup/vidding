@@ -41,7 +41,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; awardCount?: { rows: number; builtAt: string }; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -140,6 +140,9 @@ async function doSync(): Promise<BidCache> {
   }
   return g.__ipchalBids;
 }
+
+/** 낙찰 저장소(R2)에 쌓인 낙찰 건수. 빌드가 저장소를 못 읽었으면 null */
+export const getAwardCount = () => bidCache().awardCount ?? null;
 
 export function getSyncInfo() {
   const { syncedAt, source, error, items } = bidCache();

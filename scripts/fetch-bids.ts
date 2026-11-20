@@ -13,7 +13,7 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta } from "./awards/forBuild";
 import { makeAiInputs } from "./aiSheets";
 import { makeTextCache } from "./attachCache";
 import type { BidAttachment } from "../src/lib/types";
@@ -125,7 +125,15 @@ async function main() {
   } catch (e) {
     console.warn("낙찰 결과 분석 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, syncedAt, source: "g2b" }));
+  // 메인 상단 현황 줄의 '낙찰정보 N건' (낙찰 저장소에 쌓인 낙찰 건수)
+  let awardCount: { rows: number; builtAt: string } | undefined;
+  try {
+    const m = await awardMeta();
+    if (m?.rows) awardCount = { rows: m.rows, builtAt: m.builtAt };
+  } catch (e) {
+    console.warn("낙찰 저장소 건수 읽기 실패:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, awardCount, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

@@ -16,3 +16,12 @@ AI_SHEET_MODEL = "claude-haiku-5-5"
 [[r2_buckets]]
 binding = "AWARDS"
 bucket_name = "bidmate-awards"
+
+# 실시간 이용자 수 (?presence=). 무료 요금제에서도 되는 SQLite 기반 Durable Object. 저장소에는 쓰지 않고 메모리만 쓴다
+[[durable_objects.bindings]]
+name = "PRESENCE"
+class_name = "Presence"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Presence"]

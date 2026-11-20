@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { BidsExplorer, BidsExplorerFallback } from "@/components/BidsExplorer";
 import { BidSourceTabs } from "@/components/BidSourceTabs";
 import { dateTime } from "@/lib/format";
-import { getBids, getSyncInfo } from "@/lib/store";
+import { getAptBids, getBids, getSyncInfo } from "@/lib/store";
 
 export const metadata: Metadata = { title: "공고 검색" };
 export const revalidate = 600;
@@ -11,6 +11,7 @@ export const revalidate = 600;
 export default async function BidsPage() {
   const bids = await getBids();
   const sync = getSyncInfo();
+  const apt = await getAptBids();
   const open = bids.filter((b) => new Date(b.closeAt).getTime() > Date.now()).length;
   return (
     <div className="container-x py-10 sm:py-14">
@@ -24,7 +25,7 @@ export default async function BidsPage() {
           {sync.source === "g2b" ? "나라장터 연동" : "데모 데이터"} · 갱신 {dateTime(sync.syncedAt)}
         </p>
       </div>
-      <BidSourceTabs active="g2b" />
+      <BidSourceTabs active="g2b" counts={{ g2b: open, apt: apt.items.length }} />
       <Suspense fallback={<BidsExplorerFallback />}>
         <BidsExplorer />
       </Suspense>

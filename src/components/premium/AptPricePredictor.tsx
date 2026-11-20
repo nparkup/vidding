@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { aptDetailUrl, type AptBid, type AptBidsFile } from "@/lib/apt";
 import { contractMonths, forecastAptPrice, type AptPriceCheck } from "@/lib/aptPrice";
@@ -25,7 +25,7 @@ export function AptPricePredictor() {
   const [picked, setPicked] = useState<string | null>(sp.get("apt"));
   // 직전 계약을 직접 넣는 칸 (자료가 없거나 다른 계약과 비교하고 싶을 때)
   const [manualAmount, setManualAmount] = useState("");
-  const [manualMonths, setManualMonths] = useState("");
+  const [scale, setScale] = useState("1");
   const [months, setMonths] = useState("");
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function AptPricePredictor() {
 
   const open = useMemo(() => (data?.items ?? []).filter((b) => PRICEABLE.has(b.category) && new Date(b.closeAt).getTime() > Date.now()), [data]);
   const bid = useMemo(() => (data?.items ?? []).find((b) => b.no === picked), [data, picked]);
-  useEffect(() => { setManualAmount(""); setManualMonths(""); setMonths(""); }, [picked]);
+  useEffect(() => { setManualAmount(""); setScale("1"); setMonths(""); }, [picked]);
 
   const matches = useMemo(() => {
     const words = q.trim().split(/\s+/).filter(Boolean).map(norm);
@@ -77,7 +77,7 @@ export function AptPricePredictor() {
       </div>
 
       <div className="min-w-0">
-        {bid ? <Result bid={bid} data={data} manualAmount={manualAmount} setManualAmount={setManualAmount} manualMonths={manualMonths} setManualMonths={setManualMonths} months={months} setMonths={setMonths} /> : (
+        {bid ? <Result bid={bid} data={data} manualAmount={manualAmount} setManualAmount={setManualAmount} scale={scale} setScale={setScale} months={months} setMonths={setMonths} /> : (
           <div className="card p-6 text-sm text-ink-500">왼쪽에서 아파트 공고를 고르면 같은 단지 직전 계약금액과 과거 낙찰 변화율로 예상 낙찰금액을 계산합니다.</div>
         )}
       </div>
@@ -85,23 +85,37 @@ export function AptPricePredictor() {
   );
 }
 
-function Result({ bid, data, manualAmount, setManualAmount, manualMonths, setManualMonths, months, setMonths }: {
+const SCALES = [
+  { v: "1", t: "직전과 같음" },
+  { v: "2", t: "두 배 (예: 1년 → 2년 계약)" },
+  { v: "0.5", t: "절반 (예: 2년 → 1년 계약)" },
+  { v: "1.5", t: "1.5배 (예: 2년 → 3년 계약)" },
+];
+
+function Result({ bid, data, manualAmount, setManualAmount, scale, setScale, months, setMonths }: {
   bid: AptBid; data: AptBidsFile;
   manualAmount: string; setManualAmount: (v: string) => void;
-  manualMonths: string; setManualMonths: (v: string) => void;
+  scale: string; setScale: (v: string) => void;
   months: string; setMonths: (v: string) => void;
 }) {
   const model = data.pricing!;
   const manual = digits(manualAmount) > 0;
-  const mm = Math.min(60, digits(manualMonths)) || 12;
-  // 직접 넣은 금액은 오늘부터 그 개월 수만큼의 계약으로 본다 (개월 수만 쓰인다)
-  const prior = manual ? { amount: digits(manualAmount), start: "2000-01-01", end: new Date(Date.UTC(2000, mm, 0)).toISOString().slice(0, 10) } : bid.prior;
-  const priorMonths = prior ? contractMonths(prior.start, prior.end) : undefined;
-  const want = Math.min(60, digits(months)) || undefined;
-  const f = prior && PRICEABLE.has(bid.category) ? forecastAptPrice(model, bid.category, bid.award, prior, want) : undefined;
+  const prior = manual ? { amount: digits(manualAmount) } : bid.prior;
+  const priorMonths = !manual && bid.prior ? contractMonths(bid.prior.start, bid.prior.end) : undefined;
+  const want = Math.min(60, digits(months));
+  // 직전 계약기간을 알면 이번 개월 수로, 모르면 규모 배율로 맞춘다
+  const k = priorMonths && want ? want / priorMonths : Number(scale) || 1;
+  const f = prior && PRICEABLE.has(bid.category) ? forecastAptPrice(model, bid.category, bid.award, prior, k) : undefined;
+  const st = f?.stat;
+  const round = (x: number) => Math.round(x / 1000) * 1000;
+  // 좁은 화면은 결과가 목록 아래에 있어 공고를 고르면 결과로 내려간다
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (window.innerWidth < 1024) box.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [bid.no]);
 
   return (
-    <div className="card min-w-0 p-5 sm:p-6">
+    <div ref={box} className="card min-w-0 scroll-mt-20 p-5 sm:p-6">
       <div className="flex flex-wrap items-center gap-1.5">
         <CloseDdayBadge iso={bid.closeAt} />
         <span className="chip">{bid.category}</span>
@@ -122,47 +136,50 @@ function Result({ bid, data, manualAmount, setManualAmount, manualMonths, setMan
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="min-w-0 text-sm">
-          <span className="text-ink-500">{bid.prior ? "직전 계약금액 직접 입력 (선택)" : "직전 계약금액 (원)"}</span>
-          <input inputMode="numeric" value={manualAmount ? Number(digits(manualAmount)).toLocaleString() : ""} onChange={(e) => setManualAmount(e.target.value)} placeholder="예: 36,000,000" className="input mt-1 w-full" />
+          <span className="text-ink-500">{bid.prior ? "다른 직전 계약금액으로 계산 (선택)" : "직전 계약금액 (원)"}</span>
+          <input inputMode="numeric" value={manualAmount ? digits(manualAmount).toLocaleString() : ""} onChange={(e) => setManualAmount(e.target.value)} placeholder="예: 36,000,000" className="input mt-1 w-full" />
         </label>
-        {manual ? (
+        {priorMonths ? (
           <label className="min-w-0 text-sm">
-            <span className="text-ink-500">그 계약의 기간 (개월)</span>
-            <input inputMode="numeric" value={manualMonths} onChange={(e) => setManualMonths(e.target.value.replace(/[^\d]/g, ""))} placeholder="12" className="input mt-1 w-full" />
+            <span className="text-ink-500">이번 계약기간 (개월)</span>
+            <input inputMode="numeric" value={months} onChange={(e) => setMonths(e.target.value.replace(/[^\d]/g, ""))} placeholder={`${priorMonths} (직전과 같음)`} className="input mt-1 w-full" />
           </label>
         ) : (
           <label className="min-w-0 text-sm">
-            <span className="text-ink-500">이번 계약기간 (개월, 선택)</span>
-            <input inputMode="numeric" value={months} onChange={(e) => setMonths(e.target.value.replace(/[^\d]/g, ""))} placeholder={priorMonths ? `${priorMonths} (직전과 같음)` : "12"} className="input mt-1 w-full" />
+            <span className="text-ink-500">이번 계약 규모 (직전 대비)</span>
+            <select value={scale} onChange={(e) => setScale(e.target.value)} className="input mt-1 w-full">
+              {SCALES.map((o) => <option key={o.v} value={o.v}>{o.t}</option>)}
+            </select>
           </label>
         )}
       </div>
 
-      {f ? (
+      {f && st ? (
         <div className="mt-5">
-          <p className="text-sm text-ink-500">예상 낙찰금액 ({f.months}개월 계약 기준)</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{wonFull(Math.round(f.mid / 1000) * 1000)}</p>
-          <p className="mt-1 text-sm tabular-nums text-ink-700">예상 구간 {wonFull(Math.round(f.low / 1000) * 1000)} ~ {wonFull(Math.round(f.high / 1000) * 1000)}</p>
-          <p className="mt-1 text-sm tabular-nums text-ink-500">월 {won(f.prevMonthly * f.stat.median)} (직전 월 {won(f.prevMonthly)} 대비 {signed(f.stat.median)})</p>
-          <div className="mt-4 rounded-xl border border-ink-100 p-3 text-sm leading-relaxed text-ink-700">
-            <p><b>계산 근거</b> · {f.basis} 공고에서 같은 단지의 직전 계약 다음에 나온 낙찰 {f.stat.n.toLocaleString()}건을 보면, 월 환산 낙찰금액이 직전 계약보다 가운데값 {signed(f.stat.median)}, 20~80% 구간 {signed(f.stat.p20)} ~ {signed(f.stat.p80)} 달라졌습니다.</p>
-            {f.check && f.check.n > 0 && <CheckLine c={f.check} cutoff={model.check.cutoff} cat={model.check.byCat[bid.category] === f.check ? bid.category : "전체 분야"} />}
+          <p className="text-sm text-ink-500">예상 낙찰금액{f.scale !== 1 ? ` (직전 대비 ${Math.round(f.scale * 100) / 100}배 규모)` : " (계약 기간·범위가 직전과 같을 때)"}</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{wonFull(round(f.mid))}</p>
+          <p className="mt-1 text-sm tabular-nums text-ink-700">예상 구간 {wonFull(round(f.low))} ~ {wonFull(round(f.high))}</p>
+          <p className="mt-1 text-sm tabular-nums text-ink-500">직전 계약{f.scale !== 1 ? " 환산" : ""} 대비 {signed(st.median)}</p>
+          <div className="mt-4 space-y-2 rounded-xl border border-ink-100 p-3 text-sm leading-relaxed text-ink-700">
+            <p><b>계산 근거</b> · {f.basis} 낙찰 가운데 같은 단지의 직전 계약 다음에 나온 {st.all.toLocaleString()}건을 보면, {pct(st.same)}는 규모가 직전과 비슷했고 그 {st.n.toLocaleString()}건의 낙찰금액은 직전보다 가운데값 {signed(st.median)}(10~90% 구간 {signed(st.low)} ~ {signed(st.high)}) 달라졌습니다. 전체 짝의 {pct(st.double)}는 약 두 배, {pct(st.half)}는 약 절반이었는데, 계약기간이나 과업 범위가 바뀐 경우로 보입니다.</p>
+            {f.check && f.check.n > 0 && <CheckLine c={f.check} cutoff={model.check.cutoff} cat={f.checkBasis} />}
           </div>
         </div>
       ) : (
         <p className="mt-5 rounded-xl bg-paper p-3 text-sm text-ink-500">같은 단지 직전 계약 자료가 없어 예측하지 않습니다. 직전 계약금액을 알고 있으면 위에 입력해 주세요.</p>
       )}
 
-      <p className="mt-4 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 분야 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 과업 범위·인원이 바뀐 공고는 실제와 크게 다를 수 있으니 공고서의 과업 내용과 함께 보세요.</p>
+      <p className="mt-4 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 분야 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 공고서의 계약기간·과업 범위가 직전과 다르면 위의 계약기간이나 규모를 바꿔 보세요.</p>
       <a href={aptDetailUrl(bid.no)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm mt-3">K-apt 원문 보기</a>
     </div>
   );
 }
 
 function CheckLine({ c, cutoff, cat }: { c: AptPriceCheck; cutoff: string; cat: string }) {
+  const y = cutoff.slice(0, 4);
   return (
-    <p className="mt-2">
-      <b>정확도</b> · {cutoff.slice(0, 4)}년 이전 자료로 만든 같은 계산을 {cutoff.slice(0, 4)}년 {cat} 낙찰 {c.n.toLocaleString()}건에 맞춰 보니, 실제 낙찰금액이 예상 구간 안에 든 비율 {pct(c.inRange)}, 예상 금액과 10% 안 {pct(c.within10)}, 5% 안 {pct(c.within5)}였습니다 (직전 계약금액 그대로라고 봤을 때 10% 안 {pct(c.naive10)}).
+    <p>
+      <b>정확도</b> · {y}년 이전 자료로 만든 같은 계산을 {y}년 {cat} 낙찰 중 규모가 직전과 비슷했던 {c.n.toLocaleString()}건에 맞춰 보니, 예상 금액과 5% 안 {pct(c.within5)}, 10% 안 {pct(c.within10)}, 예상 구간 안 {pct(c.inRange)}였습니다. 직전 계약금액을 그대로 썼다면 5% 안 {pct(c.naive5)}, 10% 안 {pct(c.naive10)}입니다.
     </p>
   );
 }

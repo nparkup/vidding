@@ -7,6 +7,7 @@ import { BidRow } from "@/components/BidRow";
 import { GradeBadge, ScoreBar } from "@/components/Badges";
 import { FeatureTabs } from "@/components/home/FeatureTabs";
 import { ProductMockup } from "@/components/home/ProductMockup";
+import { HeroStats, type CloseMarks } from "@/components/home/HeroStats";
 import { AnalysisEngine } from "@/components/home/AnalysisEngine";
 import { AgencyMark, AGENCY_KINDS } from "@/components/home/AgencyMark";
 import { MatchDemo } from "@/components/MatchDemo";
@@ -15,7 +16,7 @@ import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
-import { getBids } from "@/lib/store";
+import { getAwardCount, getBids } from "@/lib/store";
 import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
 import { bidHref } from "@/lib/links";
 
@@ -59,8 +60,25 @@ const FAQ = [
   { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트LAB은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
 
+/** 빌드 시각 이후 마감하는 공고를 마감 분(分)별로 묶는다. 화면이 지금 시각보다 늦게 마감하는 것만 더해 입찰 가능 공고 수를 낸다 */
+function closeMarks(bids: { closeAt: string }[], now: number): CloseMarks {
+  const base = Math.floor(now / 60_000);
+  const by = new Map<number, number>();
+  for (const b of bids) {
+    const t = Date.parse(b.closeAt);
+    if (!(t > now)) continue;
+    const m = Math.floor(t / 60_000) - base;
+    by.set(m, (by.get(m) ?? 0) + 1);
+  }
+  const at = [...by.keys()].sort((a, b) => a - b);
+  return { base, at, n: at.map((m) => by.get(m)!) };
+}
+
 export default async function Home() {
   const bids = await getBids();
+  const builtAt = Date.now();
+  const marks = closeMarks(bids, builtAt);
+  const awardCount = getAwardCount();
   // 업종이 다른 예시 고객사들: [0] 전기·통신공사, [1] IT 용역, [2] 의료 물품, [3] 시설관리 용역, [4] 건축공사
   const client = SEED_CLIENTS[0];
   const digest = buildDigest(client, bids);
@@ -298,7 +316,8 @@ export default async function Home() {
           <p className="lead mx-auto mt-6 max-w-2xl">
             입찰 특화 알고리즘이 나라장터 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해, 점수와 근거를 매일 아침 보내 드립니다.
           </p>
-          <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
+          <HeroStats marks={marks} builtAt={builtAt} awards={awardCount?.rows ?? null} />
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/apply" className="btn-mint px-7 text-base">2주 무료로 시작하기</Link>
             <Link href="/bids" className="btn-ghost px-7 text-base">오늘의 공고 둘러보기</Link>
           </div>

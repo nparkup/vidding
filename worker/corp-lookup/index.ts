@@ -11,6 +11,10 @@
  * - GET /?awards=사업자번호&biz=용역 : 그 업체의 최근 3년 낙찰을 공고 분류와 함께. 조달청 API를 부르지 않는다 (6시간 캐시)
  * - GET /?awardmeta=1 : 저장소 수집 범위·완료 여부
  *
+ * 실시간 이용자 수 (src/lib/presence.ts, 메인 상단 현황 줄):
+ * - GET /?presence=브라우저ID : 사이트를 연 브라우저가 1분마다 부른다. 최근 PRESENCE_WINDOW_MS 안에 부른 브라우저 수를 돌려준다.
+ *   Durable Object(Presence) 하나가 메모리에만 들고 있다 (저장소에 쓰지 않는다). ID 없이 부르면 세기만 한다.
+ *
  * 공고 배점표 AI 판독 (src/lib/nara/aiSheet.ts):
  * - GET /?aisheet=공고번호-차수 : 사이트가 빌드 때 만든 /ai-input/{공고}.json 본문을 Claude로 읽어 검증한 배점표를 돌려준다.
  *   결과는 R2 ai-sheets/v{버전}/{공고}-{본문 해시}.json 에 두어 같은 공고는 한 번만 부른다. 키는 Worker 비밀값 ANTHROPIC_API_KEY.
@@ -42,6 +46,23 @@ interface Env {
   ATTACH_HOSTS?: string;
   /** 쉼표로 구분한 허용 Origin, 예: https://nparkup.github.io,http://localhost:3000 */
   ALLOWED_ORIGINS?: string;
+  /** 실시간 이용자 수 (wrangler.toml durable_objects). 없으면 ?presence 는 503 */
+  PRESENCE?: { idFromName(name: string): unknown; get(id: unknown): { fetch(req: Request | string): Promise<Response> } };
+}
+
+/** 이 시간 안에 신호를 보낸 브라우저를 '지금 보고 있는 이용자'로 센다. 화면은 1분마다 신호를 보낸다 */
+const PRESENCE_WINDOW_MS = 150_000;
+
+/** 지금 사이트를 열어 둔 브라우저 수. 한 인스턴스가 메모리에만 들고 있다 (아무도 없으면 지워져도 0이라 상관없다) */
+export class Presence {
+  private seen = new Map<string, number>();
+  async fetch(req: Request): Promise<Response> {
+    const id = new URL(req.url).searchParams.get("id") ?? "";
+    const now = Date.now();
+    if (id) this.seen.set(id, now);
+    for (const [k, t] of this.seen) if (now - t > PRESENCE_WINDOW_MS) this.seen.delete(k);
+    return new Response(JSON.stringify({ count: this.seen.size }), { headers: { "Content-Type": "application/json" } });
+  }
 }
 
 const CACHE_SECONDS = 12 * 3600;
@@ -60,6 +81,14 @@ export default {
     if (req.method !== "GET") return json({ error: "GET만 지원합니다." }, 405);
     if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
     const sp = new URL(req.url).searchParams;
+    if (sp.has("presence")) {
+      if (!env.PRESENCE) return json({ error: "off" }, 503);
+      const id = sp.get("presence") ?? "";
+      if (id && !/^[a-z0-9]{8,40}$/.test(id)) return json({ error: "잘못된 ID" }, 400);
+      const stub = env.PRESENCE.get(env.PRESENCE.idFromName("site"));
+      const r = await stub.fetch(`https://presence/?id=${id}`);
+      return json(await r.json(), 200, { "Cache-Control": "no-store" });
+    }
     if (sp.has("awards") || sp.has("awardmeta")) {
       try {
         const r = await readAwards(env.AWARDS, sp.get("awards") ?? "", sp.get("biz") ?? "");

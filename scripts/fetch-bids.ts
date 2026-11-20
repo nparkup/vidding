@@ -19,6 +19,7 @@ import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
 import { attachPriors, COMPARABLE, fetchAptAwards, fetchAptNotices, fetchAptPrivateContracts, type AptAward } from "../src/lib/kapt/client";
 import type { AptBidsFile } from "../src/lib/apt";
+import { buildAptPriceModel } from "../src/lib/aptPrice";
 import { fetchOrderPlans } from "../src/lib/nara/orderPlan";
 import { fetchContracts } from "../src/lib/nara/contract";
 import { linkPlansToBids } from "../src/lib/orderPlans";
@@ -184,7 +185,10 @@ async function main() {
       console.warn("공동주택 수의계약 건너뜀:", e instanceof Error ? e.message : e);
     }
     priors = attachPriors(items, prev);
-    aptBids = { builtAt: new Date().toISOString(), items, awards, privates };
+    // 입찰가격 예측: 지난해까지의 (직전 계약 → 다음 낙찰) 짝으로 비율을 만들고 올해 낙찰로 맞춰 본다
+    const pricing = prev.length ? buildAptPriceModel(prev, `${new Date(Date.now() + 9 * 3600e3).getUTCFullYear()}-01-01`) : undefined;
+    if (pricing) console.log(`공동주택 입찰가격 예측: 짝 ${pricing.pairs.toLocaleString()}개, 검증 ${pricing.check.all.n.toLocaleString()}건 구간 적중 ${(pricing.check.all.inRange * 100).toFixed(1)}%, 10% 안 ${(pricing.check.all.within10 * 100).toFixed(1)}% (직전 금액 그대로 ${(pricing.check.all.naive10 * 100).toFixed(1)}%)`);
+    aptBids = { builtAt: new Date().toISOString(), items, awards, privates, pricing };
     const by = (k: string) => items.filter((b) => b.category === k).length;
     console.log(`공동주택 입찰: 진행 중 ${items.length.toLocaleString()}건 (청소 ${by("청소")}, 경비 ${by("경비")}, 소독 ${by("소독")}, 위탁관리 ${by("주택관리(위탁)")}, 공사 ${by("공사")}), 낙찰 ${awards.toLocaleString()}건·수의계약 ${privates.toLocaleString()}건 중 직전 계약 붙인 공고 ${priors}건`);
   } catch (e) {

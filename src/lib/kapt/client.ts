@@ -1,5 +1,6 @@
 import "server-only";
 import type { AptBid, AptCategory, AptPrior } from "../apt";
+import type { AptPriceRecord } from "../aptPrice";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { mapLimit } from "../nara/client";
@@ -191,7 +192,8 @@ export async function fetchAptNotices(days = APT_NOTICE_DAYS, now = new Date()):
 }
 
 /** 낙찰·수의계약 한 건 (직전 계약 비교용) */
-export interface AptAward { no: string; key: string; prior: AptPrior }
+/** 낙찰·수의계약 한 건 (award = 낙찰방법, 낙찰 건만) */
+export type AptAward = AptPriceRecord;
 
 /** 올해와 작년 낙찰 건 (입찰결과공지, 상태 5 = 낙찰·계약완료) */
 export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
@@ -200,7 +202,7 @@ export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
   // 아파트 용역은 2년 계약이 많아 3개 연도를 본다
   for (const year of [y - 2, y - 1, y]) {
     // 지난 연도는 거의 바뀌지 않아 7일 캐시, 올해는 매번 받되 게이트웨이가 끝내 실패하면 지난 빌드 자료를 쓴다
-    const name = `awards-${year}.json`;
+    const name = `awards-v2-${year}.json`;
     let rows = year < y ? readCache<AptAward[]>(name, 7 * DAY) : undefined;
     if (!rows) {
       const items = await all(RESULT, "getBidSttusSearchV3", { bidState: "5", searchYear: String(year) });
@@ -213,6 +215,7 @@ export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
         rows.push({
           no: s(it.bidNum),
           key: `${apt}|${cat}`,
+          award: SUC[s(it.codeSucWay)],
           prior: { via: "낙찰", title: s(it.bidTitle).replace(PREFIX, ""), amount, start: day(it.contractPeriodSdate), end: day(it.contractPeriodEdate), closedAt: day(it.bidDeadline) },
         });
       }

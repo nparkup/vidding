@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { APT_CATEGORIES, APT_REGIONS, aptDetailUrl, aptFileUrl, type AptBid, type AptBidsFile } from "@/lib/apt";
 import { dateTime, shortDate, won, wonFull } from "@/lib/format";
@@ -182,6 +183,9 @@ function AptRow({ bid: b }: { bid: AptBid }) {
               <p className="text-sm text-ink-300">직전 계약 자료 없음</p>
             ) : <span />}
             <p className="text-xs text-ink-300">마감 {shortDate(b.closeAt)} · 펼쳐 보기</p>
+            {COMPARABLE.has(b.category) && (
+              <Link href={`/premium?apt=${encodeURIComponent(b.no)}#apt-price`} onClick={(e) => e.stopPropagation()} className="btn-mint btn-sm mt-2 shrink-0">입찰가격 예측</Link>
+            )}
           </div>
         </summary>
         <div className="grid min-w-0 gap-4 border-t border-ink-100 p-4 sm:grid-cols-2 sm:p-5">

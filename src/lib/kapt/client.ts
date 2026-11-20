@@ -25,7 +25,7 @@ async function call(path: string, op: string, params: Record<string, string>): P
   if (!key) throw new Error("DATA_GO_KR_SERVICE_KEY 가 설정되지 않았습니다.");
   const qs = new URLSearchParams({ serviceKey: key, _type: "json", pageNo: "1", numOfRows: String(ROWS), ...params });
   let last: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const res = await fetch(`${BASE}${path}/${op}?${qs}`, { cache: "no-store", signal: AbortSignal.timeout(60_000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -33,7 +33,8 @@ async function call(path: string, op: string, params: Record<string, string>): P
       let json: { response?: { header?: { resultCode?: string; resultMsg?: string }; body?: { items?: unknown; totalCount?: unknown } }; OpenAPI_ServiceResponse?: { cmmMsgHeader?: { returnAuthMsg?: string; errMsg?: string } } };
       try { json = JSON.parse(text); } catch { throw new Error(`응답 파싱 실패: ${text.slice(0, 120)}`); }
       const auth = json.OpenAPI_ServiceResponse?.cmmMsgHeader;
-      if (auth) throw Object.assign(new Error(`인증 오류: ${auth.returnAuthMsg ?? auth.errMsg}`), { fatal: true });
+      // 게이트웨이의 HTTP_ERROR·시간 초과는 잠깐 뒤 다시 하면 된다. 키 오류 등은 바로 멈춘다
+      if (auth) throw Object.assign(new Error(`게이트웨이 오류: ${auth.returnAuthMsg ?? auth.errMsg}`), { fatal: !/HTTP|TIMEOUT|LIMITED/i.test(`${auth.errMsg} ${auth.returnAuthMsg}`) });
       const code = json.response?.header?.resultCode;
       if (code && code !== "00") throw Object.assign(new Error(`API 오류(${code}): ${json.response?.header?.resultMsg}`), { fatal: true });
       const raw = json.response?.body?.items as { item?: Item | Item[] } | Item[] | undefined;
@@ -42,7 +43,7 @@ async function call(path: string, op: string, params: Record<string, string>): P
     } catch (e) {
       last = e;
       if ((e as { fatal?: boolean }).fatal) break;
-      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
     }
   }
   throw new Error(`공동주택 ${op}: ${(last as Error)?.message}`);
@@ -55,7 +56,10 @@ async function all(path: string, op: string, params: Record<string, string>, max
   const pages = Math.min(maxPages, Math.ceil(first.total / ROWS));
   // 999건 한 쪽이 몇 초씩 걸려 네 쪽씩 함께 받는다
   const rest = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
-  const got = await mapLimit(rest, 4, async (p) => (await call(path, op, { ...params, pageNo: String(p) })).items);
+  // 한 쪽이 끝내 실패해도 나머지는 쓴다 (낙찰 비교 자료가 조금 빠질 뿐)
+  let failed = 0;
+  const got = await mapLimit(rest, 4, async (p) => (await call(path, op, { ...params, pageNo: String(p) }).catch(() => { failed++; return { items: [] as Item[] }; })).items);
+  if (failed) console.warn(`공동주택 ${op} ${JSON.stringify(params)}: ${pages}쪽 중 ${failed}쪽 받지 못함`);
   return items.concat(...got);
 }
 

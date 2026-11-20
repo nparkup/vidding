@@ -5,8 +5,10 @@ import { attachPriors, COMPARABLE, fetchAptAwards, fetchAptNotices, fetchAptPriv
   const items = await fetchAptNotices();
   const codes = items.filter((b) => COMPARABLE.includes(b.category)).map((b) => b.aptCode);
   const t1 = Date.now();
+  console.log('notices', items.length, t1 - t0);
   const pc = await fetchAptPrivateContracts(codes);
   const t2 = Date.now();
+  console.log('private', pc.asked, pc.items.length, t2 - t1);
   const aw = await fetchAptAwards();
   const n = attachPriors(items, [...aw, ...pc.items]);
   const onlyAw = items.map((b) => ({ ...b, prior: undefined }));

@@ -122,8 +122,8 @@ export function OrderPlanExplorer() {
               {p.central && <span className="chip">조달청 대행</span>}
               {p.bidIds?.length ? <span className="chip border-mint/30 bg-mint-50 text-mint-700">공고 나온 것으로 보임</span> : null}
             </div>
-            <h3 className="mt-2 font-bold leading-snug">{p.title}</h3>
-            <p className="mt-1 text-sm text-ink-500">
+            <h3 className="mt-2 font-bold leading-snug [overflow-wrap:anywhere]">{p.title}</h3>
+            <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">
               {[p.top && !p.agency.startsWith(p.top) ? `${p.top} ${p.agency}` : p.agency, p.amount ? `발주 예정 금액 ${won(p.amount)} (${wonFull(p.amount)})` : "금액 미공개", p.site ? `현장 ${p.site}` : "", p.work ? `${p.work}공사` : "", p.item ? `품목 ${p.item}` : "", p.kind ?? ""].filter(Boolean).join(" · ")}
             </p>
             <p className="mt-0.5 text-xs text-ink-400">

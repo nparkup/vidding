@@ -93,7 +93,7 @@ export function ContractExplorer() {
         {list ? `최근 2주 경쟁 계약 ${list.length.toLocaleString()}건 중 ${shown.length.toLocaleString()}건${total ? ` · 합계 ${won(total)}` : ""}` : "불러오는 중…"}
       </p>
       {corpSummary && corpSummary.n > 0 && (
-        <p className="mt-1 text-sm text-ink-500">이 업체는 최근 2주 {corpSummary.n}건을 계약했습니다. 주요 기관: {corpSummary.top.map(([a, n]) => `${a} ${n}건`).join(", ")}</p>
+        <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">이 업체는 최근 2주 {corpSummary.n}건을 계약했습니다. 주요 기관: {corpSummary.top.map(([a, n]) => `${a} ${n}건`).join(", ")}</p>
       )}
 
       <ul className="mt-3 space-y-3">
@@ -109,8 +109,8 @@ export function ContractExplorer() {
                 {c.kind && c.kind !== "신규" && <span className="chip">{c.kind}</span>}
                 {c.corps.length > 1 && <span className="chip">공동수급 {c.corps.length}개사</span>}
               </div>
-              <h3 className="mt-2 font-bold leading-snug">{c.title}</h3>
-              <p className="mt-1 text-sm text-ink-500">
+              <h3 className="mt-2 font-bold leading-snug [overflow-wrap:anywhere]">{c.title}</h3>
+              <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">
                 {[c.demand === c.agency ? c.demand : `${c.demand} (계약 ${c.agency})`, `계약금액 ${won(c.amount)} (${wonFull(c.amount)})`, c.total ? `총 ${won(c.total)}` : "", end ? `계약 끝 ${end}` : c.period ? `기간 ${c.period}` : ""].filter(Boolean).join(" · ")}
               </p>
               <p className="mt-1 text-sm">

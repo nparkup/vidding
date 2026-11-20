@@ -6,6 +6,22 @@ import { dateTime, shortDate, won, wonFull } from "@/lib/format";
 import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "./Badges";
 import { CloseDay } from "./CloseDay";
+import { Tile } from "./CategoryTiles";
+import { ArrowUpDown, BrushCleaning, Building, Droplets, Ellipsis, HardHat, Package, PlugZap, Shield, SprayCan, type LucideIcon } from "lucide-react";
+
+/** 아파트 공고 분야별 선 아이콘 (공고 검색 업종 타일과 같은 모양) */
+const APT_ICONS: Record<string, LucideIcon> = {
+  청소: BrushCleaning,
+  경비: Shield,
+  소독: SprayCan,
+  승강기유지: ArrowUpDown,
+  전기안전관리: PlugZap,
+  "정화조·저수조": Droplets,
+  "기타 용역": Ellipsis,
+  "주택관리(위탁)": Building,
+  공사: HardHat,
+  "물품·기타": Package,
+};
 
 const PAGE = 50;
 /** 직전 낙찰을 비교하는 분야 (공사·기타는 단지마다 일이 달라 비교하지 않는다) */
@@ -72,7 +88,21 @@ export function AptBidsExplorer() {
   const toggle = (c: string) => setCats(cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c]);
   return (
     <>
-      <div className="card mt-6 grid min-w-0 grid-cols-[1fr_auto] items-center gap-3 p-4 sm:grid-cols-[1fr_auto_auto]">
+      <section className="card mt-6 p-4 sm:p-5" aria-label="분야 선택">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-bold">분야로 찾기 <span className="font-normal text-ink-400">여러 개 고를 수 있습니다</span></p>
+          <button type="button" onClick={() => setCats([])} aria-pressed={cats.length === 0} className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${cats.length === 0 ? "border-mint bg-mint-50 text-mint-700" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
+            전체 분야
+          </button>
+        </div>
+        <div className="mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-5 sm:gap-2 lg:grid-cols-10">
+          {APT_CATEGORIES.map((c) => (
+            <Tile key={c} icon={APT_ICONS[c] ?? Ellipsis} label={c} count={counts.get(c) ?? 0} on={cats.includes(c)} onClick={() => toggle(c)} />
+          ))}
+        </div>
+      </section>
+
+      <div className="card mt-3 grid min-w-0 grid-cols-[1fr_auto] items-center gap-3 p-4 sm:grid-cols-[1fr_auto_auto]">
         <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="공고명·단지명 (예: 경비, -재활용)" className="input col-span-2 min-w-0 sm:col-span-1" aria-label="검색어" />
         <select value={region} onChange={(e) => setRegion(e.target.value)} className="input sm:w-36" aria-label="지역">
           <option value="">전국</option>
@@ -81,14 +111,6 @@ export function AptBidsExplorer() {
         <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
           <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
         </label>
-        <div className="col-span-2 flex min-w-0 flex-wrap gap-1.5 sm:col-span-3">
-          <button type="button" onClick={() => setCats([])} className={`rounded-full border px-3 py-1.5 text-sm ${cats.length === 0 ? "border-mint bg-mint text-white" : "border-ink-100 bg-white text-ink-500"}`}>전체 분야</button>
-          {APT_CATEGORIES.map((c) => (
-            <button key={c} type="button" onClick={() => toggle(c)} aria-pressed={cats.includes(c)} className={`rounded-full border px-3 py-1.5 text-sm ${cats.includes(c) ? "border-mint bg-mint text-white" : "border-ink-100 bg-white text-ink-500"}`}>
-              {c} <span className="tabular-nums opacity-70">{(counts.get(c) ?? 0).toLocaleString()}</span>
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">

@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { BidRow } from "./BidRow";
+import { CategoryTiles } from "./CategoryTiles";
 import { LicensePicker } from "./LicensePicker";
 import { daysLeft, rank } from "@/lib/analysis";
 import { BIZ_TYPES, CATEGORY_GROUPS, REGIONS, type Bid, type License, type Region } from "@/lib/types";
@@ -89,7 +90,7 @@ function Explorer({ bids }: { bids: Bid[] }) {
     setLimit(PAGE);
     const next = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(patch)) v ? next.set(k, v) : next.delete(k);
-    router.push(`${pathname}?${next}`);
+    router.push(`${pathname}?${next}`, { scroll: false });
   };
 
   const { list, matches } = useMemo(() => {
@@ -110,32 +111,35 @@ function Explorer({ bids }: { bids: Bid[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bids, sp]);
 
+  // 업종 타일 숫자: 마감 전 공고 기준 업종별 건수
+  const catCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const b of bids) if (daysLeft(b.closeAt) > 0) c[b.category] = (c[b.category] ?? 0) + 1;
+    return c;
+  }, [bids]);
+  const groupOf = (c: string) => Object.entries(CATEGORY_GROUPS).find(([, cs]) => (cs as readonly string[]).includes(c))?.[0] ?? "";
+
   const shown = matches ? (onlyOk ? matches.filter((m) => m.eligible) : matches) : null;
   const profileQs = new URLSearchParams({ lic: lic.join(","), rg: rg.join(","), min: String(min), max: String(max), ...(p3 ? { p3: String(p3) } : {}), ...(p5 ? { p5: String(p5) } : {}) }).toString();
 
   return (
     <>
+      <CategoryTiles value={cat} counts={catCounts} onPick={(c) => go({ cat: c, biz: c && biz && groupOf(c) !== biz ? "" : biz })} />
       <form
         key={sp.toString()}
-        className="card mt-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto_auto]"
+        className="card mt-3 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto]"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
-          go({ q: String(f.get("q") ?? ""), biz: String(f.get("biz") ?? ""), cat: String(f.get("cat") ?? ""), region: String(f.get("region") ?? ""), urgent: f.get("urgent") ? "1" : "" });
+          const nb = String(f.get("biz") ?? "");
+          // 업무 구분을 바꿔 고른 업종과 맞지 않으면 업종 선택을 푼다
+          go({ q: String(f.get("q") ?? ""), biz: nb, cat: cat && nb && groupOf(cat) !== nb ? "" : cat, region: String(f.get("region") ?? ""), urgent: f.get("urgent") ? "1" : "" });
         }}
       >
         <input name="q" defaultValue={q} placeholder="공고명, 발주기관, 공고번호 검색 (예: 청사 유지보수, R26BK01234567)" className="input sm:col-span-2 lg:col-span-1" />
-        <select name="biz" defaultValue={biz} className="input lg:w-28" aria-label="업무 구분">
+        <select name="biz" defaultValue={biz} className="input lg:w-36" aria-label="업무 구분">
           <option value="">용역·공사·물품</option>
           {BIZ_TYPES.map((b) => <option key={b}>{b}</option>)}
-        </select>
-        <select name="cat" defaultValue={cat} className="input lg:w-44" aria-label="업종">
-          <option value="">전체 업종</option>
-          {Object.entries(CATEGORY_GROUPS).map(([g, cs]) => (
-            <optgroup key={g} label={g}>
-              {cs.map((c) => <option key={c}>{c}</option>)}
-            </optgroup>
-          ))}
         </select>
         <select name="region" defaultValue={region} className="input lg:w-32" aria-label="지역">
           <option value="">전체 지역</option>

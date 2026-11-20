@@ -9,13 +9,6 @@ export const metadata: Metadata = {
   description: "공고 첨부파일의 평가기준과 나라장터 기업 정보로 적격심사·협상계약 예상 점수를 계산합니다.",
 };
 
-const FLOW = [
-  { t: "첨부파일 판독", d: "공고서·규격서·제안요청서에서 평가항목, 배점, 통과 기준, 가격 평가식을 읽어 공고별 평가표를 만듭니다." },
-  { t: "기업 정보 결합", d: "사업자번호 하나로 국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업·재무 정보를 불러오고 신용평가등급확인서, 실적증명과 함께 평가항목에 연결합니다." },
-  { t: "항목별 채점", d: "실적은 기초금액 대비 비율, 신용은 사업 규모별 등급 구간, 가격은 공고의 평가식으로 각각 계산합니다." },
-  { t: "통과선 역산", d: "적격심사는 통과 가능한 투찰률 범위를, 협상계약은 협상적격자 기준까지 남은 기술점수를 보여 드립니다." },
-];
-
 export default function PremiumPage() {
   return (
     <>
@@ -29,18 +22,6 @@ export default function PremiumPage() {
           <Link href="/apply?plan=partner" className="btn-ghost">파트너 요금제로 맡기기</Link>
         </div>
       </PageHero>
-
-      <section className="container-x pt-12">
-        <ol className="grid gap-4 md:grid-cols-4">
-          {FLOW.map((f, i) => (
-            <li key={f.t} className="card p-6">
-              <p className="text-sm font-bold text-mint-600 tabular-nums">0{i + 1}</p>
-              <p className="mt-2 text-lg font-bold">{f.t}</p>
-              <p className="mt-2 text-sm leading-relaxed text-ink-500">{f.d}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
 
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">평가점수 예측</p>

@@ -9,6 +9,9 @@ import { attachPriors, COMPARABLE, fetchAptAwards, fetchAptNotices, fetchAptPriv
   const pc = await fetchAptPrivateContracts(codes);
   const t2 = Date.now();
   console.log('private', pc.asked, pc.items.length, t2 - t1);
+  const pc2 = await fetchAptPrivateContracts(codes);
+  console.log('private2', pc2.asked, pc2.cached, pc2.items.length, Date.now() - t2);
+  pc.items.push(...pc2.items);
   const aw = await fetchAptAwards();
   const n = attachPriors(items, [...aw, ...pc.items]);
   const onlyAw = items.map((b) => ({ ...b, prior: undefined }));

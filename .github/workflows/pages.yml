@@ -50,6 +50,13 @@ jobs:
           path: .cache/contracts
           key: contracts-${{ github.run_id }}
           restore-keys: contracts-
+      # 공동주택 지난 연도 낙찰·단지별 수의계약은 캐시에 두고 다음 빌드는 아직 안 물어본 단지부터 묻는다 (src/lib/kapt/client.ts)
+      - name: 공동주택 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/apt
+          key: apt-${{ github.run_id }}
+          restore-keys: apt-
       - name: 나라장터 공고 수집
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
@@ -77,6 +84,12 @@ jobs:
         with:
           path: .cache/contracts
           key: contracts-${{ github.run_id }}
+      - name: 공동주택 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/apt
+          key: apt-${{ github.run_id }}
       - name: 기업 정보 중계 서버 주소 확인
         id: corp
         env:

@@ -179,7 +179,7 @@ async function main() {
       const pc = await fetchAptPrivateContracts(items.filter((b) => COMPARABLE.includes(b.category)).map((b) => b.aptCode));
       privates = pc.items.length;
       prev.push(...pc.items);
-      console.log(`공동주택 수의계약: 단지 ${pc.asked.toLocaleString()}곳 조회, 최근 3개 연도 ${privates.toLocaleString()}건`);
+      console.log(`공동주택 수의계약: 단지 ${pc.asked.toLocaleString()}곳 조회·${pc.cached.toLocaleString()}곳 캐시, 최근 3개 연도 ${privates.toLocaleString()}건`);
     } catch (e) {
       console.warn("공동주택 수의계약 건너뜀:", e instanceof Error ? e.message : e);
     }

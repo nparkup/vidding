@@ -1,6 +1,22 @@
 import "server-only";
 import type { AptBid, AptCategory, AptPrior } from "../apt";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { mapLimit } from "../nara/client";
+
+/** 빌드 사이에 남기는 캐시 (.github/workflows/pages.yml 이 복원·저장). 지난 연도 낙찰과 단지별 수의계약을 다시 묻지 않으려고 둔다 */
+const CACHE = ".cache/apt";
+function readCache<T>(name: string, maxAgeMs: number): T | undefined {
+  const file = join(CACHE, name);
+  try {
+    if (!existsSync(file) || Date.now() - statSync(file).mtimeMs > maxAgeMs) return undefined;
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch { return undefined; }
+}
+function writeCache(name: string, v: unknown) {
+  try { mkdirSync(join(CACHE, name, ".."), { recursive: true }); writeFileSync(join(CACHE, name), JSON.stringify(v)); } catch { /* 캐시는 없어도 된다 */ }
+}
+const DAY = 86_400_000;
 
 /**
  * 공동주택(아파트) 입찰 수집. 공공데이터포털 국토교통부 서비스 2개 (키는 나라장터와 같은 DATA_GO_KR_SERVICE_KEY):
@@ -183,18 +199,27 @@ export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
   const out: AptAward[] = [];
   // 아파트 용역은 2년 계약이 많아 3개 연도를 본다
   for (const year of [y - 2, y - 1, y]) {
-    const items = await all(RESULT, "getBidSttusSearchV3", { bidState: "5", searchYear: String(year) });
-    for (const it of items) {
-      const amount = Number(s(it.amount).replace(/[^\d]/g, "")) || 0;
-      const apt = s(it.aptCode);
-      if (!amount || !apt) continue;
-      const cat = aptCategory(s(it.codeClassifyType1), s(it.codeClassifyType2), s(it.codeClassifyType3));
-      out.push({
-        no: s(it.bidNum),
-        key: `${apt}|${cat}`,
-        prior: { via: "낙찰", title: s(it.bidTitle).replace(PREFIX, ""), amount, start: day(it.contractPeriodSdate), end: day(it.contractPeriodEdate), closedAt: day(it.bidDeadline) },
-      });
+    // 지난 연도는 거의 바뀌지 않아 7일 캐시, 올해는 매번 받되 게이트웨이가 끝내 실패하면 지난 빌드 자료를 쓴다
+    const name = `awards-${year}.json`;
+    let rows = year < y ? readCache<AptAward[]>(name, 7 * DAY) : undefined;
+    if (!rows) {
+      const items = await all(RESULT, "getBidSttusSearchV3", { bidState: "5", searchYear: String(year) });
+      rows = [];
+      for (const it of items) {
+        const amount = Number(s(it.amount).replace(/[^\d]/g, "")) || 0;
+        const apt = s(it.aptCode);
+        if (!amount || !apt) continue;
+        const cat = aptCategory(s(it.codeClassifyType1), s(it.codeClassifyType2), s(it.codeClassifyType3));
+        rows.push({
+          no: s(it.bidNum),
+          key: `${apt}|${cat}`,
+          prior: { via: "낙찰", title: s(it.bidTitle).replace(PREFIX, ""), amount, start: day(it.contractPeriodSdate), end: day(it.contractPeriodEdate), closedAt: day(it.bidDeadline) },
+        });
+      }
+      if (rows.length) writeCache(name, rows);
+      else rows = readCache<AptAward[]>(name, 30 * DAY) ?? [];
     }
+    out.push(...rows);
   }
   return out;
 }
@@ -204,14 +229,20 @@ export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
  * 단지코드 조회(kaptCode)는 그 단지의 모든 연도 계약을 한 번에 돌려주므로 진행 중 공고의 단지만 묻는다.
  * 업체는 이름만 남기고 대표자·주소·전화는 버린다. budgetMs 를 넘기면 남은 단지는 다음 빌드로 미룬다.
  */
-export async function fetchAptPrivateContracts(aptCodes: string[], now = new Date(), budgetMs = 4 * 60_000): Promise<{ items: AptAward[]; asked: number }> {
+export async function fetchAptPrivateContracts(aptCodes: string[], now = new Date(), budgetMs = 4 * 60_000): Promise<{ items: AptAward[]; asked: number; cached: number }> {
   const since = `${Number(kstYmd(now).slice(0, 4)) - 2}-01-01`;
   const started = Date.now();
   let asked = 0;
-  const rows = await mapLimit([...new Set(aptCodes)].filter(Boolean), 12, async (code) => {
+  // 단지 하나 묻는 데 1초 남짓이라 한 빌드에 다 못 묻는다. 3일 안에 물어본 단지는 캐시를 쓰고, 처음 보는 단지부터 묻는다
+  const codes = [...new Set(aptCodes)].filter(Boolean);
+  const cached = new Map<string, AptAward[]>();
+  for (const c of codes) { const v = readCache<AptAward[]>(`private/${c}.json`, 3 * DAY); if (v) cached.set(c, v); }
+  const todo = codes.filter((c) => !cached.has(c));
+  const rows = await mapLimit(todo, 12, async (code) => {
     if (Date.now() - started > budgetMs) return [];
     asked++;
-    const items = (await call(PRIVATE, "getHsmpCdSearchV3", { kaptCode: code }).catch(() => ({ items: [] as Item[] }))).items;
+    let failed = false;
+    const items = (await call(PRIVATE, "getHsmpCdSearchV3", { kaptCode: code }).catch(() => { failed = true; return { items: [] as Item[] }; })).items;
     const out: AptAward[] = [];
     for (const it of items) {
       const amount = Number(s(it.pcAmount).replace(/[^\d]/g, "")) || 0;
@@ -224,9 +255,10 @@ export async function fetchAptPrivateContracts(aptCodes: string[], now = new Dat
         prior: { via: "수의계약", title: s(it.pcTitle).replace(PREFIX, ""), amount, company: s(it.companyName) || undefined, start: day(it.pcStDate), end: day(it.pcEdDate), closedAt: date },
       });
     }
+    if (!failed) writeCache(`private/${code}.json`, out);
     return out;
   });
-  return { items: rows.flat(), asked };
+  return { items: [...[...cached.values()].flat(), ...rows.flat()], asked, cached: cached.size };
 }
 
 /** 직전 계약을 비교하는 분야 (공사·기타는 단지마다 일이 달라 비교하지 않는다) */

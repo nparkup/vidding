@@ -7,6 +7,8 @@ import type { Bid } from "./types";
 
 export const MYBOX_KEY = "bidmate.mybox.v1";
 export const MYBOX_EVENT = "bidmate:mybox";
+/** 서류함을 화면에 보일지. 로그인 기능이 완료되면 true로 바꿔 메뉴·담기 버튼·정정 알림 "관심공고만"을 다시 연다 (/mybox 페이지는 그대로 있음) */
+export const MYBOX_ENABLED = false;
 
 export interface MyBoxItem {
   /** 공고번호 (bidNtceNo) */

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
+import { MYBOX_ENABLED } from "@/lib/mybox";
 
 type Item = { href: string; label: string; desc: string };
 type Entry = { label: string; href: string } | { label: string; items: Item[] };
@@ -39,7 +40,8 @@ export const NAV: Entry[] = [
       { href: "/tools/joint", label: "공동도급 지분 계산기", desc: "구성원별 최대 참여비율 계산" },
       { href: "/tools/finance", label: "경영상태 평균비율", desc: "업종별 부채비율·유동비율 평균" },
       { href: "/rates", label: "낙찰하한율·실적 기준표", desc: "금액 구간별 기준 한눈에" },
-      { href: "/mybox", label: "내 서류함", desc: "관심 공고 일정·제출서류 관리" },
+      // 내 서류함은 로그인 기능이 생기면 보인다 (lib/mybox MYBOX_ENABLED)
+      ...(MYBOX_ENABLED ? [{ href: "/mybox", label: "내 서류함", desc: "관심 공고 일정·제출서류 관리" }] : []),
     ],
   },
   { label: "요금제", href: "/pricing" },

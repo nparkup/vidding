@@ -4,6 +4,7 @@ import { attachPriors, fetchAptAwards, fetchAptNotices } from "../src/lib/kapt/c
   const t0 = Date.now();
   const items = await fetchAptNotices();
   const t1 = Date.now();
+  console.log("notices done", items.length, t1 - t0);
   const awards = await fetchAptAwards();
   const n = attachPriors(items, awards);
   console.log("notices", items.length, `${t1 - t0}ms`, "awards", awards.length, `${Date.now() - t1}ms`, "priors", n);

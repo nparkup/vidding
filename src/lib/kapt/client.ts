@@ -53,7 +53,12 @@ async function all(path: string, op: string, params: Record<string, string>, max
   const pages = Math.min(maxPages, Math.ceil(first.total / ROWS));
   // 999건 한 쪽이 몇 초씩 걸려 네 쪽씩 함께 받는다
   const rest = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
-  const got = await mapLimit(rest, 4, async (p) => (await call(path, op, { ...params, pageNo: String(p) })).items);
+  const got = await mapLimit(rest, 4, async (p) => {
+    const t = Date.now();
+    const r = (await call(path, op, { ...params, pageNo: String(p) })).items;
+    if (process.env.KAPT_DEBUG) console.log(`  ${op} ${JSON.stringify(params)} ${p}/${pages} ${Date.now() - t}ms`);
+    return r;
+  });
   return items.concat(...got);
 }
 

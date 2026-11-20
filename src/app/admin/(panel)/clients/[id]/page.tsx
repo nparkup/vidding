@@ -18,7 +18,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
   const bids = await getBids();
   const ranked = rank(bids, c);
   const ok = ranked.filter((r) => r.eligible);
-  const digest = buildDigest(c, bids, new Date(), await getNoticeChanges());
+  const digest = buildDigest(c, bids, new Date(), [], await getNoticeChanges());
   const watched = ranked.filter((r) => c.watchlist.includes(r.bid.id));
   const qs = new URLSearchParams({ lic: c.licenses.join(","), rg: c.regions.join(","), min: String(c.minAmount), max: String(c.maxAmount) });
 

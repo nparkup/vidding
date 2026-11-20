@@ -14,6 +14,12 @@ import type { Bid, BidAttachment } from "@/lib/types";
 import { methodProfile } from "@/lib/bidMethod";
 import { BidChangeBanner, BidCriteriaCard } from "@/components/BidNoticeExtras";
 import type { NoticeCriteria } from "@/lib/noticeCriteria";
+import { BidPriceAnalysis } from "@/components/BidPriceAnalysis";
+import { loadAwardAnalysis } from "@/components/premium/AwardAnalysis";
+import type { AwardAnalysis } from "@/lib/awards/analysis";
+import { usesAssess } from "@/lib/awards/assess";
+import { agencyId } from "@/lib/awards/agency";
+import { MyBoxButton } from "@/components/MyBoxButton";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
 export function BidDetailView({ bid }: { bid: Bid }) {
@@ -21,6 +27,15 @@ export function BidDetailView({ bid }: { bid: Bid }) {
   const [files, setFiles] = useState<BidAttachment[]>([]);
   const [qual, setQual] = useState<BidQual>();
   const [notice, setNotice] = useState<NoticeCriteria>();
+  // 낙찰 결과 분석 파일 (사정율 표본). undefined = 불러오는 중, null = 없음
+  const [award, setAward] = useState<AwardAnalysis | null>();
+  const priceBid = usesAssess(bid.contractMethod) && profile.open;
+  useEffect(() => {
+    let alive = true;
+    setAward(undefined);
+    if (priceBid) loadAwardAnalysis(bid.id).then((a) => { if (alive) setAward(a); }).catch(() => { if (alive) setAward(null); });
+    return () => { alive = false; };
+  }, [bid.id, priceBid]);
   useEffect(() => {
     let alive = true;
     setFiles([]);
@@ -63,9 +78,13 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <span className="chip">공고번호 {bid.bidNtceNo}-{bid.bidNtceOrd}</span>
           </div>
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{bid.title}</h1>
-          <p className="mt-2 text-ink-500">{bid.agency}{bid.demandAgency !== bid.agency && ` · 수요기관 ${bid.demandAgency}`}</p>
+          <p className="mt-2 text-ink-500">
+            {bid.agency}{bid.demandAgency !== bid.agency && ` · 수요기관 ${bid.demandAgency}`}
+            <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <MyBoxButton bid={bid} />
           <a href={bid.detailUrl} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">나라장터 원문</a>
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>
         </div>
@@ -115,6 +134,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             </ol>
           </section>
 
+          {priceBid && <BidPriceAnalysis bid={bid} info={info} analysis={award} />}
+
           {files.length > 0 && (
             <section className="card p-6">
               <div className="flex items-center justify-between">
@@ -155,8 +176,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             </Suspense>
           </section>
 
-          {/* 투찰 가이드 */}
-          <section className="card p-6">
+          {/* 투찰 가이드: 가격 경쟁 공고는 왼쪽 사정율 분석·투찰금액이 대신한다 */}
+          {!priceBid && <section className="card p-6">
             <h2 className="text-lg font-bold">투찰 금액 가이드</h2>
             <p className="mt-1 text-sm text-ink-500">기초금액 × 예정가격 범위(±2%) × 낙찰하한율 {guide.rate.toFixed(3)}%</p>
             <div className="mt-4 rounded-xl bg-ink p-4 text-white">
@@ -165,9 +186,9 @@ export function BidDetailView({ bid }: { bid: Bid }) {
               <p className="mt-2 text-xs text-ink-300">예상 범위 {won(guide.low)} ~ {won(guide.high)}</p>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-ink-300">
-              참고용 추정치입니다. 실제 예정가격은 복수예비가격 추첨으로 결정되며, 낙찰정보 연동 시 발주기관별 사정률 분포를 반영합니다.
+              참고용 추정치입니다. 실제 예정가격은 복수예비가격 추첨으로 결정됩니다.
             </p>
-          </section>
+          </section>}
 
           <section className="card p-6">
             <p className="text-xs font-semibold text-mint-600">프리미엄</p>

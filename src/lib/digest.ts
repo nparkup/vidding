@@ -2,6 +2,7 @@ import { evaluate, rank, type MatchResult } from "./analysis";
 import { keywordHits, titleMatchesKeywords } from "./keywords";
 import { KEY_FIELDS, type NoticeChange } from "./noticeChanges";
 import { FACILITY_CATEGORIES, type Bid, type ClientProfile } from "./types";
+import type { PreSpec } from "./preSpecs";
 
 export interface KeywordSection {
   keyword: string;
@@ -25,6 +26,8 @@ export interface Digest {
   closingSoon: MatchResult[];
   newToday: number;
   excluded: number;
+  /** 새로 공개된 같은 분야 사전규격 (파트너 요금제만, 최대 5건) */
+  preSpecs: PreSpec[];
   /** 관심 키워드별 새 공고 */
   keywords: KeywordSection[];
   /** 관심·추천 공고의 정정·취소 (최근 36시간) */
@@ -53,7 +56,7 @@ export function changesFor(client: ClientProfile, changes: NoticeChange[], eligi
 }
 
 /** 영업일 아침 발송되는 맞춤 공고 요약 */
-export function buildDigest(client: ClientProfile, bids: Bid[], now = new Date(), allChanges: NoticeChange[] = []): Digest {
+export function buildDigest(client: ClientProfile, bids: Bid[], now = new Date(), preSpecs: PreSpec[] = [], allChanges: NoticeChange[] = []): Digest {
   // 관심 업종이 없으면 전 업종. 청소·시설관리 계열을 고른 고객에게는 통합관리 공고도 함께 보낸다
   const facility = client.categories.some((c) => FACILITY_CATEGORIES.includes(c));
   const wanted = (b: Bid) => client.categories.length === 0 || client.categories.includes(b.category) || (facility && b.category === "통합관리");
@@ -75,7 +78,20 @@ export function buildDigest(client: ClientProfile, bids: Bid[], now = new Date()
     closingSoon: eligible.filter((r) => r.daysLeft <= 3).slice(0, 3),
     newToday: eligible.filter((r) => new Date(r.bid.postedAt).getTime() >= dayAgo).length,
     excluded: ranked.length - eligible.length,
+    preSpecs: client.plan === "partner" ? matchPreSpecs(client, preSpecs, now) : [],
     keywords,
     changes: changesFor(client, allChanges, new Set(eligible.map((r) => r.bid.id)), kwNos, dayAgo),
   };
+}
+
+/** 사전규격 선제 알림: 관심 분야·금액 범위에 맞고 최근 36시간 안에 공개됐으며 의견 마감 전인 사전규격 */
+export function matchPreSpecs(client: ClientProfile, list: PreSpec[], now = new Date()): PreSpec[] {
+  const since = now.getTime() - 36 * 3600 * 1000;
+  const facility = client.categories.some((c) => FACILITY_CATEGORIES.includes(c));
+  return list
+    .filter((p) => new Date(p.postedAt).getTime() >= since && (!p.opinionBy || new Date(p.opinionBy).getTime() >= now.getTime()))
+    .filter((p) => client.categories.length === 0 || client.categories.includes(p.category) || (facility && p.category === "통합관리"))
+    .filter((p) => !p.budget || ((!client.minAmount || p.budget >= client.minAmount) && (!client.maxAmount || p.budget <= client.maxAmount * 1.1)))
+    .sort((a, b) => b.budget - a.budget)
+    .slice(0, 5);
 }

@@ -708,6 +708,24 @@ function scaleLevel(scale: ScaleLevel[], lv: Level): ScaleLevel {
   return scale[Math.min(idx, scale.length - 1)];
 }
 
+/** 적격심사: 가격 외 점수(nonPrice)를 고정하고 통과 가능한 투찰률 범위를 찾는다. 통과 기준·가격 항목이 없으면 undefined */
+export function passWindow(sheet: EvalSheet, bid: Pick<Bid, "lowerLimitRate">, nonPrice: number): Prediction["rateWindow"] {
+  const priceItem = sheet.items.find((i) => i.kind === "price");
+  if (sheet.method !== "적격심사" || sheet.pass?.kind !== "total" || !priceItem) return undefined;
+  const ok: number[] = [];
+  const floor = sheet.lowerLimit ?? bid.lowerLimitRate ?? 0;
+  const start = Math.max(70, floor);
+  const rates = Array.from({ length: Math.floor((100 - start) / 0.01) + 1 }, (_, n) => Math.round((start + n * 0.01) * 1000) / 1000);
+  if (start <= 88) rates.push(88);
+  for (const r of rates.sort((x, y) => x - y)) {
+    // 점수는 소수점 처리 차이가 있어 0.01점 안쪽은 같은 점수로 본다
+    if (nonPrice + qualPrice(priceItem.max, r, priceItem.basis, sheet.price) >= sheet.pass.score - 0.01) ok.push(r);
+  }
+  // 낙찰하한율은 기준표 산식의 끝자리 처리(…745, …995)를 반영한 값이라, 계산한 하한과 0.02%p 안이면 하한율을 쓴다
+  if (!ok.length) return undefined;
+  return { low: floor && ok[0] - floor <= 0.02 ? floor : Math.round(ok[0] * 1000) / 1000, high: Math.round(ok[ok.length - 1] * 100) / 100 };
+}
+
 export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLimitRate">, c: CompanyInput): Prediction {
   const amt = sheet.refAmount || bid.baseAmount;
   const amtLabel = sheet.refAmount ? "추정가격" : "기초금액";
@@ -879,22 +897,8 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   }
 
   // 적격심사: 비가격 점수를 고정하고, 통과 가능한 투찰률 범위를 찾는다
-  let rateWindow: Prediction["rateWindow"];
   const priceItem = sheet.items.find((i) => i.kind === "price");
-  if (sheet.method === "적격심사" && sheet.pass?.kind === "total" && priceItem && !pending) {
-    const nonPrice = total - (items.find((i) => i.id === priceItem.id)?.score ?? 0);
-    const ok: number[] = [];
-    const floor = sheet.lowerLimit ?? bid.lowerLimitRate ?? 0;
-    const start = Math.max(70, floor);
-    const rates = Array.from({ length: Math.floor((100 - start) / 0.01) + 1 }, (_, n) => Math.round((start + n * 0.01) * 1000) / 1000);
-    if (start <= 88) rates.push(88);
-    for (const r of rates.sort((x, y) => x - y)) {
-      // 점수는 소수점 처리 차이가 있어 0.01점 안쪽은 같은 점수로 본다
-      if (nonPrice + qualPrice(priceItem.max, r, priceItem.basis, sheet.price) >= sheet.pass.score - 0.01) ok.push(r);
-    }
-    // 낙찰하한율은 기준표 산식의 끝자리 처리(…745, …995)를 반영한 값이라, 계산한 하한과 0.02%p 안이면 하한율을 쓴다
-    if (ok.length) rateWindow = { low: floor && ok[0] - floor <= 0.02 ? floor : Math.round(ok[0] * 1000) / 1000, high: Math.round(ok[ok.length - 1] * 100) / 100 };
-  }
+  const rateWindow = pending ? undefined : passWindow(sheet, bid, total - (items.find((i) => i.id === priceItem?.id)?.score ?? 0));
 
   const tips: string[] = [];
   for (const u of items.filter((i) => i.unknown)) tips.push(`${u.label}(${u.max}점)은 기초금액이 없는 공고라 계산하지 못했습니다. 공고서의 실적 평가 기준을 확인하면 점수를 정할 수 있습니다.`);

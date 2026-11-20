@@ -5,6 +5,8 @@ import { adapter } from "./db";
 import type { ExtractedSheet } from "./nara/docExtract";
 import type { AwardStats } from "./rivalRate";
 import type { AwardAnalysis } from "./awards/analysis";
+import type { AgencySummary } from "./awards/agency";
+import type { PreSpec } from "./preSpecs";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
 import { fetchAllBidsWithChanges, hasServiceKey } from "./nara/client";
@@ -43,7 +45,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; awardCount?: { rows: number; builtAt: string }; changes?: NoticeChange[]; rateTable?: RateTable; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; awardCount?: { rows: number; builtAt: string }; changes?: NoticeChange[]; rateTable?: RateTable; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -100,6 +102,20 @@ export async function getAwardAnalyses(): Promise<Record<string, AwardAnalysis>>
   if (!process.env.BIDS_FILE) return {};
   analysisMemo ??= fileBids()?.analyses ?? {};
   return analysisMemo;
+}
+
+let agencyMemo: Record<string, AgencySummary> | null = null;
+/** 빌드 때 만든 수요기관별 발주처 분석 (키: 수요기관 이름) */
+export async function getAgencySummaries(): Promise<Record<string, AgencySummary>> {
+  if (!process.env.BIDS_FILE) return {};
+  agencyMemo ??= fileBids()?.agencies ?? {};
+  return agencyMemo;
+}
+
+/** 빌드 때 받은 최근 2주 사전규격 */
+export async function getPreSpecs(): Promise<PreSpec[]> {
+  if (!process.env.BIDS_FILE) return [];
+  return fileBids()?.preSpecs ?? [];
 }
 
 let qualMemo: Record<string, BidQual> | null = null;

@@ -20,7 +20,7 @@ const STEPS = [
 
 export default async function ServicePage() {
   const bids = await getBids();
-  const digest = buildDigest(SEED_CLIENTS[0], bids, new Date(), await getNoticeChanges());
+  const digest = buildDigest(SEED_CLIENTS[0], bids, new Date(), [], await getNoticeChanges());
   return (
     <>
       <PageHero

@@ -13,11 +13,25 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, rateTableFromR2 } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, rateTableFromR2, agencySummariesFromR2 } from "./awards/forBuild";
 import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
+import { fetchPreSpecs } from "../src/lib/nara/preSpec";
 import { makeTextCache } from "./attachCache";
 import type { BidAttachment } from "../src/lib/types";
+
+// pdf.js 는 깨진 글꼴이 든 PDF에서 글꼴 미리 읽기 실패(FormatError)를 아무도 기다리지 않는 promise로 던진다.
+// 그 PDF 본문만 못 읽으면 될 일인데 Node가 빌드 전체를 멈추므로, pdf.js 오류는 경고만 남기고 넘어간다 (다른 오류는 그대로 멈춘다)
+let pdfRejections = 0;
+process.on("unhandledRejection", (reason) => {
+  const name = (reason as { name?: string } | null)?.name ?? "";
+  const msg = String((reason as { message?: unknown } | null)?.message ?? reason);
+  if (/^(FormatError|InvalidPDFException|UnknownErrorException|PasswordException|MissingPDFException|AbortException)$/.test(name) || /^(FormatError|InvalidPDFException):/.test(msg)) {
+    if (pdfRejections++ < 5) console.warn(`PDF 읽기 경고(빌드는 계속): ${name || "Error"}: ${msg}`);
+    return;
+  }
+  throw reason;
+});
 
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
@@ -127,6 +141,22 @@ async function main() {
   } catch (e) {
     console.warn("낙찰 결과 분석 건너뜀:", e instanceof Error ? e.message : e);
   }
+  // 발주처 분석 (/agencies): 지금 공고의 수요기관마다. 위에서 받은 수요기관 색인을 다시 쓴다
+  let agencies;
+  try {
+    agencies = await agencySummariesFromR2(items) ?? undefined;
+    if (agencies) console.log(`발주처 분석: 수요기관 ${Object.keys(agencies).length.toLocaleString()}곳`);
+  } catch (e) {
+    console.warn("발주처 분석 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  // 사전규격 미리보기 (/prespecs): 최근 2주 등록분. 실패해도 배포는 계속
+  let preSpecs;
+  try {
+    preSpecs = await fetchPreSpecs();
+    console.log(`사전규격: ${preSpecs.length.toLocaleString()}건 (본공고 나온 것 ${preSpecs.filter((p) => p.bidNos.length).length.toLocaleString()}건)`);
+  } catch (e) {
+    console.warn("사전규격 건너뜀:", e instanceof Error ? e.message : e);
+  }
   // 메인 상단 현황 줄의 '낙찰정보 N건' (낙찰 저장소에 쌓인 낙찰 건수)
   let awardCount: { rows: number; builtAt: string } | undefined;
   try {
@@ -147,7 +177,7 @@ async function main() {
     rateTable = { builtAt: new Date().toISOString(), source: "진행 중 공고", notices: inputs.filter((x) => x.method && x.lwlt).length, rows: buildRateRows(inputs) };
   }
   console.log(`하한율 기준표: ${rateTable.source} 공고 ${rateTable.notices.toLocaleString()}건, 기준 ${rateTable.rows.length}개`);
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, awardCount, changes, rateTable, syncedAt, source: "g2b" }));
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, awardCount, changes, rateTable, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

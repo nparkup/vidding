@@ -15,6 +15,8 @@ import { attachPriors, fetchAptAwards, fetchAptNotices } from "../src/lib/kapt/c
   for (const b of items.filter((x) => x.prior).slice(0, 3)) console.log("P", JSON.stringify(b));
   console.log("C", JSON.stringify(items.find((x) => x.content)));
   console.log("JSON size", JSON.stringify(items).length);
+  const pick = [...items.filter((x) => x.prior).slice(0, 14), ...items.filter((x) => !x.prior).filter((_, i) => i % 60 === 0).slice(0, 26)];
+  console.log("FIXTURE " + JSON.stringify(pick));
   const no = items[0].no;
   for (const u of [`https://www.k-apt.go.kr/bid/bidDetail.do?bidNum=${no}`, `https://www.k-apt.go.kr/bid/bidList.do`]) {
     try {

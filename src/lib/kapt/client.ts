@@ -1,5 +1,6 @@
 import "server-only";
 import type { AptBid, AptCategory, AptPrior } from "../apt";
+import { mapLimit } from "../nara/client";
 
 /**
  * 공동주택(아파트) 입찰 수집. 공공데이터포털 국토교통부 서비스 2개 (키는 나라장터와 같은 DATA_GO_KR_SERVICE_KEY):
@@ -50,8 +51,10 @@ async function all(path: string, op: string, params: Record<string, string>, max
   const first = await call(path, op, params);
   const items = [...first.items];
   const pages = Math.min(maxPages, Math.ceil(first.total / ROWS));
-  for (let p = 2; p <= pages; p++) items.push(...(await call(path, op, { ...params, pageNo: String(p) })).items);
-  return items;
+  // 999건 한 쪽이 몇 초씩 걸려 네 쪽씩 함께 받는다
+  const rest = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
+  const got = await mapLimit(rest, 4, async (p) => (await call(path, op, { ...params, pageNo: String(p) })).items);
+  return items.concat(...got);
 }
 
 /* ---------- 변환 ---------- */

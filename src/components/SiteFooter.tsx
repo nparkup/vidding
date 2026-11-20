@@ -18,6 +18,9 @@ export function SiteFooter() {
             <li><Link href="/bids" className="hover:text-ink">공고 검색</Link></li>
             <li><Link href="/changes" className="hover:text-ink">정정·취소 공고</Link></li>
             <li><Link href="/rates" className="hover:text-ink">낙찰하한율·실적 기준표</Link></li>
+            <li><Link href="/awards" className="hover:text-ink">최근 낙찰 결과</Link></li>
+            <li><Link href="/tools/joint" className="hover:text-ink">공동도급 지분 계산기</Link></li>
+            <li><Link href="/tools/finance" className="hover:text-ink">경영상태 평균비율</Link></li>
             <li><Link href="/report/sample" className="hover:text-ink">주간 보고서 샘플</Link></li>
           </ul>
         </div>

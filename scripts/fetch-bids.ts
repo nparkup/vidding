@@ -13,12 +13,15 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, rateTableFromR2, agencySummariesFromR2 } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, rateTableFromR2, agencySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
 import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
 import { attachPriors, fetchAptAwards, fetchAptNotices } from "../src/lib/kapt/client";
 import type { AptBidsFile } from "../src/lib/apt";
+import { fetchOrderPlans } from "../src/lib/nara/orderPlan";
+import { fetchContracts } from "../src/lib/nara/contract";
+import { linkPlansToBids } from "../src/lib/orderPlans";
 import { makeTextCache } from "./attachCache";
 import type { BidAttachment } from "../src/lib/types";
 
@@ -177,6 +180,23 @@ async function main() {
   } catch (e) {
     console.warn("공동주택 입찰 건너뜀:", e instanceof Error ? e.message : e);
   }
+  // 발주계획 모아보기 (/plans): 이번 달부터 넉 달 발주 예정. 실패해도 배포는 계속
+  let orderPlans;
+  try {
+    orderPlans = await fetchOrderPlans();
+    const linked = linkPlansToBids(orderPlans, items);
+    console.log(`발주계획: ${orderPlans.length.toLocaleString()}건 (진행 중 공고와 이어진 것 ${linked.toLocaleString()}건)`);
+  } catch (e) {
+    console.warn("발주계획 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  // 계약현황 (/contracts): 최근 2주 경쟁 계약. 지난 날짜는 .cache/contracts 에서 읽는다
+  let contracts;
+  try {
+    contracts = await fetchContracts();
+    console.log(`계약현황: ${contracts.length.toLocaleString()}건`);
+  } catch (e) {
+    console.warn("계약현황 건너뜀:", e instanceof Error ? e.message : e);
+  }
   // 메인 상단 현황 줄의 '낙찰정보 N건' (낙찰 저장소에 쌓인 낙찰 건수)
   let awardCount: { rows: number; builtAt: string } | undefined;
   try {
@@ -197,7 +217,15 @@ async function main() {
     rateTable = { builtAt: new Date().toISOString(), source: "진행 중 공고", notices: inputs.filter((x) => x.method && x.lwlt).length, rows: buildRateRows(inputs) };
   }
   console.log(`하한율 기준표: ${rateTable.source} 공고 ${rateTable.notices.toLocaleString()}건, 기준 ${rateTable.rows.length}개`);
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, aptBids, awardCount, changes, rateTable, syncedAt, source: "g2b" }));
+  // 최근 낙찰 결과 목록 (/awards): 최근 한 달 최종낙찰분. 실패해도 배포는 계속
+  let recentAwards;
+  try {
+    recentAwards = await recentAwardsFromR2() ?? undefined;
+    if (recentAwards) console.log(`최근 낙찰 결과: ${recentAwards.from}~${recentAwards.to} ${recentAwards.rows.length.toLocaleString()}건 (기초금액 ${recentAwards.rows.filter((r) => r[11]).length.toLocaleString()}건, 개찰 순위 ${recentAwards.rows.filter((r) => r[15].length).length.toLocaleString()}건)`);
+  } catch (e) {
+    console.warn("최근 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, orderPlans, contracts, aptBids, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

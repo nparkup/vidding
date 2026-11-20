@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DistChart } from "@/components/BidPriceAnalysis";
 import { METHOD_NAME, bandLabel, bandOfAmount, methodCode, provinceKey, quantile } from "@/lib/awards/analysis";
@@ -37,6 +38,9 @@ export function RivalExplorer({ mode = "rival" }: { mode?: Mode }) {
     setSaved(l);
     // 우리 회사는 지난번 번호로 바로 조회한다
     if (mode === "mine" && l[0]) { setInput(l[0].bizno); look(l[0].bizno); }
+    // 다른 화면(최근 낙찰 결과 등)에서 ?bizno= 로 넘어오면 그 업체를 바로 조회한다
+    const q = mode === "rival" ? new URLSearchParams(window.location.search).get("bizno") : null;
+    if (q) { setInput(q); look(q); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -186,6 +190,7 @@ function RivalDetail({ wins, bizno, from, mine }: { wins: AwardWin[]; bizno: str
             </li>
           ))}
         </ul>
+        <Link href={`/contracts?corp=${bizno}`} className="btn-ghost btn-sm mt-4 inline-flex">이 업체의 최근 2주 계약 보기</Link>
       </section>
       <section className="card p-6">
         <h3 className="font-bold">계약방법별 투찰</h3>

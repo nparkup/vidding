@@ -5,7 +5,7 @@ import { keywordHits } from "./keywords";
 import { isBusinessDay, kstDay } from "./holidays";
 import { changeAlertMail, dailyDigestMail, weeklyReportMail } from "./mail/templates";
 import { sendMail } from "./mail/send";
-import { addMailLog, addReport, getBids, getClient, getNoticeChanges, getPreSpecs, getReport, getSettings, listClients, listMailLog, setReportStatus, syncBids } from "./store";
+import { addMailLog, addReport, getBids, getClient, getNoticeChanges, getOrderPlans, getPreSpecs, getReport, getSettings, listClients, listMailLog, setReportStatus, syncBids } from "./store";
 
 /** 영업일 아침 맞춤 공고 메일을 활성·체험 고객사 전체에 발송 */
 export async function runDailyDigest(opts: { force?: boolean } = {}) {
@@ -32,7 +32,7 @@ export async function sendDigestTo(clientId: string, bidsArg?: Awaited<ReturnTyp
   const c = await getClient(clientId);
   if (!c) return null;
   const bids = bidsArg ?? (await getBids());
-  const d = buildDigest(c, bids, new Date(), await getPreSpecs(), await getNoticeChanges());
+  const d = buildDigest(c, bids, new Date(), await getPreSpecs(), await getNoticeChanges(), await getOrderPlans());
   const mail = dailyDigestMail(d);
   const r = await sendMail(c.email, mail.subject, mail.html, mail.text);
   return addMailLog({ kind, clientId: c.id, to: c.email, subject: mail.subject, status: r.status, error: r.error, itemCount: d.recommended.length });

@@ -5,7 +5,10 @@
  * 출처
  * - 종합건설업: 대한건설협회 법령·통계 > 평균비율 "2025년도 종합건설업체의 경영상태 평균비율" (cak.or.kr, 2026-11-20 확인)
  * - 전문건설업: 대한전문건설협회 2026-07-01 공시 "2025년도 전문건설업 경영상태 평균비율" (대한전문건설신문 2026-07-01 기사로 확인)
- * - 기계설비·가스, 전기, 정보통신, 소방: 협회 원문을 아직 대조하지 못한 값 (verified: false). 화면에 "원문 대조 전"으로 표시한다
+ * - 기계설비·가스: 대한기계설비건설협회 기계설비업무 > 경영상태 평균비율 (kmcca.or.kr, 2026-11-20 확인, 적용 '26.7.1~'27.6.30)
+ * - 전기: 한국전기공사협회 알림마당 > 전기공사업통계 "최근년도 전기공사업 평균비율" (keca.or.kr, 2026-11-20 확인)
+ * - 정보통신: 한국정보통신공사협회 경영분석 (kica.or.kr, 2026-11-20 확인, 활용 '26.7.31~'27.7.30)
+ * - 소방: 한국소방시설협회 경영상태평균비율 (ekffa.or.kr, 2026-11-20 확인)
  */
 
 export interface FinanceAvg {
@@ -61,10 +64,31 @@ export const FINANCE_AVG: FinanceAvg[] = [
   spec("철강구조물공사업", 129.23, 127.28, ["강구조물", "철강재설치"]),
   spec("수중·준설공사업", 130.91, 161.52, ["수중", "준설"]),
   spec("승강기·삭도공사업", 62.08, 123.26, ["승강기", "삭도"]),
-  { group: "설비·전기·통신·소방", name: "기계설비·가스공사업", aliases: ["기계설비", "가스시설", "기계가스"], debt: 99.95, current: 133.44, basisYear: 2025, from: "2026-07-01", source: "대한기계설비건설협회 공시 (원문 대조 전)", verified: false },
-  { group: "설비·전기·통신·소방", name: "전기공사업", aliases: ["전기"], debt: 120.77, current: 142.57, basisYear: 2025, from: "2026-07-31", source: "한국전기공사협회 공시 (원문 대조 전)", verified: false },
-  { group: "설비·전기·통신·소방", name: "정보통신공사업", aliases: ["통신"], debt: 123.74, current: 137.1, basisYear: 2025, from: "2026-07-31", source: "한국정보통신공사협회 공시 (원문 대조 전)", verified: false },
-  { group: "설비·전기·통신·소방", name: "소방시설공사업", aliases: ["소방"], debt: 103.66, current: 141.08, basisYear: 2025, from: "2026-07-31", source: "한국소방시설협회 공시 (원문 대조 전)", verified: false },
+  { group: "설비·전기·통신·소방", name: "기계설비·가스공사업", aliases: ["기계설비", "가스시설", "기계가스"], debt: 99.95, current: 133.44, basisYear: 2025, from: "2026-07-01", source: "대한기계설비건설협회 공시", verified: true },
+  {
+    group: "설비·전기·통신·소방", name: "전기공사업", aliases: ["전기"], debt: 120.77, current: 142.57, basisYear: 2025, from: "2026-07-31", source: "한국전기공사협회 전기공사업 평균비율", verified: true,
+    extra: [
+      { label: "매출액순이익률", value: 3.5, unit: "%" },
+      { label: "자산회전율", value: 0.82, unit: "회" },
+      { label: "매출액영업이익률", value: 4.07, unit: "%" },
+      { label: "영업이익대비 이자보상배율", value: 3.16, unit: "배" },
+      { label: "총자산순이익률", value: 2.86, unit: "%" },
+    ],
+  },
+  {
+    group: "설비·전기·통신·소방", name: "정보통신공사업", aliases: ["통신"], debt: 123.74, current: 137.1, basisYear: 2025, from: "2026-07-31", source: "한국정보통신공사협회 경영분석", verified: true,
+    extra: [
+      { label: "차입금의존도", value: 19.3, unit: "%" },
+      { label: "매출액영업이익율", value: 4.43, unit: "%" },
+      { label: "매출액순이익율", value: 3.95, unit: "%" },
+      { label: "총자산순이익율", value: 2.96, unit: "%" },
+      { label: "자산회전율", value: 0.84, unit: "회" },
+    ],
+  },
+  {
+    group: "설비·전기·통신·소방", name: "소방시설공사업", aliases: ["소방"], debt: 103.66, current: 141.08, basisYear: 2025, from: "2026-07-31", source: "한국소방시설협회 공시", verified: true,
+    extra: [{ label: "자산회전율", value: 0.74, unit: "회" }],
+  },
 ];
 
 export interface FinanceCheck {

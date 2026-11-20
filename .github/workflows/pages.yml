@@ -113,6 +113,9 @@ jobs:
           NEXT_PUBLIC_APPLY_EMAIL: ${{ vars.APPLY_EMAIL }}
           NEXT_PUBLIC_CORP_API: ${{ steps.corp.outputs.url }}
           NEXT_TELEMETRY_DISABLED: "1"
+          # 정적 페이지 3만여 개를 만드는 워커마다 공고 파일 전체를 읽어 기본 힙(약 4GB)을 넘길 때가 있다 (2026-11-20 run 44705858677)
+          NODE_OPTIONS: --max-old-space-size=6144
+          NEXT_BUILD_CPUS: "2"
         run: node scripts/build-static.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

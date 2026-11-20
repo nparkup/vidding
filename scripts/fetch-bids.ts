@@ -13,7 +13,7 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, agencySummariesFromR2 } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, agencySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
 import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
 import { makeTextCache } from "./attachCache";
@@ -163,7 +163,15 @@ async function main() {
   } catch (e) {
     console.warn("낙찰 저장소 건수 읽기 실패:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, awardCount, syncedAt, source: "g2b" }));
+  // 최근 낙찰 결과 목록 (/awards): 최근 한 달 최종낙찰분. 실패해도 배포는 계속
+  let recentAwards;
+  try {
+    recentAwards = await recentAwardsFromR2() ?? undefined;
+    if (recentAwards) console.log(`최근 낙찰 결과: ${recentAwards.from}~${recentAwards.to} ${recentAwards.rows.length.toLocaleString()}건 (기초금액 ${recentAwards.rows.filter((r) => r[11]).length.toLocaleString()}건, 개찰 순위 ${recentAwards.rows.filter((r) => r[15].length).length.toLocaleString()}건)`);
+  } catch (e) {
+    console.warn("최근 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, awardCount, recentAwards, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

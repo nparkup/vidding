@@ -5,7 +5,8 @@
  * Cloudflare 토큰이 없거나 저장소가 아직 비어 있으면 null 을 돌려주고, 빌드는 예전 방식으로 간다.
  */
 import { gunzipSync } from "zlib";
-import { OPS, addDays, kstNow, mondayOf, type AwardMeta } from "../../src/lib/awards/format";
+import { OPS, addDays, kstNow, mondayOf, type AwardBiz, type AwardMeta } from "../../src/lib/awards/format";
+import { RECENT_AWARD_DAYS, RECENT_TOP, type RecentAwardRow, type RecentAwardsFile, type RecentTop } from "../../src/lib/recentAwards";
 import { similarity, titleKey, type PriorTarget } from "../../src/lib/nara/awardStats";
 import type { AwardStats, PriorMatch, RateStat } from "../../src/lib/rivalRate";
 import type { Bid } from "../../src/lib/types";
@@ -138,4 +139,87 @@ export async function agencySummariesFromR2(items: Bid[]): Promise<Record<string
     if (s) out[name] = s;
   }
   return out;
+}
+
+/** R2 원자료 한 파일 (빌드 한 번에 같은 파일을 두 번 받지 않게 기억한다). 없으면 [] */
+const rawMemo = new Map<string, Promise<unknown[][]>>();
+function rawRows(key: string): Promise<unknown[][]> {
+  let p = rawMemo.get(key);
+  if (!p) {
+    p = r2Get(key).catch(() => null).then((b) => (b ? (JSON.parse(gunzipSync(b).toString("utf8")) as unknown[][]) : []));
+    rawMemo.set(key, p);
+  }
+  return p;
+}
+
+/**
+ * 최근 낙찰 결과 목록 (/awards): 최근 RECENT_AWARD_DAYS일 최종낙찰분.
+ * 낙찰 원자료에 같은 공고의 계약방법·낙찰하한율(공고), 기초금액, 예정가격, 개찰 순위 1~3위를 붙인다.
+ * 공고·기초금액은 공고가 나온 주에 들어 있어 낙찰 주보다 NOTICE_WEEKS 주 앞까지 본다. 저장소가 없으면 null
+ */
+export async function recentAwardsFromR2(days = RECENT_AWARD_DAYS): Promise<RecentAwardsFile | null> {
+  if (!(await awardMeta())) return null;
+  const NOTICE_WEEKS = 10;
+  const today = kstNow();
+  const to = today.toISOString().slice(0, 10);
+  const from = new Date(today.getTime() - (days - 1) * 86400e3).toISOString().slice(0, 10);
+  const cur = mondayOf(today);
+  const awardWeeks: string[] = [];
+  for (let w = cur; w >= mondayOf(new Date(Date.parse(from))); w = addDays(w, -7)) awardWeeks.push(w);
+  const leadWeeks: string[] = [];
+  for (let i = 0; i < awardWeeks.length + NOTICE_WEEKS; i++) leadWeeks.push(addDays(cur, -7 * i));
+
+  const rows: RecentAwardRow[] = [];
+  for (const [biz, op] of Object.entries(OPS) as [AwardBiz, string][]) {
+    // 공고: 공고번호 → 마지막 차수의 계약방법·낙찰하한율
+    const notice = new Map<string, { ord: string; method: string; lwlt: number }>();
+    const base = new Map<string, { ord: string; amt: number }>();
+    const plan = new Map<string, { ord: string; plnprc: number; base: number }>();
+    const keep = <T extends { ord: string }>(m: Map<string, T>, k: string, v: T) => { const p = m.get(k); if (!p || p.ord <= v.ord) m.set(k, v); };
+    for (const w of leadWeeks) {
+      for (const r of await rawRows(`raw/notice/${op}/${w}.json.gz`)) {
+        const [no, ord, method, , , , , , , , , lwlt] = r as [string, string, string, number, string, string, string, string, string, string, string, number?];
+        keep(notice, no, { ord, method: method ?? "", lwlt: lwlt || 0 });
+      }
+      for (const r of await rawRows(`raw/base/${op}/${w}.json.gz`)) {
+        const [no, ord, clsfc, amt] = r as [string, string, string, number];
+        keep(base, `${no}|${clsfc}`, { ord, amt });
+        keep(base, no, { ord, amt });
+      }
+      for (const r of await rawRows(`raw/plan/${op}/${w}.json.gz`)) {
+        const [no, ord, clsfc, rbid, plnprc, bssamt] = r as [string, string, string, string, number, number];
+        keep(plan, `${no}|${clsfc}|${rbid}`, { ord, plnprc, base: bssamt });
+        keep(plan, `${no}|${clsfc}`, { ord, plnprc, base: bssamt });
+      }
+    }
+    const seen = new Set<string>();
+    for (const w of awardWeeks) {
+      const top = new Map<string, RecentTop[]>();
+      for (const [no, ord, list] of (await rawRows(`raw/rank/${op}/${w}.json.gz`)) as [string, string, [string, string, number, string, string, number, number][]][]) {
+        for (const [clsfc, rbid, rank, , name, amt, rt] of list) {
+          if (rank > RECENT_TOP) continue;
+          const k = `${no}|${ord}|${clsfc}|${rbid}`;
+          (top.get(k) ?? top.set(k, []).get(k)!).push([rank, name, amt, rt]);
+        }
+      }
+      for (const r of await rawRows(`raw/award/${op}/${w}.json.gz`)) {
+        const [no, ord, clsfc, rbid, title, bidders, winner, bizno, amount, rate, agency, date] =
+          r as [string, string, string, string, string, number, string, string, number, number, string, string];
+        if (!date || date < from || date > to || !winner) continue;
+        const id = `${no}-${ord}-${clsfc}-${rbid}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const nt = notice.get(no);
+        const pl = plan.get(`${no}|${clsfc}|${rbid}`) ?? plan.get(`${no}|${clsfc}`);
+        const bs = base.get(`${no}|${clsfc}`)?.amt || pl?.base || base.get(no)?.amt || 0;
+        rows.push([
+          no, ord, biz, title, agency, date, bidders || 0, winner, bizno, amount || 0, rate || 0, bs, pl?.plnprc || 0,
+          nt?.method ?? "", nt?.lwlt || 0,
+          (top.get(`${no}|${ord}|${clsfc}|${rbid || "000"}`) ?? []).sort((a, b) => a[0] - b[0]),
+        ]);
+      }
+    }
+  }
+  rows.sort((a, b) => b[5].localeCompare(a[5]) || b[9] - a[9]);
+  return { from, to, builtAt: new Date().toISOString(), rows };
 }

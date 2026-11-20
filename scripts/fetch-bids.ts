@@ -18,6 +18,19 @@ import { makeAiInputs } from "./aiSheets";
 import { makeTextCache } from "./attachCache";
 import type { BidAttachment } from "../src/lib/types";
 
+// pdf.js 는 깨진 글꼴이 든 PDF에서 글꼴 미리 읽기 실패(FormatError)를 아무도 기다리지 않는 promise로 던진다.
+// 그 PDF 본문만 못 읽으면 될 일인데 Node가 빌드 전체를 멈추므로, pdf.js 오류는 경고만 남기고 넘어간다 (다른 오류는 그대로 멈춘다)
+let pdfRejections = 0;
+process.on("unhandledRejection", (reason) => {
+  const name = (reason as { name?: string } | null)?.name ?? "";
+  const msg = String((reason as { message?: unknown } | null)?.message ?? reason);
+  if (/^(FormatError|InvalidPDFException|UnknownErrorException|PasswordException|MissingPDFException|AbortException)$/.test(name) || /^(FormatError|InvalidPDFException):/.test(msg)) {
+    if (pdfRejections++ < 5) console.warn(`PDF 읽기 경고(빌드는 계속): ${name || "Error"}: ${msg}`);
+    return;
+  }
+  throw reason;
+});
+
 async function main() {
   const out = process.argv[2] ?? "data/bids.json";
   mkdirSync(dirname(out), { recursive: true });

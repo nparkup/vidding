@@ -29,6 +29,8 @@ export interface AptBid {
   region: string;
   title: string;
   content?: string;
+  /** 민간 전자입찰 공고면 그 시스템의 공고 주소 */
+  link?: string;
   category: AptCategory;
   /** 입찰분류 원문 (예: 사업자 · 용역 · 청소) */
   classLabel: string;
@@ -62,7 +64,7 @@ export interface AptBid {
 export interface AptBidsFile {
   builtAt: string;
   items: AptBid[];
-  /** 직전 낙찰을 찾아본 낙찰 건수 (입찰결과공지, 최근 2년) */
+  /** 직전 낙찰을 찾아본 낙찰 건수 (입찰결과공지, 최근 3개 연도) */
   awards?: number;
 }
 

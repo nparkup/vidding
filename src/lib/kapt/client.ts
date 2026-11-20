@@ -53,12 +53,7 @@ async function all(path: string, op: string, params: Record<string, string>, max
   const pages = Math.min(maxPages, Math.ceil(first.total / ROWS));
   // 999건 한 쪽이 몇 초씩 걸려 네 쪽씩 함께 받는다
   const rest = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
-  const got = await mapLimit(rest, 4, async (p) => {
-    const t = Date.now();
-    const r = (await call(path, op, { ...params, pageNo: String(p) })).items;
-    if (process.env.KAPT_DEBUG) console.log(`  ${op} ${JSON.stringify(params)} ${p}/${pages} ${Date.now() - t}ms`);
-    return r;
-  });
+  const got = await mapLimit(rest, 4, async (p) => (await call(path, op, { ...params, pageNo: String(p) })).items);
   return items.concat(...got);
 }
 
@@ -134,7 +129,9 @@ export function toAptBid(it: Item): AptBid | null {
     apt: s(it.bidKaptname),
     region,
     title: rawTitle.replace(PREFIX, "") || rawTitle,
-    content: content && !/^(자세한 내용은 )?(입찰 ?)?(공고문|첨부 ?파일).{0,12}(참조|참고)/.test(content) ? content.slice(0, 1000) : undefined,
+    content: content && !/^https?:\/\//.test(content) && !(content.length < 50 && /(참조|참고|바랍니다|확인)/.test(content)) ? content.slice(0, 1000) : undefined,
+    // 민간 전자입찰(KG2B·아파트장터 등) 공고는 내용 칸에 그 시스템의 공고 주소만 들어 있다
+    link: /^https?:\/\/\S+$/.test(content ?? "") ? content : undefined,
     category: aptCategory(c1, c2, c3),
     classLabel: classLabel(c1, c2, c3),
     postedAt: day(it.bidRegDate ?? it.bidRegdate) ?? closeAt.slice(0, 10),
@@ -175,7 +172,8 @@ interface AptAward { no: string; key: string; prior: AptPrior }
 export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
   const y = Number(kstYmd(now).slice(0, 4));
   const out: AptAward[] = [];
-  for (const year of [y - 1, y]) {
+  // 아파트 용역은 2년 계약이 많아 3개 연도를 본다
+  for (const year of [y - 2, y - 1, y]) {
     const items = await all(RESULT, "getBidSttusSearchV3", { bidState: "5", searchYear: String(year) });
     for (const it of items) {
       const amount = Number(s(it.amount).replace(/[^\d]/g, "")) || 0;

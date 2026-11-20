@@ -8,6 +8,8 @@ import { CloseDdayBadge } from "./Badges";
 import { CloseDay } from "./CloseDay";
 
 const PAGE = 50;
+/** 직전 낙찰을 비교하는 분야 (공사·기타는 단지마다 일이 달라 비교하지 않는다) */
+const COMPARABLE = new Set<string>(["청소", "경비", "소독", "승강기유지", "전기안전관리", "정화조·저수조", "주택관리(위탁)"]);
 const KEY = "bidmate.aptbids.v1";
 type Sort = "close" | "new" | "prior";
 interface Saved { cats: string[]; region: string }
@@ -70,8 +72,8 @@ export function AptBidsExplorer() {
   const toggle = (c: string) => setCats(cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c]);
   return (
     <>
-      <div className="card mt-6 grid min-w-0 grid-cols-1 gap-3 p-4 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-        <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="공고명, 단지명 검색 (예: 경비, 헬리오시티, -재활용)" className="input min-w-0" aria-label="검색어" />
+      <div className="card mt-6 grid min-w-0 grid-cols-[1fr_auto] items-center gap-3 p-4 sm:grid-cols-[1fr_auto_auto]">
+        <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="공고명·단지명 (예: 경비, -재활용)" className="input col-span-2 min-w-0 sm:col-span-1" aria-label="검색어" />
         <select value={region} onChange={(e) => setRegion(e.target.value)} className="input sm:w-36" aria-label="지역">
           <option value="">전국</option>
           {APT_REGIONS.map((r) => <option key={r}>{r}</option>)}
@@ -79,7 +81,7 @@ export function AptBidsExplorer() {
         <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
           <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
         </label>
-        <div className="flex min-w-0 flex-wrap gap-1.5 sm:col-span-3">
+        <div className="col-span-2 flex min-w-0 flex-wrap gap-1.5 sm:col-span-3">
           <button type="button" onClick={() => setCats([])} className={`rounded-full border px-3 py-1.5 text-sm ${cats.length === 0 ? "border-mint bg-mint text-white" : "border-ink-100 bg-white text-ink-500"}`}>전체 분야</button>
           {APT_CATEGORIES.map((c) => (
             <button key={c} type="button" onClick={() => toggle(c)} aria-pressed={cats.includes(c)} className={`rounded-full border px-3 py-1.5 text-sm ${cats.includes(c) ? "border-mint bg-mint text-white" : "border-ink-100 bg-white text-ink-500"}`}>
@@ -111,7 +113,7 @@ export function AptBidsExplorer() {
       )}
       <p className="mt-6 text-xs leading-relaxed text-ink-300">
         출처: 국토교통부 공동주택관리정보시스템(K-apt) 입찰공고·입찰결과공지. K-apt와 조달청·민간 전자입찰을 거친 공고가 함께 들어옵니다.
-        직전 낙찰은 같은 단지·같은 분야의 최근 2년 낙찰 중 가장 최근 건입니다. 투찰 전 반드시 공고문 원문을 확인하세요.
+        직전 낙찰은 같은 단지·같은 분야의 최근 3개 연도 낙찰 중 가장 최근 건입니다. 투찰 전 반드시 공고문 원문을 확인하세요.
       </p>
     </>
   );
@@ -154,9 +156,9 @@ function AptRow({ bid: b }: { bid: AptBid }) {
                 <p className="text-xs text-ink-500">직전 낙찰</p>
                 <p className="text-lg font-bold tabular-nums">{won(b.prior.amount)}</p>
               </div>
-            ) : (
+            ) : COMPARABLE.has(b.category) ? (
               <p className="text-sm text-ink-300">직전 낙찰 자료 없음</p>
-            )}
+            ) : <span />}
             <p className="text-xs text-ink-300">마감 {shortDate(b.closeAt)} · 펼쳐 보기</p>
           </div>
         </summary>
@@ -177,7 +179,8 @@ function AptRow({ bid: b }: { bid: AptBid }) {
               <div className="rounded-xl bg-paper p-3 text-sm">
                 <p className="font-semibold">같은 단지 직전 {b.category} 낙찰</p>
                 <p className="mt-1 text-ink-500 [overflow-wrap:anywhere]">{b.prior.title}</p>
-                <p className="mt-1 tabular-nums"><b>{wonFull(b.prior.amount)}</b>{b.prior.start && b.prior.end ? ` · 계약 ${b.prior.start} ~ ${b.prior.end}` : ""}</p>
+                <p className="mt-1 tabular-nums"><b>{wonFull(b.prior.amount)}</b></p>
+                {b.prior.start && b.prior.end && <p className="tabular-nums text-ink-500">계약 {b.prior.start} ~ {b.prior.end}</p>}
               </div>
             )}
             {b.content && <p className="whitespace-pre-line text-sm text-ink-700 [overflow-wrap:anywhere]">{b.content}</p>}
@@ -185,6 +188,7 @@ function AptRow({ bid: b }: { bid: AptBid }) {
               {(b.files ?? []).map((f, i) => (
                 <a key={f} href={aptFileUrl(f)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">공고 첨부{(b.files?.length ?? 0) > 1 ? ` ${i + 1}` : ""} 내려받기</a>
               ))}
+              {b.link && <a href={b.link} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">{b.system ?? "입찰 시스템"}에서 보기</a>}
               <a href={aptDetailUrl(b.no)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">K-apt 원문 보기</a>
             </div>
           </div>

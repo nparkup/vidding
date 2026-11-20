@@ -8,14 +8,18 @@ export const APT_CATEGORIES = ["청소", "경비", "소독", "승강기유지", 
 export type AptCategory = (typeof APT_CATEGORIES)[number];
 
 export interface AptPrior {
-  /** 직전 낙찰 공고명 */
+  /** 낙찰(경쟁입찰) 또는 수의계약 */
+  via?: "낙찰" | "수의계약";
+  /** 직전 낙찰 공고명 / 수의계약 계약명 */
   title: string;
-  /** 낙찰금액(원) */
+  /** 낙찰금액·계약금액(원) */
   amount: number;
+  /** 수의계약 업체명 (대표자·주소·전화는 저장하지 않는다) */
+  company?: string;
   /** 계약기간 YYYY-MM-DD */
   start?: string;
   end?: string;
-  /** 그 공고의 입찰 마감일 (YYYY-MM-DD) */
+  /** 그 공고의 입찰 마감일 또는 수의계약 계약일 (YYYY-MM-DD) */
   closedAt?: string;
 }
 
@@ -66,6 +70,8 @@ export interface AptBidsFile {
   items: AptBid[];
   /** 직전 낙찰을 찾아본 낙찰 건수 (입찰결과공지, 최근 3개 연도) */
   awards?: number;
+  /** 함께 찾아본 수의계약 건수 (수의계약 공지) */
+  privates?: number;
 }
 
 /** K-apt 지역 순서 (화면 선택지) */

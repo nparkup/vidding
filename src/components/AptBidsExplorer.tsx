@@ -98,7 +98,7 @@ export function AptBidsExplorer() {
           <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="input h-9 w-auto py-0 pr-8 text-sm" aria-label="정렬 기준">
             <option value="close">마감 임박순</option>
             <option value="new">최신 공고순</option>
-            <option value="prior">직전 낙찰금액 높은순</option>
+            <option value="prior">직전 계약금액 높은순</option>
           </select>
         </label>
       </div>
@@ -112,8 +112,8 @@ export function AptBidsExplorer() {
         </button>
       )}
       <p className="mt-6 text-xs leading-relaxed text-ink-300">
-        출처: 국토교통부 공동주택관리정보시스템(K-apt) 입찰공고·입찰결과공지. K-apt와 조달청·민간 전자입찰을 거친 공고가 함께 들어옵니다.
-        직전 낙찰은 같은 단지·같은 분야의 최근 3개 연도 낙찰 중 가장 최근 건입니다. 투찰 전 반드시 공고문 원문을 확인하세요.
+        출처: 국토교통부 공동주택관리정보시스템(K-apt) 입찰공고·입찰결과공지·수의계약 공지. K-apt와 조달청·민간 전자입찰을 거친 공고가 함께 들어옵니다.
+        직전 계약은 같은 단지·같은 분야의 최근 3개 연도 낙찰·수의계약 중 가장 최근 건입니다. 투찰 전 반드시 공고문 원문을 확인하세요.
       </p>
     </>
   );
@@ -153,11 +153,11 @@ function AptRow({ bid: b }: { bid: AptBid }) {
           <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
             {b.prior ? (
               <div>
-                <p className="text-xs text-ink-500">직전 낙찰</p>
+                <p className="text-xs text-ink-500">{b.prior.via === "수의계약" ? "직전 수의계약" : "직전 낙찰"}</p>
                 <p className="text-lg font-bold tabular-nums">{won(b.prior.amount)}</p>
               </div>
             ) : COMPARABLE.has(b.category) ? (
-              <p className="text-sm text-ink-300">직전 낙찰 자료 없음</p>
+              <p className="text-sm text-ink-300">직전 계약 자료 없음</p>
             ) : <span />}
             <p className="text-xs text-ink-300">마감 {shortDate(b.closeAt)} · 펼쳐 보기</p>
           </div>
@@ -177,9 +177,9 @@ function AptRow({ bid: b }: { bid: AptBid }) {
           <div className="min-w-0 space-y-3">
             {b.prior && (
               <div className="rounded-xl bg-paper p-3 text-sm">
-                <p className="font-semibold">같은 단지 직전 {b.category} 낙찰</p>
+                <p className="font-semibold">같은 단지 직전 {b.category} {b.prior.via === "수의계약" ? "수의계약" : "낙찰"}</p>
                 <p className="mt-1 text-ink-500 [overflow-wrap:anywhere]">{b.prior.title}</p>
-                <p className="mt-1 tabular-nums"><b>{wonFull(b.prior.amount)}</b></p>
+                <p className="mt-1 tabular-nums"><b>{wonFull(b.prior.amount)}</b>{b.prior.company ? ` · ${b.prior.company}` : ""}</p>
                 {b.prior.start && b.prior.end && <p className="tabular-nums text-ink-500">계약 {b.prior.start} ~ {b.prior.end}</p>}
               </div>
             )}

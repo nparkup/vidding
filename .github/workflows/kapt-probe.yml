@@ -2,14 +2,14 @@ name: kapt-probe (임시)
 on:
   push:
     branches: [claude/project-thread-ciaryn]
-    paths: [".probe/**", ".github/workflows/kapt-probe.yml"]
+    paths: [".probe/**", ".github/workflows/kapt-probe.yml", "src/lib/kapt/**"]
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - env: { K: "${{ secrets.DATA_GO_KR_SERVICE_KEY }}" }
-        run: node .probe/pc.mjs
+      - env: { DATA_GO_KR_SERVICE_KEY: "${{ secrets.DATA_GO_KR_SERVICE_KEY }}" }
+        run: npm ci && npx tsx --conditions=react-server .probe/run.ts

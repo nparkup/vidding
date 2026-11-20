@@ -17,7 +17,7 @@ import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, 
 import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
-import { attachPriors, fetchAptAwards, fetchAptNotices } from "../src/lib/kapt/client";
+import { attachPriors, COMPARABLE, fetchAptAwards, fetchAptNotices, fetchAptPrivateContracts, type AptAward } from "../src/lib/kapt/client";
 import type { AptBidsFile } from "../src/lib/apt";
 import { fetchOrderPlans } from "../src/lib/nara/orderPlan";
 import { fetchContracts } from "../src/lib/nara/contract";
@@ -166,17 +166,27 @@ async function main() {
   let aptBids: AptBidsFile | undefined;
   try {
     const items = await fetchAptNotices();
-    let awards = 0, priors = 0;
+    let awards = 0, privates = 0, priors = 0;
+    const prev: AptAward[] = [];
     try {
       const a = await fetchAptAwards();
       awards = a.length;
-      priors = attachPriors(items, a);
+      prev.push(...a);
     } catch (e) {
       console.warn("공동주택 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
     }
-    aptBids = { builtAt: new Date().toISOString(), items, awards };
+    try {
+      const pc = await fetchAptPrivateContracts(items.filter((b) => COMPARABLE.includes(b.category)).map((b) => b.aptCode));
+      privates = pc.items.length;
+      prev.push(...pc.items);
+      console.log(`공동주택 수의계약: 단지 ${pc.asked.toLocaleString()}곳 조회, 최근 3개 연도 ${privates.toLocaleString()}건`);
+    } catch (e) {
+      console.warn("공동주택 수의계약 건너뜀:", e instanceof Error ? e.message : e);
+    }
+    priors = attachPriors(items, prev);
+    aptBids = { builtAt: new Date().toISOString(), items, awards, privates };
     const by = (k: string) => items.filter((b) => b.category === k).length;
-    console.log(`공동주택 입찰: 진행 중 ${items.length.toLocaleString()}건 (청소 ${by("청소")}, 경비 ${by("경비")}, 소독 ${by("소독")}, 위탁관리 ${by("주택관리(위탁)")}, 공사 ${by("공사")}), 낙찰 ${awards.toLocaleString()}건 중 직전 낙찰 붙인 공고 ${priors}건`);
+    console.log(`공동주택 입찰: 진행 중 ${items.length.toLocaleString()}건 (청소 ${by("청소")}, 경비 ${by("경비")}, 소독 ${by("소독")}, 위탁관리 ${by("주택관리(위탁)")}, 공사 ${by("공사")}), 낙찰 ${awards.toLocaleString()}건·수의계약 ${privates.toLocaleString()}건 중 직전 계약 붙인 공고 ${priors}건`);
   } catch (e) {
     console.warn("공동주택 입찰 건너뜀:", e instanceof Error ? e.message : e);
   }

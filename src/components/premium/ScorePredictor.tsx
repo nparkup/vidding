@@ -25,6 +25,9 @@ import { forecast, winChance, withConfirmed, withKind, type AwardAnalysis } from
 import { CloseDay } from "../CloseDay";
 import { TrustPicker } from "./TrustPicker";
 import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
+import { jointPredict, type JointMember } from "@/lib/joint";
+import { JointMembers } from "./JointMembers";
+import { PassAmount } from "./PassAmount";
 
 /** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
 const MAX_MATCHES = 100;
@@ -268,7 +271,11 @@ export function ScorePredictor() {
     pastPerformance: autoPerf.amount + manualPerf,
     perfSource: autoPerf.count ? `나라장터 낙찰 ${autoPerf.count}건 추정${manualPerf ? " + 직접 입력" : ""}` : undefined,
   }), [co, autoPerf, manualPerf]);
-  const result = useMemo(() => (active && bid ? predict(active, bid, coEff) : null), [active, bid, coEff]);
+  // 공동수급 구성원 (적격심사·공동도급 허용 공고): 실적 합산, 신용·경영상태 지분율 가중
+  const [members, setMembers] = useState<JointMember[]>([]);
+  useEffect(() => { setMembers([]); }, [bidId]);
+  const jointOk = !!bid?.jointContract && active?.method === "적격심사";
+  const result = useMemo(() => (active && bid ? (jointOk && members.length ? jointPredict(active, bid, coEff, members) : predict(active, bid, coEff)) : null), [active, bid, coEff, jointOk, members]);
   const chance = useMemo(() => {
     if (!bid || !analysis || !result) return undefined;
     const price = result.items.find((i) => i.kind === "price");
@@ -594,6 +601,7 @@ export function ScorePredictor() {
                 ))}
               </div>
             </div>
+            {jointOk && <JointMembers members={members} onChange={setMembers} ourPerf={coEff.pastPerformance} showFinance={needs.finance} />}
             <TrustPicker rule={result?.trust?.rule ?? active?.trust} selected={co.trustItems ?? []} onChange={(ids) => set("trustItems", ids)} score={result?.trust} auto={trustAuto} checked={!!corp} />
             <Range
               label="투찰률 (예정가격 대비)"
@@ -655,15 +663,7 @@ export function ScorePredictor() {
                 </p>
               )}
               {isNego && <p className="mt-1 text-sm text-ink-300">기술 {result.techScore}/{result.techMax} · 가격 {Math.round((result.total - result.techScore) * 10) / 10}</p>}
-              {result.rateWindow && (
-                <div className="mt-4 rounded-xl bg-white/5 p-3">
-                  <p className="text-xs text-ink-300">통과 가능한 투찰률</p>
-                  <p className="mt-0.5 text-lg font-bold tabular-nums">{result.rateWindow.low}% ~ {result.rateWindow.high}%</p>
-                  {bid.baseAmount > 0 && (
-                    <p className="mt-0.5 text-sm tabular-nums text-ink-300">{wonFull(Math.floor((bid.baseAmount * result.rateWindow.low) / 100))} ~ {wonFull(Math.floor((bid.baseAmount * result.rateWindow.high) / 100))} (기초금액 기준)</p>
-                  )}
-                </div>
-              )}
+              {result.rateWindow && <PassAmount bid={bid} window={result.rateWindow} info={docs?.qual?.info} analysis={analysis} />}
             </div>
             <ul className="space-y-4 border-t border-white/10 p-6">
               {result.items.map((i) => (

@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
         basePath,
         trailingSlash: true,
         images: { unoptimized: true },
+        // 워커마다 힙을 6GB까지 쓰므로 러너 메모리(16GB) 안에서 워커 수를 줄인다 (pages.yml NEXT_BUILD_CPUS)
+        ...(process.env.NEXT_BUILD_CPUS ? { experimental: { cpus: Number(process.env.NEXT_BUILD_CPUS) } } : {}),
         env: { NEXT_PUBLIC_STATIC_SITE: "1", NEXT_PUBLIC_BASE_PATH: basePath },
       }
     : {}),

@@ -43,6 +43,13 @@ jobs:
           path: .cache/attach-text
           key: attach-text-${{ github.run_id }}
           restore-keys: attach-text-
+      # 계약현황은 지난 날짜 계약이 바뀌지 않으므로 날짜별로 캐시에 두고 다음 빌드는 최근 이틀만 다시 받는다 (src/lib/nara/contract.ts)
+      - name: 계약현황 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/contracts
+          key: contracts-${{ github.run_id }}
+          restore-keys: contracts-
       - name: 나라장터 공고 수집
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
@@ -64,6 +71,12 @@ jobs:
         with:
           path: .cache/attach-text
           key: attach-text-${{ github.run_id }}
+      - name: 계약현황 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/contracts
+          key: contracts-${{ github.run_id }}
       - name: 기업 정보 중계 서버 주소 확인
         id: corp
         env:

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { RateExplorer } from "@/components/RateExplorer";
+import { ToolTabs } from "@/components/tools/ToolTabs";
 import { standardTiers } from "@/lib/criteria";
 import { getRateTable } from "@/lib/store";
 
@@ -10,6 +11,8 @@ export default async function RatesPage() {
   const table = await getRateTable();
   const tiers = standardTiers();
   return (
+    <>
+    <ToolTabs active="rates" />
     <div className="container-x py-10 sm:py-14">
       <p className="eyebrow">발주처 기준·금액 구간별</p>
       <h1 className="mt-2 text-4xl font-extrabold tracking-[-0.04em]">낙찰하한율·실적 기준표</h1>
@@ -19,5 +22,6 @@ export default async function RatesPage() {
       </p>
       <RateExplorer table={table} tiers={tiers} />
     </div>
+    </>
   );
 }

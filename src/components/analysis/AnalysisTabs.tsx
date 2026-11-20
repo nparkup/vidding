@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const TABS = [
+  { href: "/awards", key: "awards", label: "최근 낙찰 결과" },
   { href: "/analysis/agency", key: "agency", label: "발주처 분석" },
   { href: "/analysis/rival", key: "rival", label: "경쟁사 투찰 성향" },
   { href: "/analysis/mine", key: "mine", label: "우리 회사 진단" },

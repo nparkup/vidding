@@ -7,6 +7,7 @@ import type { AwardStats } from "./rivalRate";
 import type { AwardAnalysis } from "./awards/analysis";
 import type { AgencySummary } from "./awards/agency";
 import type { PreSpec } from "./preSpecs";
+import type { RecentAwardsFile } from "./recentAwards";
 import type { OrderPlan } from "./orderPlans";
 import type { Contract } from "./contracts";
 import { buildMockBids } from "./mock/bids";
@@ -47,7 +48,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; awardCount?: { rows: number; builtAt: string }; changes?: NoticeChange[]; rateTable?: RateTable; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; awardCount?: { rows: number; builtAt: string }; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -118,6 +119,12 @@ export async function getAgencySummaries(): Promise<Record<string, AgencySummary
 export async function getPreSpecs(): Promise<PreSpec[]> {
   if (!process.env.BIDS_FILE) return [];
   return fileBids()?.preSpecs ?? [];
+}
+
+/** 빌드 때 만든 최근 낙찰 결과 목록 (/awards). 없으면 null */
+export async function getRecentAwards(): Promise<RecentAwardsFile | null> {
+  if (!process.env.BIDS_FILE) return null;
+  return fileBids()?.recentAwards ?? null;
 }
 
 /** 빌드 때 받은 발주 예정 계획 (이번 달부터 넉 달) */

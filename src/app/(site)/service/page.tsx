@@ -5,7 +5,7 @@ import { EmailPreview } from "@/components/EmailPreview";
 import { PageHero } from "@/components/PageHero";
 import { buildDigest } from "@/lib/digest";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
-import { getBids } from "@/lib/store";
+import { getBids, getNoticeChanges } from "@/lib/store";
 
 export const metadata: Metadata = { title: "서비스 소개" };
 export const revalidate = 600;
@@ -20,7 +20,7 @@ const STEPS = [
 
 export default async function ServicePage() {
   const bids = await getBids();
-  const digest = buildDigest(SEED_CLIENTS[0], bids);
+  const digest = buildDigest(SEED_CLIENTS[0], bids, new Date(), await getNoticeChanges());
   return (
     <>
       <PageHero

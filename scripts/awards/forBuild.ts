@@ -10,6 +10,7 @@ import { similarity, titleKey, type PriorTarget } from "../../src/lib/nara/award
 import type { AwardStats, PriorMatch, RateStat } from "../../src/lib/rivalRate";
 import type { Bid } from "../../src/lib/types";
 import { r2Get } from "./r2";
+import { buildRateRows, type RateInput, type RateTable } from "../../src/lib/rateTable";
 import { agencyBucket, analyzeBid, keywords, kwBucket, type AgencyIndexFile, type AwardAnalysis, type KwIndexFile, type KwLookup, type SimilarIndexFile } from "../../src/lib/awards/analysis";
 
 const canUse = () => !!process.env.R2_LOCAL_DIR || (!!process.env.CLOUDFLARE_API_TOKEN && !!process.env.CLOUDFLARE_ACCOUNT_ID);
@@ -112,4 +113,34 @@ export async function awardAnalysesFromR2(items: Bid[]): Promise<Record<string, 
     }
   }
   return out;
+}
+
+/**
+ * 발주 기준·금액 구간별 낙찰하한율 집계 (기준표 화면). 최근 weeks 주 공고 원자료에서 공고번호마다 최신 차수만 센다.
+ * 저장소가 없거나 비어 있으면 null (빌드는 진행 중 공고로 만든다)
+ */
+export async function rateTableFromR2(weeks = 26): Promise<RateTable | null> {
+  if (!(await awardMeta())) return null;
+  const cur = mondayOf(kstNow());
+  const latest = new Map<string, { ord: string; input: RateInput }>();
+  let from = "";
+  let to = "";
+  for (let i = weeks - 1; i >= 0; i--) {
+    const w = addDays(cur, -7 * i);
+    for (const [biz, op] of Object.entries(OPS) as [RateInput["biz"], string][]) {
+      const b = await r2Get(`raw/notice/${op}/${w}.json.gz`).catch(() => null);
+      if (!b) continue;
+      if (!from) from = w;
+      to = w;
+      for (const r of JSON.parse(gunzipSync(b).toString("utf8")) as unknown[][]) {
+        const [no, ord, method, price, , , , , , , , lwlt] = r as [string, string, string, number, ...unknown[]];
+        const prev = latest.get(no);
+        if (prev && prev.ord >= ord) continue;
+        latest.set(no, { ord, input: { biz, method, presmpt: price || undefined, lwlt: (lwlt as number) || undefined } });
+      }
+    }
+  }
+  if (!latest.size) return null;
+  const inputs = [...latest.values()].map((x) => x.input);
+  return { builtAt: new Date().toISOString(), from, to, source: "낙찰 저장소", notices: inputs.filter((x) => (x.lwlt ?? 0) > 0).length, rows: buildRateRows(inputs) };
 }

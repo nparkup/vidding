@@ -6,6 +6,8 @@ const NAV = [
   { href: "/service", label: "서비스" },
   { href: "/bids", label: "공고 검색" },
   { href: "/premium", label: "평가점수 예측" },
+  { href: "/rates", label: "기준표" },
+  { href: "/changes", label: "정정·취소" },
   { href: "/report/sample", label: "보고서 샘플" },
   { href: "/pricing", label: "요금제" },
 ];

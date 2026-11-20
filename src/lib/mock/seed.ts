@@ -6,27 +6,27 @@ export const SEED_CLIENTS: ClientProfile[] = [
   {
     id: "c-001", company: "(주)한빛전기통신", contactName: "김민수 대표", email: "bid@hanbit-elec.example", phone: "032-555-0101",
     licenses: ["전기공사업", "정보통신공사업"], regions: ["서울", "경기", "인천", "대전", "대구", "충남"], minAmount: 30_000_000, maxAmount: 1_500_000_000,
-    categories: [], plan: "pro", status: "활성", joinedAt: daysAgo(94), watchlist: [], pastPerformance: 2_400_000_000, creditGrade: "BBB",
+    categories: [], plan: "pro", status: "활성", joinedAt: daysAgo(94), watchlist: [], keywords: ["CCTV", "가로등", "-설계"], pastPerformance: 2_400_000_000, creditGrade: "BBB",
   },
   {
     id: "c-002", company: "누리소프트(주)", contactName: "이정희 실장", email: "sales@nurisoft.example", phone: "02-555-0144",
     licenses: ["소프트웨어사업자", "정보통신공사업"], regions: ["서울", "경기", "인천", "충남", "부산"], minAmount: 10_000_000, maxAmount: 800_000_000,
-    categories: ["IT·소프트웨어", "전기·통신공사"], plan: "partner", status: "활성", joinedAt: daysAgo(210), watchlist: [], pastPerformance: 1_600_000_000, creditGrade: "A",
+    categories: ["IT·소프트웨어", "전기·통신공사"], plan: "partner", status: "활성", joinedAt: daysAgo(210), watchlist: [], keywords: ["홈페이지", "정보시스템 유지관리"], pastPerformance: 1_600_000_000, creditGrade: "A",
   },
   {
     id: "c-003", company: "새봄메디칼(주)", contactName: "박서윤 대표", email: "order@saebom-med.example", phone: "062-555-0177",
     licenses: ["의료기기판매업", "의약품도매상"], regions: ["광주", "전남", "경기", "강원"], minAmount: 5_000_000, maxAmount: 500_000_000,
-    categories: [], plan: "basic", status: "활성", joinedAt: daysAgo(41), watchlist: [], pastPerformance: 900_000_000, creditGrade: "BB",
+    categories: [], plan: "basic", status: "활성", joinedAt: daysAgo(41), watchlist: [], keywords: ["의료기기", "진단키트"], pastPerformance: 900_000_000, creditGrade: "BB",
   },
   {
     id: "c-004", company: "대전종합시설관리(주)", contactName: "최우진 이사", email: "bid@dj-facility.example", phone: "042-555-0122",
     licenses: ["건물위생관리업", "기계설비유지관리업", "시설경비업"], regions: ["대전", "세종", "충남", "충북"], minAmount: 100_000_000, maxAmount: 2_500_000_000,
-    categories: ["통합관리", "시설관리", "청소"], plan: "pro", status: "활성", joinedAt: daysAgo(160), watchlist: [], pastPerformance: 3_800_000_000, creditGrade: "A",
+    categories: ["통합관리", "시설관리", "청소"], plan: "pro", status: "활성", joinedAt: daysAgo(160), watchlist: [], keywords: ["청사 청소", "시설물 유지관리"], pastPerformance: 3_800_000_000, creditGrade: "A",
   },
   {
     id: "c-005", company: "다온건축(주)", contactName: "정하늘 소장", email: "daon@daon-build.example", phone: "031-555-0190",
     licenses: ["실내건축공사업", "건축공사업", "조경식재·시설물공사업"], regions: ["서울", "경기", "제주"], minAmount: 50_000_000, maxAmount: 2_000_000_000,
-    categories: [], plan: "pro", status: "체험", joinedAt: daysAgo(6), watchlist: [], pastPerformance: 3_100_000_000, creditGrade: "BBB",
+    categories: [], plan: "pro", status: "체험", joinedAt: daysAgo(6), watchlist: [], keywords: ["리모델링", "옥상 방수"], pastPerformance: 3_100_000_000, creditGrade: "BBB",
   },
 ];
 

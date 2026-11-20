@@ -7,7 +7,9 @@ import type { AwardStats } from "./rivalRate";
 import type { AwardAnalysis } from "./awards/analysis";
 import { buildMockBids } from "./mock/bids";
 import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
-import { fetchAllBids, hasServiceKey } from "./nara/client";
+import { fetchAllBidsWithChanges, hasServiceKey } from "./nara/client";
+import type { NoticeChange } from "./noticeChanges";
+import type { RateTable } from "./rateTable";
 
 /**
  * 데이터 저장소.
@@ -41,7 +43,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; awardCount?: { rows: number; builtAt: string }; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; awardCount?: { rows: number; builtAt: string }; changes?: NoticeChange[]; rateTable?: RateTable; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -132,13 +134,29 @@ async function doSync(): Promise<BidCache> {
     return g.__ipchalBids;
   }
   try {
-    const items = await fetchAllBids();
-    g.__ipchalBids = { items, syncedAt: new Date().toISOString(), source: "g2b" };
+    const { bids: items, changes } = await fetchAllBidsWithChanges();
+    const prev = g.__ipchalBids;
+    g.__ipchalBids = { items, changes, rateTable: prev?.rateTable, syncedAt: new Date().toISOString(), source: "g2b" };
   } catch (e) {
     // API 실패 시 목업으로 서비스 유지 (오류는 관리자 화면에 표시)
     g.__ipchalBids = { items: buildMockBids(), syncedAt: new Date().toISOString(), source: "mock", error: (e as Error).message };
   }
   return g.__ipchalBids;
+}
+
+/** 최근 정정·취소 공고 내역 (lib/noticeChanges). 공고를 받을 때 함께 만든다 */
+let changeMemo: NoticeChange[] | null = null;
+export async function getNoticeChanges(): Promise<NoticeChange[]> {
+  if (process.env.BIDS_FILE) return (changeMemo ??= fileBids()?.changes ?? []);
+  await getBids();
+  return bidCache().changes ?? [];
+}
+
+/** 발주 기준별 낙찰하한율 집계 (lib/rateTable). 정적 빌드는 빌드 때 만든 것, 서버는 지금 공고로 만든다 */
+let rateMemo: RateTable | null | undefined;
+export async function getRateTable(): Promise<RateTable | null> {
+  if (process.env.BIDS_FILE) { if (rateMemo === undefined) rateMemo = fileBids()?.rateTable ?? null; return rateMemo; }
+  return bidCache().rateTable ?? null;
 }
 
 /** 낙찰 저장소(R2)에 쌓인 낙찰 건수. 빌드가 저장소를 못 읽었으면 null */

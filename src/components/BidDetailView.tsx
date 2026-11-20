@@ -12,17 +12,21 @@ import type { BidQual } from "@/lib/eligibility";
 import { dateTime, won, wonFull } from "@/lib/format";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { methodProfile } from "@/lib/bidMethod";
+import { BidChangeBanner, BidCriteriaCard } from "@/components/BidNoticeExtras";
+import type { NoticeCriteria } from "@/lib/noticeCriteria";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
 export function BidDetailView({ bid }: { bid: Bid }) {
   const profile = methodProfile(bid);
   const [files, setFiles] = useState<BidAttachment[]>([]);
   const [qual, setQual] = useState<BidQual>();
+  const [notice, setNotice] = useState<NoticeCriteria>();
   useEffect(() => {
     let alive = true;
     setFiles([]);
     setQual(undefined);
-    loadBidExtra(bid).then((x) => { if (alive) { setFiles(x.files); setQual(x.qual); } }).catch(() => {});
+    setNotice(undefined);
+    loadBidExtra(bid).then((x) => { if (alive) { setFiles(x.files); setQual(x.qual); setNotice(x.notice); } }).catch(() => {});
     return () => { alive = false; };
   }, [bid]);
   const info = qual?.info;
@@ -67,8 +71,10 @@ export function BidDetailView({ bid }: { bid: Bid }) {
         </div>
       </header>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <div className="space-y-6">
+      <BidChangeBanner bid={bid} />
+
+      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <div className="min-w-0 space-y-6">
           {/* 요약 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold">핵심 요약</h2>
@@ -93,6 +99,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             )}
           </section>
 
+          <BidCriteriaCard bid={bid} qual={qual} notice={notice} />
+
           {/* 일정 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold">일정</h2>
@@ -113,9 +121,9 @@ export function BidDetailView({ bid }: { bid: Bid }) {
                 <h2 className="text-lg font-bold">첨부파일</h2>
                 <span className="chip">{files.length}건 · 나라장터</span>
               </div>
-              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+              <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {files.map((f) => (
-                  <li key={f.url}>
+                  <li key={f.url} className="min-w-0">
                     <a href={f.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-paper px-3 py-2.5 text-sm hover:bg-ink-100/60">
                       <span className="truncate font-medium">{f.name}</span>
                       <span className="shrink-0 text-xs text-ink-300">{f.kind}</span>
@@ -137,7 +145,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           </section>
         </div>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           {/* 가능성 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold">입찰 가능성</h2>

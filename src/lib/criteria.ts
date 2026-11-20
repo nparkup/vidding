@@ -631,3 +631,69 @@ export function bidSheet(
   sheet.noticeFacts = facts;
   return sheet;
 }
+
+/* ---------- 기준표 화면 (발주처별 낙찰하한율·통과점수·실적 기준) ---------- */
+
+export interface StandardTier {
+  biz: "공사" | "용역" | "물품";
+  /** 기준표 이름 */
+  name: string;
+  source: string;
+  status: CriteriaRef["status"];
+  lowerLimit?: number;
+  pass: number;
+  /** 실적 평가 항목 (없으면 실적 평가 없음) */
+  perf?: { label: string; max: number; multiple: string; basis?: string };
+}
+
+/** 실적 평가가 만점이 되는 기준을 "추정가격의 1배" 같은 배수 문장으로 */
+export function perfMultiple(it: EvalItem): string {
+  if (it.perfLinear) return `기초금액의 ${it.perfLinear}배 실적이면 만점 (실적 ÷ 기준금액 × 배점)`;
+  const top = it.bands?.find((b) => b.unit === "%");
+  if (top) return `추정가격의 ${Math.round(top.min) / 100}배 이상이면 만점 (${it.bands!.filter((b) => b.unit === "%").map((b) => b.cond).join(", ")})`;
+  return "공고서 기준";
+}
+
+/** 조달청 기준표를 업무·금액 구간마다 하나씩 (화면 표시용. 값은 공고 평가에 쓰는 pickTable 과 같다) */
+export function standardTiers(): StandardTier[] {
+  const cases: [StandardTier["biz"], Pick<Bid, "bizType" | "baseAmount" | "category">, EvalBasis | undefined][] = [
+    ["공사", { bizType: "공사", baseAmount: 7_000_000_000, category: "건축·토목공사" }, undefined],
+    ["공사", { bizType: "공사", baseAmount: 3_000_000_000, category: "건축·토목공사" }, undefined],
+    ["공사", { bizType: "공사", baseAmount: 500_000_000, category: "건축·토목공사" }, undefined],
+    ["공사", { bizType: "공사", baseAmount: 250_000_000, category: "건축·토목공사" }, undefined],
+    ["공사", { bizType: "공사", baseAmount: 100_000_000, category: "건축·토목공사" }, undefined],
+    ["공사", { bizType: "공사", baseAmount: 3_000_000_000, category: "전기·통신공사" }, { method: "전기" }],
+    ["공사", { bizType: "공사", baseAmount: 100_000_000, category: "전기·통신공사" }, { method: "전기" }],
+    ["공사", { bizType: "공사", baseAmount: 50_000_000, category: "전기·통신공사" }, { method: "전기" }],
+    ["용역", { bizType: "용역", baseAmount: 600_000_000, category: "청소" }, { method: "시설분야" }],
+    ["용역", { bizType: "용역", baseAmount: 300_000_000, category: "청소" }, { method: "시설분야" }],
+    ["용역", { bizType: "용역", baseAmount: 100_000_000, category: "청소" }, { method: "시설분야" }],
+    ["용역", { bizType: "용역", baseAmount: 600_000_000, category: "연구·조사·컨설팅" }, { method: "학술연구" }],
+    ["용역", { bizType: "용역", baseAmount: 300_000_000, category: "연구·조사·컨설팅" }, { method: "학술연구" }],
+    ["용역", { bizType: "용역", baseAmount: 100_000_000, category: "연구·조사·컨설팅" }, { method: "학술연구" }],
+    ["용역", { bizType: "용역", baseAmount: 600_000_000, category: "IT·소프트웨어" }, { method: "소프트웨어" }],
+    ["용역", { bizType: "용역", baseAmount: 100_000_000, category: "IT·소프트웨어" }, { method: "소프트웨어" }],
+    ["용역", { bizType: "용역", baseAmount: 600_000_000, category: "폐기물·환경" }, { method: "폐기물" }],
+    ["용역", { bizType: "용역", baseAmount: 100_000_000, category: "폐기물·환경" }, { method: "폐기물" }],
+    ["용역", { bizType: "용역", baseAmount: 1_500_000_000, category: "설계·감리·엔지니어링" }, { srvceDiv: "기술용역" }],
+    ["용역", { bizType: "용역", baseAmount: 700_000_000, category: "설계·감리·엔지니어링" }, { srvceDiv: "기술용역" }],
+    ["용역", { bizType: "용역", baseAmount: 300_000_000, category: "설계·감리·엔지니어링" }, { srvceDiv: "기술용역" }],
+    ["용역", { bizType: "용역", baseAmount: 100_000_000, category: "설계·감리·엔지니어링" }, { srvceDiv: "기술용역" }],
+    ["물품", { bizType: "물품", baseAmount: 1_500_000_000, category: "기타 물품" }, { method: "물품 제조" }],
+    ["물품", { bizType: "물품", baseAmount: 300_000_000, category: "기타 물품" }, { method: "물품 구매" }],
+    ["물품", { bizType: "물품", baseAmount: 100_000_000, category: "기타 물품" }, { method: "물품 구매" }],
+    ["물품", { bizType: "물품", baseAmount: 300_000_000, category: "기타 물품" }, { method: "중소기업자간 경쟁" }],
+    ["물품", { bizType: "물품", baseAmount: 100_000_000, category: "기타 물품" }, { method: "중소기업자간 경쟁" }],
+  ];
+  const out: StandardTier[] = [];
+  for (const [biz, bid, b] of cases) {
+    const t = pickTable(bid, b);
+    if (out.some((x) => x.name === t.ref.name)) continue;
+    const p = t.items.find((i) => i.kind === "performance");
+    out.push({
+      biz, name: t.ref.name, source: t.ref.source, status: t.ref.status, lowerLimit: t.lowerLimit, pass: t.pass,
+      perf: p ? { label: p.label, max: p.max, multiple: perfMultiple(p), basis: p.basis } : undefined,
+    });
+  }
+  return out;
+}

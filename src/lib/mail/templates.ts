@@ -1,4 +1,5 @@
-import type { Digest } from "../digest";
+import type { Digest, KeywordSection, WatchedChange } from "../digest";
+import { changeSummary } from "../noticeChanges";
 import type { MatchResult } from "../analysis";
 import { rank } from "../analysis";
 import { date, dday, shortDate, won } from "../format";
@@ -38,6 +39,44 @@ function bidRow(r: MatchResult, i: number, qs: string) {
 </td></tr>`;
 }
 
+/** 정정·취소 한 건 (바뀐 항목 전후 값) */
+function changeRow(w: WatchedChange, qs: string) {
+  const c = w.change;
+  const link = c.bidId ? `${siteUrl()}/bids/${encodeURIComponent(c.bidId)}?${qs}` : c.detailUrl || "https://www.g2b.go.kr";
+  const tag = c.kind === "취소"
+    ? `<span style="display:inline-block;background:#FBE3DE;color:${C.coral};font-weight:700;font-size:12px;padding:2px 8px;border-radius:999px">취소</span>`
+    : `<span style="display:inline-block;background:#FDF0DA;color:${C.ink};font-weight:700;font-size:12px;padding:2px 8px;border-radius:999px">정정 ${Number(c.ord)}차</span>`;
+  const fields = c.fields.length
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:6px;font-size:13px">${c.fields.map((f) => `<tr><td style="padding:2px 10px 2px 0;color:${C.sub};white-space:nowrap">${esc(f.field)}</td><td style="padding:2px 0"><span style="color:${C.sub};text-decoration:line-through">${esc(f.before)}</span> → <b>${esc(f.after)}</b></td></tr>`).join("")}</table>`
+    : `<div style="font-size:13px;color:${C.sub};margin-top:4px">${esc(changeSummary(c))}</div>`;
+  return `<tr><td style="padding:12px 0;border-bottom:1px solid ${C.line}">
+<div>${tag} <span style="font-size:12px;color:${C.sub}">${esc(w.reason)} · ${esc(c.demandAgency || c.agency)}</span></div>
+<a href="${link}" style="display:block;margin-top:4px;color:${C.ink};text-decoration:none;font-weight:700;font-size:15px">${esc(c.title)}</a>
+${fields}</td></tr>`;
+}
+
+function changeSection(list: WatchedChange[], qs: string) {
+  if (!list.length) return "";
+  return `<h2 style="font-size:16px;margin:24px 0 0">관심·추천 공고 정정·취소 ${list.length}건</h2>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${list.slice(0, 10).map((w) => changeRow(w, qs)).join("")}</table>
+${list.length > 10 ? `<p style="margin:8px 0 0;font-size:13px"><a href="${siteUrl()}/changes" style="color:${C.mint}">외 ${list.length - 10}건 정정·취소 공고 보기</a></p>` : ""}`;
+}
+
+function keywordSection(list: KeywordSection[], qs: string) {
+  if (!list.length) return "";
+  const rows = list.map((k) => {
+    const head = `<tr><td style="padding:14px 0 4px"><b style="font-size:14px">"${esc(k.keyword)}"</b> <span style="font-size:13px;color:${C.sub}">새 공고 ${k.fresh}건 · 진행 중 ${k.total}건</span>
+<a href="${siteUrl()}/bids?${qs}&q=${encodeURIComponent(k.keyword)}" style="font-size:12px;color:${C.mint};margin-left:6px">전체 보기</a></td></tr>`;
+    const items = k.items.length
+      ? k.items.map((r) => `<tr><td style="padding:6px 0;border-bottom:1px solid ${C.line}">
+<a href="${siteUrl()}/bids/${encodeURIComponent(r.bid.id)}?${qs}" style="color:${C.ink};text-decoration:none;font-weight:600;font-size:14px">${esc(r.bid.title)}</a>
+<div style="font-size:12px;color:${C.sub};margin-top:2px">${esc(r.bid.demandAgency)} · ${won(r.bid.baseAmount)} · 마감 ${dday(r.daysLeft)} (${shortDate(r.bid.closeAt)}) · ${r.eligible ? `<b style="color:${C.mint}">참가 가능</b>` : `<span style="color:${C.coral}">${esc(r.blockers[0] ?? "조건 확인 필요")}</span>`}</div></td></tr>`).join("")
+      : `<tr><td style="padding:6px 0;font-size:13px;color:${C.sub};border-bottom:1px solid ${C.line}">최근 하루 사이 새 공고는 없습니다.</td></tr>`;
+    return head + items;
+  }).join("");
+  return `<h2 style="font-size:16px;margin:24px 0 0">관심 키워드 공고</h2><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`;
+}
+
 export function dailyDigestMail(d: Digest) {
   const qs = profileQs(d.client);
   const subject = `[입찰메이트LAB] ${date(new Date().toISOString())} ${d.client.company} 맞춤 공고 ${d.recommended.length}건`;
@@ -52,8 +91,15 @@ ${stat(d.newToday, "신규 적합 공고", C.mint, C.mintBg)}${stat(d.closingSoo
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px">
 ${d.recommended.length ? d.recommended.map((r, i) => bidRow(r, i, qs)).join("") : `<tr><td style="padding:16px 0;color:${C.sub}">오늘은 조건에 맞는 신규 공고가 없습니다.</td></tr>`}
 </table>
+${changeSection(d.changes, qs)}
+${keywordSection(d.keywords, qs)}
 <p style="margin:20px 0 0"><a href="${siteUrl()}/bids?${qs}&ok=1" style="display:inline-block;background:${C.ink};color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:10px">전체 추천 공고 보기</a></p>`;
-  const text = [subject, "", ...d.recommended.map((r, i) => `${i + 1}. ${r.bid.title} / ${won(r.bid.baseAmount)} / ${r.grade}등급 / 마감 ${dday(r.daysLeft)}\n   ${siteUrl()}/bids/${r.bid.id}?${qs}`)].join("\n");
+  const text = [
+    subject, "",
+    ...d.recommended.map((r, i) => `${i + 1}. ${r.bid.title} / ${won(r.bid.baseAmount)} / ${r.grade}등급 / 마감 ${dday(r.daysLeft)}\n   ${siteUrl()}/bids/${r.bid.id}?${qs}`),
+    ...(d.changes.length ? ["", `[관심·추천 공고 정정·취소 ${d.changes.length}건]`, ...d.changes.map((w) => `- ${w.change.kind === "취소" ? "취소" : `정정 ${Number(w.change.ord)}차`} ${w.change.title}: ${changeSummary(w.change)}`)] : []),
+    ...d.keywords.flatMap((k) => ["", `[키워드 "${k.keyword}" 새 공고 ${k.fresh}건]`, ...k.items.map((r) => `- ${r.bid.title} / ${won(r.bid.baseAmount)} / 마감 ${dday(r.daysLeft)}${r.eligible ? "" : " / 조건 확인 필요"}`)]),
+  ].join("\n");
   return { subject, html: shell(subject, body), text };
 }
 
@@ -70,4 +116,18 @@ ${note ? `<div style="border-left:4px solid ${C.mint};background:${C.mintBg};pad
 <h2 style="font-size:16px;margin:0">이번 주 꼭 볼 공고 TOP ${top.length}</h2>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${top.map((r, i) => bidRow(r, i, qs)).join("")}</table>`;
   return { subject, html: shell(subject, body), text: `${subject}\n\n${top.map((r, i) => `${i + 1}. ${r.bid.title} (${r.grade}등급)`).join("\n")}` };
+}
+
+/** 관심·추천 공고가 정정·취소되면 바로 보내는 알림 */
+export function changeAlertMail(client: ClientProfile, list: WatchedChange[]) {
+  const qs = profileQs(client);
+  const cancel = list.filter((w) => w.change.kind === "취소").length;
+  const subject = `[입찰메이트LAB] 관심 공고 ${cancel ? `취소 ${cancel}건${list.length - cancel ? `, 정정 ${list.length - cancel}건` : ""}` : `정정 ${list.length}건`} · ${client.company}`;
+  const body = `
+<p style="margin:0 0 4px;font-size:13px;color:${C.sub}">${esc(client.contactName || client.company)}님, 살펴보시던 공고가 바뀌었습니다.</p>
+<h1 style="margin:0 0 8px;font-size:20px">정정·취소 공고 ${list.length}건</h1>
+<p style="margin:0;font-size:13px;color:${C.sub}">금액·마감·참가 자격이 바뀌었으면 투찰 금액과 제출서류를 다시 확인해 주세요.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px">${list.map((w) => changeRow(w, qs)).join("")}</table>`;
+  const text = [subject, "", ...list.map((w) => `- ${w.change.kind === "취소" ? "취소" : `정정 ${Number(w.change.ord)}차`} ${w.change.title}\n  ${changeSummary(w.change)}`)].join("\n");
+  return { subject, html: shell(subject, body), text };
 }

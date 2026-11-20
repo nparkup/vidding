@@ -7,7 +7,8 @@ import { ADMIN_COOKIE, adminPassword, sessionToken } from "@/lib/auth";
 import {
   addReport, getClient, getInquiry, setInquiryStatus, syncBids, toggleWatch, updateSettings, upsertClient,
 } from "@/lib/store";
-import { runDailyDigest, sendDigestTo, sendWeeklyReport } from "@/lib/jobs";
+import { runChangeAlerts, runDailyDigest, sendDigestTo, sendWeeklyReport } from "@/lib/jobs";
+import { parseKeywords } from "@/lib/keywords";
 import { normalizeLicense } from "@/lib/licenses";
 import { REGIONS, CATEGORIES, type ClientProfile, type Inquiry, type License, type Region, type ServiceCategory, type PlanId } from "@/lib/types";
 
@@ -62,6 +63,7 @@ function parseClient(form: FormData, base?: ClientProfile): ClientProfile {
     status: (s("status") || "체험") as ClientProfile["status"],
     joinedAt: base?.joinedAt ?? new Date().toISOString(),
     watchlist: base?.watchlist ?? [],
+    keywords: parseKeywords(s("keywords")),
   };
 }
 
@@ -118,5 +120,11 @@ export async function sendTestDigest(clientId: string) {
 export async function runDailyNow() {
   await guard();
   await runDailyDigest({ force: true });
+  revalidatePath("/admin", "layout");
+}
+
+export async function runChangesNow() {
+  await guard();
+  await runChangeAlerts();
   revalidatePath("/admin", "layout");
 }

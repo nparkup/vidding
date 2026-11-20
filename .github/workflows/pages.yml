@@ -113,6 +113,8 @@ jobs:
           NEXT_PUBLIC_APPLY_EMAIL: ${{ vars.APPLY_EMAIL }}
           NEXT_PUBLIC_CORP_API: ${{ steps.corp.outputs.url }}
           NEXT_TELEMETRY_DISABLED: "1"
+          # 공고·낙찰 JSON을 읽다 Node 기본 힙(약 2GB)을 넘겨 빌드가 멈추는 문제 (공고 수집 단계와 같은 6GB)
+          NODE_OPTIONS: --max-old-space-size=6144
         run: node scripts/build-static.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

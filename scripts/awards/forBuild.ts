@@ -10,6 +10,7 @@ import { similarity, titleKey, type PriorTarget } from "../../src/lib/nara/award
 import type { AwardStats, PriorMatch, RateStat } from "../../src/lib/rivalRate";
 import type { Bid } from "../../src/lib/types";
 import { r2Get } from "./r2";
+import { agencySummary, type AgencySummary } from "../../src/lib/awards/agency";
 import { agencyBucket, analyzeBid, keywords, kwBucket, type AgencyIndexFile, type AwardAnalysis, type KwIndexFile, type KwLookup, type SimilarIndexFile } from "../../src/lib/awards/analysis";
 
 const canUse = () => !!process.env.R2_LOCAL_DIR || (!!process.env.CLOUDFLARE_API_TOKEN && !!process.env.CLOUDFLARE_ACCOUNT_ID);
@@ -103,13 +104,38 @@ export async function awardAnalysesFromR2(items: Bid[]): Promise<Record<string, 
   const kw: KwLookup | undefined = anyKw ? { n: anyKw.n, get: (k) => kwFiles.get(kwBucket(k))?.kw[k] } : undefined;
   const out: Record<string, AwardAnalysis> = {};
   for (const [k, bids] of need) {
-    const gz = await r2Get(`idx/agency/${k}.json.gz`).catch(() => null);
-    const file = gz ? (JSON.parse(gunzipSync(gz).toString("utf8")) as AgencyIndexFile) : null;
+    const file = await agencyFile(k);
     for (const b of bids) {
       const rows = file?.agencies[b.demandAgency];
       if (rows?.length && (!range.from || rows[rows.length - 1][2] < range.from)) range.from = rows[rows.length - 1][2];
       out[b.id] = analyzeBid(b, rows, similar.groups, range, { kw });
     }
+  }
+  return out;
+}
+
+/** 수요기관 색인 파일 (빌드 한 번에 같은 파일을 두 번 받지 않게 기억한다) */
+const agencyFiles = new Map<string, Promise<AgencyIndexFile | null>>();
+function agencyFile(k: string): Promise<AgencyIndexFile | null> {
+  let p = agencyFiles.get(k);
+  if (!p) {
+    p = r2Get(`idx/agency/${k}.json.gz`).catch(() => null).then((gz) => (gz ? (JSON.parse(gunzipSync(gz).toString("utf8")) as AgencyIndexFile) : null));
+    agencyFiles.set(k, p);
+  }
+  return p;
+}
+
+/** 지금 공고의 수요기관마다 발주처 분석 (src/lib/awards/agency.ts). 키는 수요기관 이름. 색인이 없으면 null */
+export async function agencySummariesFromR2(items: Bid[]): Promise<Record<string, AgencySummary> | null> {
+  if (!(await awardMeta())) return null;
+  const today = kstNow().toISOString().slice(0, 10);
+  const names = [...new Set(items.map((b) => b.demandAgency).filter(Boolean))];
+  const out: Record<string, AgencySummary> = {};
+  for (const name of names) {
+    const file = await agencyFile(agencyBucket(name));
+    const rows = file?.agencies[name];
+    const s = rows?.length ? agencySummary(name, rows, today) : undefined;
+    if (s) out[name] = s;
   }
   return out;
 }

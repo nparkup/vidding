@@ -12,6 +12,10 @@ export interface R2BucketLike {
 
 export interface AwardWin extends PerfWin {
   cls: NtceClass;
+  /** 낙찰업체명 (2026-11-20 이전 중계 서버 응답에는 없다) */
+  winner?: string;
+  /** 업무 (2026-11-20 이전 중계 서버 응답에는 없다) */
+  biz?: string;
   /** 낙찰률(%), 없으면 0 */
   rate: number;
   bidders: number;
@@ -66,6 +70,8 @@ export async function readAwards(bucket: R2BucketLike | undefined, bizno: string
       bidNtceNo: r[c.no] as string,
       bidNtceOrd: r[c.ord] as string,
       title: r[c.title] as string,
+      winner: (r[c.winner] as string) || undefined,
+      biz: r[c.biz] as string,
       amount: r[c.amount] as number,
       agency: r[c.agency] as string,
       date: r[c.date] as string,

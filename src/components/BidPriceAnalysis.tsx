@@ -158,7 +158,7 @@ function Field({ label, suffix, children }: { label: string; suffix: string; chi
 
 const W = 360, H = 170, PL = 44, PR = 8, PT = 8, PB = 22;
 
-function TrendChart({ st, samples }: { st: AssessStats; samples: [string, number, number, number][] }) {
+export function TrendChart({ st, samples }: { st: AssessStats; samples: [string, number, number, number][] }) {
   const xs = samples.filter((s) => s[1] >= st.range[0] - 0.005 && s[1] <= st.range[1] + 0.005).slice().reverse();
   const [lo, hi] = st.range;
   const x = (i: number) => PL + (xs.length <= 1 ? 0 : (i / (xs.length - 1)) * (W - PL - PR));
@@ -187,7 +187,7 @@ function TrendChart({ st, samples }: { st: AssessStats; samples: [string, number
   );
 }
 
-function DistChart({ st }: { st: AssessStats }) {
+export function DistChart({ st }: { st: AssessStats }) {
   const max = Math.max(1, ...st.bins);
   const n = st.bins.length;
   const bw = (W - PL - PR) / n;

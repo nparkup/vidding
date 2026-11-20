@@ -40,7 +40,7 @@ export const usesAssess = (method: MethodCode | string) => !/^N$|협상/.test(me
  * 같은 수요기관 낙찰(agencyRows)에서 사정율 표본을 뽑는다. 지금 공고(no)와 그 공고일(posted) 이후 낙찰은 뺀다.
  * 사정율이 90~110%를 벗어난 행(단가 공고, 기초금액 오기)은 버린다
  */
-export function assessSamples(rows: AgencyRow[] | undefined, biz: string, no: string, posted: string): AssessData | undefined {
+export function assessSamples(rows: AgencyRow[] | undefined, biz: string, no: string, posted: string, anyBiz = false): AssessData | undefined {
   if (!rows?.length) return undefined;
   const from = new Date(Date.parse(`${posted}T00:00:00Z`) - ASSESS_MONTHS * 30.44 * 86400e3).toISOString().slice(0, 10);
   const pick = (sameBiz: boolean) => {
@@ -62,9 +62,9 @@ export function assessSamples(rows: AgencyRow[] | undefined, biz: string, no: st
     }
     return out.sort((a, b) => b[0].localeCompare(a[0]));
   };
-  let samples = pick(true);
+  let samples = anyBiz ? [] : pick(true);
   let scope: AssessData["scope"] = "same";
-  if (samples.length < ASSESS_MIN) {
+  if (anyBiz || samples.length < ASSESS_MIN) {
     const all = pick(false);
     if (all.length > samples.length) { samples = all; scope = "agency"; }
   }

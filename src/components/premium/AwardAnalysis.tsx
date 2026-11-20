@@ -1,6 +1,6 @@
 "use client";
 
-import { won } from "@/lib/format";
+import { won, wonFull } from "@/lib/format";
 import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PastAward, type Related, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
@@ -14,6 +14,8 @@ export async function loadAwardAnalysis(id: string): Promise<AwardAnalysis | nul
 
 const pct = (n: number, d = 3) => `${Math.round(n * 10 ** d) / 10 ** d}%`;
 const eok = (n: number) => (n >= 1e8 ? `${(Math.round(n / 1e6) / 100).toLocaleString()}억 원` : won(n));
+/** 이 공고 기초금액 × 비율 (원). 기초금액이 없으면 빈 문자열 */
+const atBase = (base: number | undefined, rate: number) => (base && base > 0 && rate > 0 ? wonFull(Math.floor((base * rate) / 100)) : "");
 const short = (d: string) => d.slice(0, 7).replace("-", ".");
 
 const LEVEL_TONE: Record<string, string> = {
@@ -27,6 +29,8 @@ const LEVEL_TONE: Record<string, string> = {
 export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis }: { fc: Forecast; chance?: WinChance; isNego: boolean; bidRate: number; baseAmount: number; analysis?: AwardAnalysis | null }) {
   if (!fc.competition && !fc.winRate) return null;
   const prePrice = fc.pre && baseAmount ? Math.round((baseAmount * fc.pre.value) / 100) : 0;
+  // 투찰률 옆 금액: 슬라이더와 같이 공고 기초금액 기준 (예정가격은 개찰 때 정해짐)
+  const amountOf = (rate: number) => (baseAmount > 0 ? <span className="ml-2 tabular-nums">{wonFull(Math.floor((baseAmount * rate) / 100))}</span> : null);
   // 최근 낙찰 결과: 같은 사업 이력이 있으면 그것, 없으면 비슷한 공고의 최근 낙찰
   const prior = analysis?.prior;
   const years = analysis?.cycleYears ?? 1;
@@ -37,6 +41,15 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
     <section className="card mt-4 p-6">
       <h3 className="font-bold">낙찰 결과로 본 예측</h3>
       <dl className="mt-3 space-y-3 text-sm">
+        {fc.competition && (
+          <div>
+            <dt className="flex items-center justify-between gap-2">
+              <span className="text-ink-500">경쟁 강도</span>
+              <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${LEVEL_TONE[fc.competition.level]}`}>{fc.competition.level}</span>
+            </dt>
+            <dd className="mt-0.5 text-xs text-ink-500">{fc.competition.text}</dd>
+          </div>
+        )}
         {analysis && (
           <div>
             <dt className="text-ink-500">{years > 1 ? `직전 계약 낙찰 (${years}년 계약)` : "전년도 낙찰"}</dt>
@@ -56,27 +69,38 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
             )}
           </div>
         )}
-        {fc.competition && (
+        {fc.winRate && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="shrink-0 text-ink-500">과거 낙찰률</dt>
+            <dd className="text-right"><b className="tabular-nums">{pct(fc.winRate.value)}{amountOf(fc.winRate.value)}</b> <span className="block text-xs text-ink-300">{fc.winRate.basis}{!isNego && fc.suggestRate ? " (당시 하한율 기준)" : ""}{baseAmount > 0 ? " · 금액은 기초금액 기준" : ""}</span></dd>
+          </div>
+        )}
+        {isNego && fc.rival && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="shrink-0 text-ink-500">예상 최저 경쟁 투찰률</dt>
+            <dd className="text-right"><b className="tabular-nums">{pct(fc.rival.value)}{amountOf(fc.rival.value)}</b> <span className="block text-xs text-ink-300">가격점수에 반영{baseAmount > 0 ? " · 금액은 기초금액 기준" : ""}</span></dd>
+          </div>
+        )}
+        {!isNego && fc.suggestRate && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="shrink-0 text-ink-500">과거 낙찰자 투찰률</dt>
+            <dd className="text-right"><b className="tabular-nums">{pct(fc.suggestRate.value)}{amountOf(fc.suggestRate.value)}</b> <span className="block text-xs text-ink-300">{pct(fc.suggestRate.low)} ~ {pct(fc.suggestRate.high)} · 투찰률 기본값</span></dd>
+          </div>
+        )}
+        {fc.likely && fc.likely.length > 0 && (
           <div>
-            <dt className="flex items-center justify-between gap-2">
-              <span className="text-ink-500">경쟁 강도</span>
-              <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${LEVEL_TONE[fc.competition.level]}`}>{fc.competition.level}</span>
-            </dt>
-            <dd className="mt-0.5 text-xs text-ink-500">{fc.competition.text}</dd>
-            {fc.likely && fc.likely.length > 0 && (
-              <dd className="mt-2">
-                <p className="text-xs font-semibold text-ink-500">참가 예상 기업</p>
-                <ul className="mt-1 divide-y divide-ink-100 rounded-xl border border-ink-100">
-                  {fc.likely.slice(0, 6).map((b) => (
-                    <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
-                      <span className="min-w-0 truncate font-semibold">{b.name}</span>
-                      <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 공고명이 비슷한 다른 낙찰에서 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
-              </dd>
-            )}
+            <dt className="text-ink-500">참가 예상 기업</dt>
+            <dd className="mt-1">
+              <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
+                {fc.likely.slice(0, 6).map((b) => (
+                  <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
+                    <span className="min-w-0 truncate font-semibold">{b.name}</span>
+                    <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 공고명이 비슷한 다른 낙찰에서 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
+            </dd>
           </div>
         )}
         {recent.length > 0 && (
@@ -112,24 +136,6 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
             <dd className="mt-0.5 space-y-0.5 text-xs text-ink-500">{chance.basis.map((b) => <p key={b}>{b}</p>)}</dd>
           </div>
         )}
-        {fc.winRate && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-ink-500">과거 낙찰률</dt>
-            <dd className="text-right"><b className="tabular-nums">{pct(fc.winRate.value)}</b> <span className="block text-xs text-ink-300">{fc.winRate.basis}{!isNego && fc.suggestRate ? " (당시 하한율 기준)" : ""}</span></dd>
-          </div>
-        )}
-        {isNego && fc.rival && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-ink-500">예상 최저 경쟁 투찰률</dt>
-            <dd className="text-right"><b className="tabular-nums">{pct(fc.rival.value)}</b> <span className="block text-xs text-ink-300">가격점수에 반영</span></dd>
-          </div>
-        )}
-        {!isNego && fc.suggestRate && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-ink-500">과거 낙찰자 투찰률</dt>
-            <dd className="text-right"><b className="tabular-nums">{pct(fc.suggestRate.value)}</b> <span className="block text-xs text-ink-300">{pct(fc.suggestRate.low)} ~ {pct(fc.suggestRate.high)} · 투찰률 기본값</span></dd>
-          </div>
-        )}
         {prePrice > 0 && (
           <div className="flex items-baseline justify-between gap-2">
             <dt className="shrink-0 text-ink-500">예상 예정가격</dt>
@@ -145,12 +151,12 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
 }
 
 /** 평가 기준 아래: 전년도 같은 사업, 과거 같은 사업 추이, 비슷한 공고의 낙찰 결과 */
-export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, isNego }: { analysis: AwardAnalysis | null; loading: boolean; fc: Forecast; bidRate: number; floor?: number; isNego: boolean }) {
+export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, isNego, baseAmount }: { analysis: AwardAnalysis | null; loading: boolean; fc: Forecast; bidRate: number; floor?: number; isNego: boolean; baseAmount?: number }) {
   return (
     <section className="card min-w-0 p-6">
       <h3 className="text-lg font-bold">낙찰 결과 분석</h3>
       <p className="mt-1 text-sm text-ink-500">
-        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다. 권역·노선·학년 같은 대상이나 사업 종류(유지관리·구축·감리 등)가 다르거나 금액이 3배 넘게 차이 나는 공고는 같은 사업에서 뺐습니다. 아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.
+        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다. 권역·노선·학년 같은 대상이나 사업 종류(유지관리·구축·감리 등)가 다르거나 금액이 3배 넘게 차이 나는 공고는 같은 사업에서 뺐습니다. 아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.{baseAmount ? " 비율 옆 금액은 이 공고 기초금액에 그 비율을 곱한 값입니다." : ""}
       </p>
       {loading ? (
         <p className="mt-4 text-sm text-ink-300">낙찰 결과를 불러오는 중…</p>
@@ -162,11 +168,11 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
           <HistoryCard history={analysis.history} fc={fc} />
           {analysis.related && (
             <div className="min-w-0 lg:col-span-2">
-              <RelatedCard related={analysis.related} />
+              <RelatedCard related={analysis.related} base={baseAmount} />
             </div>
           )}
           <div className="min-w-0 lg:col-span-2">
-            <SimilarCard similar={analysis.similar} bidRate={bidRate} floor={floor} isNego={isNego} related={!!analysis.related} />
+            <SimilarCard similar={analysis.similar} bidRate={bidRate} floor={floor} isNego={isNego} related={!!analysis.related} base={baseAmount} />
           </div>
         </div>
       )}
@@ -270,7 +276,7 @@ function HistoryCard({ history, fc }: { history: PastAward[]; fc: Forecast }) {
           <li key={r.no} className="min-w-0 text-sm">
             <div className="flex min-w-0 items-baseline justify-between gap-2">
               <span className="min-w-0 truncate"><span className="mr-1.5 text-xs text-ink-300 tabular-nums">{short(r.date)}</span>{r.winner}</span>
-              <span className="shrink-0 text-xs tabular-nums text-ink-500"><b className="text-ink">{r.rate ? pct(r.rate) : "-"}</b> · {r.bidders}곳</span>
+              <span className="shrink-0 text-xs tabular-nums text-ink-500"><b className="text-ink">{r.rate ? pct(r.rate) : "-"}</b>{r.amount > 100 ? ` · ${won(r.amount)}` : ""} · {r.bidders}곳</span>
             </div>
             {r.rate > 0 && (
               <div className="relative mt-1 h-1.5 rounded-full bg-ink-100" aria-hidden>
@@ -286,7 +292,7 @@ function HistoryCard({ history, fc }: { history: PastAward[]; fc: Forecast }) {
   );
 }
 
-function SimilarCard({ similar, bidRate, floor, isNego, related }: { similar?: AwardAnalysis["similar"]; bidRate: number; floor?: number; isNego: boolean; related?: boolean }) {
+function SimilarCard({ similar, bidRate, floor, isNego, related, base }: { similar?: AwardAnalysis["similar"]; bidRate: number; floor?: number; isNego: boolean; related?: boolean; base?: number }) {
   if (!similar) {
     return (
       <Box title="비슷한 공고 낙찰 결과" sub="최근 3년, 같은 업무·계약방법·금액대·분류">
@@ -298,19 +304,19 @@ function SimilarCard({ similar, bidRate, floor, isNego, related }: { similar?: A
   return (
     <Box title="비슷한 공고 낙찰 결과" sub={`최근 3년 ${s.n.toLocaleString()}건 · ${similar.label}`}>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <Fact label="낙찰률 중앙값" value={s.rate ? pct(s.rate.q[2]) : "-"} note={s.rate ? `가운데 절반 ${pct(s.rate.q[1], 2)} ~ ${pct(s.rate.q[3], 2)}` : undefined} />
+        <Fact label="낙찰률 중앙값" value={s.rate ? pct(s.rate.q[2]) : "-"} note={s.rate ? [atBase(base, s.rate.q[2]) && `이 공고 기준 ${atBase(base, s.rate.q[2])}`, `가운데 절반 ${pct(s.rate.q[1], 2)} ~ ${pct(s.rate.q[3], 2)}`].filter(Boolean).join(" · ") : undefined} />
         <Fact label="참가업체 수" value={`${Math.round(s.bidders.q[1]).toLocaleString()}곳`} note={`보통 ${Math.round(s.bidders.q[0])} ~ ${Math.round(s.bidders.q[2])}곳`} />
         <Fact label="하한율 대비" value={s.gap ? `+${s.gap.q[1].toFixed(3)}%p` : "-"} note={s.gap ? "낙찰자가 하한율보다 높게 쓴 폭" : "하한율 자료 없음"} />
         <Fact label="낙찰자가 개찰 1위" value={s.ranks?.winnerFirst ? `${Math.round(s.ranks.winnerFirst * 100)}%` : "-"} note={s.ranks ? `순위 자료 ${s.ranks.n.toLocaleString()}건` : "순위 받는 중"} />
       </div>
-      {s.rate && <RateDist q={s.rate.q} bidRate={bidRate} floor={floor} isNego={isNego} />}
+      {s.rate && <RateDist q={s.rate.q} bidRate={bidRate} floor={floor} isNego={isNego} base={base} />}
       <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
         {s.ranks && s.ranks.mean.some((v) => v > 0) && (
           <div className="min-w-0">
             <p className="mb-2 text-xs font-semibold text-ink-500">개찰 순위별 평균 투찰률</p>
             <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
               {s.ranks.mean.map((v, i) => v > 0 && (
-                <li key={i} className="flex justify-between px-3 py-1.5"><span className="text-ink-500">{i + 1}위</span><span className="tabular-nums">{pct(v)}</span></li>
+                <li key={i} className="flex justify-between px-3 py-1.5"><span className="text-ink-500">{i + 1}위</span><span className="text-right tabular-nums">{pct(v)}{atBase(base, v) && <span className="ml-2 text-xs text-ink-500">{atBase(base, v)}</span>}</span></li>
               ))}
             </ol>
           </div>
@@ -373,11 +379,11 @@ function NameCounts({ title, rows, unit }: { title: string; rows: [string, numbe
 }
 
 /** 공고명 핵심어가 같은 다른 낙찰 (기관 무관, 최근 3년) */
-function RelatedCard({ related: r }: { related: Related }) {
+function RelatedCard({ related: r, base }: { related: Related; base?: number }) {
   return (
     <Box title="공고명이 비슷한 낙찰 결과" sub={`최근 3년, 다른 기관 포함 ${r.n.toLocaleString()}건 · 핵심어 ${r.terms.join(", ")}`}>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <Fact label="낙찰률 중앙값" value={r.rate ? pct(r.rate.q[1]) : "-"} note={r.rate ? `가운데 절반 ${pct(r.rate.q[0], 2)} ~ ${pct(r.rate.q[2], 2)}` : "낙찰률 자료 부족"} />
+        <Fact label="낙찰률 중앙값" value={r.rate ? pct(r.rate.q[1]) : "-"} note={r.rate ? [atBase(base, r.rate.q[1]) && `이 공고 기준 ${atBase(base, r.rate.q[1])}`, `가운데 절반 ${pct(r.rate.q[0], 2)} ~ ${pct(r.rate.q[2], 2)}`].filter(Boolean).join(" · ") : "낙찰률 자료 부족"} />
         <Fact label="참가업체 수" value={r.bidders ? `${Math.round(r.bidders.q[1])}곳` : "-"} note={r.bidders ? `보통 ${Math.round(r.bidders.q[0])} ~ ${Math.round(r.bidders.q[2])}곳` : undefined} />
       </div>
       <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
@@ -390,7 +396,7 @@ function RelatedCard({ related: r }: { related: Related }) {
 }
 
 /** 낙찰률 분포 막대: 10~90% 구간, 가운데 절반, 중앙값과 지금 투찰률 */
-function RateDist({ q, bidRate, floor, isNego }: { q: [number, number, number, number, number]; bidRate: number; floor?: number; isNego: boolean }) {
+function RateDist({ q, bidRate, floor, isNego, base }: { q: [number, number, number, number, number]; bidRate: number; floor?: number; isNego: boolean; base?: number }) {
   const lo = Math.min(q[0], floor ?? q[0], bidRate) - 0.3;
   const hi = Math.max(q[4], bidRate) + 0.3;
   const x = (v: number) => Math.max(0, Math.min(100, ((v - lo) / Math.max(0.1, hi - lo)) * 100));
@@ -410,6 +416,9 @@ function RateDist({ q, bidRate, floor, isNego }: { q: [number, number, number, n
         <span>중앙값 {pct(q[2], 2)}</span>
         <span>{pct(q[4], 2)}</span>
       </div>
+      {atBase(base, q[2]) && (
+        <p className="mt-1 text-xs tabular-nums text-ink-500">이 공고 기준 {atBase(base, q[0])} ~ {atBase(base, q[4])} · 중앙값 {atBase(base, q[2])} · 내 투찰 {atBase(base, bidRate)}</p>
+      )}
       <p className="mt-1 text-xs text-ink-300">
         회색은 낙찰률 10~90% 구간, 초록은 가운데 절반, 검은 선은 중앙값{floor ? ", 빨간 선은 이 공고의 낙찰하한율" : ""}입니다.
         {isNego ? " 협상계약은 기술점수가 순위를 정해 낙찰률이 넓게 퍼집니다." : ""}

@@ -659,6 +659,9 @@ export function ScorePredictor() {
                 <div className="mt-4 rounded-xl bg-white/5 p-3">
                   <p className="text-xs text-ink-300">통과 가능한 투찰률</p>
                   <p className="mt-0.5 text-lg font-bold tabular-nums">{result.rateWindow.low}% ~ {result.rateWindow.high}%</p>
+                  {bid.baseAmount > 0 && (
+                    <p className="mt-0.5 text-sm tabular-nums text-ink-300">{wonFull(Math.floor((bid.baseAmount * result.rateWindow.low) / 100))} ~ {wonFull(Math.floor((bid.baseAmount * result.rateWindow.high) / 100))} (기초금액 기준)</p>
+                  )}
                 </div>
               )}
             </div>
@@ -744,7 +747,7 @@ export function ScorePredictor() {
       </section>
 
     {/* 평가 기준 아래: 전년도·과거 같은 사업·비슷한 공고의 낙찰 결과 */}
-    <AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} />
+    <AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} baseAmount={bid.baseAmount} />
     </div>
   );
 }

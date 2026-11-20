@@ -12,7 +12,7 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /**
  * 공고 상세의 사정율 분석·투찰금액: 같은 수요기관의 과거 예정가격 ÷ 기초금액(사정율) 흐름과 분포,
- * 표본이 많이 든 구간 3개, 사정율·하한율·A값으로 투찰금액 계산
+ * 낙찰이 많이 몰린 구간 3개, 사정율·하한율·A값으로 투찰금액 계산
  */
 export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: NoticeInfo; analysis: AwardAnalysis | null | undefined }) {
   const st = useMemo(() => assessStats(analysis?.assess, info?.baseRange, bid.postedAt.slice(0, 10)), [analysis, info?.baseRange, bid.postedAt]);
@@ -58,13 +58,13 @@ export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: Not
               <TrendChart st={st} samples={analysis!.assess!.samples} />
             </figure>
             <figure className="min-w-0">
-              <figcaption className="text-sm font-semibold">구간별 분포 <span className="font-normal text-ink-400">0.2%p 구간 · 진한 막대가 추천 구간</span></figcaption>
+              <figcaption className="text-sm font-semibold">구간별 분포 <span className="font-normal text-ink-400">0.2%p 구간 · 진한 막대가 낙찰이 많이 몰린 구간</span></figcaption>
               <DistChart st={st} />
             </figure>
           </div>
 
           <div className="mt-5">
-            <h3 className="text-sm font-semibold">추천 사정율 구간</h3>
+            <h3 className="text-sm font-semibold">낙찰이 많이 몰린 사정율 구간</h3>
             <ol className="mt-2 divide-y divide-ink-100 rounded-xl border border-ink-100">
               {st.windows.map((w, i) => {
                 const mid = r3((w.lo + w.hi) / 2);
@@ -80,6 +80,7 @@ export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: Not
               })}
             </ol>
             <p className="mt-1 text-xs text-ink-400">구간을 누르면 아래 계산기에 그 가운데 값이 들어갑니다. 최근 낙찰일수록 무겁게(2년마다 절반) 셉니다.</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-400">예정가격은 복수예비가격 추첨으로 정해져 해마다 크게 기울지 않습니다. 지난 낙찰 3만여 건을 되짚어 보면 1순위 구간에 실제 사정율이 든 비율은 10% 안팎으로, 100%를 가운데에 둔 같은 폭 구간(11%)과 비슷했습니다. 구간은 참고로 보시고, 금액은 하한율과 A값을 정확히 넣는 데 쓰세요.</p>
           </div>
         </>
       ) : (

@@ -18,7 +18,7 @@ export function PassAmount({ bid, window, info, analysis }: { bid: Bid; window: 
   const st = useMemo(() => assessStats(analysis?.assess, info?.baseRange, bid.postedAt.slice(0, 10)), [analysis, info?.baseRange, bid.postedAt]);
   const options = useMemo(() => {
     const o: { key: string; label: string; ratio: number }[] = [];
-    st?.windows.forEach((w, i) => o.push({ key: `w${i}`, label: `추천 구간 ${i + 1} (${r3((w.lo + w.hi) / 2).toFixed(3)}%)`, ratio: r3((w.lo + w.hi) / 2) }));
+    st?.windows.forEach((w, i) => o.push({ key: `w${i}`, label: `많이 몰린 구간 ${i + 1} (${r3((w.lo + w.hi) / 2).toFixed(3)}%)`, ratio: r3((w.lo + w.hi) / 2) }));
     if (st) o.push({ key: "median", label: `과거 가운데 값 (${st.q[2].toFixed(3)}%)`, ratio: st.q[2] });
     o.push({ key: "100", label: "100% (기초금액 그대로)", ratio: 100 });
     return o;

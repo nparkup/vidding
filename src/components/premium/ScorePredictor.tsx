@@ -28,6 +28,7 @@ import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
 import { jointPredict, type JointMember } from "@/lib/joint";
 import { JointMembers } from "./JointMembers";
 import { PassAmount } from "./PassAmount";
+import { PerfCapCard } from "./PerfCapCard";
 
 /** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
 const MAX_MATCHES = 100;
@@ -685,6 +686,7 @@ export function ScorePredictor() {
             </ul>
           </section>
 
+          {active.method === "적격심사" && <PerfCapCard sheet={active} bid={bid} co={jointOk && members.length ? { ...coEff, pastPerformance: coEff.pastPerformance + members.reduce((a, m) => a + m.perf, 0) } : coEff} />}
           {result.tips.length > 0 && (
             <section className="card mt-4 p-6">
               <h3 className="font-bold">점수를 올릴 수 있는 곳</h3>

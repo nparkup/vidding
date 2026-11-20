@@ -286,7 +286,7 @@ const BAND_KEYS: { key: string; label: string; max: number }[] = [
 ];
 /** rivalRate.ts 의 금액대와 같다 */
 export const bandOfAmount = (amount: number) => (BAND_KEYS.find((b) => amount < b.max) ?? BAND_KEYS[BAND_KEYS.length - 1]).key;
-const bandLabel = (k: string) => BAND_KEYS.find((b) => b.key === k)?.label ?? "";
+export const bandLabel = (k: string) => BAND_KEYS.find((b) => b.key === k)?.label ?? "";
 export const firstLic = (raw?: string) => (raw ?? "").split(/\s*,\s*/)[0]?.replace(/\/\d+$/, "").trim() ?? "";
 
 /** 낙찰률이 비어 있으면(협상계약 용역 등) 낙찰금액 ÷ 예정가격(없으면 기초금액)으로 채운다. 50~110%를 벗어나면 0 */

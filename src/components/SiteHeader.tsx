@@ -8,6 +8,8 @@ const NAV = [
   { href: "/analysis/agency", label: "입찰 분석" },
   { href: "/premium", label: "평가점수 예측" },
   { href: "/mybox", label: "내 서류함" },
+  { href: "/rates", label: "기준표" },
+  { href: "/changes", label: "정정·취소" },
   { href: "/report/sample", label: "보고서 샘플" },
   { href: "/pricing", label: "요금제" },
 ];

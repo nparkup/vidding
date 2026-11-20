@@ -16,6 +16,8 @@ export function SiteFooter() {
           <ul className="mt-4 space-y-2.5 text-sm">
             <li><Link href="/service" className="hover:text-ink">서비스 소개</Link></li>
             <li><Link href="/bids" className="hover:text-ink">공고 검색</Link></li>
+            <li><Link href="/changes" className="hover:text-ink">정정·취소 공고</Link></li>
+            <li><Link href="/rates" className="hover:text-ink">낙찰하한율·실적 기준표</Link></li>
             <li><Link href="/report/sample" className="hover:text-ink">주간 보고서 샘플</Link></li>
           </ul>
         </div>

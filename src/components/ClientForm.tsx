@@ -43,6 +43,10 @@ export function ClientForm({ init = {} }: { init?: Init }) {
           ))}
         </div>
       </div>
+      <div>
+        <label className="label" htmlFor="keywords">관심 키워드 <span className="font-normal text-ink-300">(쉼표로 구분, 공고명에 이 단어가 든 공고를 메일에 따로 모음. "-설계"처럼 앞에 -를 붙이면 제외어)</span></label>
+        <input id="keywords" name="keywords" defaultValue={(init.keywords ?? []).join(", ")} className="input" placeholder="CCTV, 급식, 학교 청소, -설계" />
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div><label className="label">최소 규모 (만원)</label><input name="minAmount" type="number" defaultValue={init.minAmount ? init.minAmount / 10000 : 0} className="input" /></div>
         <div><label className="label">최대 규모 (만원)</label><input name="maxAmount" type="number" defaultValue={init.maxAmount ? init.maxAmount / 10000 : 50000} className="input" /></div>

@@ -78,6 +78,8 @@ export interface Bid {
   source: "mock" | "g2b";
   /** 세부품명·중분류·주공종 (빌드 때 낙찰 저장소의 공고 원자료에서 붙인다. 유사 실적 비교 기준) */
   cls?: { no?: string; nm?: string; mid?: string; lrg?: string; work?: string };
+  /** 정정공고 차수면 정정 게시 시각과 바뀐 항목 (lib/noticeChanges) */
+  amend?: { at: string; fields: string[] };
   /** 과거 유사 공고 기반 통계 (낙찰정보서비스 연동 시 계산) */
   stats?: { avgBidders: number; avgWinRate: number };
 }
@@ -104,6 +106,8 @@ export interface ClientProfile {
   status: "활성" | "체험" | "일시중지";
   joinedAt: string;
   watchlist: string[]; // 관심 공고 id
+  /** 관심 키워드 (예: CCTV, 급식, "-설계"는 제외어). 맞춤공고 메일에 키워드 공고를 따로 모은다 (lib/keywords) */
+  keywords?: string[];
   /** 직전 3년 유사용역 실적 (원) — 적격심사 실적점수 추정용 */
   pastPerformance: number;
   creditGrade: "A" | "BBB" | "BB" | "B" | "CCC";
@@ -122,6 +126,8 @@ export interface Inquiry {
   minAmount: number;
   maxAmount: number;
   message: string;
+  /** 관심 키워드 */
+  keywords?: string[];
   createdAt: string;
   status: "신규" | "연락완료" | "체험전환" | "보류";
 }
@@ -138,13 +144,15 @@ export interface WeeklyReport {
 
 export interface MailLog {
   id: string;
-  kind: "daily" | "weekly" | "test";
+  kind: "daily" | "weekly" | "test" | "change";
   clientId: string;
   to: string;
   subject: string;
   status: "발송" | "실패" | "미발송(SMTP 미설정)";
   error?: string;
   itemCount: number;
+  /** 정정·취소 알림이 다룬 공고 차수 ("공고번호-차수"), 같은 알림을 두 번 보내지 않는 데 쓴다 */
+  refs?: string[];
   createdAt: string;
 }
 

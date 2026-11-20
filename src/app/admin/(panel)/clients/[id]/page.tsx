@@ -8,7 +8,7 @@ import { documentChecklist, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { planName } from "@/lib/plans";
-import { getBids, getClient } from "@/lib/store";
+import { getBids, getClient, getNoticeChanges } from "@/lib/store";
 import { sendTestDigest, toggleWatchAction } from "../../../actions";
 
 export default async function ClientDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +18,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
   const bids = await getBids();
   const ranked = rank(bids, c);
   const ok = ranked.filter((r) => r.eligible);
-  const digest = buildDigest(c, bids);
+  const digest = buildDigest(c, bids, new Date(), [], await getNoticeChanges());
   const watched = ranked.filter((r) => c.watchlist.includes(r.bid.id));
   const qs = new URLSearchParams({ lic: c.licenses.join(","), rg: c.regions.join(","), min: String(c.minAmount), max: String(c.maxAmount) });
 
@@ -45,6 +45,15 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
               {c.licenses.map((l) => <span key={l} className="chip border-ink bg-ink text-white">{l}</span>)}
               {c.regions.map((r) => <span key={r} className="chip border-mint-100 bg-mint-50 text-mint-600">{r}</span>)}
             </div>
+            {(c.keywords ?? []).length > 0 && (
+              <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-4">
+                <span className="text-xs text-ink-500">관심 키워드</span>
+                {digest.keywords.map((k) => (
+                  <Link key={k.keyword} href={`/bids?q=${encodeURIComponent(k.keyword)}`} className="chip hover:border-mint">{k.keyword} · 진행 {k.total}건{k.fresh ? `, 새 ${k.fresh}` : ""}</Link>
+                ))}
+                {(c.keywords ?? []).filter((k) => k.startsWith("-")).map((k) => <span key={k} className="chip text-ink-300">제외 {k.slice(1)}</span>)}
+              </div>
+            )}
           </section>
 
           <section className="card overflow-hidden">

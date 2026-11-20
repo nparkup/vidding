@@ -43,12 +43,21 @@ jobs:
           path: .cache/attach-text
           key: attach-text-${{ github.run_id }}
           restore-keys: attach-text-
+      # 계약현황은 지난 날짜 계약이 바뀌지 않으므로 날짜별로 캐시에 두고 다음 빌드는 최근 이틀만 다시 받는다 (src/lib/nara/contract.ts)
+      - name: 계약현황 캐시 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/contracts
+          key: contracts-${{ github.run_id }}
+          restore-keys: contracts-
       - name: 나라장터 공고 수집
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
           # 낙찰 저장소(R2)에서 낙찰률 통계와 공고 분류를 읽는다. 없으면 예전 방식으로 간다
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 첨부 PDF·HWP 본문과 낙찰 색인을 한 프로세스에서 읽어 기본 힙(약 2GB)을 넘길 때가 있다
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npx tsx --conditions=react-server scripts/fetch-bids.ts data/bids.json
       - name: 전년도 낙찰률 캐시 저장
         if: always()
@@ -62,6 +71,12 @@ jobs:
         with:
           path: .cache/attach-text
           key: attach-text-${{ github.run_id }}
+      - name: 계약현황 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/contracts
+          key: contracts-${{ github.run_id }}
       - name: 기업 정보 중계 서버 주소 확인
         id: corp
         env:

@@ -5,7 +5,9 @@ const TABS = [
   { href: "/analysis/agency", key: "agency", label: "발주처 분석" },
   { href: "/analysis/rival", key: "rival", label: "경쟁사 투찰 성향" },
   { href: "/analysis/mine", key: "mine", label: "우리 회사 진단" },
+  { href: "/plans", key: "plan", label: "발주계획" },
   { href: "/prespecs", key: "prespec", label: "사전규격 미리보기" },
+  { href: "/contracts", key: "contract", label: "계약현황" },
 ];
 
 /** 입찰 분석 메뉴의 하위 탭 */

@@ -95,6 +95,10 @@ ${d.preSpecs.length ? `<h2 style="font-size:16px;margin:24px 0 4px">새로 공�
 <p style="margin:0 0 8px;font-size:12px;color:${C.sub}">본공고 전 단계입니다. 규격서를 미리 보고 준비를 시작하세요.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${d.preSpecs.map((p) => `<tr><td style="padding:8px 0;border-top:1px solid #E5E9F0"><div style="font-weight:700;font-size:14px">${esc(p.title)}</div><div style="font-size:12px;color:${C.sub}">${esc(p.demand)}${p.budget ? ` · 배정예산 ${won(p.budget)}` : ""}${p.opinionBy ? ` · 의견 마감 ${esc(p.opinionBy.slice(0, 10))}` : ""}</div></td></tr>`).join("")}</table>
 <p style="margin:8px 0 0;font-size:13px"><a href="${siteUrl()}/prespecs" style="color:${C.mint}">사전규격 전체 보기</a></p>` : ""}
+${d.orderPlans.length ? `<h2 style="font-size:16px;margin:24px 0 4px">새로 올라온 발주계획 ${d.orderPlans.length}건</h2>
+<p style="margin:0 0 8px;font-size:12px;color:${C.sub}">공고 전 예정 단계입니다. 발주 시기와 금액은 바뀔 수 있습니다.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${d.orderPlans.map((p) => `<tr><td style="padding:8px 0;border-top:1px solid #E5E9F0"><div style="font-weight:700;font-size:14px">${esc(p.title)}</div><div style="font-size:12px;color:${C.sub}">${esc(p.agency)} · ${p.month.slice(0, 4)}년 ${Number(p.month.slice(5))}월 발주 예정${p.amount ? ` · ${won(p.amount)}` : ""} · ${esc(p.method)}</div></td></tr>`).join("")}</table>
+<p style="margin:8px 0 0;font-size:13px"><a href="${siteUrl()}/plans" style="color:${C.mint}">발주계획 전체 보기</a></p>` : ""}
 ${changeSection(d.changes, qs)}
 ${keywordSection(d.keywords, qs)}
 <p style="margin:20px 0 0"><a href="${siteUrl()}/bids?${qs}&ok=1" style="display:inline-block;background:${C.ink};color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:10px">전체 추천 공고 보기</a></p>`;
@@ -104,6 +108,7 @@ ${keywordSection(d.keywords, qs)}
     ...(d.changes.length ? ["", `[관심·추천 공고 정정·취소 ${d.changes.length}건]`, ...d.changes.map((w) => `- ${w.change.kind === "취소" ? "취소" : `정정 ${Number(w.change.ord)}차`} ${w.change.title}: ${changeSummary(w.change)}`)] : []),
     ...d.keywords.flatMap((k) => ["", `[키워드 "${k.keyword}" 새 공고 ${k.fresh}건]`, ...k.items.map((r) => `- ${r.bid.title} / ${won(r.bid.baseAmount)} / 마감 ${dday(r.daysLeft)}${r.eligible ? "" : " / 조건 확인 필요"}`)]),
     ...(d.preSpecs.length ? ["", `새로 공개된 사전규격 ${d.preSpecs.length}건`, ...d.preSpecs.map((p) => `- ${p.title} / ${p.demand}${p.budget ? ` / ${won(p.budget)}` : ""}`), `${siteUrl()}/prespecs`] : []),
+    ...(d.orderPlans.length ? ["", `새로 올라온 발주계획 ${d.orderPlans.length}건`, ...d.orderPlans.map((p) => `- ${p.title} / ${p.agency} / ${p.month} 발주 예정${p.amount ? ` / ${won(p.amount)}` : ""}`), `${siteUrl()}/plans`] : []),
   ].join("\n");
   return { subject, html: shell(subject, body), text };
 }

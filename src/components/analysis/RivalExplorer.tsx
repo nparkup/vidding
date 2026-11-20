@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DistChart } from "@/components/BidPriceAnalysis";
 import { METHOD_NAME, bandLabel, bandOfAmount, methodCode, provinceKey, quantile } from "@/lib/awards/analysis";
@@ -186,6 +187,7 @@ function RivalDetail({ wins, bizno, from, mine }: { wins: AwardWin[]; bizno: str
             </li>
           ))}
         </ul>
+        <Link href={`/contracts?corp=${bizno}`} className="btn-ghost btn-sm mt-4 inline-flex">이 업체의 최근 2주 계약 보기</Link>
       </section>
       <section className="card p-6">
         <h3 className="font-bold">계약방법별 투찰</h3>

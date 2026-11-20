@@ -9,6 +9,7 @@ import { rank, type MatchResult } from "@/lib/analysis";
 import { won } from "@/lib/format";
 import { REGIONS, type License, type Region } from "@/lib/types";
 import { loadBids } from "@/lib/useBids";
+import { keywordHits, parseKeywords, type KeywordHit } from "@/lib/keywords";
 import { bidHref } from "@/lib/links";
 
 const SIZES = [
@@ -24,7 +25,7 @@ const SIZES = [
  * - 정적 배포(GitHub Pages): 브라우저에서 바로 추천 공고를 계산하고, 신청 내용은 메일 앱으로 전송
  */
 export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: FormData) => void; error?: boolean; plan?: string; email?: string }) {
-  const [result, setResult] = useState<{ company: string; ok: MatchResult[]; excluded: number; qs: string } | null>(null);
+  const [result, setResult] = useState<{ company: string; ok: MatchResult[]; excluded: number; qs: string; kw: KeywordHit[] } | null>(null);
   const [busy, setBusy] = useState(false);
   // 정적 배포: 참가 가능 공고 계산에 쓸 공고를 미리 받아 둔다
   useEffect(() => { if (!action) loadBids().catch(() => {}); }, [action]);
@@ -42,11 +43,12 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
     const ranked = rank(bids, { licenses, regions, minAmount, maxAmount, pastPerformance: maxAmount });
     const ok = ranked.filter((r) => r.eligible);
     const qs = new URLSearchParams({ lic: licenses.join(","), rg: regions.join(","), min: String(minAmount), max: String(maxAmount) }).toString();
-    setResult({ company: s("company"), ok, excluded: ranked.length - ok.length, qs });
+    const keywords = parseKeywords(s("keywords"));
+    setResult({ company: s("company"), ok, excluded: ranked.length - ok.length, qs, kw: keywordHits(bids, keywords) });
     const lines = [
       `회사명: ${s("company")}`, `담당자: ${s("contactName")}`, `이메일: ${s("email")}`, `연락처: ${s("phone")}`,
       `보유 면허: ${licenses.join(", ") || "-"}`, `영업 지역: ${regions.join(", ") || "-"}`, `수행 규모: ${won(minAmount)} ~ ${won(maxAmount)}`,
-      `문의: ${s("message")}`, "", `(사이트 분석 결과: 참가 가능 공고 ${ok.length}건)`,
+      `관심 키워드: ${keywords.join(", ") || "-"}`, `문의: ${s("message")}`, "", `(사이트 분석 결과: 참가 가능 공고 ${ok.length}건)`,
     ];
     if (email) window.location.href = `mailto:${email}?subject=${encodeURIComponent(`[입찰메이트LAB 무료 체험 신청] ${s("company")}`)}&body=${encodeURIComponent(lines.join("\n"))}`;
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -64,6 +66,20 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
             <div className="rounded-2xl bg-paper p-4"><p className="text-3xl font-extrabold text-ink-500">{result.excluded}</p><p className="text-sm text-ink-500">조건 불일치 제외</p></div>
           </div>
         </div>
+        {result.kw.length > 0 && (
+          <div className="card p-5">
+            <p className="text-sm font-bold">관심 키워드로 찾은 진행 중 공고</p>
+            <ul className="mt-2 divide-y divide-ink-100 text-sm">
+              {result.kw.map((k) => (
+                <li key={k.keyword} className="flex items-center justify-between gap-3 py-2">
+                  <span className="min-w-0 truncate font-semibold">{k.keyword}</span>
+                  <Link href={`/bids?q=${encodeURIComponent(k.keyword)}`} className="shrink-0 text-mint-600 hover:underline">{k.bids.length.toLocaleString()}건 보기</Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-ink-300">체험 기간에는 이 단어가 든 새 공고를 맞춤공고 메일에 따로 모아 보내 드립니다.</p>
+          </div>
+        )}
         {result.ok.slice(0, 5).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={bidHref(m.bid.id, result.qs)} />)}
         <Link href={`/bids?${result.qs}&ok=1`} className="btn-primary w-full">전체 추천 공고 보기</Link>
       </div>
@@ -106,6 +122,11 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
               ))}
             </div>
           </fieldset>
+          <div>
+            <label className="label" htmlFor="keywords">관심 키워드 <span className="font-normal text-ink-300">(선택, 쉼표로 구분)</span></label>
+            <input id="keywords" name="keywords" className="input" placeholder="CCTV, 급식, 학교 청소" />
+            <p className="mt-1 text-xs text-ink-300">공고명에 이 단어가 든 새 공고를 맞춤공고 메일에 따로 모아 드립니다. 빼고 싶은 단어는 앞에 -를 붙이세요 (예: -설계).</p>
+          </div>
           {!plan && (
             <div><label className="label" htmlFor="message">문의 내용</label><textarea id="message" name="message" rows={3} className="input" placeholder="주로 참여하고 싶은 공고, 어려운 점 등을 적어 주세요." /></div>
           )}

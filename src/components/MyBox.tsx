@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { bidHref } from "@/lib/links";
 import { checklistDone, loadMyBox, MYBOX_EVENT, removeFromMyBox, updateMyBox, type MyBoxItem } from "@/lib/mybox";
 import { useBids } from "@/lib/useBids";
+import { changesByNo, changeSummary } from "@/lib/noticeChanges";
+import { useNoticeChanges } from "@/lib/useSiteJson";
 
 const DAY = 86400e3;
 /** KST 날짜 YYYY-MM-DD */
@@ -91,8 +93,7 @@ function Row({ x, labels }: { x: RowT; labels: string[] }) {
         <span className={`chip ${d === "D-day" || /^D-[0-3]$/.test(d) ? "border-coral/30 bg-coral-100/60 text-coral" : ""}`}>{d}</span>
         {x.label && <span className="chip border-ink-300 text-ink">{x.label}</span>}
         {x.changed && <span className="chip border-amber bg-amber-100 text-ink">차수 바뀜</span>}
-        {/* 정정·취소 알림 배지 자리 (src/lib/noticeChanges.ts 가 붙인다) */}
-        <span data-notice-change={x.no} />
+        <NoticeChangeBadge no={x.no} />
       </div>
       <Link href={bidHref(x.id)} className="mt-2 block font-bold leading-snug hover:underline">{x.title}</Link>
       <p className="mt-1 text-sm text-ink-500">{x.agency} · 마감 {kday(x.closeAt)} {hm(x.closeAt)}{x.openAt ? ` · 개찰 ${kday(x.openAt)} ${hm(x.openAt)}` : ""} · 제출서류 체크 {done}개</p>
@@ -158,4 +159,17 @@ function downloadIcs(rows: RowT[]) {
   a.download = "관심공고-일정.ics";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/** 최근 14일 정정·취소가 있으면 배지 (최신 차수 기준, 바뀐 항목은 툴팁) */
+function NoticeChangeBadge({ no }: { no: string }) {
+  const { data } = useNoticeChanges();
+  const byNo = useMemo(() => changesByNo(data?.items ?? []), [data]);
+  const c = byNo.get(no)?.[0];
+  if (!c) return null;
+  return (
+    <Link href="/changes" title={changeSummary(c)} className={`chip font-bold ${c.kind === "취소" ? "border-coral/30 bg-coral-100/60 text-coral" : "border-amber/40 bg-amber-100/60 text-ink"}`}>
+      {c.kind === "취소" ? "취소됨" : `정정 ${Number(c.ord)}차${c.fields.length ? ` · ${c.fields.slice(0, 2).map((f) => f.field).join("·")}` : ""}`}
+    </Link>
+  );
 }

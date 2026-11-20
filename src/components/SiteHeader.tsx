@@ -9,6 +9,7 @@ const NAV = [
   { href: "/premium", label: "평가점수 예측" },
   { href: "/tools/joint", label: "실무 도구" },
   { href: "/mybox", label: "내 서류함" },
+  { href: "/changes", label: "정정·취소" },
   { href: "/report/sample", label: "보고서 샘플" },
   { href: "/pricing", label: "요금제" },
 ];

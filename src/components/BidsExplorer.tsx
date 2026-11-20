@@ -39,13 +39,16 @@ const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 /**
  * 검색어 매칭: 띄어쓰기로 나눈 단어가 모두 들어 있으면 일치 (순서·띄어쓰기 무관).
- * 공고명·발주기관·수요기관·공고번호(R26BK01234567, 차수 포함 R26BK01234567-000)를 함께 본다.
+ * 공고명·발주기관·수요기관·공고번호(R26BK01234567, 차수 포함 R26BK01234567-000)를 함께 본다. "-단어"는 그 단어가 든 공고를 뺀다.
  */
 export function matchesQuery(q: string): (b: Bid) => boolean {
-  const words = q.split(/\s+/).map(norm).filter(Boolean);
+  const all = q.split(/\s+/).filter(Boolean);
+  // "-단어"는 제외어 (관심 키워드와 같은 규칙)
+  const words = all.filter((w) => !w.startsWith("-")).map(norm).filter(Boolean);
+  const not = all.filter((w) => w.startsWith("-")).map((w) => norm(w.slice(1))).filter(Boolean);
   return (b) => {
     const hay = norm(`${b.title} ${b.demandAgency} ${b.agency} ${b.bidNtceNo ?? ""} ${b.id}`);
-    return words.every((w) => hay.includes(w));
+    return words.every((w) => hay.includes(w)) && !not.some((w) => hay.includes(w));
   };
 }
 

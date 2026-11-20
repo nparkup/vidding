@@ -1,6 +1,7 @@
 import "server-only";
 import type { Bid, BizType, ContractMethod, Region, ServiceCategory } from "../types";
 import { splitLicenses } from "../licenses";
+import { CHANGE_DAYS, diffBids, type NoticeChange } from "../noticeChanges";
 import { CATEGORY_KEYWORDS, NARA_BASE, STD_BID_API } from "./endpoints";
 
 /**
@@ -299,27 +300,79 @@ export function recentDays(days: number, now = new Date()): string[] {
  */
 export const COLLECT_DAYS = 60;
 
+
 /**
  * 최근 N일 동안 게시된 모든 업종(용역·공사·물품·외자) 공고 중 아직 마감 전인 공고를 업종별로 분류해 가져온다.
  * 정정·재입찰 공고는 최신 차수만 남기고, 최신 차수가 취소공고면 목록에서 뺀다.
  */
 export async function fetchAllBids(days = COLLECT_DAYS): Promise<Bid[]> {
+  return (await fetchAllBidsWithChanges(days)).bids;
+}
+
+/** 공고 목록과 함께 최근 정정·취소 내역(차수 사이 바뀐 항목)을 돌려준다 (lib/noticeChanges) */
+export async function fetchAllBidsWithChanges(days = COLLECT_DAYS): Promise<{ bids: Bid[]; changes: NoticeChange[] }> {
   const now = new Date();
   const perDay = await mapLimit(recentDays(days, now), 4, fetchStdDay);
-  const latest = new Map<string, Item>(); // bidNtceNo → 최신 차수 원본
-  for (const it of perDay.flat()) {
+  return splitOrders(perDay.flat(), now);
+}
+
+/** 공고번호별 차수를 모아 최신 차수 공고와 정정·취소 내역으로 나눈다 */
+export function splitOrders(rows: Item[], now = new Date()): { bids: Bid[]; changes: NoticeChange[] } {
+  const byNo = new Map<string, Map<string, Item>>(); // bidNtceNo → 차수 → 원본
+  for (const it of rows) {
     const no = it.bidNtceNo;
     if (!no) continue;
-    const prev = latest.get(no);
-    if (prev && (prev.bidNtceOrd ?? "000") >= (it.bidNtceOrd ?? "000")) continue;
-    latest.set(no, it);
+    const m = byNo.get(no) ?? byNo.set(no, new Map()).get(no)!;
+    m.set(it.bidNtceOrd ?? "000", it);
   }
   const out: Bid[] = [];
-  for (const it of latest.values()) {
-    if (it.bidNtceSttusNm?.includes("취소")) continue;
-    const b = mapStdItem(it);
-    if (!b || new Date(b.closeAt).getTime() <= now.getTime()) continue;
-    out.push(b);
+  const changes: NoticeChange[] = [];
+  const since = now.getTime() - CHANGE_DAYS * 86400000;
+  for (const orders of byNo.values()) {
+    const ords = [...orders.keys()].sort();
+    const latest = orders.get(ords[ords.length - 1])!;
+    const cancelled = !!latest.bidNtceSttusNm?.includes("취소");
+    let live: Bid | null = null;
+    if (!cancelled) {
+      const b = mapStdItem(latest);
+      if (b && new Date(b.closeAt).getTime() > now.getTime()) { out.push(b); live = b; }
+    }
+    // 차수마다 바로 앞 차수와 비교 (게시일이 CHANGE_DAYS 안인 것만)
+    for (let i = 0; i < ords.length; i++) {
+      const cur = orders.get(ords[i])!;
+      const ord = cur.bidNtceOrd ?? "000";
+      if (ord === "000") continue;
+      const kind = cur.bidNtceSttusNm?.includes("취소") ? "취소" : cur.bidNtceSttusNm?.includes("정정") ? "정정" : null;
+      if (!kind) continue;
+      const at = toIso(cur.bidNtceDate, cur.bidNtceBgn);
+      if (!at || new Date(at).getTime() < since) continue;
+      const prevItem = i > 0 ? orders.get(ords[i - 1]) : undefined;
+      const prev = prevItem ? mapStdItem(prevItem) : null;
+      const next = mapStdItem(cur) ?? prev;
+      if (!next) continue;
+      changes.push({
+        no: next.bidNtceNo,
+        ord,
+        prevOrd: prev?.bidNtceOrd,
+        kind,
+        at,
+        title: next.title,
+        agency: next.agency,
+        demandAgency: next.demandAgency,
+        bizType: next.bizType,
+        category: next.category,
+        bidId: live && live.bidNtceOrd === ord ? live.id : undefined,
+        closeAt: next.closeAt,
+        baseAmount: next.baseAmount || prev?.baseAmount || undefined,
+        fields: kind === "정정" && prev ? diffBids(prev, next) : [],
+        detailUrl: next.detailUrl,
+      });
+      // 진행 중인 공고가 이번 정정 차수면 목록 카드에 '정정' 표시를 붙인다
+      if (kind === "정정" && live && live.bidNtceOrd === ord) live.amend = { at, fields: changes[changes.length - 1].fields.map((f) => f.field) };
+    }
   }
-  return out.sort((a, b) => +new Date(a.closeAt) - +new Date(b.closeAt));
+  return {
+    bids: out.sort((a, b) => +new Date(a.closeAt) - +new Date(b.closeAt)),
+    changes: changes.sort((a, b) => b.at.localeCompare(a.at)),
+  };
 }

@@ -6,14 +6,15 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import { buildMockBids } from "../src/lib/mock/bids";
-import { fetchAllBids, hasServiceKey } from "../src/lib/nara/client";
+import { fetchAllBidsWithChanges, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, agencySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, rateTableFromR2, agencySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
+import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
 import { makeTextCache } from "./attachCache";
@@ -41,8 +42,9 @@ async function main() {
     console.log("서비스키 없음: 목업 공고 저장");
     return;
   }
-  const items = await fetchAllBids();
+  const { bids: items, changes } = await fetchAllBidsWithChanges();
   if (items.length === 0) throw new Error("수집된 공고가 0건입니다");
+  console.log(`정정·취소: 최근 정정 ${changes.filter((c) => c.kind === "정정").length}건(바뀐 항목 비교 ${changes.filter((c) => c.fields.length).length}건), 취소 ${changes.filter((c) => c.kind === "취소").length}건`);
   // 첨부파일(평가점수 예측용)은 입찰공고정보서비스 승인이 필요하다. 실패해도 공고 배포는 계속한다
   let attachments = {};
   // 첨부 목록을 받을 때 같은 목록 원본(업종제한 여부·지역제한 기준·자격 등록 마감)을 참가자격 수집에 넘긴다
@@ -163,6 +165,18 @@ async function main() {
   } catch (e) {
     console.warn("낙찰 저장소 건수 읽기 실패:", e instanceof Error ? e.message : e);
   }
+  // 기준표 화면: 발주 기준·금액 구간별 낙찰하한율. 낙찰 저장소 최근 26주 공고, 없으면 지금 공고(참가자격 자료의 낙찰방법·하한율)
+  let rateTable: RateTable | undefined;
+  try {
+    rateTable = (await rateTableFromR2()) ?? undefined;
+  } catch (e) {
+    console.warn("낙찰 저장소 하한율 집계 실패:", e instanceof Error ? e.message : e);
+  }
+  if (!rateTable) {
+    const inputs = items.map((b) => ({ biz: (b.bizType === "외자" ? "물품" : b.bizType ?? "용역") as "공사" | "용역" | "물품", method: quals[b.id]?.basis?.method ?? "", presmpt: quals[b.id]?.basis?.presmpt, lwlt: quals[b.id]?.basis?.lwlt }));
+    rateTable = { builtAt: new Date().toISOString(), source: "진행 중 공고", notices: inputs.filter((x) => x.method && x.lwlt).length, rows: buildRateRows(inputs) };
+  }
+  console.log(`하한율 기준표: ${rateTable.source} 공고 ${rateTable.notices.toLocaleString()}건, 기준 ${rateTable.rows.length}개`);
   // 최근 낙찰 결과 목록 (/awards): 최근 한 달 최종낙찰분. 실패해도 배포는 계속
   let recentAwards;
   try {
@@ -171,7 +185,7 @@ async function main() {
   } catch (e) {
     console.warn("최근 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, awardCount, recentAwards, syncedAt, source: "g2b" }));
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

@@ -4,11 +4,11 @@ import { dateTime } from "@/lib/format";
 import { isBusinessDay, kstDay } from "@/lib/holidays";
 import { smtpConfigured } from "@/lib/mail/send";
 import { getSettings, listClients, listMailLog } from "@/lib/store";
-import { runDailyNow } from "../../actions";
+import { runChangesNow, runDailyNow } from "../../actions";
 
 export const metadata = { title: "메일 발송" };
 
-const KIND = { daily: "일일 요약", weekly: "주간 보고서", test: "수동 발송" } as const;
+const KIND = { daily: "일일 요약", weekly: "주간 보고서", test: "수동 발송", change: "정정·취소 알림" } as const;
 const TONE: Record<string, string> = { 발송: "bg-mint-100 text-mint-600", 실패: "bg-coral-100 text-coral", "미발송(SMTP 미설정)": "bg-amber-100 text-[#9A6412]" };
 
 export default async function MailPage() {
@@ -19,7 +19,10 @@ export default async function MailPage() {
   return (
     <>
       <PageHead title="메일 발송" desc={`영업일 ${String(settings.sendHour).padStart(2, "0")}:00 자동 발송 · 오늘은 ${isBusinessDay() ? "영업일" : "휴일(자동 발송 없음)"}`}>
-        <form action={runDailyNow}><button className="btn-primary btn-sm">오늘 메일 지금 발송</button></form>
+        <div className="flex flex-wrap gap-2">
+          <form action={runChangesNow}><button className="btn-ghost btn-sm">정정·취소 알림 지금 확인</button></form>
+          <form action={runDailyNow}><button className="btn-primary btn-sm">오늘 메일 지금 발송</button></form>
+        </div>
       </PageHead>
       {!smtpConfigured() && (
         <p className="mb-4 rounded-xl bg-amber-100 p-3 text-sm text-[#9A6412]">

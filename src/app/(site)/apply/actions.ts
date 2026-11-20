@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { addInquiry } from "@/lib/store";
 import { REGIONS, type License, type Region } from "@/lib/types";
 import { normalizeLicense } from "@/lib/licenses";
+import { parseKeywords } from "@/lib/keywords";
 
 export async function submitInquiry(form: FormData) {
   const s = (k: string) => String(form.get(k) ?? "").trim().slice(0, 500);
@@ -21,6 +22,7 @@ export async function submitInquiry(form: FormData) {
     minAmount: minAmount || 0,
     maxAmount: maxAmount || 10_000_000_000,
     message: s("message"),
+    keywords: parseKeywords(s("keywords")),
   });
   redirect(`/apply/done?id=${q.id}`);
 }

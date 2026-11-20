@@ -3,6 +3,8 @@
  * 화면: /apt-bids. 브라우저에서도 쓰므로 서버 전용 모듈을 쓰지 않는다.
  * 응찰업체 담당자 이름·전화는 받지도 저장하지도 않는다.
  */
+import type { AptPriceModel } from "./aptPrice";
+
 /** 화면에서 고르는 분야 (K-apt 입찰분류 기준) */
 export const APT_CATEGORIES = ["청소", "경비", "소독", "승강기유지", "전기안전관리", "정화조·저수조", "기타 용역", "주택관리(위탁)", "공사", "물품·기타"] as const;
 export type AptCategory = (typeof APT_CATEGORIES)[number];
@@ -72,6 +74,8 @@ export interface AptBidsFile {
   awards?: number;
   /** 함께 찾아본 수의계약 건수 (수의계약 공지) */
   privates?: number;
+  /** 입찰가격 예측 비율·검증 (src/lib/aptPrice.ts) */
+  pricing?: AptPriceModel;
 }
 
 /** K-apt 지역 순서 (화면 선택지) */

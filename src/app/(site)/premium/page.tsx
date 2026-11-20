@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { PageHero } from "@/components/PageHero";
 import { ScorePredictor } from "@/components/premium/ScorePredictor";
+import { AptPricePredictor } from "@/components/premium/AptPricePredictor";
 
 export const metadata: Metadata = {
   title: "평가점수 예측",
@@ -30,6 +31,17 @@ export default function PremiumPage() {
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
             <ScorePredictor />
+          </Suspense>
+        </div>
+      </section>
+
+      <section id="apt-price" className="container-x scroll-mt-20 pt-12">
+        <p className="eyebrow">아파트 입찰가격 예측</p>
+        <h2 className="h-section mt-3">K-APT 아파트 공고의 예상 낙찰금액</h2>
+        <p className="lead mt-3 max-w-3xl">공동주택관리정보시스템(K-apt)의 입찰결과·수의계약 공지에서 같은 단지·같은 분야의 직전 계약금액을 찾고, 과거에 직전 계약 다음 낙찰이 얼마나 달라졌는지로 이번 공고의 예상 낙찰금액과 구간을 계산합니다.</p>
+        <div className="mt-8">
+          <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
+            <AptPricePredictor />
           </Suspense>
         </div>
       </section>

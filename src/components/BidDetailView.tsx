@@ -17,6 +17,7 @@ import { loadAwardAnalysis } from "@/components/premium/AwardAnalysis";
 import type { AwardAnalysis } from "@/lib/awards/analysis";
 import { usesAssess } from "@/lib/awards/assess";
 import { agencyId } from "@/lib/awards/agency";
+import { MyBoxButton } from "@/components/MyBoxButton";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
 export function BidDetailView({ bid }: { bid: Bid }) {
@@ -78,7 +79,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <MyBoxButton bid={bid} />
           <a href={bid.detailUrl} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">나라장터 원문</a>
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>
         </div>

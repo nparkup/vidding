@@ -47,7 +47,8 @@ export function sheetPerfCap(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lo
     ? maxAmount((amt) => at(amt).items.filter((i) => i.kind === "performance" && i.max > 0).every((i) => !i.unknown && i.score >= i.max - 1e-6))
     : undefined;
   const priceItem = sheet.items.find((i) => i.kind === "price");
-  const pass = sheet.pass?.kind === "total" && priceItem && co.pastPerformance > 0
+  // 실적 항목이 없는 평가표(경영상태·신인도·가격만)는 금액과 상관없이 통과 여부가 같아 계산하지 않는다
+  const pass = perfItems.length && sheet.pass?.kind === "total" && priceItem && co.pastPerformance > 0
     ? maxAmount((amt) => {
         const r = at(amt);
         if (r.pending) return false;
@@ -55,5 +56,6 @@ export function sheetPerfCap(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lo
         return r.total - priceScore + priceItem.max >= (sheet.pass as { score: number }).score - 0.01;
       })
     : undefined;
-  return { full: full || undefined, pass: pass || undefined, current };
+  // 찾는 범위(1조 원) 끝까지 되면 상한이 없는 것: 보여 주지 않는다
+  return { full: full && full < 1e12 ? full : undefined, pass: pass && pass < 1e12 ? pass : undefined, current };
 }

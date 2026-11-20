@@ -602,7 +602,7 @@ export function ScorePredictor() {
                 ))}
               </div>
             </div>
-            {jointOk && <JointMembers members={members} onChange={setMembers} ourPerf={coEff.pastPerformance} showFinance={needs.finance} />}
+            {jointOk && <div className="min-w-0 sm:col-span-3"><JointMembers members={members} onChange={setMembers} ourPerf={coEff.pastPerformance} showFinance={needs.finance} /></div>}
             <TrustPicker rule={result?.trust?.rule ?? active?.trust} selected={co.trustItems ?? []} onChange={(ids) => set("trustItems", ids)} score={result?.trust} auto={trustAuto} checked={!!corp} />
             <Range
               label="투찰률 (예정가격 대비)"

@@ -39,6 +39,7 @@ import {
   type AwardAnalysis, type AgencyRow, type SimilarIndexFile, type SimilarStat,
 } from "../../src/lib/awards/analysis";
 import { assessHit, assessSamples, assessStats } from "../../src/lib/awards/assess";
+import { agencySummary } from "../../src/lib/awards/agency";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 
 const NARA = "https://apis.data.go.kr/1230000";
@@ -540,6 +541,12 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
     const ix = await buildIndexes([...shards.values()].flat(), async (key, body) => { await r2Put(key, body, "application/gzip"); writeLocal(key, body); return true; });
     printSamples(ix);
     assessBacktest(ix);
+    // 화면 확인용: 이 수요기관들의 발주처 분석을 로그에 찍는다 (AGENCY_SUMMARY {...})
+    for (const name of (process.env.SAMPLE_AGENCIES ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+      const rows = ix.buckets[Number(agencyBucket(name))].agencies[name];
+      const sm = rows?.length ? agencySummary(name, rows, iso(ymd(kstNow()))) : undefined;
+      console.log(`AGENCY_SUMMARY ${JSON.stringify(sm ?? { name, none: true })}`);
+    }
     if (process.env.SKIP_TRIALS) return { rows, shards: keys.length };
     const { trial, relTrial } = backtest(ix);
     await checkNotices(ix);

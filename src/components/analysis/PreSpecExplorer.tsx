@@ -67,8 +67,8 @@ export function PreSpecExplorer() {
 
   return (
     <div className="container-x py-8">
-      <div className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-6 sm:p-5">
-        <label className="min-w-0 sm:col-span-2">
+      <div className="card grid grid-cols-2 gap-3 p-4 lg:grid-cols-6 sm:p-5">
+        <label className="col-span-2 min-w-0">
           <span className="label">검색어</span>
           <input className="input" placeholder="예: CCTV, 급식, 청소" value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
@@ -93,7 +93,7 @@ export function PreSpecExplorer() {
           <span className="label">예산 (만원 이하)</span>
           <input className="input" inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value.replace(/\D/g, ""))} />
         </label>
-        <div className="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-6">
+        <div className="col-span-2 flex flex-wrap items-center gap-3 lg:col-span-6">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} />의견 등록 마감 전만</label>
           <select className="input w-auto py-1.5 text-sm" value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="정렬">
             <option value="new">최근 공개순</option><option value="opinion">의견 마감 임박순</option><option value="budget">예산 큰순</option>

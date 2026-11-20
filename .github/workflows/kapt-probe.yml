@@ -13,3 +13,5 @@ jobs:
         with: { node-version: 20 }
       - env: { DATA_GO_KR_SERVICE_KEY: "${{ secrets.DATA_GO_KR_SERVICE_KEY }}" }
         run: npm ci && npx tsx --conditions=react-server .probe/run.ts
+      - uses: actions/upload-artifact@v4
+        with: { name: apt-data, path: .probe/out, retention-days: 1 }

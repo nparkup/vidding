@@ -1,0 +1,282 @@
+import "server-only";
+import type { AptBid, AptCategory, AptPrior } from "../apt";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { mapLimit } from "../nara/client";
+
+/** 빌드 사이에 남기는 캐시 (.github/workflows/pages.yml 이 복원·저장). 지난 연도 낙찰과 단지별 수의계약을 다시 묻지 않으려고 둔다 */
+const CACHE = ".cache/apt";
+function readCache<T>(name: string, maxAgeMs: number): T | undefined {
+  const file = join(CACHE, name);
+  try {
+    if (!existsSync(file) || Date.now() - statSync(file).mtimeMs > maxAgeMs) return undefined;
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch { return undefined; }
+}
+function writeCache(name: string, v: unknown) {
+  try { mkdirSync(join(CACHE, name, ".."), { recursive: true }); writeFileSync(join(CACHE, name), JSON.stringify(v)); } catch { /* 캐시는 없어도 된다 */ }
+}
+const DAY = 86_400_000;
+
+/**
+ * 공동주택(아파트) 입찰 수집. 공공데이터포털 국토교통부 서비스 2개 (키는 나라장터와 같은 DATA_GO_KR_SERVICE_KEY):
+ * - 공동주택 입찰공고 정보제공 서비스 (ApHusBidPblAncInfoOfferServiceV3): 공고일 범위(startDate·endDate, YYYYMMDD)로 전국 공고
+ * - 공동주택 입찰결과공지 정보제공 서비스 (ApHusBidResultNoticeInfoOfferServiceV3): 입찰 상태(bidState=5 낙찰)·연도(searchYear)로 낙찰 건
+ * - 공동주택 수의계약 공지 정보제공 서비스 (ApHusPrvCntrNoticeInfoOfferServiceV3): 단지코드(kaptCode)로 그 단지의 수의계약 (계약업체명만 쓰고 대표자·주소·전화는 버린다)
+ * 요청 변수와 응답 필드는 2026-11-20 실제 호출로 확인했다 (결과 서비스는 공고일 범위 변수를 무시하고 상태·연도 조회만 거른다).
+ * 결과 서비스의 응찰업체 조회(getBidEntrpsInfoSearchV3)는 담당자 이름·전화가 들어 있어 쓰지 않는다.
+ */
+const BASE = "https://apis.data.go.kr/1613000";
+const NOTICE = "/ApHusBidPblAncInfoOfferServiceV3";
+const RESULT = "/ApHusBidResultNoticeInfoOfferServiceV3";
+const PRIVATE = "/ApHusPrvCntrNoticeInfoOfferServiceV3";
+/** 공고 수집 기간 (공고일 기준). 입찰 기간이 보통 1~3주라 이 안에 진행 중 공고가 모두 들어온다 */
+export const APT_NOTICE_DAYS = 45;
+const ROWS = 999;
+
+type Item = Record<string, unknown>;
+
+async function call(path: string, op: string, params: Record<string, string>): Promise<{ items: Item[]; total: number }> {
+  const key = process.env.DATA_GO_KR_SERVICE_KEY;
+  if (!key) throw new Error("DATA_GO_KR_SERVICE_KEY 가 설정되지 않았습니다.");
+  const qs = new URLSearchParams({ serviceKey: key, _type: "json", pageNo: "1", numOfRows: String(ROWS), ...params });
+  let last: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(`${BASE}${path}/${op}?${qs}`, { cache: "no-store", signal: AbortSignal.timeout(60_000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      let json: { response?: { header?: { resultCode?: string; resultMsg?: string }; body?: { items?: unknown; totalCount?: unknown } }; OpenAPI_ServiceResponse?: { cmmMsgHeader?: { returnAuthMsg?: string; errMsg?: string } } };
+      try { json = JSON.parse(text); } catch { throw new Error(`응답 파싱 실패: ${text.slice(0, 120)}`); }
+      const auth = json.OpenAPI_ServiceResponse?.cmmMsgHeader;
+      // 게이트웨이의 HTTP_ERROR·시간 초과는 잠깐 뒤 다시 하면 된다. 키 오류 등은 바로 멈춘다
+      if (auth) throw Object.assign(new Error(`게이트웨이 오류: ${auth.returnAuthMsg ?? auth.errMsg}`), { fatal: !/HTTP|TIMEOUT|LIMITED/i.test(`${auth.errMsg} ${auth.returnAuthMsg}`) });
+      const code = json.response?.header?.resultCode;
+      if (code && code !== "00") throw Object.assign(new Error(`API 오류(${code}): ${json.response?.header?.resultMsg}`), { fatal: true });
+      const raw = json.response?.body?.items as { item?: Item | Item[] } | Item[] | undefined;
+      const items = Array.isArray(raw) ? raw : raw?.item ? (Array.isArray(raw.item) ? raw.item : [raw.item]) : [];
+      return { items, total: Number(json.response?.body?.totalCount) || items.length };
+    } catch (e) {
+      last = e;
+      if ((e as { fatal?: boolean }).fatal) break;
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+    }
+  }
+  throw new Error(`공동주택 ${op}: ${(last as Error)?.message}`);
+}
+
+/** 한 조회의 모든 페이지 */
+async function all(path: string, op: string, params: Record<string, string>, maxPages = 80): Promise<Item[]> {
+  // 첫 쪽이 게이트웨이 오류로 실패하면 30초 쉬고 한 번 더, 그래도 안 되면 이 조회만 빈 결과로 넘긴다
+  const first = await call(path, op, params)
+    .catch(async () => { await new Promise((r) => setTimeout(r, 30_000)); return call(path, op, params); })
+    .catch((e: Error) => { console.warn(`공동주택 ${op} ${JSON.stringify(params)}: 첫 쪽 실패, 건너뜀 (${e.message})`); return { items: [] as Item[], total: 0 }; });
+  const items = [...first.items];
+  const pages = Math.min(maxPages, Math.ceil(first.total / ROWS));
+  // 999건 한 쪽이 몇 초씩 걸려 네 쪽씩 함께 받는다
+  const rest = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
+  // 한 쪽이 끝내 실패해도 나머지는 쓴다 (낙찰 비교 자료가 조금 빠질 뿐)
+  let failed = 0;
+  const got = await mapLimit(rest, 4, async (p) => (await call(path, op, { ...params, pageNo: String(p) }).catch(() => { failed++; return { items: [] as Item[] }; })).items);
+  if (failed) console.warn(`공동주택 ${op} ${JSON.stringify(params)}: ${pages}쪽 중 ${failed}쪽 받지 못함`);
+  return items.concat(...got);
+}
+
+/* ---------- 변환 ---------- */
+
+const s = (v: unknown) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
+/** "2026-12-01 17:00:00" (KST) → ISO */
+function kstIso(v: unknown): string | undefined {
+  const t = s(v);
+  if (!/^\d{4}-\d{2}-\d{2}/.test(t)) return undefined;
+  const d = new Date(`${t.slice(0, 10)}T${(t.slice(11, 19) || "00:00:00").padEnd(8, ":00")}+09:00`);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+const day = (v: unknown) => (/^\d{4}-\d{2}-\d{2}/.test(s(v)) ? s(v).slice(0, 10) : undefined);
+
+/** 법정동 시·도 코드 → K-apt 지역 표기 (2026 전남·광주 통합은 12) */
+const AREA: Record<string, string> = {
+  "11": "서울", "26": "부산", "27": "대구", "28": "인천", "29": "전남광주", "30": "대전", "31": "울산", "36": "세종", "41": "경기",
+  "42": "강원", "51": "강원", "43": "충북", "44": "충남", "45": "전북", "52": "전북", "46": "전남광주", "12": "전남광주", "47": "경북", "48": "경남", "50": "제주",
+};
+/** 공고명 앞 "[경기]" 같은 지역 표기 */
+const PREFIX = /^\s*\[([^\]]{2,6})\]\s*/;
+
+const STATE: Record<string, string> = { "1": "신규공고", "2": "수정공고", "3": "재공고" };
+const KIND: Record<string, string> = { "01": "일반경쟁", "02": "제한경쟁", "03": "지명경쟁" };
+const SUC: Record<string, string> = { "01": "최저(고)낙찰", "02": "적격심사", "03": "최저낙찰", "04": "최고낙찰", "05": "적격심사(최저)", "06": "적격심사(최고)" };
+const SYSTEM: Record<string, string> = { "01": "K-APT", "02": "조달청", "03": "아파트비드포유", "04": "KG2B전자입찰", "05": "나이스아파트", "06": "이 아파트", "07": "주택관리공단", "08": "오픈매뉴얼", "09": "한국환경공단", "10": "아파트장터A2P" };
+const CLS1: Record<string, string> = { "01": "주택관리업자", "02": "사업자" };
+const CLS2: Record<string, string> = { "01": "위탁관리", "02": "공사", "03": "용역", "04": "물품", "05": "기타" };
+const CLS3_SERVICE: Record<string, string> = { "04": "경비", "05": "청소", "06": "승강기유지", "07": "지능형홈네트워크", "08": "전기안전관리", "09": "정화조 청소·관리", "10": "저수조 청소", "11": "건축물 안전진단", "12": "기타 용역", "13": "소독", "14": "주민운동시설 위탁", "15": "회계감사" };
+
+/** K-apt 입찰분류 → 화면 분야 */
+export function aptCategory(c1: string, c2: string, c3: string): AptCategory {
+  if (c1 === "01") return "주택관리(위탁)";
+  if (c2 === "02") return "공사";
+  if (c2 === "03") {
+    switch (c3) {
+      case "04": return "경비";
+      case "05": return "청소";
+      case "13": return "소독";
+      case "06": return "승강기유지";
+      case "08": return "전기안전관리";
+      case "09": case "10": return "정화조·저수조";
+      default: return "기타 용역";
+    }
+  }
+  return "물품·기타";
+}
+
+function classLabel(c1: string, c2: string, c3: string): string {
+  const parts = [CLS1[c1], c1 === "01" ? undefined : CLS2[c2], c2 === "03" ? CLS3_SERVICE[c3] : undefined].filter(Boolean);
+  return parts.join(" · ");
+}
+
+/** 빈 값·"첨부 참조" 같은 안내 문구는 버린다 */
+const meaningful = (v: unknown) => {
+  const t = s(v).replace(/\s+/g, " ");
+  return t && t.length > 1 && !/^(없음|-|null)$/i.test(t) ? t : undefined;
+};
+
+export function toAptBid(it: Item): AptBid | null {
+  const no = s(it.bidNum);
+  const rawTitle = s(it.bidTitle);
+  const closeAt = kstIso(it.bidDeadline);
+  if (!no || !rawTitle || !closeAt) return null;
+  const c1 = s(it.codeClassifyType1), c2 = s(it.codeClassifyType2), c3 = s(it.codeClassifyType3);
+  const prefix = rawTitle.match(PREFIX)?.[1];
+  const region = AREA[s(it.bidArea)] ?? (prefix && Object.values(AREA).includes(prefix) ? prefix : "");
+  const content = meaningful(it.bidContent);
+  return {
+    no,
+    aptCode: s(it.aptCode),
+    apt: s(it.bidKaptname),
+    region,
+    title: rawTitle.replace(PREFIX, "") || rawTitle,
+    content: content && !/^https?:\/\//.test(content) && !(content.length < 50 && /(참조|참고|바랍니다|확인)/.test(content)) ? content.slice(0, 1000) : undefined,
+    // 민간 전자입찰(KG2B·아파트장터 등) 공고는 내용 칸에 그 시스템의 공고 주소만 들어 있다
+    link: /^https?:\/\/\S+$/.test(content ?? "") ? content : undefined,
+    category: aptCategory(c1, c2, c3),
+    classLabel: classLabel(c1, c2, c3),
+    postedAt: day(it.bidRegDate ?? it.bidRegdate) ?? closeAt.slice(0, 10),
+    closeAt,
+    state: STATE[s(it.bidState)] ?? "공고",
+    kind: KIND[s(it.codeKind)],
+    award: SUC[s(it.codeSucWay)],
+    way: s(it.codeWay) === "01" ? "전자입찰" : s(it.codeWay) === "00" ? "직접입찰" : undefined,
+    system: SYSTEM[s(it.codeAuth)],
+    urgent: s(it.bidEmrgYn) === "Y" || undefined,
+    briefingAt: kstIso(it.bidFieldDesDate),
+    briefingPlace: meaningful(it.bidFieldDesLoc),
+    docs: meaningful(it.bidReqDocs)?.slice(0, 500),
+    docsBy: kstIso(it.bidDocsDeadline),
+    guarantee: s(it.bidGuaranteeYn) === "Y" || undefined,
+    payTerms: meaningful(it.bidTermsOfPayment)?.slice(0, 200),
+    files: s(it.bidFileSeq).split(/[,\s]+/).filter((x) => /^\d+$/.test(x)),
+  };
+}
+
+const kstYmd = (d: Date) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "");
+
+/** 공고일이 최근 days일인 공고 중 아직 마감 전인 것 (마감 임박순) */
+export async function fetchAptNotices(days = APT_NOTICE_DAYS, now = new Date()): Promise<AptBid[]> {
+  const items = await all(NOTICE, "getPblAncDeSearchV3", { startDate: kstYmd(new Date(now.getTime() - days * 86400e3)), endDate: kstYmd(now) });
+  const out = new Map<string, AptBid>();
+  for (const it of items) {
+    const b = toAptBid(it);
+    if (b && new Date(b.closeAt).getTime() > now.getTime()) out.set(b.no, b);
+  }
+  return [...out.values()].sort((a, b) => a.closeAt.localeCompare(b.closeAt));
+}
+
+/** 낙찰·수의계약 한 건 (직전 계약 비교용) */
+export interface AptAward { no: string; key: string; prior: AptPrior }
+
+/** 올해와 작년 낙찰 건 (입찰결과공지, 상태 5 = 낙찰·계약완료) */
+export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
+  const y = Number(kstYmd(now).slice(0, 4));
+  const out: AptAward[] = [];
+  // 아파트 용역은 2년 계약이 많아 3개 연도를 본다
+  for (const year of [y - 2, y - 1, y]) {
+    // 지난 연도는 거의 바뀌지 않아 7일 캐시, 올해는 매번 받되 게이트웨이가 끝내 실패하면 지난 빌드 자료를 쓴다
+    const name = `awards-${year}.json`;
+    let rows = year < y ? readCache<AptAward[]>(name, 7 * DAY) : undefined;
+    if (!rows) {
+      const items = await all(RESULT, "getBidSttusSearchV3", { bidState: "5", searchYear: String(year) });
+      rows = [];
+      for (const it of items) {
+        const amount = Number(s(it.amount).replace(/[^\d]/g, "")) || 0;
+        const apt = s(it.aptCode);
+        if (!amount || !apt) continue;
+        const cat = aptCategory(s(it.codeClassifyType1), s(it.codeClassifyType2), s(it.codeClassifyType3));
+        rows.push({
+          no: s(it.bidNum),
+          key: `${apt}|${cat}`,
+          prior: { via: "낙찰", title: s(it.bidTitle).replace(PREFIX, ""), amount, start: day(it.contractPeriodSdate), end: day(it.contractPeriodEdate), closedAt: day(it.bidDeadline) },
+        });
+      }
+      if (rows.length) writeCache(name, rows);
+      else rows = readCache<AptAward[]>(name, 30 * DAY) ?? [];
+    }
+    out.push(...rows);
+  }
+  return out;
+}
+
+/**
+ * 단지별 수의계약 (재계약 등). 등록일 조회는 소액 구매까지 하루 1천 건이 넘어 3년치를 받기 어렵고,
+ * 단지코드 조회(kaptCode)는 그 단지의 모든 연도 계약을 한 번에 돌려주므로 진행 중 공고의 단지만 묻는다.
+ * 업체는 이름만 남기고 대표자·주소·전화는 버린다. budgetMs 를 넘기면 남은 단지는 다음 빌드로 미룬다.
+ */
+export async function fetchAptPrivateContracts(aptCodes: string[], now = new Date(), budgetMs = 4 * 60_000): Promise<{ items: AptAward[]; asked: number; cached: number }> {
+  const since = `${Number(kstYmd(now).slice(0, 4)) - 2}-01-01`;
+  const started = Date.now();
+  let asked = 0;
+  // 단지 하나 묻는 데 1초 남짓이라 한 빌드에 다 못 묻는다. 3일 안에 물어본 단지는 캐시를 쓰고, 처음 보는 단지부터 묻는다
+  const codes = [...new Set(aptCodes)].filter(Boolean);
+  const cached = new Map<string, AptAward[]>();
+  for (const c of codes) { const v = readCache<AptAward[]>(`private/${c}.json`, 3 * DAY); if (v) cached.set(c, v); }
+  const todo = codes.filter((c) => !cached.has(c));
+  const rows = await mapLimit(todo, 12, async (code) => {
+    if (Date.now() - started > budgetMs) return [];
+    asked++;
+    let failed = false;
+    const items = (await call(PRIVATE, "getHsmpCdSearchV3", { kaptCode: code }).catch(() => { failed = true; return { items: [] as Item[] }; })).items;
+    const out: AptAward[] = [];
+    for (const it of items) {
+      const amount = Number(s(it.pcAmount).replace(/[^\d]/g, "")) || 0;
+      const date = day(it.pcDate) ?? day(it.regDate);
+      if (!amount || !date || date < since) continue;
+      const cat = aptCategory(s(it.codeClassifyType1), s(it.codeClassifyType2), s(it.codeClassifyType3));
+      out.push({
+        no: s(it.pcNum),
+        key: `${s(it.kaptCode) || code}|${cat}`,
+        prior: { via: "수의계약", title: s(it.pcTitle).replace(PREFIX, ""), amount, company: s(it.companyName) || undefined, start: day(it.pcStDate), end: day(it.pcEdDate), closedAt: date },
+      });
+    }
+    if (!failed) writeCache(`private/${code}.json`, out);
+    return out;
+  });
+  return { items: [...[...cached.values()].flat(), ...rows.flat()], asked, cached: cached.size };
+}
+
+/** 직전 계약을 비교하는 분야 (공사·기타는 단지마다 일이 달라 비교하지 않는다) */
+export const COMPARABLE: AptCategory[] = ["청소", "경비", "소독", "승강기유지", "전기안전관리", "정화조·저수조", "주택관리(위탁)"];
+
+/** 같은 단지·같은 분야의 가장 최근 낙찰·수의계약을 공고에 붙인다. 붙인 건수를 돌려준다 */
+export function attachPriors(bids: AptBid[], awards: AptAward[]): number {
+  const latest = new Map<string, AptAward>();
+  for (const a of awards) {
+    const cur = latest.get(a.key);
+    if (!cur || (a.prior.closedAt ?? "") > (cur.prior.closedAt ?? "")) latest.set(a.key, a);
+  }
+  let n = 0;
+  for (const b of bids) {
+    const a = latest.get(`${b.aptCode}|${b.category}`);
+    if (!a || a.no === b.no || !COMPARABLE.includes(b.category)) continue;
+    b.prior = a.prior;
+    n++;
+  }
+  return n;
+}

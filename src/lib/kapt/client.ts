@@ -51,7 +51,10 @@ async function call(path: string, op: string, params: Record<string, string>): P
 
 /** 한 조회의 모든 페이지 */
 async function all(path: string, op: string, params: Record<string, string>, maxPages = 80): Promise<Item[]> {
-  const first = await call(path, op, params);
+  // 첫 쪽이 게이트웨이 오류로 실패하면 30초 쉬고 한 번 더, 그래도 안 되면 이 조회만 빈 결과로 넘긴다
+  const first = await call(path, op, params)
+    .catch(async () => { await new Promise((r) => setTimeout(r, 30_000)); return call(path, op, params); })
+    .catch((e: Error) => { console.warn(`공동주택 ${op} ${JSON.stringify(params)}: 첫 쪽 실패, 건너뜀 (${e.message})`); return { items: [] as Item[], total: 0 }; });
   const items = [...first.items];
   const pages = Math.min(maxPages, Math.ceil(first.total / ROWS));
   // 999건 한 쪽이 몇 초씩 걸려 네 쪽씩 함께 받는다
@@ -205,7 +208,7 @@ export async function fetchAptPrivateContracts(aptCodes: string[], now = new Dat
   const since = `${Number(kstYmd(now).slice(0, 4)) - 2}-01-01`;
   const started = Date.now();
   let asked = 0;
-  const rows = await mapLimit([...new Set(aptCodes)].filter(Boolean), 6, async (code) => {
+  const rows = await mapLimit([...new Set(aptCodes)].filter(Boolean), 12, async (code) => {
     if (Date.now() - started > budgetMs) return [];
     asked++;
     const items = (await call(PRIVATE, "getHsmpCdSearchV3", { kaptCode: code }).catch(() => ({ items: [] as Item[] }))).items;

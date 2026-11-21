@@ -28,8 +28,9 @@ export async function aptMeta(): Promise<{ notices: number; awards: number; noti
   if (!canUse()) return null;
   const b = await r2Get("stats/apt-meta.json");
   if (!b) return null;
-  const m = JSON.parse(b.toString()) as { notices: number; awards: number; noticeFrom: string; builtAt: string };
-  return { notices: m.notices, awards: m.awards, noticeFrom: m.noticeFrom, builtAt: m.builtAt };
+  const m = JSON.parse(b.toString()) as { notices: number; noticesAll?: number; awards: number; noticeFrom: string; builtAt: string };
+  // 공고 API가 지난 공고를 일부만 주므로 낙찰 API에만 나온 공고번호도 공고로 센다
+  return { notices: m.noticesAll ?? m.notices, awards: m.awards, noticeFrom: m.noticeFrom, builtAt: m.builtAt };
 }
 
 /** 저장소에 최근 1년 낙찰이 다 있으면 통계를 만들고, 아니면 null */

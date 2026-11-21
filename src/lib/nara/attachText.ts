@@ -91,6 +91,19 @@ function entryName(raw: Buffer, flags: number, extra: Buffer): string {
   return dot >= 0 && raw.subarray(dot).every((c) => c < 0x80) ? `${raw.subarray(0, dot).toString("hex")}${raw.subarray(dot).toString("latin1")}` : raw.toString("hex");
 }
 
+/** 풀린 크기가 cap 을 넘으면 멈춘다. maxOutputLength 를 모르는 환경(중계 서버의 zlib 호환층)이면 풀고 나서 크기를 본다 */
+function inflateCapped(raw: Buffer, cap: number): Buffer {
+  let data: Buffer;
+  try {
+    data = inflateRawSync(raw, { maxOutputLength: cap });
+  } catch (e) {
+    if ((e as { code?: string }).code === "ERR_BUFFER_TOO_LARGE" || e instanceof RangeError) throw new Error("압축 항목이 너무 큼");
+    data = inflateRawSync(raw);
+  }
+  if (data.length > cap) throw new Error("압축 항목이 너무 큼");
+  return data;
+}
+
 /** ZIP 항목 (HWPX·DOCX·XLSX·ZIP 공통). ZIP64 머리와 확장 필드도 읽는다 */
 function zipEntries(buf: Buffer): ZipEntry[] {
   let eocd = -1;
@@ -138,7 +151,7 @@ function zipEntries(buf: Buffer): ZipEntry[] {
         if (unpacked + usize > ZIP_MAX_TOTAL) throw new Error("압축 안 파일 전체가 너무 큼");
         const raw = buf.subarray(start, start + csize);
         // 머리에 적힌 크기를 믿지 않고 실제로 풀리는 양도 막는다
-        const data = method === 8 ? inflateRawSync(raw, { maxOutputLength: Math.min(ZIP_MAX_ENTRY, ZIP_MAX_TOTAL - unpacked) }) : Buffer.from(raw);
+        const data = method === 8 ? inflateCapped(raw, Math.min(ZIP_MAX_ENTRY, ZIP_MAX_TOTAL - unpacked)) : Buffer.from(raw);
         unpacked += data.length;
         return data;
       },

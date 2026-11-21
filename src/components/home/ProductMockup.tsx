@@ -5,6 +5,7 @@ import type { Digest } from "@/lib/digest";
 import type { MatchResult } from "@/lib/analysis";
 import { dday, won } from "@/lib/format";
 import { GradeBadge, ScoreBar } from "../Badges";
+import { ScrollRow } from "@/components/ScrollRow";
 
 export interface MockupCase {
   label: string;
@@ -35,7 +36,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
         </span>
       </div>
 
-      <div role="tablist" aria-label="예시 고객사 업종" className="flex gap-1.5 overflow-x-auto border-b border-ink-100 px-4 py-2.5">
+      <ScrollRow active={k} role="tablist" aria-label="예시 고객사 업종" className="flex gap-1.5 border-b border-ink-100 px-4 py-2.5">
         <span className="hidden shrink-0 self-center pr-1 text-[11px] font-semibold text-ink-300 sm:block">예시 고객사</span>
         {cases.map((c, n) => (
           <button
@@ -48,7 +49,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
             {c.label}
           </button>
         ))}
-      </div>
+      </ScrollRow>
 
       <div className="grid md:grid-cols-[200px_1fr] lg:grid-cols-[200px_1fr_280px]">
         {/* 사이드바 */}

@@ -9,6 +9,7 @@ import { UsageTab } from "./UsageTab";
 import { SettingsTab } from "./SettingsTab";
 import { ApiTab } from "./ApiTab";
 import { SystemTab } from "./SystemTab";
+import { ScrollRow } from "@/components/ScrollRow";
 
 /** 로그인 토큰(12시간)은 이 탭에만 둔다. 비밀번호는 저장하지 않는다 */
 const TOKEN_KEY = "bm-admin-token";
@@ -140,7 +141,7 @@ export function AdminConsole({ api }: { api: string }) {
         </main>
       ) : (
         <div className="container-x py-6 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
-          <nav aria-label="관리 메뉴" className="-mx-4 mb-5 overflow-x-auto px-4 lg:mx-0 lg:mb-0 lg:overflow-visible lg:px-0">
+          <ScrollRow as="nav" active={tab} aria-label="관리 메뉴" className="-mx-4 mb-5 px-4 lg:mx-0 lg:mb-0 lg:overflow-visible lg:px-0">
             <ul className="flex gap-2 lg:sticky lg:top-6 lg:flex-col lg:gap-1">
               {TABS.map((t) => (
                 <li key={t.id} className="shrink-0">
@@ -151,7 +152,7 @@ export function AdminConsole({ api }: { api: string }) {
                 </li>
               ))}
             </ul>
-          </nav>
+          </ScrollRow>
           <main className="min-w-0">
             {msg && <p className="mb-4 rounded-xl bg-coral-100 p-3 text-sm text-coral">{msg}</p>}
             {tab === "members" && <MembersTab {...shared} />}

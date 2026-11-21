@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { aptDetailUrl, aptFileUrl, type AptBid, type AptBidsFile } from "@/lib/apt";
+import { aptDetailUrl, aptFileUrl, type AptBid, type AptBidsFile, type AptHistory } from "@/lib/apt";
 import { contractMonths, forecastAptPrice, type AptPriceCheck, type AptPriceForecast } from "@/lib/aptPrice";
 import { shortDate, won, wonFull } from "@/lib/format";
 import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "../Badges";
 import { CloseDay } from "../CloseDay";
+import { AptAwardSection, AptForecastCard } from "./AptAwardViews";
 
 /** 직전 계약과 비교해 예측하는 분야 (공사·물품·기타 용역은 단지마다 일이 달라 예측하지 않는다) */
 const PRICEABLE = new Set<string>(["청소", "경비", "소독", "승강기유지", "전기안전관리", "정화조·저수조", "주택관리(위탁)"]);
@@ -44,6 +45,8 @@ export function AptPredictor() {
 
   useEffect(() => {
     loadSiteJson<AptBidsFile>("apt-bids-data.json").then(setData).catch(() => setError(true));
+    // 낙찰 결과로 본 예측은 따로 받는다 (없어도 금액 예측은 된다)
+    loadSiteJson<Record<string, AptHistory>>("apt-history-data.json").then(setHistory).catch(() => setHistory({}));
   }, []);
   useEffect(() => {
     const no = sp.get("apt");
@@ -52,7 +55,11 @@ export function AptPredictor() {
   useEffect(() => { setManualAmount(""); setScale("1"); setMonths(""); }, [picked]);
 
   const open = useMemo(() => (data?.items ?? []).filter((b) => PRICEABLE.has(b.category) && new Date(b.closeAt).getTime() > Date.now()), [data]);
-  const bid = useMemo(() => (data?.items ?? []).find((b) => b.no === picked), [data, picked]);
+  const [history, setHistory] = useState<Record<string, AptHistory> | null>(null);
+  const bid = useMemo(() => {
+    const b = (data?.items ?? []).find((x) => x.no === picked);
+    return b && history?.[b.no] ? { ...b, history: history[b.no] } : b;
+  }, [data, picked, history]);
 
   const { matches, matchTotal } = useMemo(() => {
     const words = query.trim().split(/\s+/).filter(Boolean).map(norm);
@@ -232,6 +239,7 @@ export function AptPredictor() {
               </p>
             </section>
           )}
+          <AptForecastCard bid={bid} f={f} />
           {f && <BasisPanel f={f} />}
           {f?.check && f.check.n > 0 && <CheckPanel c={f.check} cutoff={model.check.cutoff} cat={f.checkBasis} />}
           <p className="text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 업종 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 예측값은 과거 자료로 낸 추정치입니다.</p>
@@ -240,6 +248,9 @@ export function AptPredictor() {
 
       {/* 공고 내용 (전체 폭) */}
       <NoticePanel bid={bid} />
+
+      {/* 공고 내용 아래: 같은 단지 지난 계약·비슷한 낙찰 (나라장터 예측의 낙찰 결과 분석 자리) */}
+      <AptAwardSection bid={bid} />
     </div>
   );
 }

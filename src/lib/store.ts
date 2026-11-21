@@ -7,7 +7,7 @@ import type { AwardStats } from "./rivalRate";
 import type { AwardAnalysis } from "./awards/analysis";
 import type { AgencySummary } from "./awards/agency";
 import type { PreSpec } from "./preSpecs";
-import type { AptBidsFile } from "./apt";
+import type { AptBidsFile, AptHistory } from "./apt";
 import type { RecentAwardsFile } from "./recentAwards";
 import type { OrderPlan } from "./orderPlans";
 import type { Contract } from "./contracts";
@@ -132,7 +132,16 @@ export async function getPreSpecs(): Promise<PreSpec[]> {
 
 /** 빌드 때 받은 공동주택(아파트) 입찰 (서버 배포·키 없음이면 빈 목록) */
 export async function getAptBids(): Promise<AptBidsFile> {
-  return (process.env.BIDS_FILE ? fileBids()?.aptBids : undefined) ?? { builtAt: new Date().toISOString(), items: [] };
+  const f = process.env.BIDS_FILE ? fileBids()?.aptBids : undefined;
+  if (!f) return { builtAt: new Date().toISOString(), items: [] };
+  // 낙찰 결과로 본 예측(history)은 아파트 예측 화면만 쓰므로 따로 보낸다 (/apt-history-data.json)
+  return { ...f, items: f.items.map(({ history: _h, ...b }) => b) };
+}
+
+/** 아파트 예측의 낙찰 결과로 본 예측 (키: K-apt 입찰번호) */
+export async function getAptHistory(): Promise<Record<string, AptHistory>> {
+  const f = process.env.BIDS_FILE ? fileBids()?.aptBids : undefined;
+  return Object.fromEntries((f?.items ?? []).filter((b) => b.history).map((b) => [b.no, b.history!]));
 }
 
 /** 빌드 때 만든 최근 낙찰 결과 목록 (/awards). 없으면 null */

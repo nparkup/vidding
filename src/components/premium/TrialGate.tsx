@@ -56,7 +56,7 @@ export function TrialLocked({ used, onPick }: { used: TrialEntry[]; onPick: (e: 
         </div>
       )}
       <Link href="/pricing" className="btn-primary mt-5 inline-flex">요금제 보기</Link>
-      <p className="mt-3 text-xs text-ink-400">로그인 기능이 생기기 전까지 사용 건수는 이 브라우저와, 조회한 사업자번호를 기준으로 셉니다.</p>
+      <p className="mt-3 text-xs text-ink-400">로그인 기능이 생기기 전까지 사용 건수는 가입·조회한 사업자등록번호와 이 브라우저를 기준으로 셉니다.</p>
     </aside>
   );
 }

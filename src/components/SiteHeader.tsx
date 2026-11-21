@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
-import { useSiteConfig } from "@/lib/siteConfig";
-import { MYBOX_ENABLED } from "@/lib/mybox";
+import { useMyboxOn } from "@/lib/useMyboxOn";
+import { useAccount } from "@/lib/account";
 
 type Item = { href: string; label: string; desc: string; /** 관리자 화면에서 서류함을 켰을 때만 */ mybox?: boolean };
 type Entry = { label: string; href: string } | { label: string; items: Item[] };
@@ -51,8 +51,9 @@ const isOn = (path: string, href: string) => (href === "/premium" ? path === hre
 const entryOn = (path: string, e: Entry) => ("href" in e ? isOn(path, e.href) : e.items.some((i) => isOn(path, i.href)));
 
 export function SiteHeader() {
-  const cfg = useSiteConfig();
-  const myboxOn = MYBOX_ENABLED || cfg.features.mybox;
+  const myboxOn = useMyboxOn();
+  const acc = useAccount();
+  const loggedIn = acc.status === "in";
   const nav = NAV.map((e) => ("items" in e ? { ...e, items: e.items.filter((i) => !i.mybox || myboxOn) } : e));
   const path = clean(usePathname() || "/");
   const [open, setOpen] = useState<string | null>(null);
@@ -149,9 +150,20 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Link href="/apply" className="btn-mint btn-sm whitespace-nowrap sm:px-4">
-            무료 체험
-          </Link>
+          {loggedIn ? (
+            <Link href="/account" className="btn-ghost btn-sm whitespace-nowrap sm:px-4">
+              내 정보
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="hidden whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold text-ink-500 transition hover:text-ink sm:inline-block">
+                로그인
+              </Link>
+              <Link href="/apply" className="btn-mint btn-sm whitespace-nowrap sm:px-4">
+                무료 체험
+              </Link>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setMobile(!mobile)}
@@ -170,6 +182,10 @@ export function SiteHeader() {
       {mobile && (
         <div id="mobile-menu" className="fixed inset-x-0 bottom-0 top-16 z-40 overflow-y-auto border-t border-ink-100 bg-white lg:hidden">
           <nav aria-label="주요 메뉴" className="container-x space-y-6 py-5 pb-24">
+            <Link href={loggedIn ? "/account" : "/login"} className="flex items-center justify-between rounded-xl bg-paper px-4 py-3 text-[15px] font-bold text-ink">
+              <span>{loggedIn ? "내 정보" : "로그인"}</span>
+              <span className="min-w-0 truncate pl-3 text-xs font-medium text-ink-400">{loggedIn && acc.status === "in" ? acc.company : "이메일 또는 사업자등록번호"}</span>
+            </Link>
             <div className="grid grid-cols-2 gap-2">
               {nav.filter((e): e is { label: string; href: string } => "href" in e).map((e) => {
                 const on = isOn(path, e.href);

@@ -11,6 +11,7 @@
  * - GET /?awards=사업자번호&biz=용역 : 그 업체의 최근 3년 낙찰을 공고 분류와 함께. 조달청 API를 부르지 않는다 (6시간 캐시)
  * - GET /?awardmeta=1 : 저장소 수집 범위·완료 여부
  *
+ * 회원 로그인 (account.ts): ?account=동작. 가입·로그인·내 정보·이용권 공고 예측 건수 차감·내 서류함.
  * 관리자 화면 (admin.ts): ?admin=동작. 로그인 뒤 서명 토큰으로 회원·결제·사용량·지표를 읽고 쓴다.
  * 운영 지표 (metrics.ts): 요청마다 경로·상태·처리 시간과 바깥 API 호출 수를 Durable Object Metrics에 날짜별로 더한다. ?pv= 는 페이지 조회.
  *
@@ -35,6 +36,7 @@ import type { AwardAnalysis } from "../../src/lib/awards/analysis";
 import { AI_SHEET_VERSION, readAiInput, type AiInput, type AiSheetResult } from "../../src/lib/nara/aiSheet";
 import { liveKey, readSheetLive, type LiveDocs } from "../../src/lib/nara/liveSheet";
 import { handleAdmin, readSiteConfig } from "./admin";
+import { handleAccount } from "./account";
 import { metricsStub, patchFetch, takePending, truncIp, type MetricsNs, type RecBody } from "./metrics";
 export { Metrics } from "./metrics";
 
@@ -61,6 +63,8 @@ interface Env {
   /** 관리자 화면(/admin) 아이디·비밀번호 (Worker 비밀값, 저장소 Secrets ADMIN_ID·ADMIN_PASSWORD 에서). 없으면 관리자 로그인은 503 */
   ADMIN_ID?: string;
   ADMIN_PASSWORD?: string;
+  /** 회원 로그인 토큰 서명 키 (선택, 16자 이상). 없으면 R2 config/auth-key.json 에 만들어 둔 무작위 키를 쓴다 */
+  MEMBER_SECRET?: string;
   /** 실시간 이용자 수 (wrangler.toml durable_objects). 없으면 ?presence 는 503 */
   PRESENCE?: { idFromName(name: string): unknown; get(id: unknown): { fetch(req: Request | string): Promise<Response> } };
 }
@@ -117,6 +121,11 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       if (sp0.has("admin") || sp0.has("adminlogin") || sp0.has("members")) {
         if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
         return handleAdmin(req, env, json, ctx);
+      }
+      if (sp0.has("account")) {
+        // 회원 로그인 (account.ts)
+        if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
+        return handleAccount(req, env, json);
       }
       if (sp0.has("pv")) {
         // 페이지 조회 (src/components/PageBeacon.tsx). 경로·유입 사이트만 받고, 순 방문은 그날만 쓰는 해시로 센다
@@ -300,6 +309,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
 function routeOf(req: Request): string {
   const sp = new URL(req.url).searchParams;
   if (sp.has("admin") || sp.has("adminlogin") || sp.has("members")) return `admin:${(sp.get("admin") ?? (sp.has("adminlogin") ? "login" : "members")).slice(0, 20)}`;
+  if (sp.has("account")) return `account:${(sp.get("account") ?? "").slice(0, 20)}`;
   for (const k of ["pv", "config", "signup", "trial", "awards", "awardmeta", "aisheet", "relate", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
   return "other";
 }

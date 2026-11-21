@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
  * - 나라장터 예측에서 사업자번호를 조회하면 중계 서버(?trial=)에도 그 사업자번호로 쓴 공고를 남겨,
  *   다른 브라우저에서 같은 사업자번호로 3건을 넘게 쓰지 못하게 한다.
  * - 키는 bidmate. 접두어가 아니어서 새로고침 초기화(resetOnReload)에 지워지지 않는다.
- * - 로그인·결제가 생기면 유료 회원은 이 제한을 건너뛰게 바꾼다.
+ * - 로그인한 회원은 이 파일 대신 중계 서버가 센다 (src/lib/usage.ts useUsage). 결제 중인 회원은 무료 체험 대신 이용권 한 달 건수로 센다.
  */
 import { TRIAL_LIMIT } from "./trialLimit";
 import { CONFIG_EVENT, getSiteConfig } from "./siteConfig";

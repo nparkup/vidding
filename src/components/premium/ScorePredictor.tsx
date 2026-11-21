@@ -29,7 +29,8 @@ import { jointPredict, type JointMember } from "@/lib/joint";
 import { JointMembers } from "./JointMembers";
 import { PassAmount } from "./PassAmount";
 import { PerfCapCard } from "./PerfCapCard";
-import { syncTrialServer, useTrial, type TrialEntry } from "@/lib/trial";
+import { syncTrialServer, type TrialEntry } from "@/lib/trial";
+import { useUsage } from "@/lib/usage";
 import { readMember } from "@/lib/member";
 import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
 
@@ -175,7 +176,7 @@ export function ScorePredictor() {
   }, [bids, bidId]);
   // 무료 체험: 공개 경쟁 공고를 고르면 1건 차감(이미 분석한 공고는 그대로). 3건을 넘으면 분석을 열지 않는다
   const trialKey = pickedBid && methodProfile(pickedBid).open ? `nara:${pickedBid.id}` : null;
-  const trial = useTrial(trialKey, pickedBid?.title);
+  const trial = useUsage(trialKey, pickedBid?.title);
   const trialLocked = !!pickedBid && trial?.status === "locked";
   const bid: Bid | undefined = trialLocked || (trialKey && !trial) ? undefined : pickedBid;
   const pickTrial = (e: TrialEntry) => { if (e.k.startsWith("nara:")) setBidId(e.k.slice(5)); else window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/premium/apt?apt=${encodeURIComponent(e.k.slice(4))}`; };
@@ -190,7 +191,7 @@ export function ScorePredictor() {
   }, []);
   const corpNo = corp?.bizno ?? memberNo;
   useEffect(() => {
-    if (STATIC && CORP_API && corpNo && trialKey && trial?.status === "ok") syncTrialServer(CORP_API, corpNo, trialKey);
+    if (STATIC && CORP_API && corpNo && trialKey && trial?.status === "ok" && !trial.server) syncTrialServer(CORP_API, corpNo, trialKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [corpNo, trialKey]);
 
@@ -479,7 +480,7 @@ export function ScorePredictor() {
           </div>
           {searchBox}
         </section>
-        <TrialLocked used={trial.used} onPick={pickTrial} />
+        <TrialLocked used={trial.used} onPick={pickTrial} state={trial} />
       </div>
     );
   }

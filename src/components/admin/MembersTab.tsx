@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import type { TabProps } from "./AdminConsole";
 import { bizFmt, downloadCsv, dt, SIZE_LABEL, type Member } from "./adminApi";
 import { planName } from "@/lib/plans";
+import { useSiteConfig } from "@/lib/siteConfig";
 
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const bidLink = (k: string) => (k.startsWith("apt:") ? `/apt-bids/view?no=${encodeURIComponent(k.slice(4))}` : `/bids/view?id=${encodeURIComponent(k.slice(5))}`);
 
 type Use = "all" | "none" | "some" | "full";
-type St = "all" | "active" | "suspended" | "paid";
+type St = "all" | "active" | "suspended" | "paid" | "login" | "nologin";
 
 export const isPaid = (m: Member) => m.billing?.status === "active";
 
@@ -34,6 +35,8 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
       if (st === "active" && m.status === "suspended") return false;
       if (st === "suspended" && m.status !== "suspended") return false;
       if (st === "paid" && !isPaid(m)) return false;
+      if (st === "login" && !m.login) return false;
+      if (st === "nologin" && m.login) return false;
       const hay = `${m.company} ${m.bizno} ${bizFmt(m.bizno)} ${m.name} ${m.email} ${m.phone} ${m.memo ?? ""}`.toLowerCase();
       return words.every((w) => hay.includes(w));
     });
@@ -45,6 +48,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
       total: members.length,
       recent: members.filter((m) => m.joinedAt && new Date(m.joinedAt).getTime() >= week).length,
       paid: members.filter(isPaid).length,
+      login: members.filter((m) => m.login).length,
       used: members.filter((m) => m.trial.length > 0).length,
       suspended: members.filter((m) => m.status === "suspended").length,
       mail: members.filter((m) => m.agreeMail).length,
@@ -73,7 +77,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
         </div>
       </div>
 
-      <Stats items={[["전체 회원", stats.total], ["최근 7일 가입", stats.recent], ["결제 중", stats.paid], ["체험 사용", stats.used], ["이용 정지", stats.suspended], ["메일 수신 동의", stats.mail]]} />
+      <Stats items={[["전체 회원", stats.total], ["최근 7일 가입", stats.recent], ["결제 중", stats.paid], ["로그인 계정", stats.login], ["체험 사용", stats.used], ["이용 정지", stats.suspended]]} />
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <input className="input sm:max-w-xs" placeholder="회사명·사업자번호·담당자·연락처·메모" value={q} onChange={(e) => setQ(e.target.value)} aria-label="회원 검색" />
@@ -81,6 +85,8 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
           <option value="all">상태 전체</option>
           <option value="active">정상</option>
           <option value="paid">결제 중</option>
+          <option value="login">로그인 계정 있음</option>
+          <option value="nologin">비밀번호 없는 예전 가입</option>
           <option value="suspended">이용 정지</option>
         </select>
         <select className="input sm:w-auto" value={use} onChange={(e) => setUse(e.target.value as Use)} aria-label="체험 사용">
@@ -103,12 +109,13 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
                   <span className="font-semibold [overflow-wrap:anywhere]">{m.company}</span>
                   {m.status === "suspended" && <span className="rounded-lg bg-coral-100 px-2 py-0.5 text-xs font-bold text-coral">이용 정지</span>}
                   {isPaid(m) && <span className="rounded-lg bg-mint-50 px-2 py-0.5 text-xs font-bold text-mint-700">{planName(m.billing!.plan)}</span>}
+                  {!m.login && <span className="rounded-lg bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-400">비밀번호 없음</span>}
                 </p>
                 <p className="text-xs tabular-nums text-ink-400">{bizFmt(m.bizno)} · 가입 {dt(m.joinedAt)}</p>
                 <p className="mt-1.5 text-sm">{m.name} · <span className="tabular-nums">{m.phone}</span> · <a href={`mailto:${m.email}`} className="text-mint-600 [overflow-wrap:anywhere] hover:underline">{m.email}</a></p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <TrialBadge n={m.trial.length} limit={limit} />
+                {m.paidUse ? <PaidBadge m={m} /> : <TrialBadge n={m.trial.length} limit={limit} />}
                 <span className="text-xs text-ink-400">메일 {m.agreeMail ? "동의" : "미동의"}</span>
                 <button type="button" onClick={() => setOpen(open === m.bizno ? null : m.bizno)} className="btn-ghost btn-sm">{open === m.bizno ? "닫기" : "상세"}</button>
               </div>
@@ -122,7 +129,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
         ))}
         {!shown.length && <li className="card p-6 text-center text-sm text-ink-400">{stats.total ? "조건에 맞는 회원이 없습니다." : "아직 가입한 회원이 없습니다."}</li>}
       </ul>
-      <p className="mt-3 text-xs text-ink-400">탈퇴 처리는 가입 정보와 결제 기록을 지우고, 이미 쓴 무료 체험 건수는 남겨 둡니다(다시 가입해도 {limit}건이 새로 생기지 않게). 이용 정지한 사업자번호는 무료 체험 공고가 더 늘지 않습니다.</p>
+      <p className="mt-3 text-xs text-ink-400">탈퇴 처리는 가입 정보·로그인 계정·서류함과 결제 기록을 지우고, 이미 쓴 무료 체험 건수는 남겨 둡니다(다시 가입해도 {limit}건이 새로 생기지 않게). 이용 정지한 사업자번호는 로그인할 수 없고 무료 체험·이용권 공고가 더 늘지 않습니다. 결제 중(결제정보 '이용 중', 기간 안)인 회원은 무료 체험 대신 이용권 한 달 건수로 셉니다.</p>
     </>
   );
 }
@@ -140,6 +147,15 @@ export function Stats({ items }: { items: [string, number | string][] }) {
   );
 }
 
+/** 유료 회원: 이번 기간 공고 예측 사용 건수 */
+function PaidBadge({ m }: { m: Member }) {
+  const p = useSiteConfig().pricing;
+  const plan = m.billing?.plan;
+  const q = plan === "lite" ? p.liteQuota : plan === "standard" ? p.standardQuota : null;
+  const n = m.paidUse?.used ?? 0;
+  return <span className={`inline-block shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold tabular-nums ${q !== null && n >= q ? "bg-coral-100 text-coral" : "bg-mint-50 text-mint-700"}`}>이번 달 {n.toLocaleString()}{q !== null ? `/${q.toLocaleString()}` : ""}건</span>;
+}
+
 export function TrialBadge({ n, limit }: { n: number; limit: number }) {
   return <span className={`inline-block shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold tabular-nums ${n >= limit ? "bg-coral-100 text-coral" : n ? "bg-mint-50 text-mint-700" : "bg-ink-50 text-ink-400"}`}>체험 {n}/{limit}</span>;
 }
@@ -154,7 +170,8 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
   });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
-  const [confirm, setConfirm] = useState<"" | "delete" | "trial">("");
+  const [confirm, setConfirm] = useState<"" | "delete" | "trial" | "temp">("");
+  const [temp, setTemp] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setF((x) => ({ ...x, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value }));
   const split = (s: string) => s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
@@ -164,7 +181,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
     setErr("");
     try {
       const r = await guard(call<{ member: Member }>("member", { params: { bizno: m.bizno }, body: { ...f, licenses: split(f.licenses), regions: split(f.regions) } }));
-      if (r) onSaved({ ...m, ...r.member, trial: m.trial }, `${f.company} 정보를 저장했습니다.`);
+      if (r) onSaved({ ...m, ...r.member, trial: m.trial, billing: m.billing, paidUse: m.paidUse, seen: m.seen }, `${f.company} 정보를 저장했습니다.`);
     } catch (e) { setErr((e as Error).message); } finally { setSaving(false); }
   }
   async function del() {
@@ -174,6 +191,18 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
   async function resetTrial() {
     setSaving(true);
     try { if (await guard(call("trial-reset", { params: { bizno: m.bizno }, body: {} }))) onSaved({ ...m, trial: [] }, `${m.company} 무료 체험 기록을 초기화했습니다.`); } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
+  }
+
+  async function issueTemp() {
+    setSaving(true);
+    setErr("");
+    try {
+      const r = await guard(call<{ temp: string }>("password-temp", { params: { bizno: m.bizno }, body: {} }));
+      if (r) {
+        setTemp(r.temp);
+        onSaved({ ...m, login: { email: (m.login?.email ?? m.email).toLowerCase(), setAt: new Date().toISOString(), lastLogin: m.login?.lastLogin ?? null, temp: true } }, `${m.company} 임시 비밀번호를 발급했습니다.`);
+      }
+    } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
   }
 
   return (
@@ -218,14 +247,26 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
           <dt className="text-xs text-ink-500">규모</dt><dd>{SIZE_LABEL[m.size ?? ""] ?? "-"}</dd>
           <dt className="text-xs text-ink-500">관심 이용권</dt><dd>{m.plan ? planName(m.plan) : "-"}</dd>
           <dt className="text-xs text-ink-500">마지막 조회</dt><dd>{m.seen ? `${dt(m.seen.last)} (${m.seen.n.toLocaleString()}회)` : "-"}</dd>
+          <dt className="text-xs text-ink-500">로그인 계정</dt><dd className="[overflow-wrap:anywhere]">{m.login ? `${m.login.email}${m.login.temp ? " (임시 비밀번호)" : ""}` : "비밀번호 없음 (예전 가입)"}</dd>
+          <dt className="text-xs text-ink-500">마지막 로그인</dt><dd>{m.login?.lastLogin ? dt(m.login.lastLogin) : "-"}</dd>
+          {m.paidUse && <><dt className="text-xs text-ink-500">이번 달 예측</dt><dd className="tabular-nums">{m.paidUse.used.toLocaleString()}건 ({m.paidUse.from} 시작)</dd></>}
         </dl>
+        {temp && (
+          <div className="rounded-xl bg-mint-50 p-3">
+            <p className="text-xs text-ink-500">임시 비밀번호 (이 화면에서만 보입니다. 회원에게 전하고 로그인 뒤 바꾸게 해 주세요)</p>
+            <p className="mt-1 select-all font-mono text-lg font-bold tracking-wider">{temp}</p>
+          </div>
+        )}
         <div className="space-y-2 border-t border-ink-100 pt-3">
           {confirm === "trial" ? (
             <Confirm text={`무료 체험 기록을 지우면 ${limit}건을 다시 쓸 수 있습니다.`} label="초기화" onYes={resetTrial} onNo={() => setConfirm("")} busy={saving} />
+          ) : confirm === "temp" ? (
+            <Confirm text={`임시 비밀번호를 만들면 지금 비밀번호와 다른 기기의 로그인이 모두 풀립니다. 로그인 이메일: ${m.login?.email ?? m.email}`} label="발급" onYes={issueTemp} onNo={() => setConfirm("")} busy={saving} />
           ) : confirm === "delete" ? (
             <Confirm text={`${m.company} 가입 정보와 결제 기록을 지울까요? 되돌릴 수 없습니다.`} label="삭제" onYes={del} onNo={() => setConfirm("")} busy={saving} />
           ) : (
             <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setConfirm("temp")} className="btn-ghost btn-sm">임시 비밀번호 발급</button>
               <button type="button" onClick={() => setConfirm("trial")} className="btn-ghost btn-sm" disabled={!m.trial.length}>무료 체험 초기화</button>
               <button type="button" onClick={() => setConfirm("delete")} className="btn-ghost btn-sm text-coral">탈퇴 처리</button>
             </div>

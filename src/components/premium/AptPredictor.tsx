@@ -9,6 +9,8 @@ import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "../Badges";
 import { CloseDay } from "../CloseDay";
 import { AptAwardSection, AptForecastCard } from "./AptAwardViews";
+import { useTrial, type TrialEntry } from "@/lib/trial";
+import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
 
 /** 직전 계약과 비교해 예측하는 분야 (공사·물품·기타 용역은 단지마다 일이 달라 예측하지 않는다) */
 const PRICEABLE = new Set<string>(["청소", "경비", "소독", "승강기유지", "전기안전관리", "정화조·저수조", "주택관리(위탁)"]);
@@ -56,10 +58,19 @@ export function AptPredictor() {
 
   const open = useMemo(() => (data?.items ?? []).filter((b) => PRICEABLE.has(b.category) && new Date(b.closeAt).getTime() > Date.now()), [data]);
   const [history, setHistory] = useState<Record<string, AptHistory> | null>(null);
-  const bid = useMemo(() => {
+  const pickedBid = useMemo(() => {
     const b = (data?.items ?? []).find((x) => x.no === picked);
     return b && history?.[b.no] ? { ...b, history: history[b.no] } : b;
   }, [data, picked, history]);
+  // 무료 체험: 공고를 고르면 1건 차감 (나라장터 예측과 합쳐 3건, 이미 분석한 공고는 그대로)
+  const trialKey = pickedBid ? `apt:${pickedBid.no}` : null;
+  const trial = useTrial(trialKey, pickedBid ? `${pickedBid.apt} ${pickedBid.title}` : undefined);
+  const trialLocked = !!pickedBid && trial?.status === "locked";
+  const bid = trialLocked || (trialKey && !trial) ? undefined : pickedBid;
+  const pickTrial = (e: TrialEntry) => {
+    if (e.k.startsWith("apt:")) choose(e.k.slice(4));
+    else window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/premium?bid=${encodeURIComponent(e.k.slice(5))}#predict`;
+  };
 
   const { matches, matchTotal } = useMemo(() => {
     const words = query.trim().split(/\s+/).filter(Boolean).map(norm);
@@ -121,6 +132,24 @@ export function AptPredictor() {
   if (!data) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
   if (!model) return <p className="card p-6 text-sm text-ink-500">아파트 예측 자료가 아직 준비되지 않았습니다. 다음 갱신 뒤에 다시 확인해 주세요.</p>;
 
+  // 무료 체험 3건을 다 쓴 뒤 새 공고를 고른 경우
+  if (trialLocked && pickedBid && trial) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <section className="card min-w-0 p-6">
+          <Step n={1} title="공고 선택" />
+          <div className="mt-4 rounded-2xl bg-paper p-4">
+            <p className="text-xs text-ink-500">{pickedBid.classLabel || pickedBid.category} · 공고번호 {pickedBid.no}</p>
+            <p className="mt-1 font-bold leading-snug [overflow-wrap:anywhere]"><CloseDdayBadge iso={pickedBid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={pickedBid.closeAt} />{pickedBid.title}</p>
+            <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">{pickedBid.apt}{pickedBid.region ? ` · ${pickedBid.region}` : ""}</p>
+          </div>
+          {searchBox}
+        </section>
+        <TrialLocked used={trial.used} onPick={pickTrial} />
+      </div>
+    );
+  }
+
   // 공고를 고르기 전: 검색만 보이고, 결과 자리에는 안내만 둔다
   if (!bid) {
     return (
@@ -130,6 +159,7 @@ export function AptPredictor() {
           <p className="mt-2 text-sm text-ink-500">분석할 아파트 공고를 검색해 고르세요. 청소·경비·소독·승강기유지·전기안전관리·정화조·저수조·위탁관리 진행 중 공고 {open.length.toLocaleString("ko-KR")}건에서 찾습니다.</p>
           {picked && <p className="mt-2 text-sm text-coral">고른 공고({picked})는 마감됐거나 목록에서 빠졌습니다. 다른 공고를 골라 주세요.</p>}
           {searchBox}
+          <TrialIntro />
           {quick.length > 0 && (
             <div className="mt-5 border-t border-ink-100 pt-4">
               <p className="text-xs font-semibold text-ink-500">직전 계약이 있는 마감 임박 공고</p>
@@ -168,6 +198,7 @@ export function AptPredictor() {
               <p className="mt-1 font-bold leading-snug [overflow-wrap:anywhere]"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
               <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">{bid.apt}{bid.region ? ` · ${bid.region}` : ""} · 마감 {shortDate(bid.closeAt)}</p>
             </div>
+            <TrialNote state={trial} />
             {searchBox}
             <div className="mt-4 border-t border-ink-100 pt-4">
               {!PRICEABLE.has(bid.category) && <p className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">{bid.category} 공고는 단지마다 일의 범위가 달라 금액을 예측하지 않습니다.</p>}

@@ -9,14 +9,15 @@ export function ApplyLayout({ children }: { children: React.ReactNode }) {
           <div className="bg-grid mask-fade pointer-events-none absolute inset-0" />
           <div className="pointer-events-none absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-mint/25 blur-[100px]" />
           <div className="relative">
-            <p className="text-sm font-semibold text-mint-400">2주 무료 체험</p>
+            <p className="text-sm font-semibold text-mint-400">무료 체험 · 입찰공고 3건</p>
             <h1 className="mt-3 text-3xl font-extrabold leading-[1.2] tracking-[-0.04em] sm:text-4xl">조건만 알려주세요.<br />나머지는 저희가 찾습니다.</h1>
-            <p className="mt-4 leading-relaxed text-ink-300">신청 즉시 지금 참가 가능한 공고 목록을 보여드리고, 다음 영업일 아침부터 맞춤 공고 요약 메일을 보내드립니다.</p>
+            <p className="mt-4 leading-relaxed text-ink-300">신청 즉시 지금 참가 가능한 공고 목록을 보여드리고, 그중 입찰공고 3건은 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 무료로 써 보실 수 있습니다.</p>
             <HeroCity className="mx-auto mt-4 w-full max-w-sm" />
             <ul className="mt-2 space-y-3">
               {[
                 ["즉시", "현재 참가 가능한 공고 수와 상위 공고 확인"],
-                ["다음 날 아침", "첫 맞춤 공고 요약 이메일 발송, 2주 무료"],
+                ["공고 3건", "평가점수 예측·배점표 판독·낙찰 결과 예측 무료"],
+                ["요금제 시작 후", "다음 영업일 아침부터 맞춤 공고 요약 메일"],
               ].map(([k, v]) => (
                 <li key={k} className="glass flex items-center gap-3 rounded-2xl p-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-mint text-white"><Check className="h-4 w-4" strokeWidth={3} /></span>

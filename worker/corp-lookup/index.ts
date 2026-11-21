@@ -66,6 +66,8 @@ export class Presence {
 }
 
 const CACHE_SECONDS = 12 * 3600;
+/** 무료 체험으로 분석할 수 있는 공고 수 (src/lib/trial.ts TRIAL_LIMIT 와 같게) */
+const TRIAL_LIMIT = 3;
 
 export default {
   async fetch(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
@@ -88,6 +90,24 @@ export default {
       const stub = env.PRESENCE.get(env.PRESENCE.idFromName("site"));
       const r = await stub.fetch(`https://presence/?id=${id}`);
       return json(await r.json(), 200, { "Cache-Control": "no-store" });
+    }
+    if (sp.has("trial")) {
+      // 무료 체험 사용 공고 (src/lib/trial.ts): 사업자번호마다 처음 분석한 공고 3건까지만 남긴다. 저장 값은 공고 키와 시각뿐
+      const bizno = sp.get("trial") ?? "";
+      const keys = (sp.get("bids") ?? "").split(",").filter((k) => /^(nara|apt):[A-Za-z0-9._-]{1,60}$/.test(k)).slice(0, 6);
+      if (!/^\d{10}$/.test(bizno)) return json({ error: "잘못된 사업자번호" }, 400);
+      if (!env.AWARDS) return json({ error: "off" }, 503);
+      const key = `trial/${bizno}.json`;
+      const hit = await env.AWARDS.get(key);
+      let used: { k: string; t: number }[] = [];
+      if (hit) {
+        try { used = (JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())) as { used?: typeof used }).used ?? []; } catch { used = []; }
+      }
+      const before = used.length;
+      const now = Date.now();
+      for (const k of keys) if (used.length < TRIAL_LIMIT && !used.some((e) => e.k === k)) used.push({ k, t: now });
+      if (used.length !== before) await env.AWARDS.put(key, JSON.stringify({ used }), { httpMetadata: { contentType: "application/json" } });
+      return json({ used, limit: TRIAL_LIMIT }, 200, { "Cache-Control": "no-store" });
     }
     if (sp.has("awards") || sp.has("awardmeta")) {
       try {

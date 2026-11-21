@@ -20,7 +20,7 @@ const SIZES = [
 ];
 
 /**
- * 2주 무료 체험 신청 폼.
+ * 무료 체험 신청 폼. 체험은 입찰공고 3건의 평가점수 예측(src/lib/trial.ts)이다.
  * - 서버 배포: action(서버 액션)으로 접수 저장
  * - 정적 배포(GitHub Pages): 브라우저에서 바로 추천 공고를 계산하고, 신청 내용은 메일 앱으로 전송
  */
@@ -77,11 +77,19 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-ink-300">체험 기간에는 이 단어가 든 새 공고를 맞춤공고 메일에 따로 모아 보내 드립니다.</p>
+            <p className="mt-2 text-xs text-ink-300">요금제를 이용하시면 이 단어가 든 새 공고를 맞춤공고 메일에 따로 모아 보내 드립니다.</p>
           </div>
         )}
         {result.ok.slice(0, 5).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={bidHref(m.bid.id, result.qs)} />)}
         <Link href={`/bids?${result.qs}&ok=1`} className="btn-primary w-full">전체 추천 공고 보기</Link>
+        <div className="card p-5">
+          <p className="text-sm font-bold">무료 체험: 입찰공고 3건 분석</p>
+          <p className="mt-1 text-sm text-ink-500">관심 있는 공고 3건을 골라 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 무료로 써 보세요. 공고 상세의 &lsquo;이 공고 점수 예측하기&rsquo;로도 열 수 있습니다.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/premium" className="btn-mint btn-sm">나라장터 공고 분석하기</Link>
+            <Link href="/premium/apt" className="btn-ghost btn-sm">아파트 공고 분석하기</Link>
+          </div>
+        </div>
       </div>
     );
   }

@@ -49,7 +49,7 @@ const DATA = [
 ];
 
 const FAQ = [
-  { q: "2주 무료 체험은 어떻게 진행되나요?", a: "무료 체험을 신청하고 면허·지역·금액 조건을 등록하면, 고르신 요금제 기능으로 14일 동안 이용하실 수 있습니다. 카드를 등록하지 않고 시작하므로 체험이 끝나도 자동으로 결제되지 않으며, 계속 이용할지는 그때 정하시면 됩니다." },
+  { q: "무료 체험은 어떻게 진행되나요?", a: "입찰공고 3건을 골라 평가점수 예측(나라장터·아파트), 배점표 판독, 낙찰 결과로 본 예측을 요금 없이 써 보실 수 있습니다. 나라장터와 아파트 공고를 합쳐 3건이며, 이미 분석한 공고는 다시 열어도 차감되지 않습니다. 회원 가입 기능이 생기기 전까지는 이용하신 브라우저와 조회한 사업자번호를 기준으로 셉니다. 카드를 등록하지 않으므로 체험 뒤 자동으로 결제되지 않으며, 계속 이용할지는 그때 정하시면 됩니다." },
   { q: "표시된 가격은 무엇을 기준으로 하나요?", a: "사업자 1곳, 월 단위 이용료이며 VAT 별도 금액입니다. VAT 포함 금액은 요금제 카드에 함께 적었습니다. 낙찰 금액에 비례한 성공보수 등 월 이용료 외 추가 수수료는 없습니다." },
   { q: "약정이나 해지 조건이 있나요?", a: "약정이 없습니다. 월 단위로 이용하시고, 원하는 달까지만 쓰시면 됩니다." },
   { q: "입찰 가능성 점수와 평가점수 예측은 무엇이 다른가요?", a: "입찰 가능성 점수(프로부터)는 공고 데이터로 면허·지역·규모·경쟁 강도·실적·준비 기간 6개 항목을 채점해 참여할 공고를 고르는 기준입니다. 평가점수 예측(파트너)은 한 공고의 첨부 공고서와 규격서를 읽어 평가 기준을 뽑고, 귀사 기업정보와 낙찰 10년치 유사 실적을 대입해 적격심사·협상계약의 항목별 예상 점수를 계산합니다." },
@@ -60,7 +60,7 @@ const cell = (v: Cell) => (v === true ? <span className="mx-auto grid h-6 w-6 pl
 export default function Pricing() {
   return (
     <>
-    <PageHero center eyebrow="요금제" title="입찰 담당자 채용보다 가볍게" lead="모든 요금제 2주 무료 체험 · 카드 등록 없음 · 약정 없음 · VAT 별도" />
+    <PageHero center eyebrow="요금제" title="입찰 담당자 채용보다 가볍게" lead="무료 체험 입찰공고 3건 · 카드 등록 없음 · 약정 없음 · VAT 별도" />
     <div className="container-x">
       <div className="relative z-10 -mt-6 grid gap-4 lg:grid-cols-3">
         {PLANS.map((p) => (
@@ -82,7 +82,7 @@ export default function Pricing() {
                 <li key={f} className="flex gap-2.5"><Check className="mt-0.5 h-4 w-4 shrink-0 text-mint" strokeWidth={3} />{f}</li>
               ))}
             </ul>
-            <Link href={`/apply?plan=${p.id}`} className={`relative mt-8 ${p.highlight ? "btn-mint" : "btn-ghost"}`}>2주 무료로 시작</Link>
+            <Link href={`/apply?plan=${p.id}`} className={`relative mt-8 ${p.highlight ? "btn-mint" : "btn-ghost"}`}>무료 체험으로 시작</Link>
           </div>
         ))}
       </div>
@@ -128,7 +128,7 @@ export default function Pricing() {
           ))}
           <tfoot>
             <tr>
-              <td className="text-xs text-ink-400">2주 무료 · 카드 등록 없음</td>
+              <td className="text-xs text-ink-400">무료 체험 공고 3건 · 카드 등록 없음</td>
               {PLANS.map((p) => (
                 <td key={p.id} className="text-center">
                   <Link href={`/apply?plan=${p.id}`} className={`inline-block rounded-full px-2.5 py-1.5 text-xs font-bold sm:px-4 ${p.highlight ? "bg-mint text-white" : "border border-ink-100 text-ink"}`}>시작</Link>

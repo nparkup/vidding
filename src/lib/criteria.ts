@@ -548,6 +548,8 @@ export function adoptable(ex: EvalSheet, b?: EvalBasis): boolean {
   // AI 판독은 원문 문구 확인을 거쳤으므로 "사업수행능력 + 입찰가격" 같은 두 항목 표도 받는다
   const enough = ex.reader?.by === "ai" && price.length === 1 ? ex.items.filter((i) => i.max > 0).length >= 2 : ex.items.length >= 3;
   if (!enough || price.length > 1) return false;
+  // 합계·소계 줄을 항목으로 읽은 경우 (압축 첨부 안 세부기준 전문처럼 표가 여럿인 문서에서 다른 표가 섞임)
+  if (ex.items.some((i) => /^(합\s*계|소\s*계|총\s*계|계)(\s|\d|$)/.test(i.label.trim()))) return false;
   // 가격평가가 없는 공고(기술 100점, 비예산 사업 등): 나라장터에 가격 배점이 없고 항목 합이 100점이어야 한다
   if (price.length === 0) {
     // 적격심사의 낙찰 평가표는 늘 입찰가격 배점이 있다. 가격 없는 표는 계약 전 안전보건수준 평가표나

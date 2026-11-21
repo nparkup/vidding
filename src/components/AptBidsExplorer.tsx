@@ -177,7 +177,7 @@ function AptRow({ bid: b }: { bid: AptBid }) {
           {COMPARABLE.has(b.category) && (
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/premium?apt=${encodeURIComponent(b.no)}#apt-price`); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/premium/apt?apt=${encodeURIComponent(b.no)}`); }}
               className="btn-mint btn-sm mt-2 shrink-0"
             >
               입찰가격 예측

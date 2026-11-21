@@ -265,7 +265,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
               </p>
             )}
             <p className="mt-3 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 투찰률 대신 직전 계약 대비 변화율로 계산합니다. 계약기간이 직전과 다르면 예측 화면에서 바꿔 보세요.</p>
-            {comparable && <Link href={`/premium?apt=${encodeURIComponent(b.no)}#apt-price`} className="btn-primary mt-4 w-full">계약기간 바꿔 계산하기</Link>}
+            {comparable && <Link href={`/premium/apt?apt=${encodeURIComponent(b.no)}`} className="btn-primary mt-4 w-full">계약기간 바꿔 계산하기</Link>}
           </section>
 
           <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-6 text-white shadow-glow">

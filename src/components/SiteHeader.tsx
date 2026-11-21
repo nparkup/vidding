@@ -33,7 +33,13 @@ export const NAV: Entry[] = [
       { href: "/contracts", label: "계약현황", desc: "최근 2주 계약업체·금액·기간" },
     ],
   },
-  { label: "평가점수 예측", href: "/premium" },
+  {
+    label: "평가점수 예측",
+    items: [
+      { href: "/premium", label: "나라장터 예측", desc: "적격심사·협상 예상 평가점수와 투찰률" },
+      { href: "/premium/apt", label: "아파트 예측", desc: "아파트 청소·경비 공고 예상 낙찰금액" },
+    ],
+  },
   {
     label: "실무 도구",
     items: [
@@ -48,7 +54,8 @@ export const NAV: Entry[] = [
 ];
 
 const clean = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
-const isOn = (path: string, href: string) => (href === "/bids" ? path === "/bids" || path.startsWith("/bids/") : path === href || path.startsWith(`${href}/`));
+// 나라장터 예측(/premium)은 아래에 아파트 예측(/premium/apt)이 있어 같은 주소일 때만 켠다
+const isOn = (path: string, href: string) => (href === "/premium" ? path === href : href === "/bids" ? path === "/bids" || path.startsWith("/bids/") : path === href || path.startsWith(`${href}/`));
 const entryOn = (path: string, e: Entry) => ("href" in e ? isOn(path, e.href) : e.items.some((i) => isOn(path, i.href)));
 
 export function SiteHeader() {

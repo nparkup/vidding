@@ -1,0 +1,16 @@
+name: tmp contract probe
+on:
+  push:
+    branches: [claude/project-thread-8rzxcl]
+    paths: [".github/workflows/tmp-contract-probe.yml", "scripts/tmp/**"]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npx tsx scripts/tmp/contract-probe.ts
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}

@@ -1,6 +1,8 @@
 name: GitHub Pages 배포
 
 # 영업일 아침·점심·저녁(KST 06:40, 11:40, 16:40)에 나라장터 공고를 새로 받아 사이트를 다시 만든다.
+# main 머지(push) 배포는 화면 코드만 바뀌었으면 공고를 다시 받지 않고 직전 배포 자료(data/bids.json)를 캐시에서 꺼내 쓴다.
+# 수집 코드(scripts/fetch-deps.mjs 가 찾는 파일)나 패키지가 바뀌었거나, 저장된 자료가 없거나 4일 넘게 묵었으면 새로 받는다.
 on:
   push:
     branches: [main]
@@ -29,8 +31,58 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: 자료 받기 방식 결정 (머지 배포는 수집 코드가 바뀌었는지 본다)
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          mode=fetch; why="정기·수동 배포는 항상 새로 받음"
+          if [ "$EVENT" = push ]; then
+            if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] && git fetch -q --depth=1 origin "$BEFORE"; then
+              git diff --name-only "$BEFORE" HEAD | sort > /tmp/changed.txt
+              { node scripts/fetch-deps.mjs; echo package.json; echo package-lock.json; } | sort -u > /tmp/deps.txt
+              hit=$(comm -12 /tmp/changed.txt /tmp/deps.txt | head -5 | paste -sd, -)
+              if [ -n "$hit" ]; then why="수집 코드가 바뀜: $hit"; else mode=reuse; why="화면 코드만 바뀜"; fi
+            else
+              why="직전 커밋을 못 찾아 바뀐 파일을 알 수 없음"
+            fi
+          fi
+          echo "판단: $mode ($why)"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+      - name: 직전 배포 자료 복원
+        if: steps.plan.outputs.mode == 'reuse'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/bids.json
+            data/synced-at
+          key: bids-data-${{ github.run_id }}
+          restore-keys: bids-data-
+      - name: 자료 재사용 여부 확정
+        id: mode
+        env:
+          PLAN: ${{ steps.plan.outputs.mode }}
+        run: |
+          mode=fetch
+          if [ "$PLAN" = reuse ]; then
+            if [ -s data/bids.json ] && [ -s data/synced-at ]; then
+              age=$(( $(date -u +%s) - $(cat data/synced-at) ))
+              if [ "$age" -lt 345600 ]; then
+                mode=reuse
+                echo "직전 배포 자료 재사용: $(date -u -d @"$(cat data/synced-at)" '+%Y-%m-%d %H:%M UTC')에 받은 자료 ($((age / 3600))시간 전)"
+              else
+                echo "저장된 자료가 4일 넘게 묵어 새로 받음 ($((age / 3600))시간 전)"
+              fi
+            else
+              echo "저장된 자료가 없어 새로 받음"
+            fi
+          fi
+          [ "$mode" = fetch ] && rm -f data/bids.json data/synced-at
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
       # 전년도 낙찰률 자료는 바뀌지 않으므로 받은 만큼 캐시에 두고 다음 빌드가 이어 받는다
       - name: 전년도 낙찰률 캐시 복원
+        if: steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/restore@v4
         with:
           path: .cache/award
@@ -38,6 +90,7 @@ jobs:
           restore-keys: award-stats-
       # 첨부 본문은 한 번 읽으면 바뀌지 않으므로 캐시에 두고 다음 빌드는 새 첨부만 받는다 (scripts/attachCache.ts)
       - name: 첨부 본문 캐시 복원
+        if: steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/restore@v4
         with:
           path: .cache/attach-text
@@ -45,6 +98,7 @@ jobs:
           restore-keys: attach-text-
       # 계약현황은 지난 날짜 계약이 바뀌지 않으므로 날짜별로 캐시에 두고 다음 빌드는 최근 이틀만 다시 받는다 (src/lib/nara/contract.ts)
       - name: 계약현황 캐시 복원
+        if: steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/restore@v4
         with:
           path: .cache/contracts
@@ -52,12 +106,14 @@ jobs:
           restore-keys: contracts-
       # 공동주택 지난 연도 낙찰·단지별 수의계약은 캐시에 두고 다음 빌드는 아직 안 물어본 단지부터 묻는다 (src/lib/kapt/client.ts)
       - name: 공동주택 캐시 복원
+        if: steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/restore@v4
         with:
           path: .cache/apt
           key: apt-${{ github.run_id }}
           restore-keys: apt-
       - name: 나라장터 공고 수집
+        if: steps.mode.outputs.mode == 'fetch'
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
           # 낙찰 저장소(R2)에서 낙찰률 통계와 공고 분류를 읽는다. 없으면 예전 방식으로 간다
@@ -67,29 +123,41 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
         run: npx tsx --conditions=react-server scripts/fetch-bids.ts data/bids.json
       - name: 전년도 낙찰률 캐시 저장
-        if: always()
+        if: always() && steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/save@v4
         with:
           path: .cache/award
           key: award-stats-${{ github.run_id }}
       - name: 첨부 본문 캐시 저장
-        if: always()
+        if: always() && steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/save@v4
         with:
           path: .cache/attach-text
           key: attach-text-${{ github.run_id }}
       - name: 계약현황 캐시 저장
-        if: always()
+        if: always() && steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/save@v4
         with:
           path: .cache/contracts
           key: contracts-${{ github.run_id }}
       - name: 공동주택 캐시 저장
-        if: always()
+        if: always() && steps.mode.outputs.mode == 'fetch'
         uses: actions/cache/save@v4
         with:
           path: .cache/apt
           key: apt-${{ github.run_id }}
+      # 다음 머지 배포가 다시 쓸 수 있게 새로 받은 공고 자료를 캐시에 둔다 (오래된 항목은 GitHub이 7일 뒤·10GB 넘으면 지운다)
+      - name: 배포 자료 저장
+        if: steps.mode.outputs.mode == 'fetch'
+        run: date -u +%s > data/synced-at
+      - name: 배포 자료 캐시 저장
+        if: steps.mode.outputs.mode == 'fetch'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/bids.json
+            data/synced-at
+          key: bids-data-${{ github.run_id }}
       - name: 기업 정보 중계 서버 주소 확인
         id: corp
         env:

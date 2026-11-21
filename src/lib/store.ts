@@ -58,13 +58,20 @@ function bidCache(): BidCache {
   return g.__ipchalBids;
 }
 
-/** 정적 빌드(GitHub Pages): scripts/fetch-bids.ts 가 미리 받아 둔 파일을 그대로 사용 */
+/**
+ * 정적 빌드(GitHub Pages): scripts/fetch-bids.ts 가 미리 받아 둔 파일을 그대로 사용.
+ * 파일이 수백 MB라 페이지마다 다시 읽으면 페이지 생성 워커(Next가 힙 옵션을 빼서 약 2GB)가 메모리를 넘긴다
+ * (2026-11-21 run 44847080545). 워커마다 한 번만 읽어 둔다
+ */
+let fileMemo: BidCache | null | undefined;
 function fileBids(): BidCache | null {
   const f = process.env.BIDS_FILE;
   if (!f) return null;
+  if (fileMemo !== undefined) return fileMemo;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs") as typeof import("fs");
-  return JSON.parse(fs.readFileSync(f, "utf8")) as BidCache;
+  fileMemo = JSON.parse(fs.readFileSync(f, "utf8")) as BidCache;
+  return fileMemo;
 }
 
 export async function getBids(): Promise<Bid[]> {

@@ -29,7 +29,7 @@ const SCALES = [
 /**
  * 아파트 예측: 나라장터 예측(ScorePredictor)과 같은 구성으로
  * 1. 공고 선택 → 2. 직전 계약과 이번 계약 규모 → 오른쪽 예상 낙찰금액 → 아래 공고 내용을 보여 준다.
- * 예측은 같은 단지·같은 분야 직전 계약(낙찰·수의계약)과 과거 낙찰 변화율로 낸다 (src/lib/aptPrice.ts).
+ * 예측은 같은 단지·같은 업종 직전 계약(낙찰·수의계약)과 과거 낙찰 변화율로 낸다 (src/lib/aptPrice.ts).
  */
 export function AptPredictor() {
   const sp = useSearchParams();
@@ -85,7 +85,7 @@ export function AptPredictor() {
 
   const searchBox = (
     <div className={`relative ${bid ? "mt-3" : "mt-4"}`}>
-      <input className="input" placeholder={bid ? "다른 공고 찾기: 단지명·공고명·분야·지역" : "단지명·공고명·분야·지역으로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} aria-label="아파트 공고 검색" />
+      <input className="input" placeholder={bid ? "다른 공고 찾기: 단지명·공고명·업종·지역" : "단지명·공고명·업종·지역으로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} aria-label="아파트 공고 검색" />
       {query.trim() && (
         <div className="card absolute inset-x-0 top-full z-20 mt-1 overflow-hidden">
           <p className="border-b border-ink-100 px-4 py-2 text-xs text-ink-500">
@@ -142,7 +142,7 @@ export function AptPredictor() {
         <aside className="card grid min-h-[12rem] min-w-0 place-items-center p-6 text-center">
           <div>
             <p className="font-bold">예측 기준</p>
-            <p className="mt-2 text-sm text-ink-500">공고를 고르면 같은 단지·같은 분야의 직전 계약금액과 과거 낙찰 변화율로 이번 공고의 예상 낙찰금액과 구간이 나옵니다.</p>
+            <p className="mt-2 text-sm text-ink-500">공고를 고르면 같은 단지·같은 업종의 직전 계약금액과 과거 낙찰 변화율로 이번 공고의 예상 낙찰금액과 구간이 나옵니다.</p>
           </div>
         </aside>
       </div>
@@ -234,7 +234,7 @@ export function AptPredictor() {
           )}
           {f && <BasisPanel f={f} />}
           {f?.check && f.check.n > 0 && <CheckPanel c={f.check} cutoff={model.check.cutoff} cat={f.checkBasis} />}
-          <p className="text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 분야 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 예측값은 과거 자료로 낸 추정치입니다.</p>
+          <p className="text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 업종 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 예측값은 과거 자료로 낸 추정치입니다.</p>
         </aside>
       </div>
 

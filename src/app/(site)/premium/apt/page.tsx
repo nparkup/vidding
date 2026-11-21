@@ -15,7 +15,7 @@ export default function AptPredictPage() {
       <PageHero
         eyebrow="프리미엄 · 평가점수 예측 · 아파트 예측"
         title={<>아파트 공고를 고르면,<br />예상 낙찰금액이 나옵니다.</>}
-        lead="공동주택관리정보시스템(K-apt)의 입찰결과·수의계약 공지에서 같은 단지·같은 분야의 직전 계약금액을 찾고, 과거에 직전 계약 다음 낙찰이 얼마나 달라졌는지로 이번 공고의 예상 낙찰금액과 구간을 계산합니다."
+        lead="공동주택관리정보시스템(K-apt)의 입찰결과·수의계약 공지에서 같은 단지·같은 업종의 직전 계약금액을 찾고, 과거에 직전 계약 다음 낙찰이 얼마나 달라졌는지로 이번 공고의 예상 낙찰금액과 구간을 계산합니다."
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <a href="#predict" className="btn-mint">지금 예측해 보기</a>
@@ -38,11 +38,11 @@ export default function AptPredictPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <div className="card p-7">
             <p className="text-lg font-bold">읽는 자료</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">국토교통부 공동주택 입찰공고·입찰결과·수의계약 공지를 하루 세 번 모아, 같은 단지·같은 분야의 직전 낙찰과 수의계약 금액을 공고마다 붙입니다.</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-500">국토교통부 공동주택 입찰공고·입찰결과·수의계약 공지를 하루 세 번 모아, 같은 단지·같은 업종의 직전 낙찰과 수의계약 금액을 공고마다 붙입니다.</p>
           </div>
           <div className="card p-7">
             <p className="text-lg font-bold">예측 구조</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">K-apt 결과에는 예정가격이 없어 투찰률 대신 직전 계약 대비 다음 낙찰의 변화율을 분야·낙찰방법별로 모으고, 규모가 비슷했던 계약만으로 가운데값과 구간을 냅니다.</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-500">K-apt 결과에는 예정가격이 없어 투찰률 대신 직전 계약 대비 다음 낙찰의 변화율을 업종·낙찰방법별로 모으고, 규모가 비슷했던 계약만으로 가운데값과 구간을 냅니다.</p>
           </div>
           <div className="card p-7">
             <p className="text-lg font-bold">정확도 확인</p>

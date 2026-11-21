@@ -81,8 +81,8 @@ export function buildDigest(client: ClientProfile, bids: Bid[], now = new Date()
     closingSoon: eligible.filter((r) => r.daysLeft <= 3).slice(0, 3),
     newToday: eligible.filter((r) => new Date(r.bid.postedAt).getTime() >= dayAgo).length,
     excluded: ranked.length - eligible.length,
-    preSpecs: client.plan === "partner" ? matchPreSpecs(client, preSpecs, now) : [],
-    orderPlans: client.plan === "partner" ? matchOrderPlans(client, orderPlans, now) : [],
+    preSpecs: matchPreSpecs(client, preSpecs, now),
+    orderPlans: matchOrderPlans(client, orderPlans, now),
     keywords,
     changes: changesFor(client, allChanges, new Set(eligible.map((r) => r.bid.id)), kwNos, dayAgo),
   };

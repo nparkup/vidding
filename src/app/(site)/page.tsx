@@ -15,7 +15,7 @@ import { MatchDemo } from "@/components/MatchDemo";
 import { bidPriceGuide, documentChecklist, evaluate, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
-import { PLANS } from "@/lib/plans";
+import { PricingCards } from "@/components/PricingCards";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getAptBids, getAwardCount, getBids, getContracts, getNoticeChanges, getOrderPlans, getPreSpecs, getRecentAwards } from "@/lib/store";
 import { APT_CATEGORIES } from "@/lib/apt";
@@ -53,9 +53,9 @@ const TRUST = [
 ];
 
 const PERSONAS = [
-  { tags: ["아파트 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 아파트 공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", plan: "베이직" },
-  { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 매니저가 마감 전 서류를 한 번 더 봅니다.", plan: "프로" },
-  { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", plan: "파트너" },
+  { tags: ["아파트 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 아파트 공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", use: "아침 맞춤 공고 메일·아파트 예측" },
+  { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 매니저가 마감 전 서류를 한 번 더 봅니다.", use: "입찰 가능성 점수·주간 보고서" },
+  { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", use: "사업장별 조건·평가점수 예측" },
 ];
 
 const FAQ = [
@@ -229,7 +229,7 @@ export default async function Home() {
     {
       label: "제출서류 체크리스트",
       title: "계약방법에 맞는 제출서류를 빠짐없이 정리합니다",
-      points: [<>적격심사·협상계약 등 <b>계약방법별</b> 서류를 나눠 드립니다</>, <>서류마다 <b>발급처와 유효기간</b> 주의사항을 붙입니다</>, <>프로 요금제부터 매니저가 <b>마감 전 누락 여부</b>를 확인합니다</>],
+      points: [<>적격심사·협상계약 등 <b>계약방법별</b> 서류를 나눠 드립니다</>, <>서류마다 <b>발급처와 유효기간</b> 주의사항을 붙입니다</>, <>요금제 이용 시 매니저가 <b>마감 전 누락 여부</b>를 확인합니다</>],
       use: ["처음 공공 입찰에 참가하는 업체", "체크리스트대로 서류를 모으고, 빠진 항목만 매니저에게 물어봅니다."],
       visual: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
@@ -697,7 +697,7 @@ export default async function Home() {
               </div>
               <p className="mt-5 text-lg font-bold">{p.t}</p>
               <p className="mt-2 flex-1 leading-relaxed text-ink-500">{p.d}</p>
-              <p className="mt-6 border-t border-ink-100 pt-4 text-sm text-ink-400">추천 요금제 <b className="text-ink">{p.plan}</b></p>
+              <p className="mt-6 border-t border-ink-100 pt-4 text-sm text-ink-400">자주 쓰는 기능 <b className="text-ink">{p.use}</b></p>
             </div>
           ))}
         </div>
@@ -708,30 +708,12 @@ export default async function Home() {
         <div className="text-center">
           <p className="eyebrow">요금제</p>
           <h2 className="h-section mt-3">입찰 담당자 한 명 인건비의 일부로.</h2>
-          <p className="mt-4 text-ink-500">무료 체험 입찰공고 3건 · 약정 없음 · VAT 별도 · 낙찰 성공보수 없음</p>
+          <p className="mt-4 text-ink-500">연 348,000원 한 번 결제(월 29,000원 꼴) 또는 월 33,000원 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 3건</p>
         </div>
-        <div className="mt-12 grid gap-4 lg:grid-cols-3">
-          {PLANS.map((p) => (
-            <div key={p.id} className={`relative flex flex-col overflow-hidden rounded-3xl border p-8 ${p.highlight ? "border-mint bg-white shadow-glow" : "border-ink-100 bg-white shadow-card"}`}>
-              <div className="flex items-center justify-between">
-                <p className="text-lg font-bold">{p.name}</p>
-                {p.highlight && <span className="rounded-full bg-mint px-3 py-1 text-xs font-extrabold text-white">BEST</span>}
-              </div>
-              <p className="mt-1 text-sm text-ink-500">{p.tagline}</p>
-              <p className="mt-6 text-5xl font-extrabold tracking-tight tabular-nums">
-                {(p.price / 10000).toFixed(1).replace(/\.0$/, "")}<span className="text-lg font-bold">만원</span>
-                <span className="ml-1 text-sm font-medium text-ink-300">/ 월</span>
-              </p>
-              <ul className="mt-6 flex-1 space-y-3 border-t border-ink-100 pt-6 text-sm">
-                {p.features.map((f) => (
-                  <li key={f} className="flex gap-2.5"><Check className="mt-0.5 h-4 w-4 shrink-0 text-mint" strokeWidth={3} />{f}</li>
-                ))}
-              </ul>
-              <Link href={`/apply?plan=${p.id}`} className={`mt-8 ${p.highlight ? "btn-mint" : "btn-ghost"}`}>무료 체험으로 시작</Link>
-            </div>
-          ))}
+        <div className="mx-auto mt-12 max-w-4xl">
+          <PricingCards dark={false} />
         </div>
-        <p className="mt-6 text-center"><Link href="/pricing" className="font-semibold text-mint-600">요금제 기능 자세히 비교</Link></p>
+        <p className="mt-6 text-center"><Link href="/pricing" className="font-semibold text-mint-600">요금·환불 기준 자세히 보기</Link></p>
       </section>
 
       {/* FAQ */}

@@ -21,7 +21,7 @@ export default function PremiumPage() {
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <a href="#predict" className="btn-mint">지금 예측해 보기</a>
-          <Link href="/apply?plan=partner" className="btn-ghost">파트너 요금제로 맡기기</Link>
+          <Link href="/pricing" className="btn-ghost">요금제 보기</Link>
         </div>
       </PageHero>
 

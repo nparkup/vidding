@@ -14,7 +14,7 @@ function weekLabel(d = new Date()) {
 export default async function Reports({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
   const sp = await searchParams;
   const all = await listClients();
-  const clients = all.filter((c) => c.plan !== "basic");
+  const clients = all;
   const reports = await listReports();
   return (
     <>

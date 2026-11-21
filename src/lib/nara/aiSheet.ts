@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 8;
+export const AI_SHEET_VERSION = 9;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -194,7 +194,9 @@ export async function readSheetWithAI(
   const r = toSheet(out, text, bid, model);
   if (!r.sheet) return { model, status: "rejected", reason: r.reason, usage };
   // 나라장터에 등록된 기술·가격 배점과도 맞아야 화면에서 쓴다
-  if (!adoptable(r.sheet, { techRatio: opts.techRatio, priceRatio: opts.priceRatio })) return { model, status: "rejected", reason: "나라장터 기술·가격 배점과 다름", usage };
+  if (!adoptable(r.sheet, { techRatio: opts.techRatio, priceRatio: opts.priceRatio, method: bid.contractMethod === "적격심사" ? "적격심사" : undefined })) {
+    return { model, status: "rejected", reason: bid.contractMethod === "적격심사" && !r.sheet.items.some((i) => i.kind === "price") ? "적격심사인데 입찰가격 배점이 없는 표 (계약 전 안전보건 평가표 등)" : "나라장터 기술·가격 배점과 다름", usage };
+  }
   return { model, status: "ok", sheet: r.sheet, usage };
 }
 

@@ -12,14 +12,15 @@ import { AnalysisEngine } from "@/components/home/AnalysisEngine";
 import { AgencyMark } from "@/components/home/AgencyMark";
 import { agencyLogoKey } from "@/lib/agencyLogos";
 import { MatchDemo } from "@/components/MatchDemo";
-import { documentChecklist, evaluate, rank } from "@/lib/analysis";
+import { bidPriceGuide, documentChecklist, evaluate, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
-import { getAptBids, getAwardCount, getBids } from "@/lib/store";
+import { getAptBids, getAwardCount, getBids, getContracts, getNoticeChanges, getOrderPlans, getPreSpecs, getRecentAwards } from "@/lib/store";
+import { APT_CATEGORIES } from "@/lib/apt";
 import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
-import { bidHref } from "@/lib/links";
+import { aptBidHref, bidHref } from "@/lib/links";
 
 export const revalidate = 600;
 
@@ -33,15 +34,18 @@ const BIZ_ART = { 용역: ITArt, 공사: ConstructionArt, 물품: SupplyArt } as
 
 const COMPARE = [
   ["공고 탐색", "직접 키워드 검색, 수백 건 확인", "조건에 맞는 공고만 매일 배달"],
+  ["공고 범위", "나라장터와 아파트 공고를 사이트마다 따로 확인", "나라장터 전 업종과 아파트 관리 입찰을 한 곳에서"],
   ["업종 범위", "전 업종 공고를 한 목록에 나열", "전 업종 수집 후 귀사 면허에 맞는 공고만"],
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 체크리스트 제공"],
   ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 채점과 S·A·B·C 등급"],
+  ["정정·취소", "공고를 다시 열어 바뀐 곳을 직접 비교", "바뀐 항목만 골라 따로 알림"],
+  ["낙찰 분석", "과거 결과를 건마다 직접 검색", "10년치 낙찰 기록으로 사정율·발주처·경쟁사 분석"],
 ];
 
 const TRUST = [
-  { t: "공공데이터 원본 그대로", d: "조달청 나라장터가 공공데이터포털로 공개하는 공고 데이터를 가공 없이 받아 씁니다." },
-  { t: "영업일 하루 세 번 갱신", d: "아침·점심·저녁에 새 공고를 다시 받아 정정 공고와 마감 변경을 놓치지 않습니다." },
+  { t: "공공데이터 원본 그대로", d: "조달청 나라장터와 국토교통부 공동주택관리정보시스템(K-apt)이 공공데이터포털로 공개하는 공고·낙찰 데이터를 가공 없이 받아 씁니다." },
+  { t: "영업일 하루 세 번 갱신", d: "아침·점심·저녁에 새 공고를 다시 받고, 정정·취소 공고는 이전 차수와 비교해 바뀐 항목을 따로 알려 드립니다." },
   { t: "17개 시·도 지역제한 판정", d: "공고문의 참가 가능 지역을 읽어 귀사 소재지로 참가할 수 있는지 먼저 가립니다." },
   { t: "가중치와 점수 근거 공개", d: "면허 30·지역 20·규모 15·경쟁 15·실적 10·기간 10점. 가중치와 항목별 점수, 그 근거를 모두 보여 드립니다." },
   { t: "투찰은 귀사가 직접", d: "법령상 투찰은 대리할 수 없습니다. 저희는 판단과 준비를 돕고, 결정과 투찰은 귀사가 합니다." },
@@ -49,14 +53,15 @@ const TRUST = [
 ];
 
 const PERSONAS = [
-  { tags: ["청소·시설관리", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "아침 메일 한 통으로 오늘 볼 공고만 확인하고, 관심 공고만 골라 서류 준비를 맡기세요.", plan: "베이직" },
+  { tags: ["아파트 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 아파트 공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", plan: "베이직" },
   { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 매니저가 마감 전 서류를 한 번 더 봅니다.", plan: "프로" },
   { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", plan: "파트너" },
 ];
 
 const FAQ = [
   { q: "프로그램을 설치하거나 매일 접속해야 하나요?", a: "아닙니다. 조건만 한 번 등록하시면 영업일마다 이메일로 받아 보시면 됩니다. 필요할 때만 웹에서 공고 분석을 열어보시면 됩니다." },
-  { q: "공고 데이터는 어디서 오나요?", a: "조달청 나라장터가 공공데이터포털로 공개하는 입찰공고·낙찰·사전규격 정보를 매일 수집해 분석합니다." },
+  { q: "공고 데이터는 어디서 오나요?", a: "조달청 나라장터가 공공데이터포털로 공개하는 입찰공고·낙찰·사전규격·발주계획·계약 정보와, 국토교통부 공동주택관리정보시스템(K-apt)의 아파트 입찰공고·입찰결과·수의계약 정보를 매일 수집해 분석합니다." },
+  { q: "아파트 관리 입찰도 볼 수 있나요?", a: "네. 아파트 청소·경비·소독·승강기 유지·위탁관리·공사 공고를 업종별로 모아 보여 드리고, 같은 단지의 직전 낙찰·수의계약 금액과 아파트 입찰가격 예측을 함께 제공합니다." },
   { q: "입찰 가능성 점수는 어떻게 계산하나요?", a: "입찰 특화 알고리즘이 6개 항목을 가중 채점합니다. 면허 요건 30점, 참가 지역 20점, 사업 규모 15점은 필수 조건으로 먼저 판정하고, 하나라도 맞지 않으면 39점 이하로 제한해 제외합니다. 통과한 공고는 유사 공고 평균 참여업체 수로 본 경쟁 강도 15점, 기초금액 대비 실적 10점, 남은 준비 기간 10점을 더해 100점 만점으로 산출하고, 85점 이상 S, 72점 이상 A, 58점 이상 B, 그 아래는 C 등급을 붙입니다." },
   { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트LAB은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
@@ -67,6 +72,13 @@ export default async function Home() {
   // 현황 줄은 나라장터와 아파트(K-apt) 공고·낙찰을 합친 누적 숫자다 (낙찰 저장소에 쌓인 것)
   const apt = await getAptBids();
   const awardCount = getAwardCount();
+  // 입찰 분석 메뉴 카드에 붙일 건수 (빌드 때 받은 자료, 없으면 숫자 없이 보여 준다)
+  const [plans, preSpecs, contracts, changes, recent] = await Promise.all([getOrderPlans(), getPreSpecs(), getContracts(), getNoticeChanges(), getRecentAwards()]);
+  // 아파트 공고: 마감 전 공고만, 업종별 건수와 직전 낙찰금액이 붙은 예시
+  const aptOpen = apt.items.filter((b) => new Date(b.closeAt).getTime() > builtAt);
+  const aptCats = APT_CATEGORIES.map((c) => ({ c, n: aptOpen.filter((b) => b.category === c).length })).filter((x) => x.n > 0);
+  const aptWithPrior = aptOpen.filter((b) => b.prior && b.prior.amount > 0);
+  const aptSamples = [...aptWithPrior.filter((b) => b.category !== "공사"), ...aptOpen.filter((b) => !b.prior)].slice(0, 3);
   // 아파트 공고 중 나라장터 공고와 번호가 겹치는 것은 한 번만 센다
   const aptNotices = Math.max(0, (awardCount?.aptNotices ?? 0) - (awardCount?.aptDup ?? 0));
   // 아파트 낙찰(입찰결과 누적, 없으면 빌드 때 받은 최근 3개 연도)과 수의계약을 모두 더한다
@@ -89,6 +101,7 @@ export default async function Home() {
   const featuredEval = evaluate(featured, itClient);
   const docs = documentChecklist(featured);
   const docCount = docs.reduce((s, g) => s + g.items.length, 0);
+  const guide = bidPriceGuide(featured);
 
   // 1차 선별 단계별 남는 공고 수 (예시 고객사 기준)
   const buildClient = SEED_CLIENTS[4];
@@ -275,28 +288,69 @@ export default async function Home() {
       ),
     },
     {
-      label: "주간 보고서",
-      title: "매주 월요일, 이번 주 집중할 공고를 정리해 드립니다",
-      desc: "지난주 공고 흐름, 이번 주 꼭 볼 공고 TOP 5, 발주기관 동향, 매니저 코멘트를 한 장 보고서로 받습니다.",
-      href: "/report/sample",
-      cta: "보고서 샘플 보기",
+      label: "평가점수 예측",
+      title: "적격심사·협상 공고의 예상 점수와 투찰률을 미리 계산합니다",
+      desc: "공고 첨부의 배점표와 공고서 기준을 읽고 귀사 실적·경영상태·신뢰도 가감점을 넣어 항목별 예상 점수를 냅니다. 같은 사업의 과거 낙찰률과 참가 예상 기업까지 함께 봅니다.",
+      href: "/premium",
+      cta: "나라장터 예측 열기",
       preview: (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-lift">
-          <div className="bg-ink p-5 text-white">
-            <p className="text-xs text-mint-300">주간 분석보고서 · 이번 주</p>
-            <p className="mt-1 text-lg font-bold">{client.company}</p>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              {[["참가 가능", `${clientEligible.length}건`], ["총 규모", won(clientEligible.reduce((s, r) => s + r.bid.baseAmount, 0))], ["A등급 이상", `${clientEligible.filter((r) => r.grade === "S" || r.grade === "A").length}건`]].map(([k, v]) => (
-                <div key={k} className="rounded-xl bg-white/5 p-2.5"><p className="text-[11px] text-ink-300">{k}</p><p className="mt-0.5 font-bold">{v}</p></div>
-              ))}
-            </div>
-          </div>
-          <div className="p-5">
-            <DeskArt className="mx-auto w-full max-w-[260px]" />
-          </div>
+        <div className="rounded-2xl bg-white p-5 shadow-lift">
+          <p className="text-xs text-ink-400">{featured.demandAgency}</p>
+          <p className="mt-1 font-bold">{featured.title}</p>
+          <dl className="mt-4 grid grid-cols-2 gap-2">
+            {[
+              ["기초금액", won(featured.baseAmount)],
+              ["낙찰하한율", featured.lowerLimitRate ? `${featured.lowerLimitRate}%` : "해당 없음"],
+              ["예상 투찰 범위", `${won(guide.low)} ~ ${won(guide.high)}`],
+            ].map(([k, v], n) => (
+              <div key={k} className={`min-w-0 rounded-xl bg-paper p-3 ${n === 2 ? "col-span-2" : ""}`}>
+                <dt className="text-[11px] text-ink-400">{k}</dt>
+                <dd className="mt-0.5 truncate text-sm font-bold">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <ol className="mt-4 space-y-1.5 text-sm text-ink-500">
+            {["공고 첨부 배점표·공고서 기준 판독", "실적·경영상태·신뢰도 가감점 입력", "항목별 예상 점수와 투찰률 산출"].map((t, n) => (
+              <li key={t} className="flex gap-2.5"><span className="font-bold tabular-nums text-mint-600">0{n + 1}</span>{t}</li>
+            ))}
+          </ol>
         </div>
       ),
     },
+    {
+      label: "아파트 공고",
+      title: "아파트 청소·경비·위탁관리 입찰도 함께 봅니다",
+      desc: "공동주택관리정보시스템(K-apt)의 아파트 입찰공고를 업종별로 모으고, 같은 단지의 직전 낙찰·수의계약 금액과 예상 낙찰금액을 붙여 드립니다.",
+      href: "/apt-bids",
+      cta: "아파트 공고 열기",
+      preview: (
+        <div className="space-y-2">
+          {aptSamples.length ? aptSamples.map((b) => (
+            <Link key={b.no} href={aptBidHref(b.no)} className="block rounded-2xl bg-white p-4 shadow-card transition hover:shadow-lift">
+              <p className="text-xs text-ink-400">{b.apt} · {b.region} · {b.category}</p>
+              <p className="mt-1 font-semibold leading-snug">{b.title}</p>
+              <p className="mt-1.5 text-xs text-ink-500">
+                마감 {b.closeAt.slice(0, 10)}
+                {b.prior && b.prior.amount > 0 && <> · 직전 {b.prior.via ?? "낙찰"} <b className="text-ink">{won(b.prior.amount)}</b></>}
+              </p>
+            </Link>
+          )) : (
+            <div className="rounded-2xl bg-white p-5 text-sm text-ink-500 shadow-card">아파트 공고는 매일 새로 받아 업종별로 보여 드립니다.</div>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const ANALYSIS: { tag: string; t: string; d: string; href: string; n?: number; unit?: string }[] = [
+    { tag: "낙찰", t: "최근 낙찰 결과", d: "최근 한 달 최종낙찰 업체와 개찰 순위, 사정율을 봅니다.", href: "/awards", n: recent?.rows.length, unit: "최근 한 달" },
+    { tag: "발주처", t: "발주처 분석", d: "수요기관별 낙찰률·사정율 분포와 자주 낙찰받는 업체를 봅니다.", href: "/analysis/agency" },
+    { tag: "경쟁사", t: "경쟁사 투찰 성향", d: "경쟁사가 주로 쓰는 사정율 구간과 주요 발주처를 확인합니다.", href: "/analysis/rival" },
+    { tag: "우리 회사", t: "우리 회사 진단", d: "사업자번호 하나로 10년치 낙찰을 발주처·지역·금액별로 나누고 사정율 습관을 진단합니다.", href: "/analysis/mine" },
+    { tag: "사전 준비", t: "발주계획", d: "기관이 미리 올린 넉 달 치 발주 예정 사업을 업종별로 모았습니다.", href: "/plans", n: plans.length, unit: "발주 예정" },
+    { tag: "사전 준비", t: "사전규격 미리보기", d: "본공고 전에 공개된 규격으로 준비 기간을 먼저 확보합니다.", href: "/prespecs", n: preSpecs.length, unit: "최근 2주" },
+    { tag: "계약", t: "계약현황", d: "최근 2주 계약업체·계약금액·계약기간을 발주처별로 봅니다.", href: "/contracts", n: contracts.length, unit: "최근 2주" },
+    { tag: "알림", t: "정정·취소 공고", d: "바뀐 마감일·개찰일·금액을 이전 공고와 비교해 보여 드립니다.", href: "/changes", n: changes.length, unit: "최근 2주" },
   ];
 
   return (
@@ -317,12 +371,12 @@ export default async function Home() {
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님이.</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
-            입찰 특화 알고리즘이 나라장터 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해, 점수와 근거를 매일 아침 보내 드립니다.
+            입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해 매일 아침 보내 드립니다. 아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.
           </p>
           <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/apply" className="btn-mint px-7 text-base">2주 무료로 시작하기</Link>
-            <Link href="/bids" className="btn-ghost px-7 text-base">오늘의 공고 둘러보기</Link>
+            <Link href="/bids" className="btn-ghost px-7 text-base">공고 검색 둘러보기</Link>
           </div>
           <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-ink-400">
             {["카드 등록 없음", "약정 없음", "조건 등록 3분"].map((t) => (
@@ -446,6 +500,42 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* 아파트 관리 입찰 */}
+      <section className="container-x pt-10">
+        <div className="card grid gap-8 overflow-hidden bg-gradient-to-br from-sky-100/70 via-white to-white p-5 sm:p-8 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+          <div className="min-w-0">
+            <p className="eyebrow">아파트 관리 입찰</p>
+            <h3 className="mt-3 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
+            <p className="mt-4 leading-relaxed text-ink-500">공동주택관리정보시스템(K-apt)에 올라온 아파트 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다. 아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+              <Link href="/apt-bids" className="btn-primary">아파트 공고 보기</Link>
+              <Link href="/premium/apt" className="btn-ghost">아파트 입찰가격 예측</Link>
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-white p-4 shadow-card">
+                <p className="text-xs text-ink-400">진행 중인 아파트 공고</p>
+                <p className="mt-1 text-3xl font-extrabold tabular-nums">{aptOpen.length.toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-400">건</span></p>
+              </div>
+              <div className="rounded-2xl bg-white p-4 shadow-card">
+                <p className="text-xs text-ink-400">직전 낙찰금액 확인</p>
+                <p className="mt-1 text-3xl font-extrabold tabular-nums text-mint-600">{aptWithPrior.length.toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-400">건</span></p>
+              </div>
+            </div>
+            {aptCats.length > 0 && (
+              <ul className="mt-4 flex flex-wrap gap-1.5">
+                {aptCats.map(({ c, n }) => (
+                  <li key={c} className="inline-flex items-center gap-1.5 rounded-full border border-ink-100 bg-white px-3 py-1.5 text-sm text-ink-700">
+                    {c}<span className="text-xs font-bold tabular-nums text-ink-300">{n.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* 기능 탭 */}
       <section className="container-x pt-28">
         <div className="text-center">
@@ -454,6 +544,27 @@ export default async function Home() {
         </div>
         <div className="mt-10">
           <FeatureTabs tabs={TABS} />
+        </div>
+      </section>
+
+      {/* 입찰 분석 메뉴 */}
+      <section className="container-x pt-28">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="eyebrow">입찰 분석</p>
+            <h2 className="h-section mt-3">공고 밖의 흐름까지<br className="sm:hidden" /> 숫자로 봅니다.</h2>
+          </div>
+          <p className="max-w-md text-ink-500">2016년부터 쌓은 낙찰 기록과 발주계획·사전규격·계약 정보로 발주처와 경쟁사의 움직임을 미리 읽습니다.</p>
+        </div>
+        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {ANALYSIS.map((a) => (
+            <Link key={a.href} href={a.href} className="card group flex min-w-0 flex-col p-5 transition hover:border-mint hover:shadow-lift">
+              <p className="text-xs font-bold text-mint-600">{a.tag}</p>
+              <p className="mt-1.5 text-lg font-bold group-hover:text-mint-600">{a.t}</p>
+              <p className="mt-1.5 flex-1 text-sm leading-relaxed text-ink-500">{a.d}</p>
+              {a.n !== undefined && a.n > 0 && <p className="mt-4 text-sm text-ink-400">{a.unit} <b className="tabular-nums text-ink">{a.n.toLocaleString()}</b>건</p>}
+            </Link>
+          ))}
         </div>
       </section>
 

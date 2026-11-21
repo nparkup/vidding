@@ -37,10 +37,26 @@ const filesOf = (it: Item): BidAttachment[] => {
 
 const show = (r: LiveResult) => r.sheet ? `${r.status}(${r.by}) ${r.sheet.items.length}항목 합${r.sheet.items.reduce((a, i) => a + i.max, 0)}` : `${r.status}${r.reason ? ` - ${r.reason}` : ""}`;
 
+async function byId(no: string): Promise<{ it: Item; biz: string } | undefined> {
+  for (const [biz, op] of [["용역", "Servc"], ["공사", "Cnstwk"], ["물품", "Thng"]]) {
+    const q = new URLSearchParams({ type: "json", numOfRows: "10", pageNo: "1", inqryDiv: "2", bidNtceNo: no });
+    try {
+      const j = await (await fetch(`https://apis.data.go.kr/1230000/ad/BidPublicInfoService02/getBidPblancListInfo${op}02?serviceKey=${KEY}&${q}`, { signal: AbortSignal.timeout(60_000) })).json();
+      const items: Item[] = j?.response?.body?.items ?? [];
+      const it = items.sort((a, b) => (b.bidNtceOrd ?? "").localeCompare(a.bidNtceOrd ?? ""))[0];
+      if (it) return { it, biz };
+    } catch { /* 다음 업무 */ }
+  }
+  return undefined;
+}
+
 async function main() {
-  const days = Number(process.argv[2] || 10), max = Number(process.argv[3] || 40);
+  // 공고번호를 주면 그 공고만 (예: R26BK01846123+R26BK01845329), 아니면 최근 영업일에서 고른다
+  const ids = /^R\d/.test(process.argv[2] ?? "") ? process.argv[2].split(/[+ ]/).filter(Boolean) : [];
+  const days = ids.length ? 0 : Number(process.argv[2] || 10), max = ids.length || Number(process.argv[3] || 40);
   const ext: Record<string, number> = {};
   const cands: { it: Item; biz: string }[] = [];
+  for (const no of ids) { const f = await byId(no); if (f) cands.push(f); }
   let total = 0;
   for (let back = 1, got = 0; got < days && back < days * 2 + 6; back++) {
     const d = new Date(Date.now() + 9 * 3600_000 - back * 86400_000);

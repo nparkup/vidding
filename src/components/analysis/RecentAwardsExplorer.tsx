@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AwardsCharts } from "@/components/analysis/AwardsCharts";
 import { won, wonFull } from "@/lib/format";
 import { assessRate, methodGroup, type RecentAwardRow, type RecentAwardsFile } from "@/lib/recentAwards";
 
@@ -121,6 +122,8 @@ export function RecentAwardsExplorer() {
         {data.from}~{data.to} 최종낙찰 {data.rows.length.toLocaleString()}건 중 {shown.length.toLocaleString()}건
         {summary && ` · 낙찰금액 합계 ${won(summary.total)} · 낙찰률 중앙값 ${pct(summary.medRate)} · 평균 참가 ${summary.avgBidders.toLocaleString()}곳`}
       </p>
+
+      <AwardsCharts rows={shown} />
 
       <ul className="mt-3 space-y-3">
         {shown.slice(0, limit).map((r) => <AwardCard key={`${r[0]}-${r[1]}-${r[3]}-${r[8]}`} r={r} />)}

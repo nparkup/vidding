@@ -101,6 +101,13 @@ export function AptPredictor() {
   const k = priorMonths && want ? want / priorMonths : Number(scale) || 1;
   const f = bid && model && prior && PRICEABLE.has(bid.category) ? forecastAptPrice(model, bid.category, bid.award, prior, k) : undefined;
 
+  const basis = f ? (
+    <>
+      <BasisPanel f={f} />
+      {f.check && f.check.n > 0 && model && <CheckPanel c={f.check} cutoff={model.check.cutoff} cat={f.checkBasis} />}
+    </>
+  ) : null;
+
   const searchBox = (
     <div className={`relative ${bid ? "mt-3" : "mt-4"}`}>
       <input className="input" placeholder={bid ? "다른 공고 찾기: 단지명·공고명·업종·지역" : "단지명·공고명·업종·지역으로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} aria-label="아파트 공고 검색" />
@@ -258,9 +265,12 @@ export function AptPredictor() {
               <p className="mt-3 text-xs leading-relaxed text-ink-500">공고서의 계약기간·과업 범위가 직전과 다르면 계약기간이나 규모를 바꿔 보세요. 계약기간이 1년에서 2년으로 늘면 금액도 거의 두 배가 됩니다.</p>
             </section>
           )}
+
+          {/* 넓은 화면: 계산 기준·정확도는 입력 아래에 둔다 (오른쪽 결과만 길어져 왼쪽이 비지 않게) */}
+          {basis && <div className="hidden space-y-6 lg:block">{basis}</div>}
         </div>
 
-        {/* 결과: 예상 낙찰금액 → 계산 기준 → 정확도 */}
+        {/* 결과: 예상 낙찰금액 → 낙찰 결과로 본 예측 */}
         <aside ref={resultRef} className="min-w-0 scroll-mt-20 space-y-4 lg:self-start">
           {f ? <PriceCard f={f} /> : (
             <section className="card p-6">
@@ -271,8 +281,8 @@ export function AptPredictor() {
             </section>
           )}
           <AptForecastCard bid={bid} f={f} />
-          {f && <BasisPanel f={f} />}
-          {f?.check && f.check.n > 0 && <CheckPanel c={f.check} cutoff={model.check.cutoff} cat={f.checkBasis} />}
+          {/* 좁은 화면: 예상 금액 다음에 계산 기준·정확도 */}
+          {basis && <div className="space-y-4 lg:hidden">{basis}</div>}
           <p className="text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 업종 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 예측값은 과거 자료로 낸 추정치입니다.</p>
         </aside>
       </div>

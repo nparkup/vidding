@@ -177,10 +177,11 @@ export function AptAwardSection({ bid }: { bid: AptBid }) {
       {!h ? (
         <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 비교할 지난 낙찰이 없습니다. 같은 단지·같은 지역의 같은 업종 낙찰이 최근 3개 연도에 없거나 사이트가 다시 만들어질 때 채워집니다.</p>
       ) : (
-        <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="mt-4 grid min-w-0 grid-cols-1 gap-4">
+          {/* 응찰 업체 목록 길이가 공고마다 달라 두 칸으로 나누면 빈 자리가 생긴다. 위아래로 쌓는다 */}
           <SameCard same={h.same} />
-          <TrendCard same={h.same} />
-          <div className="min-w-0 lg:col-span-2">
+          {h.same.length >= 2 && <TrendCard same={h.same} />}
+          <div className="min-w-0">
             <SimilarCard similar={h.similar} region={bid.region} category={bid.category} />
           </div>
         </div>

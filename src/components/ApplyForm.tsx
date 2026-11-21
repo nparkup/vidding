@@ -145,7 +145,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
             {joined && <p className="mt-2 rounded-xl bg-mint-50 px-3 py-2 text-xs text-mint-700">이 브라우저는 {joined}(으)로 가입되어 있습니다. 바로 <Link href="/premium#predict" className="font-semibold underline">공고 분석</Link>을 시작하셔도 됩니다.</p>}
           </div>
           {(error || msg) && <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">{msg || "회사명, 이메일, 연락처는 꼭 입력해 주세요."}</p>}
-          {plan && <input type="hidden" name="message" value={`관심 결제 방식: ${planName(plan)}`} />}
+          {plan && <input type="hidden" name="message" value={`관심 이용권: ${planName(plan)}`} />}
 
           <fieldset className="space-y-4">
             <legend className="text-sm font-bold">기본 정보</legend>

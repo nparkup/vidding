@@ -38,7 +38,7 @@ export function ApplyLayout({ children }: { children: React.ReactNode }) {
               ))}
             </ul>
             <a href="#signup" className="btn-mint mt-6 w-full lg:hidden">회원가입하고 시작하기</a>
-            <p className="mt-5 text-xs text-ink-300">카드 등록 없음 · 자동 결제 없음 · 체험 뒤 연간 월 <Price k="annualMonthly" />원 · 월간 월 <Price k="monthly" />원, VAT 포함</p>
+            <p className="mt-5 text-xs text-ink-300">카드 등록 없음 · 자동 결제 없음 · 체험 뒤 월간 이용권 월 <Price k="lite" />원부터, VAT 포함</p>
           </div>
         </div>
 

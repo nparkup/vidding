@@ -216,7 +216,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
         </div>
         <dl className="grid grid-cols-[5.5rem_1fr] gap-x-3 gap-y-1">
           <dt className="text-xs text-ink-500">규모</dt><dd>{SIZE_LABEL[m.size ?? ""] ?? "-"}</dd>
-          <dt className="text-xs text-ink-500">관심 결제</dt><dd>{m.plan || "-"}</dd>
+          <dt className="text-xs text-ink-500">관심 이용권</dt><dd>{m.plan ? planName(m.plan) : "-"}</dd>
           <dt className="text-xs text-ink-500">마지막 조회</dt><dd>{m.seen ? `${dt(m.seen.last)} (${m.seen.n.toLocaleString()}회)` : "-"}</dd>
         </dl>
         <div className="space-y-2 border-t border-ink-100 pt-3">

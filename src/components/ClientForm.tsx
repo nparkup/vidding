@@ -56,7 +56,7 @@ export function ClientForm({ init = {} }: { init?: Init }) {
         <div><label className="label">신용등급</label>
           <select name="creditGrade" defaultValue={init.creditGrade ?? "BBB"} className="input">{["A", "BBB", "BB", "B", "CCC"].map((g) => <option key={g}>{g}</option>)}</select></div>
         <div><label className="label">요금제</label>
-          <select name="plan" defaultValue={init.plan ?? "monthly"} className="input">{PLANS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+          <select name="plan" defaultValue={init.plan ?? "lite"} className="input">{PLANS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
         <div><label className="label">상태</label>
           <select name="status" defaultValue={init.status ?? "체험"} className="input">{["활성", "체험", "일시중지"].map((s) => <option key={s}>{s}</option>)}</select></div>
       </div>

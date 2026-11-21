@@ -709,9 +709,9 @@ export default async function Home() {
         <div className="text-center">
           <p className="eyebrow">요금제</p>
           <h2 className="h-section mt-3">입찰 담당자 한 명 인건비의 일부로.</h2>
-          <p className="mt-4 text-ink-500">연간 월 <Price k="annualMonthly" />원 · 월간 월 <Price k="monthly" />원 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 <TrialN />건</p>
+          <p className="mt-4 text-ink-500">월간 이용권 월 <Price k="lite" />원부터 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 <TrialN />건</p>
         </div>
-        <div className="mx-auto mt-12 max-w-4xl">
+        <div className="mt-12">
           <PricingCards dark={false} />
         </div>
         <p className="mt-6 text-center"><Link href="/pricing" className="font-semibold text-mint-600">요금·환불 기준 자세히 보기</Link></p>

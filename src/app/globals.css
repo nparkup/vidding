@@ -35,6 +35,12 @@
     background-image: linear-gradient(rgba(11,20,38,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(11,20,38,.045) 1px, transparent 1px);
     background-size: 40px 40px;
   }
+  /* 가로로 넘기는 탭·칩 줄: 스크롤바 숨김, 넘칠 때만 끝을 흐리게 (ScrollRow가 data-fade-* 를 붙임) */
+  .scroll-row { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+  .scroll-row::-webkit-scrollbar { display: none; }
+  .scroll-row[data-fade-end="true"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
+  .scroll-row[data-fade-start="true"] { -webkit-mask-image: linear-gradient(to right, transparent, #000 2.5rem); mask-image: linear-gradient(to right, transparent, #000 2.5rem); }
+  .scroll-row[data-fade-start="true"][data-fade-end="true"] { -webkit-mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); }
   .mask-fade { mask-image: radial-gradient(ellipse at center, #000 40%, transparent 75%); }
   .input { @apply w-full rounded-xl border border-ink-100 bg-white px-3.5 py-2.5 text-[15px] outline-none transition focus:border-mint focus:ring-4 focus:ring-mint-100; }
   .calc-input { @apply w-full min-w-0 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-[15px] tabular-nums text-white outline-none transition focus:border-mint; }

@@ -18,14 +18,14 @@ export function FeatureTabs({ tabs }: { tabs: FeatureTab[] }) {
   const t = tabs[i];
   return (
     <div>
-      <div role="tablist" className="mx-auto flex max-w-2xl gap-1 overflow-x-auto rounded-full bg-paper p-1">
+      <div role="tablist" className="mx-auto grid max-w-2xl grid-cols-2 gap-1 rounded-3xl bg-paper p-1 sm:flex sm:rounded-full">
         {tabs.map((x, n) => (
           <button
             key={x.label}
             role="tab"
             aria-selected={n === i}
             onClick={() => setI(n)}
-            className={`flex-1 whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold transition ${n === i ? "bg-white text-ink shadow-card" : "text-ink-400 hover:text-ink"}`}
+            className={`flex-1 whitespace-nowrap rounded-[1.25rem] sm:rounded-full px-4 py-2.5 text-sm font-semibold transition ${n === i ? "bg-white text-ink shadow-card" : "text-ink-400 hover:text-ink"}`}
           >
             {x.label}
           </button>

@@ -9,7 +9,7 @@ import { FeatureTabs } from "@/components/home/FeatureTabs";
 import { ProductMockup } from "@/components/home/ProductMockup";
 import { HeroStats } from "@/components/home/HeroStats";
 import { AnalysisEngine } from "@/components/home/AnalysisEngine";
-import { AgencyMark, AGENCY_KINDS } from "@/components/home/AgencyMark";
+import { AgencyMark } from "@/components/home/AgencyMark";
 import { agencyLogoKey } from "@/lib/agencyLogos";
 import { MatchDemo } from "@/components/MatchDemo";
 import { documentChecklist, evaluate, rank } from "@/lib/analysis";
@@ -104,17 +104,17 @@ export default async function Home() {
   ] as const;
   const cut = bids.length ? Math.round((1 - eligible.length / bids.length) * 100) : 0;
 
-  // 공식 CI가 있는 기관을 먼저, 같은 CI(예: 정부상징)는 한 번만 보여 주고 나머지 자리는 다른 기관으로 채운다
+  // 공식 CI가 확인된 기관만, 같은 CI(예: 정부상징)는 한 번만. 확인되지 않은 기관은 띠에 넣지 않는다
   const agencies = (() => {
-    const names = [...new Set(bids.map((b) => b.demandAgency))];
     const seen = new Set<string>();
-    const withLogo = names.filter((n) => {
+    const list = [...new Set(bids.map((b) => b.demandAgency))].filter((n) => {
       const k = agencyLogoKey(n);
       if (!k || seen.has(k)) return false;
       seen.add(k);
       return true;
-    });
-    return [...withLogo, ...names.filter((n) => !agencyLogoKey(n))].slice(0, 24);
+    }).slice(0, 30);
+    // 기관이 적으면 띠 한 바퀴가 화면보다 짧아 빈 곳이 보이므로 같은 목록을 이어 붙여 24칸 이상으로 만든다
+    return list.length ? Array.from({ length: Math.ceil(24 / list.length) }, () => list).flat() : [];
   })();
   // 업무 구분·업종별 공고 수 (외자는 물품에 포함)
   const bizOf = (b: (typeof bids)[number]): keyof typeof CATEGORY_GROUPS => {
@@ -337,7 +337,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 발주기관 마키 */}
+      {/* 발주기관 마키 (공식 CI가 확인된 기관만) */}
+      {agencies.length > 0 && (
       <section className="pt-16">
         <p className="container-x text-center text-sm font-semibold text-ink-400">오늘 수집한 공고의 발주기관</p>
         <div className="relative mt-5 overflow-hidden">
@@ -354,13 +355,8 @@ export default async function Home() {
             ))}
           </div>
         </div>
-        <div className="container-x mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] text-ink-400">
-          {AGENCY_KINDS.map((k) => (
-            <span key={k.label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: k.fill }} />{k.label}</span>
-          ))}
-          <span className="basis-full text-center text-ink-300 sm:basis-auto">CI는 위키미디어 공용에 공개된 기관 공식 CI이며, 확인되지 않은 기관은 입찰메이트LAB이 만든 유형 표시입니다. 공고를 낸 기관을 알아보기 쉽게 하려는 표시로, 고객사나 제휴 기관을 뜻하지 않습니다.</span>
-        </div>
       </section>
+      )}
 
       {/* 숫자 */}
       <section className="container-x pt-20">

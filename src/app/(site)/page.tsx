@@ -10,6 +10,7 @@ import { ProductMockup } from "@/components/home/ProductMockup";
 import { HeroStats } from "@/components/home/HeroStats";
 import { AnalysisEngine } from "@/components/home/AnalysisEngine";
 import { AgencyMark, AGENCY_KINDS } from "@/components/home/AgencyMark";
+import { agencyLogoKey } from "@/lib/agencyLogos";
 import { MatchDemo } from "@/components/MatchDemo";
 import { documentChecklist, evaluate, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
@@ -103,7 +104,18 @@ export default async function Home() {
   ] as const;
   const cut = bids.length ? Math.round((1 - eligible.length / bids.length) * 100) : 0;
 
-  const agencies = [...new Set(bids.map((b) => b.demandAgency))].slice(0, 24);
+  // 공식 CI가 있는 기관을 먼저, 같은 CI(예: 정부상징)는 한 번만 보여 주고 나머지 자리는 다른 기관으로 채운다
+  const agencies = (() => {
+    const names = [...new Set(bids.map((b) => b.demandAgency))];
+    const seen = new Set<string>();
+    const withLogo = names.filter((n) => {
+      const k = agencyLogoKey(n);
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    return [...withLogo, ...names.filter((n) => !agencyLogoKey(n))].slice(0, 24);
+  })();
   // 업무 구분·업종별 공고 수 (외자는 물품에 포함)
   const bizOf = (b: (typeof bids)[number]): keyof typeof CATEGORY_GROUPS => {
     const t: BizType = b.bizType ?? "용역";
@@ -339,7 +351,7 @@ export default async function Home() {
           {AGENCY_KINDS.map((k) => (
             <span key={k.label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: k.fill }} />{k.label}</span>
           ))}
-          <span className="basis-full text-center text-ink-300 sm:basis-auto">공식 CI는 사용 승인을 받은 기관만 표시하고, 나머지는 입찰메이트LAB이 만든 유형 표시입니다. 고객사나 제휴 기관을 뜻하지 않습니다.</span>
+          <span className="basis-full text-center text-ink-300 sm:basis-auto">CI는 위키미디어 공용에 공개된 기관 공식 CI이며, 확인되지 않은 기관은 입찰메이트LAB이 만든 유형 표시입니다. 공고를 낸 기관을 알아보기 쉽게 하려는 표시로, 고객사나 제휴 기관을 뜻하지 않습니다.</span>
         </div>
       </section>
 

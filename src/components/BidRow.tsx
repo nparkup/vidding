@@ -7,6 +7,7 @@ import { CloseDay } from "./CloseDay";
 import { DdayBadge, ScoreMeter } from "./Badges";
 import { bidHref } from "@/lib/links";
 import { closedLabel } from "@/lib/bidMethod";
+import { AgencyLogo } from "./AgencyLogo";
 
 export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; href?: string }) {
   const left = match?.daysLeft ?? daysLeft(bid.closeAt);
@@ -30,6 +31,7 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
           {bid.title}
         </p>
         <p className="mt-1 line-clamp-1 text-sm text-ink-500">
+          <AgencyLogo name={bid.demandAgency} size={16} maxW={72} className="mr-1.5 -mt-0.5" />
           {bid.demandAgency} · 면허 {bid.licenseRaw || bid.licenses.join(", ") || "제한없음"}
         </p>
         {match && !match.eligible && <p className="mt-1 text-xs font-medium text-coral">{match.blockers.join(" · ")}</p>}

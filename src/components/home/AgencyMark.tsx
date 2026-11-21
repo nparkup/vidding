@@ -1,8 +1,8 @@
-import { agencyLogoSrc } from "@/lib/agencyLogos";
+import { agencyLogoLabel, agencyLogoSrc } from "@/lib/agencyLogos";
 
 /**
- * 발주기관 표기 (자체 제작). 실제 기관 CI가 아니라 기관 유형별 도형과 이름 첫 글자로 만든 엠블럼이다.
- * 공고 데이터의 기관명만으로 그리므로 매일 바뀌는 기관 목록에도 그대로 동작한다.
+ * 발주기관 표기. 공식 CI가 확인된 기관(src/lib/agencyLogos.ts)은 CI와 기관명을,
+ * 나머지는 기관 유형별 도형과 이름 첫 글자로 만든 자체 엠블럼을 보여 준다.
  */
 
 type Kind = "local" | "edu" | "corp" | "gov";
@@ -51,9 +51,13 @@ export function AgencyMark({ name }: { name: string }) {
   const logo = agencyLogoSrc(name);
   if (logo) {
     return (
-      <span className="inline-flex h-[54px] items-center whitespace-nowrap rounded-2xl border border-ink-100 bg-white px-4" title={name}>
+      <span className="inline-flex h-[54px] items-center gap-2.5 whitespace-nowrap rounded-2xl border border-ink-100 bg-white py-2 pl-3 pr-4" title={name}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo} alt={name} className="h-8 w-auto max-w-[160px] object-contain" loading="lazy" />
+        <img src={logo} alt={`${agencyLogoLabel(name)} CI`} className="h-8 w-auto max-w-[150px] object-contain" loading="lazy" />
+        <span className="flex flex-col leading-tight">
+          {top && <span className="text-[10px] font-medium text-ink-400">{top}</span>}
+          <span className="text-[14px] font-extrabold tracking-[-0.03em] text-ink-700">{main}</span>
+        </span>
       </span>
     );
   }

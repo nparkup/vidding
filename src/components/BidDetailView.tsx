@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AgencyLogo } from "./AgencyLogo";
 import { Suspense, useEffect, useState } from "react";
 import { DdayBadge } from "@/components/Badges";
 import { ProfileScore } from "@/components/ProfileScore";
@@ -79,6 +80,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           </div>
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{bid.title}</h1>
           <p className="mt-2 text-ink-500">
+            <AgencyLogo name={bid.demandAgency} size={24} maxW={140} className="mr-2 -mt-1" />
             {bid.agency}{bid.demandAgency !== bid.agency && ` · 수요기관 ${bid.demandAgency}`}
             <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>
           </p>

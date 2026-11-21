@@ -49,8 +49,13 @@ export function allowedTrial(list: TrialEntry[]): TrialEntry[] {
   return [...list].sort((a, b) => a.t - b.t).slice(0, TRIAL_LIMIT);
 }
 
+/** 관리자가 이용 정지한 사업자번호로 확인되면 이 브라우저의 체험을 막는다 */
+const BLOCK_KEY = "bm-trial.blocked";
+const blocked = () => { try { return localStorage.getItem(BLOCK_KEY) === "1"; } catch { return false; } };
+
 export function judgeTrial(list: TrialEntry[], key: string): TrialState & { add?: boolean } {
   const allowed = allowedTrial(list);
+  if (blocked() && !allowed.some((e) => e.k === key)) return { status: "locked", used: allowed };
   if (allowed.some((e) => e.k === key)) return { status: "ok", used: allowed, left: TRIAL_LIMIT - allowed.length, fresh: false };
   if (!list.some((e) => e.k === key) && allowed.length < TRIAL_LIMIT) {
     return { status: "ok", used: allowed, left: TRIAL_LIMIT - allowed.length - 1, fresh: true, add: true };
@@ -101,7 +106,8 @@ export async function syncTrialServer(api: string, bizno: string, key: string): 
   try {
     const r = await fetch(`${api}?${new URLSearchParams({ trial: bizno, bids: keys.join(",") })}`);
     if (!r.ok) return;
-    const j = (await r.json()) as { used?: { k: string; t: number }[] };
+    const j = (await r.json()) as { used?: { k: string; t: number }[]; suspended?: boolean };
+    if (j.suspended) { try { localStorage.setItem(BLOCK_KEY, "1"); } catch { /* 무시 */ } }
     if (Array.isArray(j.used)) mergeTrial(j.used.filter((e) => typeof e?.k === "string" && typeof e?.t === "number"));
   } catch { /* 서버 확인이 안 되면 브라우저 기준으로 둔다 */ }
 }

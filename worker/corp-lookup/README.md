@@ -37,3 +37,12 @@ Worker는 그 기간을 7일 단위로 다시 쪼개 조달청 낙찰정보서�
 - 용량: R2 사용량이 승인 용량(저장소 변수 `R2_APPROVED_BYTES`, 기본 5GB)의 90%에 닿거나 예상 최종 용량이 넘으면 수집이 올리지 않고 실패로 끝난다.
   사용자 승인 후 변수를 올려야 이어진다. 2026-11-15 첫 수집 기준 약 2년치가 0.12GB여서 5년치는 약 0.35GB로 예상한다.
 - 토큰: `CLOUDFLARE_API_TOKEN` 에 Workers R2 Storage Write 권한이 있어야 한다. 수집 워크플로의 "R2 권한 확인" 단계가 읽기·쓰기를 시험한다.
+
+## 관리자 화면 API와 운영 지표
+
+관리자 화면(`/admin`, `src/components/admin/AdminConsole.tsx`)은 `?admin=동작` 으로 이 Worker를 부른다. 로그인(`?admin=login`)만 빼고 모두 12시간 서명 토큰이 필요하다. 동작 목록은 `admin.ts` 머리말.
+
+- 회원: R2 `members/{사업자번호}.json` (가입 정보·상태·관리 메모), `trial/{사업자번호}.json` (무료 체험 사용 공고), `billing/{사업자번호}.json` (결제 기록, 결제 대행사 연동 전이라 관리자가 적는다)
+- 이용 정지(`status: "suspended"`)한 사업자번호는 `?trial=` 이 새 공고를 더하지 않고 `suspended: true` 를 돌려준다
+- 운영 지표: Durable Object `Metrics`(`metrics.ts`, SQLite). 요청마다 경로·상태·처리 시간, 그 사이 공공데이터포털·Anthropic 호출(전역 fetch를 감싸 센다)을 날짜별로 더한다.
+  사이트는 화면을 옮길 때 `?pv=1&p=경로` 를 보낸다(`src/components/PageBeacon.tsx`). 순 방문은 그날만 쓰는 무작위 값과 IP·브라우저 정보를 섞은 해시로 세고 이틀 뒤 지운다. IP는 앞 세 자리만 남긴다.

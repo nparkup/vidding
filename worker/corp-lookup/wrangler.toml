@@ -25,3 +25,12 @@ class_name = "Presence"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Presence"]
+
+# 운영 지표 (관리자 화면 시스템 정보·API 사용량·회원 사용량, metrics.ts). 날짜별 집계와 최근 요청 기록만 SQLite에 둔다
+[[durable_objects.bindings]]
+name = "METRICS"
+class_name = "Metrics"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Metrics"]

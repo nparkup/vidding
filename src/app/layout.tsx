@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import { resetOnReloadScript } from "@/lib/resetOnReload";
+import { PageBeacon } from "@/components/PageBeacon";
 
 export const viewport = { themeColor: "#0B1426" };
 
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* 새로고침하면 고른 조건·조회 결과를 처음 상태로 (src/lib/resetOnReload.ts) */}
         <script dangerouslySetInnerHTML={{ __html: resetOnReloadScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <PageBeacon />
+      </body>
     </html>
   );
 }

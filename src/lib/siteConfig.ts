@@ -8,6 +8,7 @@ import { useSyncExternalStore } from "react";
  * 화면은 기본값으로 먼저 그리고, 받은 값이 다르면 그 자리만 바꾼다. 마지막으로 받은 값은 이 브라우저에 두어 다음 화면부터 바로 쓴다.
  */
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "./siteConfigCore";
+import type { PlanId } from "./types";
 export { DEFAULT_CONFIG, normalizeConfig, type SiteConfig };
 
 const CACHE_KEY = "bm-site-config.v1";
@@ -61,9 +62,16 @@ export function useSiteConfig(): SiteConfig {
 
 /** 요금 값들 (VAT 포함) */
 export function priceOf(c: SiteConfig) {
-  const monthly = c.pricing.monthly;
-  const annualMonthly = c.pricing.annualMonthly;
-  const annualCharge = annualMonthly * 12;
-  const saving = monthly * 12 - annualCharge;
-  return { monthly, annualMonthly, annualCharge, monthly12: monthly * 12, saving, savingPct: Math.round((saving / (monthly * 12)) * 100), used3: annualMonthly * 3, refund3: annualCharge - annualMonthly * 3 };
+  const p = c.pricing;
+  return { lite: p.lite, standard: p.standard, unlimited: p.unlimited, liteQuota: p.liteQuota, standardQuota: p.standardQuota };
+}
+
+/** 이용권별 금액·한 달 공고 예측 건수 (null = 무제한) */
+export function plansOf(c: SiteConfig): { id: PlanId; price: number; quota: number | null }[] {
+  const p = c.pricing;
+  return [
+    { id: "lite", price: p.lite, quota: p.liteQuota },
+    { id: "standard", price: p.standard, quota: p.standardQuota },
+    { id: "unlimited", price: p.unlimited, quota: null },
+  ];
 }

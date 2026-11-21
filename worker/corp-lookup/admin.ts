@@ -215,7 +215,8 @@ function cleanMember(b: Record<string, unknown>): Record<string, unknown> {
 
 export interface Payment { id: string; date: string; kind: "pay" | "refund"; amount: number; method: string; memo: string }
 export interface Billing {
-  plan: "" | "monthly" | "annual";
+  /** 이용권 (lite·standard·unlimited). monthly·annual은 예전 요금제로 남은 기록 */
+  plan: "" | "lite" | "standard" | "unlimited" | "monthly" | "annual";
   status: "none" | "active" | "cancelled" | "expired" | "refunded";
   start: string;
   end: string;
@@ -225,7 +226,7 @@ export interface Billing {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 function cleanBilling(b: Record<string, unknown>): Billing | { error: string } {
-  const plan = b.plan === "monthly" || b.plan === "annual" ? b.plan : "";
+  const plan = (["lite", "standard", "unlimited", "monthly", "annual"] as const).find((x) => x === b.plan) ?? "";
   const status = (["none", "active", "cancelled", "expired", "refunded"] as const).find((x) => x === b.status) ?? "none";
   const start = s(b.start, 10);
   const end = s(b.end, 10);

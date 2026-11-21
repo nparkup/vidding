@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import type { TabProps } from "./AdminConsole";
 import { bizFmt, downloadCsv, won, type Billing, type Member, type Payment } from "./adminApi";
 import { Field, Stats } from "./MembersTab";
-import { ANNUAL_CHARGE, MONTHLY_PRICE, planName } from "@/lib/plans";
+import { PLANS, planName } from "@/lib/plans";
+import { plansOf, useSiteConfig } from "@/lib/siteConfig";
 import { calcRefund, planEnd } from "@/lib/refund";
 
 const STATUS: Record<Billing["status"], string> = { none: "결제 없음", active: "이용 중", cancelled: "해지", expired: "기간 만료", refunded: "환불 완료" };
@@ -30,7 +31,7 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
     }
     return {
       active: members.filter((m) => m.billing?.status === "active").length,
-      annual: members.filter((m) => m.billing?.status === "active" && m.billing.plan === "annual").length,
+      unlimited: members.filter((m) => m.billing?.status === "active" && m.billing.plan === "unlimited").length,
       monthSum, total, refunds,
       expiring: members.filter((m) => m.billing?.status === "active" && m.billing.end && m.billing.end <= soon).length,
     };
@@ -45,9 +46,9 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
 
   function csv() {
     const rows: (string | number)[][] = [];
-    for (const m of members) for (const p of m.billing?.payments ?? []) rows.push([p.date, m.company, bizFmt(m.bizno), p.kind === "refund" ? "환불" : "결제", p.kind === "refund" ? -p.amount : p.amount, p.method, planName(m.billing!.plan || "monthly"), p.memo]);
+    for (const m of members) for (const p of m.billing?.payments ?? []) rows.push([p.date, m.company, bizFmt(m.bizno), p.kind === "refund" ? "환불" : "결제", p.kind === "refund" ? -p.amount : p.amount, p.method, (m.billing!.plan ? planName(m.billing!.plan) : ""), p.memo]);
     rows.sort((a, b) => String(b[0]).localeCompare(String(a[0])));
-    downloadCsv("결제내역", ["날짜", "회사명", "사업자등록번호", "구분", "금액", "결제 수단", "결제 방식", "메모"], rows);
+    downloadCsv("결제내역", ["날짜", "회사명", "사업자등록번호", "구분", "금액", "결제 수단", "이용권", "메모"], rows);
   }
 
   return (
@@ -55,7 +56,7 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold">결제정보</h1>
-          <p className="mt-1 text-sm text-ink-500">회원별 결제 방식·이용 기간·결제 내역과 중도 해지 환불 계산.</p>
+          <p className="mt-1 text-sm text-ink-500">회원별 이용권·이용 기간·결제 내역과 중도 해지 환불 계산.</p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={reload} className="btn-ghost btn-sm" disabled={busy}>{busy ? "불러오는 중…" : "새로 불러오기"}</button>
@@ -66,7 +67,7 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
         결제 대행사(PG) 연동 전입니다. 계좌이체 등으로 받은 결제와 환불을 여기에 직접 적어 주세요. 연동하면 결제 내역이 자동으로 들어오고, 이 기록은 그대로 남습니다.
       </p>
 
-      <Stats items={[["이용 중", stats.active], ["그중 연간", stats.annual], ["이번 달 순결제", won(stats.monthSum)], ["누적 결제", won(stats.total)], ["누적 환불", won(stats.refunds)], ["30일 안 만료", stats.expiring]]} />
+      <Stats items={[["이용 중", stats.active], ["그중 무제한", stats.unlimited], ["이번 달 순결제", won(stats.monthSum)], ["누적 결제", won(stats.total)], ["누적 환불", won(stats.refunds)], ["30일 안 만료", stats.expiring]]} />
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <input className="input sm:max-w-xs" placeholder="회사명·사업자번호" value={q} onChange={(e) => setQ(e.target.value)} aria-label="결제 회원 검색" />
@@ -118,13 +119,15 @@ function BillingEditor({ m, call, guard, onSaved }: { m: Member; call: TabProps[
   const [cancel, setCancel] = useState(today());
   const set = <K extends keyof Billing>(k: K, v: Billing[K]) => setB((x) => ({ ...x, [k]: v }));
   const setPay = (i: number, p: Partial<Payment>) => setB((x) => ({ ...x, payments: x.payments.map((y, j) => (j === i ? { ...y, ...p } : y)) }));
-  const addPay = (p: Partial<Payment> = {}) => setB((x) => ({ ...x, payments: [...x.payments, { id: "", date: today(), kind: "pay", amount: x.plan === "annual" ? ANNUAL_CHARGE : MONTHLY_PRICE, method: "계좌이체", memo: "", ...p }] }));
+  const prices = plansOf(useSiteConfig());
+  const priceFor = (plan: string) => prices.find((p) => p.id === plan)?.price ?? prices[0].price;
+  const addPay = (p: Partial<Payment> = {}) => setB((x) => ({ ...x, payments: [...x.payments, { id: "", date: today(), kind: "pay", amount: priceFor(x.plan), method: "계좌이체", memo: "", ...p }] }));
 
   /** 환불 계산은 이 이용 기간(시작일 이후)에 결제한 금액 기준 */
   const periodPaid = b.payments.filter((p) => p.kind === "pay" && (!b.start || p.date >= b.start)).reduce((s, p) => s + p.amount, 0);
   const refund = b.plan ? calcRefund(b.plan, periodPaid, b.start, cancel) : null;
 
-  function newPeriod(plan: "monthly" | "annual") {
+  function newPeriod(plan: Billing["plan"]) {
     const start = today();
     setB((x) => ({ ...x, plan, status: "active", start, end: planEnd(plan, start) }));
   }
@@ -141,11 +144,11 @@ function BillingEditor({ m, call, guard, onSaved }: { m: Member; call: TabProps[
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Field label="결제 방식">
+        <Field label="이용권">
           <select className="input" value={b.plan} onChange={(e) => set("plan", e.target.value as Billing["plan"])}>
             <option value="">없음</option>
-            <option value="annual">연간 결제 ({won(ANNUAL_CHARGE)})</option>
-            <option value="monthly">월간 결제 ({won(MONTHLY_PRICE)})</option>
+            {PLANS.map((p) => <option key={p.id} value={p.id}>{p.name} ({won(priceFor(p.id))})</option>)}
+            {(b.plan === "monthly" || b.plan === "annual") && <option value={b.plan}>{planName(b.plan)}</option>}
           </select>
         </Field>
         <Field label="상태">
@@ -163,8 +166,7 @@ function BillingEditor({ m, call, guard, onSaved }: { m: Member; call: TabProps[
       </div>
       <div className="flex flex-wrap gap-2 text-sm">
         <span className="self-center text-xs text-ink-500">오늘부터 새 이용 기간:</span>
-        <button type="button" className="btn-ghost btn-sm" onClick={() => newPeriod("annual")}>연간 1년</button>
-        <button type="button" className="btn-ghost btn-sm" onClick={() => newPeriod("monthly")}>월간 1개월</button>
+        {PLANS.map((p) => <button key={p.id} type="button" className="btn-ghost btn-sm" onClick={() => newPeriod(p.id)}>{p.name} 1개월</button>)}
       </div>
 
       <div>
@@ -196,7 +198,7 @@ function BillingEditor({ m, call, guard, onSaved }: { m: Member; call: TabProps[
 
       <div className="rounded-2xl border border-ink-100 bg-paper p-4">
         <p className="text-sm font-bold">중도 해지 환불 계산</p>
-        <p className="mt-1 text-xs text-ink-500">연간: 쓴 기간을 결제한 가격(결제액 ÷ 12) 기준으로 계산하고 나머지를 환불합니다. 위약금 없음. 월간: 결제한 달은 끝까지 이용, 환불 없음.</p>
+        <p className="mt-1 text-xs text-ink-500">월간 이용권: 결제한 달은 끝까지 이용, 환불 없음. (예전 연간 결제 기록만 쓴 기간을 결제액 ÷ 12 기준으로 계산해 환불)</p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
           <Field label="해지일"><input className="input sm:w-44" type="date" value={cancel} onChange={(e) => setCancel(e.target.value)} /></Field>
           {refund ? (
@@ -204,7 +206,7 @@ function BillingEditor({ m, call, guard, onSaved }: { m: Member; call: TabProps[
               <p>이 기간 결제 {won(refund.paid)} · 사용 {won(refund.used)} · <b className="text-mint-700">환불 {won(refund.refund)}</b></p>
               <p className="text-xs text-ink-500">{refund.note}</p>
             </div>
-          ) : <p className="text-sm text-ink-400">결제 방식·시작일·결제 금액이 있어야 계산합니다.</p>}
+          ) : <p className="text-sm text-ink-400">이용권·시작일·결제 금액이 있어야 계산합니다.</p>}
         </div>
         {refund && refund.refund > 0 && (
           <button type="button" className="btn-ghost btn-sm mt-3" onClick={() => { addPay({ kind: "refund", amount: refund.refund, date: today(), memo: `중도 해지 환불 (해지일 ${cancel})` }); setB((x) => ({ ...x, status: "refunded", end: cancel })); }}>

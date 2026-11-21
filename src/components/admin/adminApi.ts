@@ -5,7 +5,8 @@
 export interface TrialUse { k: string; t: number }
 export interface Payment { id: string; date: string; kind: "pay" | "refund"; amount: number; method: string; memo: string }
 export interface Billing {
-  plan: "" | "monthly" | "annual";
+  /** 이용권 (lite·standard·unlimited). monthly·annual은 예전 요금제로 남은 기록 */
+  plan: "" | "lite" | "standard" | "unlimited" | "monthly" | "annual";
   status: "none" | "active" | "cancelled" | "expired" | "refunded";
   start: string;
   end: string;

@@ -74,9 +74,9 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
   const round = (x: number) => Math.round(x / 1000) * 1000;
 
   const cells: (Cell | undefined | false | "")[] = [
-    b.prior ? amountCell(`${priorLabel} 금액`, b.prior.amount, `같은 단지 ${b.category}${priorMonths ? ` · ${priorMonths}개월 계약` : ""}`) : comparable && { k: "직전 계약금액", v: "자료 없음", sub: "최근 3개 연도 같은 단지·분야" },
+    b.prior ? amountCell(`${priorLabel} 금액`, b.prior.amount, `같은 단지 ${b.category}${priorMonths ? ` · ${priorMonths}개월 계약` : ""}`) : comparable && { k: "직전 계약금액", v: "자료 없음", sub: "최근 3개 연도 같은 단지·업종" },
     forecast && amountCell("예상 낙찰금액", round(forecast.mid), `직전 계약과 규모가 같을 때 · 구간 ${won(round(forecast.low))} ~ ${won(round(forecast.high))}`),
-    { k: "분야", v: b.category, sub: b.classLabel },
+    { k: "업종", v: b.category, sub: b.classLabel },
     { k: "지역", v: b.region || "-" },
     b.kind && { k: "입찰방법", v: b.kind },
     b.award && { k: "낙찰방법", v: b.award },
@@ -210,7 +210,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
                 <Fact k="계약기간" v={b.prior.start && b.prior.end ? `${ymd(b.prior.start)} ~ ${ymd(b.prior.end)}${priorMonths ? ` (${priorMonths}개월)` : ""}` : undefined} />
                 <Fact k={b.prior.via === "수의계약" ? "계약일" : "입찰 마감"} v={b.prior.closedAt ? ymd(b.prior.closedAt) : undefined} />
               </dl>
-              <p className="mt-3 text-xs leading-relaxed text-ink-300">같은 단지·같은 분야의 최근 3개 연도 낙찰·수의계약 중 가장 최근 건입니다.</p>
+              <p className="mt-3 text-xs leading-relaxed text-ink-300">같은 단지·같은 업종의 최근 3개 연도 낙찰·수의계약 중 가장 최근 건입니다.</p>
             </section>
           )}
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RELAY_API, usePresence } from "@/lib/presence";
+/** 정적 사이트의 중계 서버 주소 (낙찰 저장소 최신 건수). 없으면(로컬·서버 배포) 빌드 값만 쓴다 */
+const RELAY_API = process.env.NEXT_PUBLIC_STATIC_SITE === "1" ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "";
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -16,7 +17,7 @@ function kstToday(now: number): string {
  * 메인 상단 현황 줄. 날짜는 화면을 연 시각 기준으로 1분마다 다시 센다.
  * 누적입찰공고: 낙찰 저장소에 쌓인 나라장터 공고(2016~) + 아파트(K-apt) 공고(겹치는 공고번호는 한 번).
  * 누적낙찰정보: 나라장터 낙찰 저장소 누적 건수 + 아파트 입찰결과 낙찰 누적·수의계약 건수.
- * 나라장터 값은 빌드 값이고 중계 서버가 있으면 최신 값으로 바꾼다. 이용자 수는 중계 서버가 센 값이다. 모르는 값은 빼고 보여 준다.
+ * 나라장터 값은 빌드 값이고 중계 서버가 있으면 최신 값으로 바꾼다. 모르는 값은 빼고 보여 준다.
  */
 export function HeroStats({ builtAt, notices, aptNotices = 0, awards, aptAwards = 0 }: {
   builtAt: number; notices: number | null; aptNotices?: number; awards: number | null; aptAwards?: number;
@@ -24,7 +25,6 @@ export function HeroStats({ builtAt, notices, aptNotices = 0, awards, aptAwards 
   const [now, setNow] = useState(builtAt);
   const [awardRows, setAwardRows] = useState(awards);
   const [noticeRows, setNoticeRows] = useState(notices);
-  const users = usePresence();
 
   useEffect(() => {
     setNow(Date.now());
@@ -50,7 +50,6 @@ export function HeroStats({ builtAt, notices, aptNotices = 0, awards, aptAwards 
   const items: [string, string][] = [
     ...(noticeRows ? [["누적입찰공고", fmt(noticeRows + aptNotices)] as [string, string]] : []),
     ...(awardTotal ? [["누적낙찰정보", fmt(awardTotal)] as [string, string]] : []),
-    ...(users !== null ? [["실시간 이용자수", `${users.toLocaleString("ko-KR")}명`] as [string, string]] : []),
   ];
 
   return (

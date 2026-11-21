@@ -54,7 +54,7 @@ export default async function ServicePage() {
         </ol>
       </section>
 
-      <section className="container-x grid items-center gap-12 overflow-x-clip py-24 lg:grid-cols-2">
+      <section className="container-x grid grid-cols-1 items-center gap-12 overflow-x-clip py-24 lg:grid-cols-2">
         <div>
           <p className="eyebrow">매일 받는 것</p>
           <h2 className="h-section mt-3">영업일 아침 7시,<br />오늘 볼 공고만.</h2>
@@ -71,7 +71,7 @@ export default async function ServicePage() {
             ))}
           </ul>
         </div>
-        <div className="relative">
+        <div className="relative min-w-0">
           <div className="pointer-events-none absolute -inset-6 rounded-[40px] bg-gradient-to-tr from-mint-100 via-white to-sky-100 opacity-80 blur-2xl" />
           <div className="relative"><EmailPreview digest={digest} /></div>
         </div>

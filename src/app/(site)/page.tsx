@@ -712,7 +712,7 @@ export default async function Home() {
           <p className="mt-4 text-ink-500">월간 이용권 월 <Price k="lite" />원부터 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 <TrialN />건</p>
         </div>
         <div className="mt-12">
-          <PricingCards dark={false} />
+          <PricingCards />
         </div>
         <p className="mt-6 text-center"><Link href="/pricing" className="font-semibold text-mint-600">요금·환불 기준 자세히 보기</Link></p>
       </section>

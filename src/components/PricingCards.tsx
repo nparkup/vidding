@@ -4,7 +4,7 @@ import { ANNUAL_SAVING, ANNUAL_SAVING_PCT, FEATURES, MONTHLY_PRICE, PLANS } from
 
 const won = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
-/** 요금 카드 두 장(연간·월간). 실제 결제 금액을 가장 먼저, 월 환산은 그 다음에 보여 준다. */
+/** 요금 카드 두 장(연간·월간). 둘 다 월 금액을 크게, 연간 실제 결제 금액은 그 아래에 보여 준다. */
 export function PricingCards({ dark = true }: { dark?: boolean }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -20,12 +20,12 @@ export function PricingCards({ dark = true }: { dark?: boolean }) {
             </div>
             <p className={`relative mt-1 text-sm ${hi ? "text-ink-300" : "text-ink-500"}`}>{p.tagline}</p>
             <p className="relative mt-6 text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl">
-              {won(p.charge)}<span className="text-lg font-bold">원</span>
-              <span className={`ml-1 text-sm font-medium ${hi ? "text-ink-300" : "text-ink-400"}`}>/ {annual ? "연 1회 결제" : "월"}</span>
+              {won(p.monthly)}<span className="text-lg font-bold">원</span>
+              <span className={`ml-1 text-sm font-medium ${hi ? "text-ink-300" : "text-ink-400"}`}>/ 월</span>
             </p>
             <p className={`relative mt-2 text-sm tabular-nums ${hi ? "text-ink-100" : "text-ink-500"}`}>
               {annual
-                ? <>월 <b>{won(p.monthly)}원</b> 꼴 · 월간 1년({won(MONTHLY_PRICE * 12)}원)보다 {won(ANNUAL_SAVING)}원 적게</>
+                ? <>1년 {won(p.charge)}원 결제 · 월간 1년({won(MONTHLY_PRICE * 12)}원)보다 {won(ANNUAL_SAVING)}원 적게</>
                 : <>매달 {won(p.charge)}원 결제 · 약정 없음</>}
             </p>
             <p className={`relative mt-1 text-xs ${hi ? "text-ink-300" : "text-ink-400"}`}>VAT 포함 금액 · 낙찰 성공보수 없음</p>

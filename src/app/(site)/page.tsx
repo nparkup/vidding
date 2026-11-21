@@ -708,7 +708,7 @@ export default async function Home() {
         <div className="text-center">
           <p className="eyebrow">요금제</p>
           <h2 className="h-section mt-3">입찰 담당자 한 명 인건비의 일부로.</h2>
-          <p className="mt-4 text-ink-500">연 348,000원 한 번 결제(월 29,000원 꼴) 또는 월 33,000원 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 3건</p>
+          <p className="mt-4 text-ink-500">연간 월 29,000원 · 월간 월 33,000원 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 3건</p>
         </div>
         <div className="mx-auto mt-12 max-w-4xl">
           <PricingCards dark={false} />

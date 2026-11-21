@@ -10,7 +10,8 @@ import { useEffect, useMemo, useState } from "react";
  * - 키는 bidmate. 접두어가 아니어서 새로고침 초기화(resetOnReload)에 지워지지 않는다.
  * - 로그인·결제가 생기면 유료 회원은 이 제한을 건너뛰게 바꾼다.
  */
-export const TRIAL_LIMIT = 3;
+import { TRIAL_LIMIT } from "./trialLimit";
+export { TRIAL_LIMIT };
 export const TRIAL_KEY = "bm-trial.v1";
 const EVENT = "bm-trial";
 

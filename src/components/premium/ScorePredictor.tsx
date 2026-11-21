@@ -30,6 +30,7 @@ import { JointMembers } from "./JointMembers";
 import { PassAmount } from "./PassAmount";
 import { PerfCapCard } from "./PerfCapCard";
 import { syncTrialServer, useTrial, type TrialEntry } from "@/lib/trial";
+import { readMember } from "@/lib/member";
 import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
 
 /** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
@@ -179,7 +180,15 @@ export function ScorePredictor() {
   const bid: Bid | undefined = trialLocked || (trialKey && !trial) ? undefined : pickedBid;
   const pickTrial = (e: TrialEntry) => { if (e.k.startsWith("nara:")) setBidId(e.k.slice(5)); else window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/premium/apt?apt=${encodeURIComponent(e.k.slice(4))}`; };
   // 사업자번호를 조회했으면 그 번호로 쓴 체험 건수도 중계 서버에서 맞춘다 (다른 브라우저에서 쓴 공고 포함)
-  const corpNo = corp?.bizno;
+  // 가입한 사업자번호가 있으면 조회 전에도 그 번호로 센다. 조회 칸에도 미리 넣어 둔다
+  const [memberNo, setMemberNo] = useState<string | undefined>();
+  useEffect(() => {
+    const m = readMember();
+    if (!m) return;
+    setMemberNo(m.bizno);
+    setBizno((v) => v || `${m.bizno.slice(0, 3)}-${m.bizno.slice(3, 5)}-${m.bizno.slice(5)}`);
+  }, []);
+  const corpNo = corp?.bizno ?? memberNo;
   useEffect(() => {
     if (STATIC && CORP_API && corpNo && trialKey && trial?.status === "ok") syncTrialServer(CORP_API, corpNo, trialKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps

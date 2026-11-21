@@ -74,12 +74,17 @@ export default {
     const origin = req.headers.get("Origin") ?? "";
     const allowed = (env.ALLOWED_ORIGINS ?? "https://nparkup.github.io").split(",").map((s) => s.trim()).filter(Boolean);
     const cors: Record<string, string> = allowed.includes(origin)
-      ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET, OPTIONS", Vary: "Origin" }
+      ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", Vary: "Origin" }
       : {};
     const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
       new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", ...cors, ...extra } });
 
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...cors, "Access-Control-Max-Age": "86400" } });
+    if (req.method === "POST" && new URL(req.url).searchParams.has("signup")) {
+      if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
+      if (!env.AWARDS) return json({ error: "off" }, 503);
+      return json(...(await signup(req, env.AWARDS)));
+    }
     if (req.method !== "GET") return json({ error: "GET만 지원합니다." }, 405);
     if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
     const sp = new URL(req.url).searchParams;
@@ -235,3 +240,31 @@ export default {
     }
   },
 };
+
+/**
+ * 무료 체험 회원가입 (src/components/ApplyForm.tsx). 로그인 기능이 생기기 전이라 비밀번호는 받지 않고,
+ * 사업자번호마다 가입 정보 하나를 R2 members/{사업자번호}.json 에 둔다. 이미 가입된 번호는 덮어쓰지 않는다(다른 사람이 연락처를 바꾸지 못하게).
+ * 무료 체험 건수는 같은 사업자번호의 trial/{사업자번호}.json 으로 센다.
+ */
+async function signup(req: Request, bucket: NonNullable<Env["AWARDS"]>): Promise<[unknown, number]> {
+  const raw = await req.text();
+  if (raw.length > 8000) return [{ error: "입력이 너무 깁니다." }, 413];
+  let b: Record<string, unknown>;
+  try { b = JSON.parse(raw) as Record<string, unknown>; } catch { return [{ error: "잘못된 요청" }, 400]; }
+  const str = (k: string, max: number) => String(b[k] ?? "").trim().slice(0, max);
+  const list = (k: string, max: number) => (Array.isArray(b[k]) ? (b[k] as unknown[]).map((x) => String(x).trim().slice(0, 60)).filter(Boolean).slice(0, max) : []);
+  const bizno = normalizeBizno(str("bizno", 20));
+  const m = {
+    company: str("company", 100), bizno, name: str("name", 40), email: str("email", 120), phone: str("phone", 30),
+    licenses: list("licenses", 40), regions: list("regions", 20), size: str("size", 40), keywords: str("keywords", 200),
+    agreePrivacy: b.agreePrivacy === true, agreeMail: b.agreeMail === true, plan: str("plan", 20),
+  };
+  if (!m.company || !m.name || !m.phone) return [{ error: "회사명, 담당자 이름, 연락처를 입력해 주세요." }, 400];
+  if (!validBizno(bizno)) return [{ error: "올바른 사업자등록번호가 아닙니다." }, 400];
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.email)) return [{ error: "이메일 주소를 확인해 주세요." }, 400];
+  if (!m.agreePrivacy) return [{ error: "개인정보 수집·이용에 동의해 주세요." }, 400];
+  const key = `members/${bizno}.json`;
+  if (await bucket.get(key)) return [{ status: "exists" }, 200];
+  await bucket.put(key, JSON.stringify({ ...m, joinedAt: new Date().toISOString() }), { httpMetadata: { contentType: "application/json" } });
+  return [{ status: "ok" }, 200];
+}

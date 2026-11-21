@@ -9,8 +9,11 @@ import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "../Badges";
 import { CloseDay } from "../CloseDay";
 import { AptAwardSection, AptForecastCard } from "./AptAwardViews";
-import { useTrial, type TrialEntry } from "@/lib/trial";
+import { syncTrialServer, useTrial, type TrialEntry } from "@/lib/trial";
+import { readMember } from "@/lib/member";
 import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
+
+const TRIAL_API = process.env.NEXT_PUBLIC_STATIC_SITE === "1" ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "";
 
 /** 직전 계약과 비교해 예측하는 분야 (공사·물품·기타 용역은 단지마다 일이 달라 예측하지 않는다) */
 const PRICEABLE = new Set<string>(["청소", "경비", "소독", "승강기유지", "전기안전관리", "정화조·저수조", "주택관리(위탁)"]);
@@ -67,6 +70,12 @@ export function AptPredictor() {
   const trial = useTrial(trialKey, pickedBid ? `${pickedBid.apt} ${pickedBid.title}` : undefined);
   const trialLocked = !!pickedBid && trial?.status === "locked";
   const bid = trialLocked || (trialKey && !trial) ? undefined : pickedBid;
+  // 가입한 사업자번호가 있으면 그 번호로 쓴 체험 건수도 중계 서버에서 맞춘다
+  useEffect(() => {
+    const m = readMember();
+    if (TRIAL_API && m && trialKey && trial?.status === "ok") syncTrialServer(TRIAL_API, m.bizno, trialKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trialKey]);
   const pickTrial = (e: TrialEntry) => {
     if (e.k.startsWith("apt:")) choose(e.k.slice(4));
     else window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/premium?bid=${encodeURIComponent(e.k.slice(5))}#predict`;

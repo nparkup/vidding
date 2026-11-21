@@ -10,7 +10,7 @@ import { MYBOX_ENABLED, MYBOX_KEY } from "@/lib/mybox";
  * - 관리자 화면(/admin)은 건드리지 않는다.
  * React가 주소를 읽기 전에 돌아야 하므로 <head>의 인라인 스크립트로 넣는다.
  */
-const KEEP_PARAMS: Record<string, string[]> = { "/bids/view": ["id"], "/apt-bids/view": ["no"] };
+const KEEP_PARAMS: Record<string, string[]> = { "/bids/view": ["id"], "/apt-bids/view": ["no"], "/contracts/view": ["no"] };
 
 function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: boolean) {
   try {

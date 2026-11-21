@@ -9,14 +9,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { call, classify, mapLimit, recentDays } from "./client";
 import type { BizType } from "../types";
-import { contractEnd, type Contract, type ContractCorp } from "../contracts";
+import { contractEnd, type Contract, type ContractCorp, type ContractDetail } from "../contracts";
 
 export const CONTRACT_DAYS = 14;
 const PATH = "/ao/CntrctInfoService";
 const OPS: [string, BizType][] = [["getCntrctInfoListServc", "용역"], ["getCntrctInfoListCnstwk", "공사"], ["getCntrctInfoListThng", "물품"]];
 const CACHE = ".cache/contracts";
 /** 캐시에는 다듬은 계약을 넣으므로, 다듬는 방식(toContract)을 바꾸면 올린다 */
-const CACHE_VER = 2;
+const CACHE_VER = 3;
 
 const t = (v?: string) => (v ?? "").trim();
 /** 링크 주소의 쿼리 값 하나 */
@@ -30,6 +30,20 @@ export function parseCorps(raw?: string): ContractCorp[] {
     const share = Number(f[6]);
     return { name: t(f[3]), bizNo: bizNo.length === 10 ? bizNo : undefined, share: share > 0 ? share : undefined, role: t(f[1]) && t(f[1]) !== "주계약업체" ? t(f[1]) : undefined };
   }).filter((c) => c.name);
+}
+
+/** 계약업체 원문의 대표자·공동수급 방식·국적까지 (상세 화면용) */
+function parseCorpsFull(raw?: string): NonNullable<ContractDetail["corps"]> {
+  return [...t(raw).matchAll(/\[([^\]]*)\]/g)].map((m) => {
+    const f = m[1].split("^");
+    const base = parseCorps(`[${m[1]}]`)[0];
+    return base ? { ...base, role: t(f[1]) || undefined, mode: t(f[2]) || undefined, ceo: t(f[4]) || undefined, nation: t(f[5]) || undefined } : undefined;
+  }).filter((c): c is NonNullable<typeof c> => !!c);
+}
+
+/** "[1^Z015416^세종학당재단^기타공공기관^^^]" 여러 개 → [이름, 구분] */
+function parseDemands(raw?: string): [string, string][] {
+  return [...t(raw).matchAll(/\[([^\]]*)\]/g)].map((m) => { const f = m[1].split("^"); return [t(f[2]), t(f[3])] as [string, string]; }).filter(([n]) => n);
 }
 
 /** "[1^1384000^성평등가족부^국가기관^^^]" 의 첫 기관 이름 */
@@ -63,7 +77,41 @@ export function toContract(it: Record<string, string>, biz: BizType): Contract |
     bidNo: t(it.ntceNo) || undefined,
     ref: qp(url, "ctrtNo"),
     se: qp(url, "prcmBsneSeCd"),
+    x: detailOf(it, url),
   };
+}
+
+function detailOf(it: Record<string, string>, url: string): ContractDetail {
+  const ymd = (v?: string) => (/^\d{4}-\d{2}-\d{2}/.test(t(v)) ? t(v).slice(0, 10) : undefined);
+  const num = (v?: string) => { const n = Number(t(v)); return t(v) && Number.isFinite(n) && n > 0 ? n : undefined; };
+  const cls = [t(it.pubPrcrmntLrgClsfcNm), t(it.pubPrcrmntMidClsfcNm), t(it.pubPrcrmntClsfcNm)].filter(Boolean);
+  const x: ContractDetail = {
+    dcsnNo: t(it.dcsnCntrctNo) || undefined,
+    refNo: t(it.cntrctRefNo) || undefined,
+    chgOrd: qp(url, "ctrtChgOrd"),
+    joint: t(it.cmmnCntrctYn) === "Y" || undefined,
+    law: t(it.baseLawNm) || undefined,
+    basis: t(it.baseDtls) || undefined,
+    guarantee: num(it.grntymnyRate),
+    delay: num(it.dfrcmpnstRt),
+    pay: t(it.payDivNm) || undefined,
+    reqNo: t(it.reqNo) || undefined,
+    jur: t(it.cntrctInsttJrsdctnDivNm) || undefined,
+    dept: t(it.cntrctInsttChrgDeptNm) || undefined,
+    creditor: t(it.crdtrNm) || undefined,
+    demands: parseDemands(it.dminsttList),
+    corps: parseCorpsFull(it.corpList),
+    cls: [...new Set(cls)].join(" > ") || undefined,
+    clsNo: t(it.pubPrcrmntClsfcNo) || undefined,
+    start: ymd(it.cbgnDate) ?? ymd(it.wbgnDate),
+    thisEnd: ymd(it.thtmCcmpltDate) ?? ymd(it.thtmScmpltDate),
+    allEnd: ymd(it.ttalCcmpltDate) ?? ymd(it.ttalScmpltDate),
+    priceAdj: t(it.prcesChangeAplBssNm) || undefined,
+    infoBiz: t(it.infoBizYn) === "Y" || undefined,
+    cntrctDate: ymd(it.cntrctDate),
+    rgstDt: t(it.rgstDt) || undefined,
+  };
+  return Object.fromEntries(Object.entries(x).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length))) as ContractDetail;
 }
 
 async function fetchDay(d: string, op: string, biz: BizType): Promise<Contract[] | null> {

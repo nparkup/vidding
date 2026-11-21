@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { won, wonFull } from "@/lib/format";
-import { contractUrl, type Contract } from "@/lib/contracts";
+import { contractHref, contractUrl, type Contract } from "@/lib/contracts";
+import { loadSiteJson } from "@/lib/useSiteJson";
 
-const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
-const BASE = STATIC ? process.env.NEXT_PUBLIC_BASE_PATH ?? "" : "";
 type Sort = "new" | "amount" | "end";
 
 /** 계약현황: 최근 2주 나라장터 경쟁 계약을 기관·업체·사업자번호로 찾는다 */
@@ -20,7 +20,7 @@ export function ContractExplorer() {
   const [limit, setLimit] = useState(50);
 
   useEffect(() => {
-    fetch(`${BASE}/contracts-data.json`).then((r) => (r.ok ? r.json() : [])).then((l: Contract[]) => setList(l)).catch(() => setList([]));
+    loadSiteJson<Contract[]>("contracts-data.json").then(setList).catch(() => setList([]));
     try {
       const p = new URLSearchParams(location.search);
       if (p.get("corp")) setCorp(p.get("corp")!);
@@ -109,7 +109,7 @@ export function ContractExplorer() {
                 {c.kind && c.kind !== "신규" && <span className="chip">{c.kind}</span>}
                 {c.corps.length > 1 && <span className="chip">공동수급 {c.corps.length}개사</span>}
               </div>
-              <h3 className="mt-2 font-bold leading-snug [overflow-wrap:anywhere]">{c.title}</h3>
+              <h3 className="mt-2 font-bold leading-snug [overflow-wrap:anywhere]"><Link href={contractHref(c.no)} className="hover:text-mint-700">{c.title}</Link></h3>
               <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">
                 {[c.demand === c.agency ? c.demand : `${c.demand} (계약 ${c.agency})`, `계약금액 ${won(c.amount)} (${wonFull(c.amount)})`, c.total ? `총 ${won(c.total)}` : "", end ? `계약 끝 ${end}` : c.period ? `기간 ${c.period}` : ""].filter(Boolean).join(" · ")}
               </p>
@@ -122,7 +122,8 @@ export function ContractExplorer() {
                 ))}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <a href={contractUrl(c)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">나라장터 계약 상세</a>
+                <Link href={contractHref(c.no)} className="btn-mint btn-sm">계약 상세 보기</Link>
+                <a href={contractUrl(c)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm text-ink-500">나라장터 원문</a>
               </div>
             </li>
           );

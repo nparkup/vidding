@@ -10,9 +10,9 @@ import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "./Badges";
 import { CloseDay } from "./CloseDay";
 import { Tile } from "./CategoryTiles";
-import { ArrowUpDown, BrushCleaning, Building, Droplets, Ellipsis, HardHat, Package, PlugZap, Shield, SprayCan, type LucideIcon } from "lucide-react";
+import { ArrowUpDown, BrushCleaning, Building, Droplets, Ellipsis, HardHat, LayoutGrid, Package, PlugZap, Shield, SprayCan, type LucideIcon } from "lucide-react";
 
-/** 아파트 공고 분야별 선 아이콘 (공고 검색 업종 타일과 같은 모양) */
+/** 아파트 공고 업종별 선 아이콘 (공고 검색 업종 타일과 같은 모양) */
 const APT_ICONS: Record<string, LucideIcon> = {
   청소: BrushCleaning,
   경비: Shield,
@@ -91,14 +91,10 @@ export function AptBidsExplorer() {
   const toggle = (c: string) => setCats(cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c]);
   return (
     <>
-      <section className="card mt-6 p-4 sm:p-5" aria-label="분야 선택">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-bold">분야로 찾기 <span className="font-normal text-ink-400">여러 개 고를 수 있습니다</span></p>
-          <button type="button" onClick={() => setCats([])} aria-pressed={cats.length === 0} className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${cats.length === 0 ? "border-mint bg-mint-50 text-mint-700" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
-            전체 분야
-          </button>
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-5 sm:gap-2 lg:grid-cols-10">
+      <section className="card mt-6 p-4 sm:p-5" aria-label="업종 선택">
+        <p className="text-sm font-bold">업종으로 찾기 <span className="font-normal text-ink-400">여러 개 고를 수 있습니다</span></p>
+        <div className="mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2 lg:grid-cols-11">
+          <Tile icon={LayoutGrid} label="전체" title="전체 업종" count={[...counts.values()].reduce((a, b) => a + b, 0)} on={cats.length === 0} onClick={() => setCats([])} />
           {APT_CATEGORIES.map((c) => (
             <Tile key={c} icon={APT_ICONS[c] ?? Ellipsis} label={c} count={counts.get(c) ?? 0} on={cats.includes(c)} onClick={() => toggle(c)} />
           ))}
@@ -117,7 +113,7 @@ export function AptBidsExplorer() {
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-ink-500">{shown.length.toLocaleString()}건 · 분야와 지역은 이 기기에 저장됩니다</p>
+        <p className="text-sm text-ink-500">{shown.length.toLocaleString()}건 · 업종과 지역은 이 기기에 저장됩니다</p>
         <label className="flex items-center gap-2 text-sm text-ink-500">
           <span className="whitespace-nowrap">정렬</span>
           <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="input h-9 w-auto py-0 pr-8 text-sm" aria-label="정렬 기준">
@@ -138,7 +134,7 @@ export function AptBidsExplorer() {
       )}
       <p className="mt-6 text-xs leading-relaxed text-ink-300">
         출처: 국토교통부 공동주택관리정보시스템(K-apt) 입찰공고·입찰결과공지·수의계약 공지. K-apt와 조달청·민간 전자입찰을 거친 공고가 함께 들어옵니다.
-        직전 계약은 같은 단지·같은 분야의 최근 3개 연도 낙찰·수의계약 중 가장 최근 건입니다. 투찰 전 반드시 공고문 원문을 확인하세요.
+        직전 계약은 같은 단지·같은 업종의 최근 3개 연도 낙찰·수의계약 중 가장 최근 건입니다. 투찰 전 반드시 공고문 원문을 확인하세요.
       </p>
     </>
   );

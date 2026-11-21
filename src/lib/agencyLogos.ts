@@ -10,7 +10,8 @@ import data from "./agencyLogos.data.json";
  * 가장 아래 단계부터 목록에 있는 기관을 찾되, 그 아래에 학교나 시·군·구가 붙으면
  * 그 기관은 자기 CI가 따로 있으므로 상위 기관 CI를 쓰지 않는다.
  */
-const FILES: Record<string, string> = data;
+/** 기관명 → [파일명, 가로÷세로] */
+const FILES = data as unknown as Record<string, [string, number]>;
 
 /** 중앙행정기관과 그 소속기관은 2016년부터 정부상징 하나를 함께 쓴다 */
 const GOV = "정부상징";
@@ -71,9 +72,15 @@ export function agencyLogoKey(name: string): string | null {
 }
 
 export function agencyLogoSrc(name: string): string | undefined {
+  return agencyLogo(name)?.src;
+}
+
+/** CI 파일 주소와 가로÷세로 비율 (비율로 이미지 자리를 미리 잡아 레이아웃이 흔들리지 않게 한다) */
+export function agencyLogo(name: string): { src: string; ratio: number } | undefined {
   const key = agencyLogoKey(name);
-  const file = key ? FILES[key] : undefined;
-  return file ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/agency-logos/${file}` : undefined;
+  const hit = key ? FILES[key] : undefined;
+  if (!hit) return undefined;
+  return { src: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/agency-logos/${hit[0]}`, ratio: hit[1] || 1 };
 }
 
 /** CI를 쓰는 기관 이름(정부상징이면 "정부상징") — 대체 텍스트용 */

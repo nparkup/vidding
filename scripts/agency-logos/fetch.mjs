@@ -47,6 +47,8 @@ for (let i = 0; i < files.length; i += 40) {
     if (!ii) { console.warn("공용에 없음:", name); continue; }
     meta[name] = {
       thumb: ii.thumburl ?? ii.url,
+      // 가로÷세로. 화면이 이미지를 받기 전에 자리를 잡아 두어 흐르는 띠가 덜컥이지 않게 한다
+      ratio: Math.round(((ii.thumbwidth ?? ii.width) / (ii.thumbheight ?? ii.height)) * 1000) / 1000,
       page: ii.descriptionurl,
       license: strip(ii.extmetadata?.LicenseShortName?.value),
       artist: strip(ii.extmetadata?.Artist?.value).slice(0, 120),
@@ -61,7 +63,7 @@ for (const [agency, file] of Object.entries(sources)) {
   const hash = createHash("sha1").update(file).digest("hex").slice(0, 12);
   const old = prev[agency];
   if (!force && old && old.source === file && existsSync(new URL(old.file, OUT_DIR))) {
-    out[agency] = old; skip++; continue;
+    out[agency] = { ...old, ratio: m.ratio }; skip++; continue;
   }
   try {
     const r = await get(m.thumb);
@@ -70,7 +72,7 @@ for (const [agency, file] of Object.entries(sources)) {
     if (!ext) throw new Error("알 수 없는 형식 " + type);
     const name = `${hash}.${ext}`;
     writeFileSync(new URL(name, OUT_DIR), Buffer.from(await r.arrayBuffer()));
-    out[agency] = { file: name, source: file, page: m.page, license: m.license, artist: m.artist };
+    out[agency] = { file: name, ratio: m.ratio, source: file, page: m.page, license: m.license, artist: m.artist };
     got++;
   } catch (e) {
     console.warn("받기 실패:", agency, file, String(e));
@@ -81,7 +83,7 @@ for (const [agency, file] of Object.entries(sources)) {
 
 const sorted = Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b, "ko")));
 writeFileSync(CREDITS, JSON.stringify(sorted, null, 1) + "\n");
-writeFileSync(DATA, JSON.stringify(Object.fromEntries(Object.entries(sorted).map(([k, v]) => [k, v.file]))) + "\n");
+writeFileSync(DATA, JSON.stringify(Object.fromEntries(Object.entries(sorted).map(([k, v]) => [k, [v.file, v.ratio || 1]]))) + "\n");
 console.log(`발주기관 CI: 받음 ${got} · 그대로 ${skip} · 실패 ${fail} · 전체 ${Object.keys(sources).length}`);
 }
 
@@ -89,5 +91,5 @@ main().catch((e) => {
   console.warn("발주기관 CI 받기를 건너뜀:", String(e));
   // 캐시에 남은 지난번 파일이 있으면 그것으로 표시한다
   const keep = Object.entries(prev).filter(([, v]) => existsSync(new URL(v.file, OUT_DIR)));
-  writeFileSync(DATA, JSON.stringify(Object.fromEntries(keep.map(([k, v]) => [k, v.file]))) + "\n");
+  writeFileSync(DATA, JSON.stringify(Object.fromEntries(keep.map(([k, v]) => [k, [v.file, v.ratio || 1]]))) + "\n");
 });

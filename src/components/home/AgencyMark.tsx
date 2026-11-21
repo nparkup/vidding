@@ -1,4 +1,4 @@
-import { agencyLogoLabel, agencyLogoSrc } from "@/lib/agencyLogos";
+import { agencyLogo, agencyLogoLabel } from "@/lib/agencyLogos";
 
 /**
  * 발주기관 표기. 공식 CI가 확인된 기관(src/lib/agencyLogos.ts)은 CI와 기관명을,
@@ -48,12 +48,24 @@ export function AgencyMark({ name }: { name: string }) {
   const [top, main] = split(name);
   const kind = kindOf(main);
   const ch = main.replace(/^(국립|한국)/, "").charAt(0);
-  const logo = agencyLogoSrc(name);
+  const logo = agencyLogo(name);
   if (logo) {
+    // 흐르는 띠에서 이미지가 늦게 받아져 폭이 바뀌면 띠 전체가 덜컥이므로 비율로 폭을 미리 정한다
+    const w = Math.round(Math.min(150, 32 * logo.ratio));
     return (
       <span className="inline-flex h-[54px] items-center gap-2.5 whitespace-nowrap rounded-2xl border border-ink-100 bg-white py-2 pl-3 pr-4" title={name}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo} alt={`${agencyLogoLabel(name)} CI`} className="h-8 w-auto max-w-[150px] object-contain" loading="lazy" />
+        <img
+          src={logo.src}
+          alt={`${agencyLogoLabel(name)} CI`}
+          width={w}
+          height={32}
+          style={{ width: w, height: 32 }}
+          className="shrink-0 object-contain"
+          loading="eager"
+          decoding="async"
+          draggable={false}
+        />
         <span className="flex flex-col leading-tight">
           {top && <span className="text-[10px] font-medium text-ink-400">{top}</span>}
           <span className="text-[14px] font-extrabold tracking-[-0.03em] text-ink-700">{main}</span>

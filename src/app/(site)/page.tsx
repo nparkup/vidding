@@ -340,10 +340,17 @@ export default async function Home() {
       {/* 발주기관 마키 */}
       <section className="pt-16">
         <p className="container-x text-center text-sm font-semibold text-ink-400">오늘 수집한 공고의 발주기관</p>
-        <div className="relative mt-5 overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
-          <div className="flex w-max animate-marquee gap-3">
+        <div className="relative mt-5 overflow-hidden">
+          {/* 양 끝 흐림은 mask-image 대신 흰 그라데이션을 덮는다. 움직이는 층에 mask를 걸면 매 프레임 다시 그려 끊긴다 */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[10%] bg-gradient-to-r from-white to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-[10%] bg-gradient-to-l from-white to-transparent" />
+          {/* 같은 목록을 두 번 이어 붙이고 정확히 절반(-50%)만큼 옮겨 이음매 없이 돈다.
+              간격은 gap 대신 항목마다 오른쪽 여백으로 줘야 절반 지점이 딱 맞는다(gap이면 한 바퀴마다 6px 튐) */}
+          <div className="flex w-max animate-marquee [backface-visibility:hidden] [will-change:transform] motion-reduce:animate-none">
             {[...agencies, ...agencies].map((a, i) => (
-              <AgencyMark key={i} name={a} />
+              <div key={i} className="shrink-0 pr-3" aria-hidden={i >= agencies.length || undefined}>
+                <AgencyMark name={a} />
+              </div>
             ))}
           </div>
         </div>

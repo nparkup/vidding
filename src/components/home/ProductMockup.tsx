@@ -17,11 +17,11 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
   const [k, setK] = useState(0);
   const { digest, top } = cases[k];
   const menu = [
-    { t: "오늘의 공고", on: true, n: digest.recommended.length },
-    { t: "관심 공고" },
+    { t: "맞춤 공고", on: true, n: digest.recommended.length },
+    { t: "아파트 공고" },
+    { t: "정정·취소 알림" },
+    { t: "평가점수 예측" },
     { t: "서류 체크리스트" },
-    { t: "주간 보고서" },
-    { t: "알림 설정" },
   ];
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white text-left shadow-lift sm:rounded-3xl">

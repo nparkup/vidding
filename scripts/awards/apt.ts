@@ -22,6 +22,8 @@ const ROWS = 999;
 const WORK = process.env.AWARDS_WORK_DIR || ".cache/awards";
 const APPROVED = Number(process.env.R2_APPROVED_BYTES || 5e9);
 const FROM_YEAR = Number(process.env.APT_FROM_YEAR || 2010);
+/** 공고 API는 2013-10 공고부터 있다 (2026-11-21 실행: 2010~2013-09 는 0건, 2010-06~08 은 게이트웨이가 계속 HTTP 에러) */
+const NOTICE_FROM_YEAR = Number(process.env.APT_NOTICE_FROM_YEAR || 2013);
 const MAX_MS = Math.min(300, Number(process.env.MAX_MINUTES || 100)) * 60_000;
 const started = Date.now();
 const STATE = "apt/state.json";
@@ -37,6 +39,9 @@ export interface AptMeta {
   /** 자료가 있는 첫 달 YYYY-MM, 마지막으로 받은 달 */
   noticeFrom: string;
   noticeTo: string;
+  /** 공고 API 또는 낙찰 API에 한 번이라도 나온 공고번호 수 (현황 줄 누적입찰공고에 쓴다).
+   * 공고 API는 지난 공고를 일부만 돌려준다 (2025년 공고 409건, 같은 해 낙찰 31,880건) → 낙찰 난 공고도 공고로 센다 */
+  noticesAll: number;
   /** 공고번호 기준 누적 낙찰 수, 자료가 있는 첫 해 */
   awards: number;
   awardFrom: string;
@@ -128,7 +133,7 @@ async function main() {
   console.log(`R2 사용량 ${(measured / 1e9).toFixed(2)}GB (Cloudflare 집계), 승인 용량 ${(APPROVED / 1e9).toFixed(2)}GB, 아파트 자료 ${(own() / 1e6).toFixed(1)}MB`);
 
   const months: string[] = [];
-  for (let yy = FROM_YEAR; yy <= y; yy++) for (let mm = 1; mm <= (yy === y ? m : 12); mm++) months.push(`${yy}-${p2(mm)}`);
+  for (let yy = NOTICE_FROM_YEAR; yy <= y; yy++) for (let mm = 1; mm <= (yy === y ? m : 12); mm++) months.push(`${yy}-${p2(mm)}`);
   const recentMonths = new Set(months.slice(-2));
   const years = Array.from({ length: y - FROM_YEAR + 1 }, (_, i) => String(FROM_YEAR + i));
   const recentYears = new Set([String(y - 1), String(y)]);
@@ -212,7 +217,7 @@ async function main() {
   const withData = months.filter((mo) => state.months[mo]?.rows);
   const meta: AptMeta = {
     builtAt: new Date().toISOString(),
-    notices: noticeNos.size, noticeFrom: withData[0] ?? "", noticeTo: withData[withData.length - 1] ?? "",
+    notices: noticeNos.size, noticesAll: new Set([...noticeNos, ...awardNos]).size, noticeFrom: withData[0] ?? "", noticeTo: withData[withData.length - 1] ?? "",
     awards: awardNos.size, awardFrom: years.find((yr) => state.years[yr]?.rows) ?? "",
     g2b: [...g2b], bytes: own(),
   };
@@ -222,7 +227,7 @@ async function main() {
   if (!missingMonths && !missingYears) await r2Put(APT_META, Buffer.from(JSON.stringify(meta)), "application/json");
   console.log(`아파트 공고 연도별: ${JSON.stringify(perYear)}`);
   console.log(`아파트 낙찰 연도별: ${JSON.stringify(awardYear)}`);
-  console.log(`아파트 누적 공고 ${meta.notices.toLocaleString()}건 (${meta.noticeFrom}~${meta.noticeTo}, 조달청 시스템 ${g2b.size.toLocaleString()}건), 누적 낙찰 ${meta.awards.toLocaleString()}건 (${meta.awardFrom}~), 호출 ${calls}회, 저장 ${(own() / 1e6).toFixed(1)}MB`);
+  console.log(`아파트 누적 공고 ${meta.notices.toLocaleString()}건 (${meta.noticeFrom}~${meta.noticeTo}, 조달청 시스템 ${g2b.size.toLocaleString()}건), 누적 낙찰 ${meta.awards.toLocaleString()}건 (${meta.awardFrom}~), 공고·낙찰 합친 공고번호 ${meta.noticesAll.toLocaleString()}건, 호출 ${calls}회, 저장 ${(own() / 1e6).toFixed(1)}MB`);
   console.log(missingMonths || missingYears ? `남은 것: 공고 ${missingMonths}달, 낙찰 ${missingYears}해 (건수는 다 받은 뒤 올린다)` : `${APT_META} 갱신`);
   if (stopped) {
     console.error(`::warning::아파트 수집 중단: ${stopped}`);

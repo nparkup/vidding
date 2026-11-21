@@ -18,7 +18,7 @@ export const MONTHLY_PRICE = 33000;
 export const ANNUAL_CHARGE = 348000;
 
 export const PLANS: Plan[] = [
-  { id: "annual", name: "연간 결제", charge: ANNUAL_CHARGE, months: 12, monthly: ANNUAL_CHARGE / 12, tagline: "1년 치를 한 번에 결제", highlight: true },
+  { id: "annual", name: "연간 결제", charge: ANNUAL_CHARGE, months: 12, monthly: ANNUAL_CHARGE / 12, tagline: "1년 이용, 월간보다 12% 저렴", highlight: true },
   { id: "monthly", name: "월간 결제", charge: MONTHLY_PRICE, months: 1, monthly: MONTHLY_PRICE, tagline: "매달 결제, 원하는 달까지만" },
 ];
 

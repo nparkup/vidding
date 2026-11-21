@@ -10,10 +10,30 @@
  * - GET  hits&days=&kinds=    : 날짜별 집계 (요청·API·페이지 조회 등, metrics.ts)
  * - GET  logs[&errors=1]      : 최근 요청 기록
  * - GET  audit                : 관리자 로그인·변경 기록
+ * - GET  apiusage&days=        : 공공데이터포털 호출(중계 서버 + 빌드·수집), Anthropic 호출·토큰 (ops.ts)
+ * - GET  storage[&fresh=1]     : R2 저장 용량
+ * - GET  actions               : GitHub Actions 최근 실행
+ * - GET  opsconfig / POST opsconfig : API 일일 한도·환율 (관리자만 보는 값, R2 config/admin.json)
+ * - GET  settings / POST settings : 사이트 설정 (공지 띠·요금·무료 체험 건수·기능). 사이트는 공개 주소 ?config=1 로 읽는다
  *
  * R2 저장 위치: members/{사업자번호}.json, trial/{사업자번호}.json, billing/{사업자번호}.json
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
+import { actions, apiUsage, storage } from "./ops";
+import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../../src/lib/siteConfigCore";
+
+/** 사이트 설정 (R2 config/site.json). 한 인스턴스 안에서 1분 동안 다시 읽지 않는다 */
+let cfgCache: { at: number; v: SiteConfig } | null = null;
+export async function readSiteConfig(bucket: AdminBucket | undefined): Promise<SiteConfig> {
+  if (cfgCache && Date.now() - cfgCache.at < 60_000) return cfgCache.v;
+  let v = DEFAULT_CONFIG;
+  if (bucket) {
+    const o = await bucket.get("config/site.json");
+    if (o) { try { v = normalizeConfig(JSON.parse(new TextDecoder().decode(await o.arrayBuffer()))); } catch { /* 기본값 */ } }
+  }
+  cfgCache = { at: Date.now(), v };
+  return v;
+}
 
 export interface AdminBucket {
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
@@ -27,6 +47,10 @@ export interface AdminEnv {
   ADMIN_ID?: string;
   ADMIN_PASSWORD?: string;
   METRICS?: MetricsNs;
+  /** GitHub Actions 상태 조회용 (선택, 읽기 전용 토큰). 없으면 공개 API */
+  GITHUB_TOKEN?: string;
+  /** 기본 nparkup/vidding */
+  GITHUB_REPO?: string;
 }
 
 /** 관리자 로그인 유지 시간 */
@@ -41,7 +65,7 @@ const readJson = async (bucket: AdminBucket, key: string) => {
 };
 const putJson = (bucket: AdminBucket, key: string, v: unknown) => bucket.put(key, JSON.stringify(v), { httpMetadata: { contentType: "application/json" } });
 
-export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: { waitUntil(p: Promise<unknown>): void }, trialLimit: number): Promise<Response> {
+export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
   const sp = new URL(req.url).searchParams;
   // 예전 화면 주소(?adminlogin, ?members)도 받는다
   const action = sp.get("admin") ?? (sp.has("adminlogin") ? "login" : sp.has("delete") ? "member-delete" : "members");
@@ -82,7 +106,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
   switch (action) {
     case "members": {
       if (post) break;
-      return json(await listMembers(bucket, env, trialLimit), 200, noStore);
+      return json(await listMembers(bucket, env, (await readSiteConfig(bucket)).trialLimit), 200, noStore);
     }
     case "member": {
       if (!post || !needBizno()) break;
@@ -120,6 +144,46 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       await putJson(bucket, `billing/${bizno}.json`, { ...rec, updatedAt: new Date().toISOString() });
       audit("billing", `${bizno} ${rec.plan || "-"} ${rec.status}`);
       return json({ status: "ok", billing: rec }, 200, noStore);
+    }
+    case "settings": {
+      if (!post) return json({ config: await readSiteConfig(bucket), defaults: DEFAULT_CONFIG }, 200, noStore);
+      let b: unknown;
+      try { b = await req.json(); } catch { return json({ error: "잘못된 요청" }, 400); }
+      const prev = await readSiteConfig(bucket);
+      const next = { ...normalizeConfig(b), updatedAt: new Date().toISOString() };
+      await putJson(bucket, "config/site.json", next);
+      cfgCache = { at: Date.now(), v: next };
+      const changed = (["banner", "pricing", "trialLimit", "features"] as const).filter((k) => JSON.stringify(prev[k]) !== JSON.stringify(next[k]));
+      audit("settings", changed.length ? `바뀐 항목: ${changed.join(", ")}` : "변경 없음");
+      return json({ status: "ok", config: next }, 200, noStore);
+    }
+    case "apiusage": {
+      if (post) break;
+      const days = Math.min(60, Math.max(1, Number(sp.get("days") || 30)));
+      return json(await apiUsage(bucket, env.METRICS, days), 200, noStore);
+    }
+    case "storage": {
+      if (post) break;
+      return json(await storage(bucket, sp.get("fresh") === "1"), 200, noStore);
+    }
+    case "actions": {
+      if (post) break;
+      try { return json(await actions(env.GITHUB_REPO || "nparkup/vidding", env.GITHUB_TOKEN), 200, noStore); } catch (e) { return json({ error: (e as Error).message }, 502); }
+    }
+    case "opsconfig": {
+      if (!post) return json({ ops: (await readJson(bucket, "config/admin.json")) ?? {} }, 200, noStore);
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
+      const quotas: Record<string, number> = {};
+      for (const [k, v] of Object.entries((b.quotas ?? {}) as Record<string, unknown>).slice(0, 100)) {
+        const n = Math.round(Number(v));
+        if (/^[\w.-]{1,80}$/.test(k) && n > 0 && n < 1e9) quotas[k] = n;
+      }
+      const rate = Math.round(Number(b.krwPerUsd));
+      const ops = { quotas, krwPerUsd: rate > 100 && rate < 10000 ? rate : 1400, updatedAt: new Date().toISOString() };
+      await putJson(bucket, "config/admin.json", ops);
+      audit("opsconfig", `API 한도 ${Object.keys(quotas).length}개, 환율 ${ops.krwPerUsd}`);
+      return json({ status: "ok", ops }, 200, noStore);
     }
     case "hits":
     case "logs":

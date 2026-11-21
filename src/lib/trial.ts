@@ -11,7 +11,10 @@ import { useEffect, useMemo, useState } from "react";
  * - 로그인·결제가 생기면 유료 회원은 이 제한을 건너뛰게 바꾼다.
  */
 import { TRIAL_LIMIT } from "./trialLimit";
+import { CONFIG_EVENT, getSiteConfig } from "./siteConfig";
 export { TRIAL_LIMIT };
+/** 지금 무료 체험 공고 수 (관리자 화면 페이지 설정, 받기 전에는 기본값 TRIAL_LIMIT) */
+const limit = () => getSiteConfig().trialLimit;
 export const TRIAL_KEY = "bm-trial.v1";
 const EVENT = "bm-trial";
 
@@ -46,7 +49,7 @@ function writeTrial(bids: TrialEntry[]) {
 
 /** 먼저 분석한 순서로 3건까지가 체험으로 쓸 수 있는 공고 */
 export function allowedTrial(list: TrialEntry[]): TrialEntry[] {
-  return [...list].sort((a, b) => a.t - b.t).slice(0, TRIAL_LIMIT);
+  return [...list].sort((a, b) => a.t - b.t).slice(0, limit());
 }
 
 /** 관리자가 이용 정지한 사업자번호로 확인되면 이 브라우저의 체험을 막는다 */
@@ -56,9 +59,9 @@ const blocked = () => { try { return localStorage.getItem(BLOCK_KEY) === "1"; } 
 export function judgeTrial(list: TrialEntry[], key: string): TrialState & { add?: boolean } {
   const allowed = allowedTrial(list);
   if (blocked() && !allowed.some((e) => e.k === key)) return { status: "locked", used: allowed };
-  if (allowed.some((e) => e.k === key)) return { status: "ok", used: allowed, left: TRIAL_LIMIT - allowed.length, fresh: false };
-  if (!list.some((e) => e.k === key) && allowed.length < TRIAL_LIMIT) {
-    return { status: "ok", used: allowed, left: TRIAL_LIMIT - allowed.length - 1, fresh: true, add: true };
+  if (allowed.some((e) => e.k === key)) return { status: "ok", used: allowed, left: limit() - allowed.length, fresh: false };
+  if (!list.some((e) => e.k === key) && allowed.length < limit()) {
+    return { status: "ok", used: allowed, left: limit() - allowed.length - 1, fresh: true, add: true };
   }
   return { status: "locked", used: allowed };
 }
@@ -82,8 +85,9 @@ export function useTrial(key: string | null, title?: string): TrialState | null 
   useEffect(() => {
     const on = () => setVer((v) => v + 1);
     window.addEventListener(EVENT, on);
+    window.addEventListener(CONFIG_EVENT, on);
     window.addEventListener("storage", on);
-    return () => { window.removeEventListener(EVENT, on); window.removeEventListener("storage", on); };
+    return () => { window.removeEventListener(EVENT, on); window.removeEventListener(CONFIG_EVENT, on); window.removeEventListener("storage", on); };
   }, []);
   // 공고 목록은 브라우저에서 받은 뒤에야 key가 생기므로 여기서 localStorage를 읽어도 서버 렌더와 어긋나지 않는다
   const judged = useMemo(() => (key && typeof window !== "undefined" ? judgeTrial(readTrial(), key) : null), [key, ver]);

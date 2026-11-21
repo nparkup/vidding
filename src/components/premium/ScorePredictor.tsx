@@ -29,6 +29,8 @@ import { jointPredict, type JointMember } from "@/lib/joint";
 import { JointMembers } from "./JointMembers";
 import { PassAmount } from "./PassAmount";
 import { PerfCapCard } from "./PerfCapCard";
+import { syncTrialServer, useTrial, type TrialEntry } from "@/lib/trial";
+import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
 
 /** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
 const MAX_MATCHES = 100;
@@ -165,11 +167,23 @@ export function ScorePredictor() {
   const [trustAuto, setTrustAuto] = useState<Record<string, TrustAuto>>({});
   const onPerf = useCallback((s: PerfSummary) => setAutoPerf((p) => (p.amount === s.amount && p.count === s.count ? p : s)), []);
 
-  const bid: Bid | undefined = useMemo(() => {
+  const pickedBid: Bid | undefined = useMemo(() => {
     if (!bids) return undefined;
     // 미리 고르지 않는다: 사용자가 검색해서 고른 공고(또는 공고 상세에서 넘어온 공고)만 쓴다
     return bidId ? bids.find((b) => b.id === bidId) : undefined;
   }, [bids, bidId]);
+  // 무료 체험: 공개 경쟁 공고를 고르면 1건 차감(이미 분석한 공고는 그대로). 3건을 넘으면 분석을 열지 않는다
+  const trialKey = pickedBid && methodProfile(pickedBid).open ? `nara:${pickedBid.id}` : null;
+  const trial = useTrial(trialKey, pickedBid?.title);
+  const trialLocked = !!pickedBid && trial?.status === "locked";
+  const bid: Bid | undefined = trialLocked || (trialKey && !trial) ? undefined : pickedBid;
+  const pickTrial = (e: TrialEntry) => { if (e.k.startsWith("nara:")) setBidId(e.k.slice(5)); else window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/premium/apt?apt=${encodeURIComponent(e.k.slice(4))}`; };
+  // 사업자번호를 조회했으면 그 번호로 쓴 체험 건수도 중계 서버에서 맞춘다 (다른 브라우저에서 쓴 공고 포함)
+  const corpNo = corp?.bizno;
+  useEffect(() => {
+    if (STATIC && CORP_API && corpNo && trialKey && trial?.status === "ok") syncTrialServer(CORP_API, corpNo, trialKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [corpNo, trialKey]);
 
   // 수의시담·지명경쟁처럼 정해진 업체만 참가하는 공고는 평가점수를 예측하지 않는다
   const profile = useMemo(() => (bid ? methodProfile(bid) : undefined), [bid]);
@@ -443,6 +457,24 @@ export function ScorePredictor() {
     );
   }
 
+  // 무료 체험 3건을 다 쓴 뒤 새 공고를 고른 경우
+  if (trialLocked && pickedBid && trial) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
+        <section className="card min-w-0 p-6">
+          <Step n={1} title="공고 선택" />
+          <div className="mt-4 rounded-2xl bg-paper p-4">
+            <p className="text-xs text-ink-500">{pickedBid.bizType ?? "용역"} · {pickedBid.category} · {pickedBid.contractMethod} · 공고번호 {pickedBid.bidNtceNo}</p>
+            <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={pickedBid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={pickedBid.closeAt} />{pickedBid.title}</p>
+            <p className="mt-1 text-sm text-ink-500">{pickedBid.agency} · 기초금액 {won(pickedBid.baseAmount)}</p>
+          </div>
+          {searchBox}
+        </section>
+        <TrialLocked used={trial.used} onPick={pickTrial} />
+      </div>
+    );
+  }
+
   // 공고를 고르기 전: 검색만 보이고, 결과 자리에는 안내만 둔다
   if (!bid || !active || !result) {
     return (
@@ -451,6 +483,7 @@ export function ScorePredictor() {
           <Step n={1} title="공고 선택" />
           <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요. 고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다.</p>
           {searchBox}
+          <TrialIntro />
         </section>
         <aside className="card grid min-h-[12rem] min-w-0 place-items-center p-6 text-center">
           <div>
@@ -477,6 +510,7 @@ export function ScorePredictor() {
             <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
             <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
           </div>
+          <TrialNote state={trial} />
           {searchBox}
           {/* 고른 공고의 첨부파일을 자동으로 확인해 평가표를 적용한다 (첨부가 없으면 표시하지 않는다) */}
           {(!docs || docs.sheet || docs.files.length > 0) && (

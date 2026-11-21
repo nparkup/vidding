@@ -144,7 +144,7 @@ export function SiteHeader() {
 
         <div className="flex shrink-0 items-center gap-2">
           <Link href="/apply" className="btn-mint btn-sm whitespace-nowrap sm:px-4">
-            2주 무료 체험
+            무료 체험
           </Link>
           <button
             type="button"

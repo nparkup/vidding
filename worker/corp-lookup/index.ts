@@ -35,7 +35,11 @@ import { liveKey, readSheetLive, type LiveDocs } from "../../src/lib/nara/liveSh
 interface Env {
   DATA_GO_KR_SERVICE_KEY: string;
   /** 낙찰 저장소 (wrangler.toml r2_buckets). 없으면 ?awards 는 ready:false */
-  AWARDS?: R2BucketLike & { put(key: string, value: string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown> };
+  AWARDS?: R2BucketLike & {
+    put(key: string, value: string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+    delete(key: string): Promise<unknown>;
+    list(opts: { prefix: string; cursor?: string; limit?: number }): Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
+  };
   /** 공고 배점표 AI 판독용 Anthropic API 키 (Worker 비밀값). 없으면 ?aisheet 는 503 */
   ANTHROPIC_API_KEY?: string;
   /** AI 판독 모델 (기본 claude-haiku-5-5) */
@@ -46,6 +50,9 @@ interface Env {
   ATTACH_HOSTS?: string;
   /** 쉼표로 구분한 허용 Origin, 예: https://nparkup.github.io,http://localhost:3000 */
   ALLOWED_ORIGINS?: string;
+  /** 관리자 화면(/admin) 아이디·비밀번호 (Worker 비밀값, 저장소 Secrets ADMIN_ID·ADMIN_PASSWORD 에서). 없으면 관리자 로그인은 503 */
+  ADMIN_ID?: string;
+  ADMIN_PASSWORD?: string;
   /** 실시간 이용자 수 (wrangler.toml durable_objects). 없으면 ?presence 는 503 */
   PRESENCE?: { idFromName(name: string): unknown; get(id: unknown): { fetch(req: Request | string): Promise<Response> } };
 }
@@ -68,18 +75,51 @@ export class Presence {
 const CACHE_SECONDS = 12 * 3600;
 /** 무료 체험으로 분석할 수 있는 공고 수 (src/lib/trial.ts TRIAL_LIMIT 와 같게) */
 const TRIAL_LIMIT = 3;
+/** 관리자 로그인 유지 시간 */
+const ADMIN_SESSION_MS = 12 * 3600_000;
 
 export default {
   async fetch(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
     const origin = req.headers.get("Origin") ?? "";
     const allowed = (env.ALLOWED_ORIGINS ?? "https://nparkup.github.io").split(",").map((s) => s.trim()).filter(Boolean);
     const cors: Record<string, string> = allowed.includes(origin)
-      ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", Vary: "Origin" }
+      ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", Vary: "Origin" }
       : {};
     const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
       new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", ...cors, ...extra } });
 
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...cors, "Access-Control-Max-Age": "86400" } });
+    if (new URL(req.url).searchParams.has("adminlogin") || new URL(req.url).searchParams.has("members")) {
+      if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
+      if (!env.AWARDS) return json({ error: "off" }, 503);
+      if (!env.ADMIN_ID || !env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 10) return json({ error: "관리자 계정이 아직 설정되지 않았습니다." }, 503);
+      const noStore = { "Cache-Control": "no-store" };
+      const sp2 = new URL(req.url).searchParams;
+      // 로그인: 아이디·비밀번호가 맞으면 12시간짜리 서명 토큰을 준다. 이후 요청은 이 토큰만 보낸다
+      if (sp2.has("adminlogin")) {
+        if (req.method !== "POST") return json({ error: "POST만 지원합니다." }, 405);
+        let b: { id?: unknown; password?: unknown } = {};
+        try { b = (await req.json()) as typeof b; } catch { /* 빈 입력 */ }
+        const idOk = await sameSecret(String(b.id ?? ""), env.ADMIN_ID);
+        const pwOk = await sameSecret(String(b.password ?? ""), env.ADMIN_PASSWORD);
+        if (!idOk || !pwOk) {
+          await new Promise((r) => setTimeout(r, 1000)); // 비밀번호 대입을 느리게
+          return json({ error: "아이디 또는 비밀번호가 맞지 않습니다." }, 401, noStore);
+        }
+        const exp = Date.now() + ADMIN_SESSION_MS;
+        return json({ token: await signAdmin(exp, env), exp }, 200, noStore);
+      }
+      const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      if (!(await checkAdmin(token, env))) return json({ error: "로그인이 필요합니다." }, 401, noStore);
+      const del = sp2.get("delete");
+      if (req.method === "POST" && del) {
+        if (!/^\d{10}$/.test(del)) return json({ error: "잘못된 사업자번호" }, 400);
+        await env.AWARDS.delete(`members/${del}.json`);
+        return json({ status: "deleted" }, 200, noStore);
+      }
+      if (req.method !== "GET") return json({ error: "GET만 지원합니다." }, 405);
+      return json(await listMembers(env.AWARDS), 200, noStore);
+    }
     if (req.method === "POST" && new URL(req.url).searchParams.has("signup")) {
       if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
       if (!env.AWARDS) return json({ error: "off" }, 503);
@@ -267,4 +307,56 @@ async function signup(req: Request, bucket: NonNullable<Env["AWARDS"]>): Promise
   if (await bucket.get(key)) return [{ status: "exists" }, 200];
   await bucket.put(key, JSON.stringify({ ...m, joinedAt: new Date().toISOString() }), { httpMetadata: { contentType: "application/json" } });
   return [{ status: "ok" }, 200];
+}
+
+/** 관리자 비밀번호 비교: 해시끼리 끝까지 비교해 응답 시간으로 맞힌 글자 수를 알 수 없게 한다 */
+async function sameSecret(a: string, b: string): Promise<boolean> {
+  const h = async (x: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(x)));
+  const [x, y] = await Promise.all([h(a), h(b)]);
+  let d = a.length ? 0 : 1;
+  for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i];
+  return d === 0;
+}
+
+/** 관리자 화면용 가입자 목록: members/ 전부와 사업자번호별 무료 체험 사용 공고 (trial/) */
+async function listMembers(bucket: NonNullable<Env["AWARDS"]>) {
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const r = await bucket.list({ prefix: "members/", cursor, limit: 1000 });
+    keys.push(...r.objects.map((o) => o.key));
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor && keys.length < 5000);
+  const read = async (key: string) => {
+    const o = await bucket.get(key);
+    if (!o) return null;
+    try { return JSON.parse(new TextDecoder().decode(await o.arrayBuffer())) as Record<string, unknown>; } catch { return null; }
+  };
+  const out: unknown[] = [];
+  for (let i = 0; i < keys.length; i += 20) {
+    const part = await Promise.all(keys.slice(i, i + 20).map(async (k) => {
+      const m = await read(k);
+      if (!m) return null;
+      const t = await read(`trial/${String(m.bizno)}.json`);
+      return { ...m, trial: (t?.used as unknown[]) ?? [] };
+    }));
+    out.push(...part.filter(Boolean));
+  }
+  return { members: out, limit: TRIAL_LIMIT, at: new Date().toISOString() };
+}
+
+/** 관리자 토큰 서명 키: 아이디·비밀번호에서 만든다. 비밀번호를 바꾸면 이전 토큰은 모두 무효가 된다 */
+async function adminKey(env: Env) {
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`bidmate-admin:${env.ADMIN_ID}:${env.ADMIN_PASSWORD}`));
+  return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+}
+const hex = (b: ArrayBuffer) => Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, "0")).join("");
+async function signAdmin(exp: number, env: Env): Promise<string> {
+  const sig = await crypto.subtle.sign("HMAC", await adminKey(env), new TextEncoder().encode(`admin.${exp}`));
+  return `${exp}.${hex(sig)}`;
+}
+async function checkAdmin(token: string, env: Env): Promise<boolean> {
+  const m = /^(\d{10,16})\.([0-9a-f]{64})$/.exec(token);
+  if (!m || Number(m[1]) < Date.now()) return false;
+  return sameSecret(token, await signAdmin(Number(m[1]), env));
 }

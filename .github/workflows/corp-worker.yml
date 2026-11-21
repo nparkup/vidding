@@ -4,6 +4,7 @@ name: 기업 정보 중계 서버 배포
 # 필요한 저장소 Secrets: CLOUDFLARE_API_TOKEN (Workers 편집 권한), CLOUDFLARE_ACCOUNT_ID, DATA_GO_KR_SERVICE_KEY
 # 선택: ANTHROPIC_API_KEY (공고 배점표 AI 판독, ?aisheet=). 있으면 Worker 비밀값으로 넣는다
 # 선택: ADMIN_ID, ADMIN_PASSWORD (관리자 화면 /admin 로그인, 비밀번호 10자 이상). 있으면 Worker 비밀값으로 넣는다
+# 선택: ADMIN_GITHUB_TOKEN (관리자 화면 GitHub Actions 실행 목록, Actions 읽기 권한만). 있으면 Worker 비밀값 GITHUB_TOKEN 으로 넣는다
 on:
   push:
     branches: [main]
@@ -117,3 +118,12 @@ jobs:
           if [ ${#ADMIN_PASSWORD} -lt 10 ]; then echo "ADMIN_PASSWORD 는 10자 이상이어야 합니다: 관리자 로그인은 꺼진 채로 둡니다"; exit 0; fi
           printf '%s' "$ADMIN_ID" | npx --yes wrangler@4.40.0 secret put ADMIN_ID
           printf '%s' "$ADMIN_PASSWORD" | npx --yes wrangler@4.40.0 secret put ADMIN_PASSWORD
+      # 선택: 관리자 화면 시스템 정보의 GitHub Actions 실행 목록. 없으면 공개 API(시간당 60회)로 읽는다
+      - name: GitHub 읽기 토큰을 Worker 비밀값으로 저장
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
+        working-directory: worker/corp-lookup
+        env:
+          ADMIN_GITHUB_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$ADMIN_GITHUB_TOKEN" ]; then echo "ADMIN_GITHUB_TOKEN 없음: 공개 API로 읽습니다"; exit 0; fi
+          printf '%s' "$ADMIN_GITHUB_TOKEN" | npx --yes wrangler@4.40.0 secret put GITHUB_TOKEN

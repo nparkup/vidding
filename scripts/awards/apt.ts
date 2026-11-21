@@ -10,6 +10,8 @@
  * 따로 적어 두고, 수집 실행(collect.ts)이 나라장터 공고와 겹치는 수를 센다.
  * 용량 한도: Cloudflare가 센 R2 사용량이 승인 용량(R2_APPROVED_BYTES)의 90%에 닿으면 올리지 않고 멈춘다.
  */
+// 공공데이터포털 호출 수 (관리자 화면 API 사용량)
+import { flushApiCounts } from "../apiCounter";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { gunzipSync, gzipSync } from "zlib";
@@ -235,7 +237,8 @@ async function main() {
   }
 }
 
-main().catch((e) => {
+main().then(() => flushApiCounts("awards-apt"), async (e) => {
   console.error("아파트 수집 실패:", e instanceof Error ? e.message : e);
+  await flushApiCounts("awards-apt");
   process.exit(1);
 });

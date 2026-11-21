@@ -22,6 +22,8 @@
  * 4. 용량 한도: R2 사용량이 승인 용량(R2_APPROVED_BYTES, 기본 5GB)의 90%에 닿거나, 예상 최종 용량이 승인 용량을 넘으면
  *    올리기 전에 멈추고 실패로 끝낸다(사용자 승인 후 R2_APPROVED_BYTES 를 올려야 이어진다).
  */
+// 공공데이터포털 호출 수 (관리자 화면 API 사용량). 다른 모듈보다 먼저 불러 전역 fetch를 감싼다
+import { flushApiCounts } from "../apiCounter";
 import { createHash } from "crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
@@ -1166,6 +1168,8 @@ async function main() {
   const rs = await r2Get("rank-state.json");
   if (rs) rankState = JSON.parse(rs.toString()) as RankState;
   r2Measured = (await r2BucketBytes()) ?? 0;
+  // 관리자 화면 저장 용량: Cloudflare가 잰 버킷 사용량을 남겨 둔다 (Worker는 이 값을 직접 잴 수 없다)
+  if (r2Measured) await r2Put("ops/r2-usage.json", Buffer.from(JSON.stringify({ bytes: r2Measured, approved: APPROVED, at: new Date().toISOString() })), "application/json").catch(() => undefined);
   const today = kstNow();
   const { jobs, awardWeeks, leadWeeks } = plan(today);
   const totalRaw = KINDS.reduce((s, k) => s + (k.lead ? leadWeeks : awardWeeks).length * k.ops.length, 0);
@@ -1243,7 +1247,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
+// 정상 종료·실패 모두 호출 수를 남긴다 (process.exit 로 끝나는 경로는 남기지 못한다)
+main().then(() => flushApiCounts(`awards-${process.argv[2] ?? "collect"}`), async (e) => {
   console.error(e);
+  await flushApiCounts(`awards-${process.argv[2] ?? "collect"}`);
   process.exit(1);
 });

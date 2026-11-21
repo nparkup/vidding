@@ -4,6 +4,8 @@
  * 키가 없으면 목업 데이터를 저장한다. 키가 있는데 수집에 실패하면 종료 코드 1 (이전 배포 유지).
  */
 import { mkdirSync, writeFileSync } from "fs";
+// 공공데이터포털 호출 수 (관리자 화면 API 사용량). 다른 모듈보다 먼저 불러 전역 fetch를 감싼다
+import { flushApiCounts } from "./apiCounter";
 import { dirname } from "path";
 import { buildMockBids } from "../src/lib/mock/bids";
 import { fetchAllBidsWithChanges, hasServiceKey } from "../src/lib/nara/client";
@@ -260,7 +262,8 @@ async function main() {
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 
-main().catch((e) => {
+main().then(() => flushApiCounts("pages-build"), async (e) => {
   console.error("공고 수집 실패:", e instanceof Error ? e.message : e);
+  await flushApiCounts("pages-build");
   process.exit(1);
 });

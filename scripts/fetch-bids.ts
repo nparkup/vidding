@@ -21,6 +21,7 @@ import { fetchPreSpecs } from "../src/lib/nara/preSpec";
 import { attachPriors, COMPARABLE, fetchAptAwards, fetchAptNotices, fetchAptPrivateContracts, type AptAward } from "../src/lib/kapt/client";
 import type { AptBidsFile } from "../src/lib/apt";
 import { buildAptPriceModel } from "../src/lib/aptPrice";
+import { attachAptHistory } from "../src/lib/kapt/history";
 import { fetchOrderPlans } from "../src/lib/nara/orderPlan";
 import { fetchContracts } from "../src/lib/nara/contract";
 import { linkPlansToBids } from "../src/lib/orderPlans";
@@ -186,6 +187,13 @@ async function main() {
       console.warn("공동주택 수의계약 건너뜀:", e instanceof Error ? e.message : e);
     }
     priors = attachPriors(items, prev);
+    // 낙찰 결과로 본 예측 (아파트 예측): 같은 단지 지난 계약·비슷한 낙찰·응찰 업체 수·참가 예상 기업
+    try {
+      const h = await attachAptHistory(items, prev);
+      console.log(`공동주택 낙찰 결과로 본 예측: 공고 ${h.attached.toLocaleString()}건, 응찰업체 조회 ${h.asked.toLocaleString()}건·캐시 ${h.cached.toLocaleString()}건${h.failed ? `·실패 ${h.failed}건 (${h.error})` : ""}`);
+    } catch (e) {
+      console.warn("공동주택 낙찰 결과로 본 예측 건너뜀:", e instanceof Error ? e.message : e);
+    }
     // 입찰가격 예측: 지난해까지의 (직전 계약 → 다음 낙찰) 짝으로 비율을 만들고 올해 낙찰로 맞춰 본다
     const pricing = prev.length ? buildAptPriceModel(prev, `${new Date(Date.now() + 9 * 3600e3).getUTCFullYear()}-01-01`) : undefined;
     if (pricing) console.log(`공동주택 입찰가격 예측: 짝 ${pricing.pairs.toLocaleString()}개, 검증 ${pricing.check.all.n.toLocaleString()}건 구간 적중 ${(pricing.check.all.inRange * 100).toFixed(1)}%, 10% 안 ${(pricing.check.all.within10 * 100).toFixed(1)}% (직전 금액 그대로 ${(pricing.check.all.naive10 * 100).toFixed(1)}%)`);

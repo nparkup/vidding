@@ -65,6 +65,46 @@ export interface AptBid {
   files?: string[];
   /** 같은 단지·같은 분야의 직전 낙찰 (입찰결과공지) */
   prior?: AptPrior;
+  /** 낙찰 결과로 본 예측 (아파트 예측 화면). 빌드 때 src/lib/kapt/history.ts 가 붙인다 */
+  history?: AptHistory;
+}
+
+/**
+ * K-apt 분류에서 '주택관리업자' 입찰에 광고물·재활용품·헌옷 수거 같은 잡수입 계약도 섞여 있다.
+ * 이런 계약과 관리·용역 계약은 금액과 업체가 전혀 달라 서로 비교하지 않는다.
+ */
+const SIDE = /(광고|전단|재활용|헌옷|의류|폐지|수거|알뜰|게시판|현수막|중고|고철)/;
+export const isSideDeal = (title: string) => SIDE.test(title);
+
+/** 지난 낙찰·수의계약 한 건 (업체는 이름만, 담당자 이름·전화는 받지 않는다) */
+export interface AptPastDeal {
+  no: string;
+  via: "낙찰" | "수의계약";
+  /** 입찰 마감일 또는 계약일 YYYY-MM-DD */
+  date: string;
+  title: string;
+  /** 단지명 (비슷한 낙찰에만) */
+  apt?: string;
+  amount: number;
+  /** 낙찰 업체·수의계약 업체 */
+  winner?: string;
+  /** 응찰 업체 수 (낙찰만, 응찰업체 조회로 센다) */
+  bidders?: number;
+  /** 응찰 업체 이름 (같은 단지 낙찰만). K-apt는 투찰금액·순위를 공개하지 않아 이름만 있다 */
+  entrants?: string[];
+  start?: string;
+  end?: string;
+}
+
+export interface AptHistory {
+  /** 같은 단지·같은 업종 지난 계약 (최근순) */
+  same: AptPastDeal[];
+  /** 같은 지역·같은 업종에서 금액이 비슷한 최근 낙찰 (같은 단지 제외, 최근순) */
+  similar: AptPastDeal[];
+  /** 경쟁 강도: 같은 단지·비슷한 낙찰의 응찰 업체 수 */
+  competition?: { level: "낮음" | "보통" | "높음"; median: number; avg: number; n: number; text: string };
+  /** 참가 예상 기업: 같은 단지·비슷한 낙찰에 응찰·낙찰한 업체 */
+  likely?: { name: string; sameWins: number; sameBids: number; wins: number; bids: number }[];
 }
 
 export interface AptBidsFile {

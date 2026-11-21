@@ -118,6 +118,9 @@ export interface AptPriceRecord {
   key: string;
   /** 낙찰방법 (적격심사·최저낙찰 등, 낙찰 건만) */
   award?: string;
+  /** 단지명·지역 (낙찰 건만, 비슷한 낙찰 찾기에 쓴다) */
+  apt?: string;
+  area?: string;
   prior: AptPrior;
 }
 

@@ -1,5 +1,5 @@
 import "server-only";
-import type { AptBid, AptCategory, AptPrior } from "../apt";
+import { isSideDeal, type AptBid, type AptCategory, type AptPrior } from "../apt";
 import type { AptPriceRecord } from "../aptPrice";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -202,7 +202,7 @@ export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
   // 아파트 용역은 2년 계약이 많아 3개 연도를 본다
   for (const year of [y - 2, y - 1, y]) {
     // 지난 연도는 거의 바뀌지 않아 7일 캐시, 올해는 매번 받되 게이트웨이가 끝내 실패하면 지난 빌드 자료를 쓴다
-    const name = `awards-v2-${year}.json`;
+    const name = `awards-v3-${year}.json`;
     let rows = year < y ? readCache<AptAward[]>(name, 7 * DAY) : undefined;
     if (!rows) {
       const items = await all(RESULT, "getBidSttusSearchV3", { bidState: "5", searchYear: String(year) });
@@ -216,6 +216,8 @@ export async function fetchAptAwards(now = new Date()): Promise<AptAward[]> {
           no: s(it.bidNum),
           key: `${apt}|${cat}`,
           award: SUC[s(it.codeSucWay)],
+          apt: s(it.bidKaptname) || undefined,
+          area: AREA[s(it.bidArea)] || undefined,
           prior: { via: "낙찰", title: s(it.bidTitle).replace(PREFIX, ""), amount, start: day(it.contractPeriodSdate), end: day(it.contractPeriodEdate), closedAt: day(it.bidDeadline) },
         });
       }
@@ -264,19 +266,52 @@ export async function fetchAptPrivateContracts(aptCodes: string[], now = new Dat
   return { items: [...[...cached.values()].flat(), ...rows.flat()], asked, cached: cached.size };
 }
 
+/**
+ * 낙찰 건의 응찰 업체 (입찰결과공지 getBidEntrpsInfoSearchV3). 응답에는 담당자 이름·전화가 함께 오지만
+ * 업체명과 낙찰 여부만 남기고 버린다. 끝난 입찰이라 바뀌지 않으므로 오래 캐시한다.
+ * maxCalls·budgetMs 를 넘으면 남은 건은 다음 빌드로 미룬다 (앞쪽일수록 먼저 묻는다).
+ */
+export interface AptEntrants { n: number; winner?: string; names: string[] }
+export async function fetchAptEntrants(nos: string[], maxCalls = 2500, budgetMs = 6 * 60_000): Promise<{ map: Map<string, AptEntrants>; asked: number; cached: number; failed: number; error?: string }> {
+  const map = new Map<string, AptEntrants>();
+  const todo: string[] = [];
+  for (const no of [...new Set(nos)].filter(Boolean)) {
+    const v = readCache<AptEntrants>(`entrants/${no}.json`, 400 * DAY);
+    if (v) map.set(no, v); else todo.push(no);
+  }
+  const cached = map.size;
+  const started = Date.now();
+  let asked = 0, failed = 0, error: string | undefined;
+  await mapLimit(todo.slice(0, maxCalls), 3, async (no) => {
+    if (Date.now() - started > budgetMs) return;
+    asked++;
+    try {
+      const { items } = await call(RESULT, "getBidEntrpsInfoSearchV3", { bidNum: no, numOfRows: "200" });
+      const names = [...new Set(items.map((it) => s(it.companyName)).filter(Boolean))];
+      const winner = s(items.find((it) => s(it.bidSuccessfulYn) === "Y")?.companyName) || undefined;
+      const v: AptEntrants = { n: names.length, winner, names };
+      map.set(no, v);
+      writeCache(`entrants/${no}.json`, v);
+    } catch (e) { failed++; error ??= e instanceof Error ? e.message : String(e); }
+  });
+  return { map, asked, cached, failed, error };
+}
+
 /** 직전 계약을 비교하는 분야 (공사·기타는 단지마다 일이 달라 비교하지 않는다) */
 export const COMPARABLE: AptCategory[] = ["청소", "경비", "소독", "승강기유지", "전기안전관리", "정화조·저수조", "주택관리(위탁)"];
 
 /** 같은 단지·같은 분야의 가장 최근 낙찰·수의계약을 공고에 붙인다. 붙인 건수를 돌려준다 */
 export function attachPriors(bids: AptBid[], awards: AptAward[]): number {
+  // 광고물·재활용품 수거 같은 잡수입 계약은 관리·용역 계약과 따로 본다 (isSideDeal)
   const latest = new Map<string, AptAward>();
   for (const a of awards) {
-    const cur = latest.get(a.key);
-    if (!cur || (a.prior.closedAt ?? "") > (cur.prior.closedAt ?? "")) latest.set(a.key, a);
+    const k = `${a.key}|${isSideDeal(a.prior.title) ? 1 : 0}`;
+    const cur = latest.get(k);
+    if (!cur || (a.prior.closedAt ?? "") > (cur.prior.closedAt ?? "")) latest.set(k, a);
   }
   let n = 0;
   for (const b of bids) {
-    const a = latest.get(`${b.aptCode}|${b.category}`);
+    const a = latest.get(`${b.aptCode}|${b.category}|${isSideDeal(b.title) ? 1 : 0}`);
     if (!a || a.no === b.no || !COMPARABLE.includes(b.category)) continue;
     b.prior = a.prior;
     n++;

@@ -2,7 +2,7 @@
 
 import {
   Boxes, BrushCleaning, Building2, Cable, CodeXml, DraftingCompass, Ellipsis, FileSearch, FireExtinguisher, HardHat,
-  Layers, Megaphone, Monitor, Package, Recycle, Shield, SprayCan, Stethoscope, Trees, Truck, Utensils,
+  Layers, LayoutGrid, Megaphone, Monitor, Package, Recycle, Shield, SprayCan, Stethoscope, Trees, Truck, Utensils,
   type LucideIcon,
 } from "lucide-react";
 import { CATEGORY_GROUPS, type ServiceCategory } from "@/lib/types";
@@ -39,9 +39,9 @@ const SHORT: Partial<Record<ServiceCategory, string>> = {
   "소방·기계설비공사": "소방·설비공사",
 };
 
-/** 넓은 화면: 용역은 한 줄 전체, 공사·물품은 한 줄에 나란히 (타일 폭이 같도록 12칸 기준) */
+/** 넓은 화면: 용역(맨 앞 전체 포함)은 한 줄 전체, 공사·물품은 한 줄에 나란히 (타일 폭이 같도록 13칸 기준) */
 const LAYOUT: Record<string, { span: string; cols: string }> = {
-  용역: { span: "lg:col-span-12", cols: "lg:grid-cols-12" },
+  용역: { span: "lg:col-span-full", cols: "lg:grid-cols-[repeat(13,minmax(0,1fr))]" },
   공사: { span: "lg:col-span-4", cols: "lg:grid-cols-4" },
   물품: { span: "lg:col-span-5", cols: "lg:grid-cols-5" },
 };
@@ -51,22 +51,13 @@ export function CategoryTiles({ value, counts, onPick }: { value: string; counts
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   return (
     <section className="card mt-6 p-4 sm:p-5" aria-label="업종 선택">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-bold">업종으로 찾기</p>
-        <button
-          type="button"
-          onClick={() => onPick("")}
-          aria-pressed={!value}
-          className={`rounded-full border px-3 py-1 text-xs font-semibold ${!value ? "border-mint bg-mint-50 text-mint-700" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}
-        >
-          전체 업종 {total.toLocaleString()}
-        </button>
-      </div>
-      <div className="mt-3 grid gap-4 lg:grid-cols-12 lg:gap-x-2">
-        {Object.entries(CATEGORY_GROUPS).map(([g, cs]) => (
+      <p className="text-sm font-bold">업종으로 찾기</p>
+      <div className="mt-3 grid gap-4 lg:grid-cols-[repeat(13,minmax(0,1fr))] lg:gap-x-2">
+        {Object.entries(CATEGORY_GROUPS).map(([g, cs], i) => (
           <div key={g} className={LAYOUT[g]?.span}>
             <p className="mb-1.5 text-xs font-semibold text-ink-400">{g}</p>
-            <div className={`grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2 ${LAYOUT[g]?.cols ?? "lg:grid-cols-12"}`}>
+            <div className={`grid grid-cols-4 gap-1.5 sm:grid-cols-7 sm:gap-2 ${LAYOUT[g]?.cols ?? "lg:grid-cols-12"}`}>
+              {i === 0 && <Tile icon={LayoutGrid} label="전체" title="전체 업종" count={total} on={!value} onClick={() => onPick("")} />}
               {cs.map((c) => (
                 <Tile key={c} icon={ICONS[c]} label={SHORT[c] ?? c} title={c} count={counts[c] ?? 0} on={value === c} onClick={() => onPick(value === c ? "" : c)} />
               ))}

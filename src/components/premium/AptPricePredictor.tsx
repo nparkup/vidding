@@ -57,7 +57,7 @@ export function AptPricePredictor() {
       <div className="card min-w-0 p-5 sm:p-6">
         <p className="text-sm font-semibold">아파트 공고 고르기</p>
         <p className="mt-1 text-xs text-ink-500">청소·경비·소독·승강기유지·전기안전관리·정화조·저수조·위탁관리 진행 중 공고 {open.length.toLocaleString()}건. 직전 계약이 있는 공고가 먼저 나옵니다.</p>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="단지명·공고명·분야·지역" className="input mt-3 w-full" aria-label="아파트 공고 검색" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="단지명·공고명·업종·지역" className="input mt-3 w-full" aria-label="아파트 공고 검색" />
         <ul className="mt-3 max-h-[420px] min-w-0 space-y-2 overflow-y-auto pr-1">
           {matches.map((b) => (
             <li key={b.no}>
@@ -169,7 +169,7 @@ function Result({ bid, data, manualAmount, setManualAmount, scale, setScale, mon
         <p className="mt-5 rounded-xl bg-paper p-3 text-sm text-ink-500">같은 단지 직전 계약 자료가 없어 예측하지 않습니다. 직전 계약금액을 알고 있으면 위에 입력해 주세요.</p>
       )}
 
-      <p className="mt-4 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 분야 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 공고서의 계약기간·과업 범위가 직전과 다르면 위의 계약기간이나 규모를 바꿔 보세요.</p>
+      <p className="mt-4 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 업종 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 공고서의 계약기간·과업 범위가 직전과 다르면 위의 계약기간이나 규모를 바꿔 보세요.</p>
       <a href={aptDetailUrl(bid.no)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm mt-3">K-apt 원문 보기</a>
     </div>
   );

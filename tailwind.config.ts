@@ -43,7 +43,7 @@ export default {
       borderRadius: { "4xl": "2rem" },
       keyframes: {
         float: { "0%,100%": { transform: "translateY(0)" }, "50%": { transform: "translateY(-8px)" } },
-        marquee: { from: { transform: "translateX(0)" }, to: { transform: "translateX(-50%)" } },
+        marquee: { from: { transform: "translate3d(0,0,0)" }, to: { transform: "translate3d(-50%,0,0)" } },
         "fade-up": { from: { opacity: "0", transform: "translateY(12px)" }, to: { opacity: "1", transform: "none" } },
         "loading-slide": { from: { transform: "translateX(-100%)" }, to: { transform: "translateX(250%)" } },
       },

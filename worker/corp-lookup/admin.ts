@@ -6,6 +6,7 @@
  * - POST member&bizno=        : 가입 정보 고치기 (회사명·담당자·연락처·이메일·업종·지역·규모·키워드·메일 수신·상태·메모)
  * - POST member-delete&bizno= : 탈퇴 처리 (가입 정보·결제 기록 삭제, 무료 체험 사용 기록은 남긴다)
  * - POST trial-reset&bizno=   : 무료 체험 사용 기록 초기화
+ * - POST password-temp&bizno= : 임시 비밀번호 발급 (회원 로그인, account.ts). 화면에 한 번만 보여 주고 저장하지 않는다
  * - GET  billing&bizno=       : 결제 기록 / POST billing&bizno= : 결제 기록 저장 (결제 대행사 연동 전이라 손으로 적는다)
  * - GET  hits&days=&kinds=    : 날짜별 집계 (요청·API·페이지 조회 등, metrics.ts)
  * - GET  logs[&errors=1]      : 최근 요청 기록
@@ -20,6 +21,7 @@
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
 import { actions, apiUsage, storage } from "./ops";
+import { adminMember, deleteAccountData, issueTempPassword, moveEmail, normEmail, paidUsageCount, type MemberAuth } from "./account";
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../../src/lib/siteConfigCore";
 
 /** 사이트 설정 (R2 config/site.json). 한 인스턴스 안에서 1분 동안 다시 읽지 않는다 */
@@ -117,12 +119,26 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       const next: Record<string, unknown> = { ...cur, ...cleanMember(b), bizno, updatedAt: new Date().toISOString() };
       if (!next.company || !next.name) return json({ error: "회사명과 담당자 이름은 비울 수 없습니다." }, 400);
       if (next.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(next.email))) return json({ error: "이메일 주소를 확인해 주세요." }, 400);
+      // 로그인하는 회원이면 이메일을 바꿀 때 로그인 이메일도 같이 바꾼다
+      const auth = cur.auth as MemberAuth | undefined;
+      if (auth && next.email && normEmail(String(next.email)) !== auth.email) {
+        if (!(await moveEmail(bucket, bizno, auth.email, String(next.email)))) return json({ error: "이 이메일은 다른 회원이 로그인에 쓰고 있습니다." }, 409);
+        next.auth = { ...auth, email: normEmail(String(next.email)) };
+      }
       await putJson(bucket, `members/${bizno}.json`, next);
       audit("member-edit", `${bizno}${cur.status !== next.status ? ` 상태 ${next.status === "suspended" ? "이용 정지" : "정상"}` : ""}`);
-      return json({ status: "ok", member: next }, 200, noStore);
+      return json({ status: "ok", member: adminMember(next) }, 200, noStore);
+    }
+    case "password-temp": {
+      if (!post || !needBizno()) break;
+      const r = await issueTempPassword(bucket, bizno);
+      if ("error" in r) return json(r, 400, noStore);
+      audit("password-temp", bizno);
+      return json({ status: "ok", ...r }, 200, noStore);
     }
     case "member-delete": {
       if (!post || !needBizno()) break;
+      await deleteAccountData(bucket, await readJson(bucket, `members/${bizno}.json`), bizno);
       await bucket.delete(`members/${bizno}.json`);
       await bucket.delete(`billing/${bizno}.json`);
       audit("member-delete", bizno);
@@ -275,7 +291,8 @@ async function listMembers(bucket: AdminBucket, env: AdminEnv, trialLimit: numbe
       if (!m) return null;
       const no = String(m.bizno);
       const [t, bill] = await Promise.all([readJson(bucket, `trial/${no}.json`), billed.has(no) ? readJson(bucket, `billing/${no}.json`) : null]);
-      return { ...m, trial: (t?.used as unknown[]) ?? [], billing: bill, seen: seen[no] ?? null };
+      const paidUse = bill ? await paidUsageCount(bucket, no, bill) : null;
+      return { ...adminMember(m), trial: (t?.used as unknown[]) ?? [], billing: bill, paidUse, seen: seen[no] ?? null };
     }));
     out.push(...part.filter(Boolean));
   }

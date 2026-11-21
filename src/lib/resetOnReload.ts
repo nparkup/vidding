@@ -1,6 +1,8 @@
 import { MYBOX_ENABLED, MYBOX_KEY } from "@/lib/mybox";
 /** src/lib/siteConfig.ts CACHE_KEY 와 같게 (그 파일은 "use client" 라 여기서 가져오지 않는다) */
 const SITE_CONFIG_KEY = "bm-site-config.v1";
+/** src/lib/account.ts AUTH_KEY 와 같게: 로그인한 회원은 서류함이 켜지므로 체크 표시도 남긴다 */
+const AUTH_KEY = "bm-auth.v1";
 
 /**
  * 새로고침하면 화면에서 고르거나 조회했던 것을 모두 처음 상태로 돌린다.
@@ -14,7 +16,7 @@ const SITE_CONFIG_KEY = "bm-site-config.v1";
  */
 const KEEP_PARAMS: Record<string, string[]> = { "/bids/view": ["id"], "/apt-bids/view": ["no"], "/contracts/view": ["no"] };
 
-function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: boolean, configKey: string) {
+function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: boolean, configKey: string, authKey: string) {
   try {
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     const legacy = (performance as unknown as { navigation?: { type: number } }).navigation;
@@ -26,6 +28,7 @@ function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: 
     const ls = window.localStorage;
     // 관리자 화면 페이지 설정에서 서류함을 켰으면 체크도 남긴다 (마지막으로 받은 설정)
     try { if ((JSON.parse(ls.getItem(configKey) ?? "null") as { features?: { mybox?: boolean } } | null)?.features?.mybox) clearChecklist = false; } catch { /* 무시 */ }
+    if (ls.getItem(authKey)) clearChecklist = false;
     for (let i = ls.length - 1; i >= 0; i--) {
       const k = ls.key(i);
       if (!k || k === keepMybox) continue;
@@ -48,4 +51,4 @@ function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: 
   }
 }
 
-export const resetOnReloadScript = `(${run.toString()})(${JSON.stringify(KEEP_PARAMS)},${JSON.stringify(MYBOX_KEY)},${JSON.stringify(!MYBOX_ENABLED)},${JSON.stringify(SITE_CONFIG_KEY)});`;
+export const resetOnReloadScript = `(${run.toString()})(${JSON.stringify(KEEP_PARAMS)},${JSON.stringify(MYBOX_KEY)},${JSON.stringify(!MYBOX_ENABLED)},${JSON.stringify(SITE_CONFIG_KEY)},${JSON.stringify(AUTH_KEY)});`;

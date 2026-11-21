@@ -29,6 +29,7 @@ export function SiteFooter() {
           <ul className="mt-4 space-y-2.5 text-sm">
             <li><Link href="/pricing" className="hover:text-ink">요금제</Link></li>
             <li><Link href="/apply" className="hover:text-ink">무료 체험 · 회원가입</Link></li>
+            <li><Link href="/login" className="hover:text-ink">로그인</Link></li>
           </ul>
         </div>
       </div>

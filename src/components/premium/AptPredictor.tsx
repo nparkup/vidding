@@ -9,7 +9,8 @@ import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "../Badges";
 import { CloseDay } from "../CloseDay";
 import { AptAwardSection, AptForecastCard } from "./AptAwardViews";
-import { syncTrialServer, useTrial, type TrialEntry } from "@/lib/trial";
+import { syncTrialServer, type TrialEntry } from "@/lib/trial";
+import { useUsage } from "@/lib/usage";
 import { readMember } from "@/lib/member";
 import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
 
@@ -67,13 +68,13 @@ export function AptPredictor() {
   }, [data, picked, history]);
   // 무료 체험: 공고를 고르면 1건 차감 (나라장터 예측과 합쳐 3건, 이미 분석한 공고는 그대로)
   const trialKey = pickedBid ? `apt:${pickedBid.no}` : null;
-  const trial = useTrial(trialKey, pickedBid ? `${pickedBid.apt} ${pickedBid.title}` : undefined);
+  const trial = useUsage(trialKey, pickedBid ? `${pickedBid.apt} ${pickedBid.title}` : undefined);
   const trialLocked = !!pickedBid && trial?.status === "locked";
   const bid = trialLocked || (trialKey && !trial) ? undefined : pickedBid;
   // 가입한 사업자번호가 있으면 그 번호로 쓴 체험 건수도 중계 서버에서 맞춘다
   useEffect(() => {
     const m = readMember();
-    if (TRIAL_API && m && trialKey && trial?.status === "ok") syncTrialServer(TRIAL_API, m.bizno, trialKey);
+    if (TRIAL_API && m && trialKey && trial?.status === "ok" && !trial.server) syncTrialServer(TRIAL_API, m.bizno, trialKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trialKey]);
   const pickTrial = (e: TrialEntry) => {
@@ -161,7 +162,7 @@ export function AptPredictor() {
           </div>
           {searchBox}
         </section>
-        <TrialLocked used={trial.used} onPick={pickTrial} />
+        <TrialLocked used={trial.used} onPick={pickTrial} state={trial} />
       </div>
     );
   }

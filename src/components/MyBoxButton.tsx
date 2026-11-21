@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { addToMyBox, inMyBox, MYBOX_ENABLED, MYBOX_EVENT, removeFromMyBox } from "@/lib/mybox";
+import { addToMyBox, inMyBox, MYBOX_EVENT, removeFromMyBox } from "@/lib/mybox";
+import { useMyboxOn } from "@/lib/useMyboxOn";
 import type { Bid } from "@/lib/types";
-import { useSiteConfig } from "@/lib/siteConfig";
 
 /** 공고를 관심공고 서류함에 담기 / 빼기 */
 export function MyBoxButton({ bid, className = "btn-ghost btn-sm" }: { bid: Bid; className?: string }) {
-  const cfg = useSiteConfig();
-  const enabled = MYBOX_ENABLED || cfg.features.mybox;
+  const enabled = useMyboxOn();
   const [on, setOn] = useState(false);
   useEffect(() => {
     const sync = () => setOn(inMyBox(bid.bidNtceNo));

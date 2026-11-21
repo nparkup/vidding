@@ -6,8 +6,7 @@ import { bidHref } from "@/lib/links";
 import { dateTime, won } from "@/lib/format";
 import { KEY_FIELDS, changeSummary, type NoticeChange } from "@/lib/noticeChanges";
 import { useMyBoxNos, useNoticeChanges } from "@/lib/useSiteJson";
-import { MYBOX_ENABLED } from "@/lib/mybox";
-import { useSiteConfig } from "@/lib/siteConfig";
+import { useMyboxOn } from "@/lib/useMyboxOn";
 
 type Kind = "" | "정정" | "취소";
 type Scope = "all" | "key" | "mine";
@@ -18,8 +17,7 @@ const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 export function NoticeChangesList() {
   const { data, error } = useNoticeChanges();
   const mine = useMyBoxNos();
-  const cfg = useSiteConfig();
-  const myboxOn = MYBOX_ENABLED || cfg.features.mybox;
+  const myboxOn = useMyboxOn();
   const [kind, setKind] = useState<Kind>("");
   const [scope, setScope] = useState<Scope>("all");
   const [biz, setBiz] = useState("");

@@ -32,6 +32,10 @@ export interface Member {
   memo?: string;
   trial: TrialUse[];
   billing?: Billing | null;
+  /** 로그인 계정 (비밀번호를 정했으면). 비밀번호 해시는 서버가 보내지 않는다 */
+  login?: { email: string; setAt: string; lastLogin: string | null; temp: boolean } | null;
+  /** 유료 이용권 이번 기간 공고 예측 사용 건수 */
+  paidUse?: { used: number; from: string; to: string } | null;
   /** 사업자번호를 넣은 조회가 마지막으로 온 때(ms)와 누적 횟수 (지표 수집 시작 뒤부터) */
   seen?: { last: number; n: number } | null;
 }

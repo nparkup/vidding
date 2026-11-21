@@ -84,7 +84,7 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
         )}
         {!compact && (
           <p className="mt-4 rounded-xl bg-paper p-3 text-xs leading-relaxed text-ink-500">
-            각 공고의 참가조건과 제출서류 체크리스트는 공고명을 누르면 확인할 수 있습니다. 관심 공고로 표시하시면 담당 매니저가 서류 준비를 도와드립니다.
+            각 공고의 참가조건과 제출서류 체크리스트는 공고명을 누르면 확인할 수 있습니다.
           </p>
         )}
       </div>

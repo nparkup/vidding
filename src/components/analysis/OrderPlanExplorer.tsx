@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ColumnChart, MetricToggle } from "@/components/charts/ColumnChart";
 import { won, wonFull } from "@/lib/format";
 import { bidHref } from "@/lib/links";
 import { orderPlanUrl, type OrderPlan } from "@/lib/orderPlans";
@@ -39,20 +40,24 @@ export function OrderPlanExplorer() {
 
   const cats = useMemo(() => [...new Set((list ?? []).filter((p) => !biz || p.biz === biz).map((p) => p.category))].sort(), [list, biz]);
   const months = useMemo(() => [...new Set((list ?? []).map((p) => p.month))].sort(), [list]);
-  const shown = useMemo(() => {
+  /** 예정월만 빼고 거른 목록 (월별 차트용) */
+  const anyMonth = useMemo(() => {
     const words = q.trim().split(/\s+/).filter(Boolean);
     const lo = Number(min) * 1e4 || 0, hi = Number(max) * 1e4 || Infinity;
-    const xs = (list ?? []).filter((p) =>
-      (!biz || p.biz === biz) && (!cat || p.category === cat) && (!month || p.month === month) &&
+    return (list ?? []).filter((p) =>
+      (!biz || p.biz === biz) && (!cat || p.category === cat) &&
       (!lo || p.amount >= lo) && (hi === Infinity || (p.amount > 0 && p.amount <= hi)) &&
       words.every((w) => `${p.title} ${p.agency} ${p.top ?? ""} ${p.item ?? ""} ${p.site ?? ""}`.includes(w)));
+  }, [list, q, biz, cat, min, max]);
+  const shown = useMemo(() => {
+    const xs = anyMonth.filter((p) => !month || p.month === month);
     const by: Record<Sort, (a: OrderPlan, b: OrderPlan) => number> = {
       month: (a, b) => a.month.localeCompare(b.month) || b.amount - a.amount,
       amount: (a, b) => b.amount - a.amount,
       new: (a, b) => b.postedAt.localeCompare(a.postedAt),
     };
     return xs.sort(by[sort]);
-  }, [list, q, biz, cat, month, min, max, sort]);
+  }, [anyMonth, month, sort]);
   const isNew = (p: OrderPlan) => !!saved?.seen && p.postedAt > saved.seen;
   const newCount = saved?.seen ? shown.filter(isNew).length : 0;
   const total = useMemo(() => shown.reduce((s, p) => s + p.amount, 0), [shown]);
@@ -110,6 +115,8 @@ export function OrderPlanExplorer() {
         {saved?.seen && ` · 저장한 조건 기준 지난 방문 뒤 새로 올라온 계획 ${newCount}건`}
       </p>
 
+      <MonthChart plans={anyMonth} month={month} onPick={(m) => setMonth(month === m ? "" : m)} />
+
       <ul className="mt-3 space-y-3">
         {shown.slice(0, limit).map((p) => (
           <li key={p.no} className="card p-4 sm:p-5">
@@ -141,5 +148,29 @@ export function OrderPlanExplorer() {
         발주계획은 기관이 앞으로 발주할 사업을 미리 올린 예정 목록입니다. 시기와 금액은 실제 공고에서 바뀌거나 취소될 수 있습니다. 이미 공고가 연결된 계획과 수의계약 계획은 뺐습니다. &quot;공고 나온 것으로 보임&quot;은 같은 기관의 비슷한 이름 공고를 찾아 붙인 것이라 직접 확인이 필요합니다. 저장한 조건은 이 브라우저에만 남습니다.
       </p>
     </div>
+  );
+}
+
+/** 발주 예정월별 건수·금액. 막대를 누르면 그 달만 본다 */
+function MonthChart({ plans, month, onPick }: { plans: OrderPlan[]; month: string; onPick: (m: string) => void }) {
+  const [m, setM] = useState<"n" | "amt">("n");
+  const rows = useMemo(() => {
+    const d = new Map<string, [number, number, number]>();
+    for (const p of plans) { const v = d.get(p.month) ?? [0, 0, 0]; v[0]++; v[1] += p.amount; if (p.amount > 0) v[2]++; d.set(p.month, v); }
+    return [...d.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [plans]);
+  if (rows.length < 2 && !month) return null;
+  return (
+    <section className="card mt-3 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">발주 예정월별 {m === "n" ? "건수" : "금액 합계"} <span className="font-normal text-ink-400">막대를 누르면 그 달만 봅니다</span></p>
+        <MetricToggle value={m} onChange={setM} options={[["n", "건수"], ["amt", "금액"]]} />
+      </div>
+      <ColumnChart
+        ariaLabel="발주 예정월별 발주계획" height={170} onPick={onPick}
+        fmt={m === "n" ? (v) => `${Math.round(v).toLocaleString()}건` : (v) => (v ? won(v) : "0")}
+        cols={rows.map(([mo, [n, a, priced]]) => ({ key: mo, label: `${Number(mo.slice(5))}월`, value: m === "n" ? n : a, hot: mo === month, tip: [monthLabel(mo), `${n.toLocaleString()}건`, `금액 합계 ${won(a)}${priced < n ? ` (금액 공개 ${priced.toLocaleString()}건)` : ""}`] }))}
+      />
+    </section>
   );
 }

@@ -3,6 +3,10 @@
 import type { AptBid, AptHistory, AptPastDeal } from "@/lib/apt";
 import type { AptPriceForecast } from "@/lib/aptPrice";
 import { contractMonths } from "@/lib/aptPrice";
+import { useMemo } from "react";
+import { ColumnChart } from "@/components/charts/ColumnChart";
+import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
+import { CHART } from "@/components/charts/useWidth";
 import { won, wonFull } from "@/lib/format";
 
 /**
@@ -183,6 +187,9 @@ export function AptAwardSection({ bid }: { bid: AptBid }) {
           <div className="min-w-0 lg:col-span-2">
             <SimilarCard similar={h.similar} region={bid.region} category={bid.category} />
           </div>
+          <div className="min-w-0 lg:col-span-2">
+            <AptNetwork apt={bid.apt} h={h} />
+          </div>
         </div>
       )}
     </section>
@@ -223,7 +230,15 @@ function TrendCard({ same }: { same: AptPastDeal[] }) {
   }
   return (
     <Box title="같은 단지 계약 추이" sub={`최근 ${same.length}건, 최근순`}>
-      <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
+      <ColumnChart
+        ariaLabel="같은 단지 계약 금액 추이" height={160}
+        fmt={(v) => (v ? won(v) : "0")}
+        cols={[...same].reverse().map((d, i, xs) => ({
+          key: d.no, label: d.date.slice(2, 7).replace("-", "."), value: d.amount, hot: i === xs.length - 1,
+          tip: [`${d.date} ${label(d)}`, d.winner || "업체명 확인 중", `금액 ${wonFull(d.amount)}`, ...(i > 0 ? [`이전 대비 ${signed(d.amount / xs[i - 1].amount)}`] : []), ...(period(d) ? [period(d)] : [])],
+        }))}
+      />
+      <ul className="mt-3 divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
         {same.map((d, i) => {
           const older = same[i + 1];
           return (
@@ -276,5 +291,45 @@ function SimilarCard({ similar, region, category }: { similar: AptPastDeal[]; re
         </div>
       )}
     </Box>
+  );
+}
+
+/** 관계도: 이 단지 ― 응찰·낙찰 업체 ― 같은 업체가 낙찰받은 비슷한 단지 */
+function AptNetwork({ apt, h }: { apt: string; h: AptHistory }) {
+  const g = useMemo(() => {
+    const nodes = new Map<string, NetNode>();
+    const edges = new Map<string, NetEdge>();
+    const edge = (a: string, b: string) => { const k = `${a}|${b}`; const e = edges.get(k); if (e) e.w++; else edges.set(k, { a, b, w: 1 }); };
+    nodes.set("me", { id: "me", label: apt, group: "me", weight: h.same.length, tip: [apt, `같은 업종 지난 계약 ${h.same.length}건`] });
+    const cnt = new Map<string, { bids: number; wins: number }>();
+    for (const d of h.same) {
+      const names = new Set([...(d.entrants ?? []), ...(d.winner ? [d.winner] : [])]);
+      for (const n of names) { const c = cnt.get(n) ?? { bids: 0, wins: 0 }; c.bids++; if (n === d.winner) c.wins++; cnt.set(n, c); }
+    }
+    for (const [n, c] of [...cnt.entries()].sort((a, b) => b[1].bids - a[1].bids).slice(0, 16)) {
+      nodes.set(`c:${n}`, { id: `c:${n}`, label: n, group: c.wins ? "win" : "bid", weight: c.bids, tip: [n, `이 단지 ${c.wins ? `낙찰 ${c.wins}회 · ` : ""}응찰 ${c.bids}회`] });
+      for (let i = 0; i < c.bids; i++) edge("me", `c:${n}`);
+    }
+    for (const d of h.similar.slice(0, 10)) {
+      if (!d.winner || !d.apt) continue;
+      const a = `a:${d.apt}`;
+      if (!nodes.has(a)) nodes.set(a, { id: a, label: d.apt, group: "apt", weight: 1, tip: [d.apt, `${d.date} ${d.winner} 낙찰 ${won(d.amount)}`] });
+      const c = `c:${d.winner}`;
+      if (!nodes.has(c)) nodes.set(c, { id: c, label: d.winner, group: "sim", weight: 1, tip: [d.winner, "비슷한 단지 낙찰"] });
+      edge(a, c);
+    }
+    return { nodes: [...nodes.values()], edges: [...edges.values()] };
+  }, [apt, h]);
+  if (g.nodes.length < 3) return null;
+  return (
+    <div className="min-w-0 rounded-2xl border border-ink-100 p-4">
+      <p className="font-bold">단지·업체 관계도</p>
+      <p className="mt-0.5 text-xs text-ink-500">원 크기 = 이 단지 응찰 횟수, 선 = 응찰 또는 낙찰</p>
+      <NetworkGraph
+        nodes={g.nodes} edges={g.edges} centerId="me" height={380} ariaLabel="단지와 업체 관계도"
+        groups={[{ key: "win", label: "이 단지 낙찰 업체", color: CHART.cat[0] }, { key: "bid", label: "이 단지 응찰 업체", color: CHART.cat[1] }, { key: "apt", label: "비슷한 단지", color: CHART.cat[2] }, { key: "sim", label: "비슷한 단지 낙찰 업체", color: CHART.cat[3] }]}
+      />
+      <p className="mt-2 text-xs text-ink-500">업체 이름만 씁니다. 원을 누르면 이어진 곳만 진하게 보입니다.</p>
+    </div>
   );
 }

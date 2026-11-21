@@ -1,5 +1,7 @@
 "use client";
 
+import { LineChart } from "@/components/charts/LineChart";
+import { CHART } from "@/components/charts/useWidth";
 import { won, wonFull } from "@/lib/format";
 import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PastAward, type Related, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
 
@@ -261,16 +263,25 @@ function HistoryCard({ history, fc }: { history: PastAward[]; fc: Forecast }) {
     );
   }
   const rows = [...history].sort((a, b) => a.date.localeCompare(b.date));
-  const rates = rows.map((r) => r.rate).filter((r) => r > 0);
-  const lo = Math.min(...rates, ...rows.map((r) => r.lwlt).filter((x) => x > 0)) - 0.5;
-  const hi = Math.max(...rates) + 0.5;
-  const x = (v: number) => `${Math.max(0, Math.min(100, ((v - lo) / Math.max(0.1, hi - lo)) * 100))}%`;
+  const hasFloor = rows.some((r) => r.lwlt > 0);
   return (
     <Box title="과거 같은 사업 낙찰 추이" sub={`같은 수요기관의 같은 사업 ${history.length}건 (${short(rows[0].date)} ~ ${short(rows[rows.length - 1].date)})`}>
       <div className="flex flex-wrap gap-2 text-xs">
         {fc.trend && <span className="chip">{fc.trend.text} ({pct(fc.trend.first, 2)} → {pct(fc.trend.last, 2)})</span>}
         {fc.incumbent && <span className="chip">{fc.incumbent.name} {fc.incumbent.total}건 중 {fc.incumbent.count}건 낙찰</span>}
       </div>
+      {rows.filter((r) => r.rate > 0).length >= 2 && (
+        <LineChart
+          ariaLabel="같은 사업 낙찰률 추이" height={170} pad={0.4}
+          xs={rows.map((r) => short(r.date))}
+          fmt={(v) => `${v.toFixed(1)}%`}
+          series={[
+            { name: "낙찰률", color: CHART.line, values: rows.map((r) => (r.rate > 0 ? r.rate : null)) },
+            ...(hasFloor ? [{ name: "그 공고 낙찰하한율", color: CHART.ref, dash: true, values: rows.map((r) => (r.lwlt > 0 ? r.lwlt : null)) }] : []),
+          ]}
+          tips={rows.map((r) => [`${r.date} · ${r.winner || "업체명 없음"}`, r.rate ? `낙찰률 ${pct(r.rate)}` : "낙찰률 없음", ...(r.amount > 100 ? [`낙찰금액 ${won(r.amount)}`] : []), ...(r.lwlt ? [`하한율 ${pct(r.lwlt)}`] : []), `${r.bidders.toLocaleString()}곳 참가`])}
+        />
+      )}
       <ul className="mt-3 space-y-2.5">
         {[...rows].reverse().map((r) => (
           <li key={r.no} className="min-w-0 text-sm">
@@ -278,16 +289,10 @@ function HistoryCard({ history, fc }: { history: PastAward[]; fc: Forecast }) {
               <span className="min-w-0 truncate"><span className="mr-1.5 text-xs text-ink-300 tabular-nums">{short(r.date)}</span>{r.winner}</span>
               <span className="shrink-0 text-xs tabular-nums text-ink-500"><b className="text-ink">{r.rate ? pct(r.rate) : "-"}</b>{r.amount > 100 ? ` · ${won(r.amount)}` : ""} · {r.bidders}곳</span>
             </div>
-            {r.rate > 0 && (
-              <div className="relative mt-1 h-1.5 rounded-full bg-ink-100" aria-hidden>
-                {r.lwlt > 0 && <span className="absolute top-[-2px] h-2.5 w-px bg-coral" style={{ left: x(r.lwlt) }} />}
-                <span className="absolute top-[-1px] h-2 w-2 -translate-x-1/2 rounded-full bg-ink" style={{ left: x(r.rate) }} />
-              </div>
-            )}
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-ink-300">점은 낙찰률, 빨간 선은 그 공고의 낙찰하한율입니다.</p>
+      <p className="mt-3 text-xs text-ink-300">점에 마우스를 올리거나 누르면 그 해 낙찰업체·금액이 나옵니다.</p>
     </Box>
   );
 }

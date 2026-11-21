@@ -8,6 +8,10 @@ import { AgencyLogo } from "@/components/AgencyLogo";
 import { Tile as KindTile } from "@/components/CategoryTiles";
 import { AGENCY_KINDS, KIND_LABEL, REGION_ORDER, agencyKind, agencyRegion, type AgencyKind } from "@/lib/agencyKind";
 import { DistChart } from "@/components/BidPriceAnalysis";
+import { YearChart } from "@/components/charts/YearChart";
+import { HBarList } from "@/components/charts/HBarList";
+import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
+import { CHART } from "@/components/charts/useWidth";
 import { METHOD_NAME } from "@/lib/awards/analysis";
 import type { AgencySummary } from "@/lib/awards/agency";
 import { assessStats } from "@/lib/awards/assess";
@@ -199,7 +203,6 @@ export function AgencyExplorer() {
 
 function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title: string; closeAt: string; contractMethod: string }[] }) {
   const st = useMemo(() => assessStats(s.assess, undefined), [s]);
-  const maxYear = Math.max(1, ...s.years.map((y) => y[1]));
   const recent4 = s.groups.reduce((a, g) => a + g.n, 0);
   return (
     <div className="space-y-6">
@@ -215,16 +218,9 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
       </section>
 
       <section className="card p-6">
-        <h3 className="font-bold">연도별 낙찰 건수</h3>
-        <ul className="mt-3 space-y-1.5">
-          {s.years.slice(-10).map(([y, n, amt, avg]) => (
-            <li key={y} className="grid grid-cols-[3rem_1fr_auto] items-center gap-2 text-sm">
-              <span className="tabular-nums text-ink-500">{y}</span>
-              <span className="h-3 rounded-full bg-paper"><span className="block h-3 rounded-full bg-mint-400" style={{ width: `${(n / maxYear) * 100}%` }} /></span>
-              <span className="text-right text-xs tabular-nums text-ink-500">{n.toLocaleString()}건 · {won(amt)}{avg ? ` · 평균 ${avg}곳` : ""}</span>
-            </li>
-          ))}
-        </ul>
+        <h3 className="font-bold">연도별 낙찰</h3>
+        <YearChart years={s.years.slice(-10)} title="최근 10년" />
+        <GroupShare s={s} />
       </section>
 
       <section className="card p-6">
@@ -253,14 +249,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-6">
           <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">최근 4년</span></h3>
-          <ol className="mt-3 divide-y divide-ink-100 rounded-xl border border-ink-100">
-            {s.winners.map(([n, c, a], i) => (
-              <li key={n} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5 text-sm">
-                <span className="min-w-0 truncate"><span className="mr-1.5 tabular-nums text-ink-400">{i + 1}</span><b>{n}</b></span>
-                <span className="shrink-0 text-xs text-ink-500">{c}건 · {won(a)}</span>
-              </li>
-            ))}
-          </ol>
+          <HBarList rows={s.winners.map(([n, c, a], i) => ({ label: `${i + 1}. ${n}`, value: c, text: `${c}건 · ${won(a)}` }))} />
           {s.ranked.length > 0 && (
             <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
           )}
@@ -275,6 +264,8 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
           ) : <p className="mt-3 text-sm text-ink-500">예정가격·기초금액이 공개된 낙찰이 적어 분포를 만들지 못했습니다.</p>}
         </section>
       </div>
+
+      <AgencyNetwork s={s} />
 
       {bids.length > 0 && (
         <section className="card p-6">
@@ -312,5 +303,59 @@ function Tile({ k, v, sub }: { k: string; v: string; sub?: string }) {
       <dd className="mt-0.5 text-lg font-bold tabular-nums">{v}</dd>
       {sub && <dd className="text-xs text-ink-400">{sub}</dd>}
     </div>
+  );
+}
+
+/** 최근 4년 업무·계약방법별 낙찰 건수 비중 (한 줄 막대) */
+function GroupShare({ s }: { s: AgencySummary }) {
+  const gs = s.groups.slice(0, 4);
+  const rest = s.groups.slice(4).reduce((a, g) => a + g.n, 0);
+  const total = gs.reduce((a, g) => a + g.n, 0) + rest;
+  if (!total) return null;
+  const parts = [...gs.map((g, i) => ({ label: `${g.biz} ${METHOD_NAME[g.method]}`, n: g.n, color: CHART.cat[i] })), ...(rest ? [{ label: "그 밖", n: rest, color: CHART.ref }] : [])];
+  return (
+    <div className="mt-5">
+      <p className="text-sm font-semibold">업무·계약방법 비중 <span className="font-normal text-ink-400">최근 4년 {total.toLocaleString()}건</span></p>
+      <div className="mt-2 flex h-3 gap-0.5 overflow-hidden rounded-full">
+        {parts.map((p) => <span key={p.label} title={`${p.label} ${p.n.toLocaleString()}건`} style={{ width: `${(p.n / total) * 100}%`, background: p.color }} />)}
+      </div>
+      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-500">
+        {parts.map((p) => <li key={p.label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />{p.label} {Math.round((p.n / total) * 100)}% ({p.n.toLocaleString()}건)</li>)}
+      </ul>
+    </div>
+  );
+}
+
+/** 관계도: 기관 ― 업무(공사·용역·물품) ― 최근 낙찰 업체, 그리고 자주 낙찰·상위에 든 업체 */
+function AgencyNetwork({ s }: { s: AgencySummary }) {
+  const g = useMemo(() => {
+    const nodes = new Map<string, NetNode>();
+    const edges = new Map<string, NetEdge>();
+    const edge = (a: string, b: string, w: number) => { const k = `${a}|${b}`; const e = edges.get(k); if (e) e.w += w; else edges.set(k, { a, b, w }); };
+    nodes.set("ag", { id: "ag", label: s.name, group: "ag", weight: s.n, tip: [s.name, `낙찰 ${s.n.toLocaleString()}건`] });
+    const bizN = new Map<string, number>();
+    for (const g of s.groups) bizN.set(g.biz, (bizN.get(g.biz) ?? 0) + g.n);
+    for (const [b, n] of bizN) { nodes.set(`b:${b}`, { id: `b:${b}`, label: b, group: "biz", weight: n, tip: [b, `최근 4년 낙찰 ${n.toLocaleString()}건`] }); edge("ag", `b:${b}`, n); }
+    const winBiz = new Map<string, Map<string, number>>();
+    for (const r of s.recent) { if (!r[8]) continue; const m = winBiz.get(r[8]) ?? new Map<string, number>(); m.set(r[3], (m.get(r[3]) ?? 0) + 1); winBiz.set(r[8], m); }
+    const link = (id: string, name: string, w: number) => {
+      const bs = winBiz.get(name);
+      const hit = bs && [...bs.keys()].filter((b) => nodes.has(`b:${b}`));
+      if (hit?.length) for (const b of hit) edge(`b:${b}`, id, w); else edge("ag", id, w);
+    };
+    for (const [n, c, a] of s.winners) { nodes.set(`w:${n}`, { id: `w:${n}`, label: n, group: "win", weight: c, tip: [n, `최근 4년 낙찰 ${c}건 · ${won(a)}`] }); link(`w:${n}`, n, c); }
+    for (const [n, c] of s.ranked.slice(0, 8)) { if (nodes.has(`w:${n}`)) continue; nodes.set(`r:${n}`, { id: `r:${n}`, label: n, group: "rank", weight: c, tip: [n, `최근 4년 개찰 1~5위 ${c}회 (낙찰 제외)`] }); link(`r:${n}`, n, c); }
+    return { nodes: [...nodes.values()], edges: [...edges.values()] };
+  }, [s]);
+  if (g.nodes.length < 3) return null;
+  return (
+    <section className="card p-6">
+      <h3 className="font-bold">업무·업체 관계도 <span className="text-sm font-normal text-ink-400">최근 4년, 원 크기 = 건수</span></h3>
+      <NetworkGraph
+        nodes={g.nodes} edges={g.edges} centerId="ag" ariaLabel="수요기관 업무와 업체 관계도"
+        groups={[{ key: "biz", label: "업무 (낙찰 건수)", color: CHART.cat[2] }, { key: "win", label: "자주 낙찰받은 업체", color: CHART.cat[0] }, { key: "rank", label: "개찰 1~5위에 자주 든 업체", color: CHART.cat[1] }]}
+      />
+      <p className="mt-2 text-xs leading-relaxed text-ink-500">업체는 최근 낙찰 20건에서 맡은 업무에 잇고, 그 안에 없으면 기관에 바로 잇습니다. 원을 누르면 이어진 곳만 진하게 보입니다.</p>
+    </section>
   );
 }

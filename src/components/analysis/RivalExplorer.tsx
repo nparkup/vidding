@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DistChart } from "@/components/BidPriceAnalysis";
+import { YearChart } from "@/components/charts/YearChart";
+import { HBarList } from "@/components/charts/HBarList";
+import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
+import { CHART } from "@/components/charts/useWidth";
 import { METHOD_NAME, bandLabel, bandOfAmount, methodCode, provinceKey, quantile } from "@/lib/awards/analysis";
 import { assessStats, type AssessData, type AssessSample } from "@/lib/awards/assess";
 import type { AwardLookup, AwardWin } from "@/lib/awards/read";
@@ -108,6 +112,8 @@ export interface RivalProfile {
   groups: { label: string; n: number; rate?: number; gap?: number; bidders: number }[];
   agencies: [string, number, number][];
   rivals: [string, number][];
+  /** 함께 개찰 1~5위에 든 업체가 어느 기관 공고에서 만났는지 [업체명, 기관, 횟수] */
+  links: [string, string, number][];
   assess?: AssessData;
   firstShare?: number;
   /** 참가 지역(시·도)별 [지역, 건수, 낙찰금액 합] */
@@ -136,12 +142,18 @@ export function rivalProfile(wins: AwardWin[], bizno: string): RivalProfile {
   const ag = new Map<string, [number, number]>();
   for (const w of xs) { const v = ag.get(w.agency) ?? [0, 0]; v[0]++; v[1] += w.amount; ag.set(w.agency, v); }
   const rv = new Map<string, number>();
+  const lk = new Map<string, number>();
   let first = 0, ranked = 0;
   for (const w of xs) {
     if (!w.top.length) continue;
     ranked++;
     if (w.top.find((t) => t.bizno === bizno)?.rank === 1) first++;
-    for (const t of w.top) if (t.name && t.bizno !== bizno) rv.set(t.name, (rv.get(t.name) ?? 0) + 1);
+    for (const t of w.top) {
+      if (!t.name || t.bizno === bizno) continue;
+      rv.set(t.name, (rv.get(t.name) ?? 0) + 1);
+      const k = `${t.name}\t${w.agency}`;
+      lk.set(k, (lk.get(k) ?? 0) + 1);
+    }
   }
   // 이 업체의 사정율 = 낙찰금액 ÷ (기초금액 × 하한율)
   const samples: AssessSample[] = xs
@@ -164,6 +176,7 @@ export function rivalProfile(wins: AwardWin[], bizno: string): RivalProfile {
     groups,
     agencies: [...ag.entries()].sort((a, b) => b[1][0] - a[1][0]).slice(0, 8).map(([n, [c, a]]) => [n, c, Math.round(a)]),
     rivals: [...rv.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10),
+    links: [...lk.entries()].map(([k, c]) => { const [n, a] = k.split("\t"); return [n, a, c] as [string, string, number]; }),
     assess: samples.length ? { scope: "agency", samples } : undefined,
     firstShare: ranked >= 5 ? first / ranked : undefined,
   };
@@ -174,22 +187,13 @@ function RivalDetail({ wins, bizno, from, mine }: { wins: AwardWin[]; bizno: str
   const p = useMemo(() => rivalProfile(wins, bizno), [wins, bizno]);
   const name = winnerName(wins);
   const st = useMemo(() => assessStats(p.assess, [-3, 3]), [p]);
-  const maxY = Math.max(1, ...p.years.map((y) => y[1]));
   if (!p.n) return <p className="card p-6 text-sm text-ink-500">{from ? `${from} 이후 ` : ""}나라장터 낙찰 기록이 없습니다.</p>;
   return (
     <div className="space-y-6">
       <section className="card p-6">
         <h2 className="text-xl font-extrabold">{name ? `${name} · ` : ""}낙찰 {p.n.toLocaleString()}건</h2>
         <p className="mt-1 text-sm text-ink-500">{from ? `${from} 이후 ` : ""}나라장터 낙찰 기준입니다. 떨어진 입찰은 공개 자료에 없어 넣지 않았습니다.{p.firstShare !== undefined ? ` 개찰 순위를 아는 낙찰 중 1위로 낙찰받은 비율 ${Math.round(p.firstShare * 100)}%.` : ""}</p>
-        <ul className="mt-4 space-y-1.5">
-          {p.years.slice(-10).map(([y, n, a]) => (
-            <li key={y} className="grid grid-cols-[3rem_1fr_auto] items-center gap-2 text-sm">
-              <span className="tabular-nums text-ink-500">{y}</span>
-              <span className="h-3 rounded-full bg-paper"><span className="block h-3 rounded-full bg-mint-400" style={{ width: `${(n / maxY) * 100}%` }} /></span>
-              <span className="text-right text-xs tabular-nums text-ink-500">{n}건 · {won(a)}</span>
-            </li>
-          ))}
-        </ul>
+        <YearChart years={p.years.slice(-10).map(([y, n, a]) => [y, n, a])} title="연도별 낙찰" />
         <Link href={`/contracts?corp=${bizno}`} className="btn-ghost btn-sm mt-4 inline-flex">이 업체의 최근 2주 계약 보기</Link>
       </section>
       <section className="card p-6">
@@ -223,36 +227,22 @@ function RivalDetail({ wins, bizno, from, mine }: { wins: AwardWin[]; bizno: str
         </section>
         <section className="card p-6">
           <h3 className="font-bold">주요 발주처</h3>
-          <ol className="mt-3 divide-y divide-ink-100 rounded-xl border border-ink-100">
-            {p.agencies.map(([n, c, a]) => (
-              <li key={n} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5 text-sm">
-                <span className="min-w-0 truncate font-semibold">{n}</span>
-                <span className="shrink-0 text-xs text-ink-500">{c}건 · {won(a)}</span>
-              </li>
-            ))}
-          </ol>
+          <HBarList rows={p.agencies.map(([n, c, a]) => ({ label: n, value: c, text: `${c}건 · ${won(a)}` }))} />
           {p.rivals.length > 0 && (
             <p className="mt-3 text-xs leading-relaxed text-ink-500">이 업체가 낙찰받을 때 개찰 1~5위에 함께 든 업체: {p.rivals.slice(0, 8).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
           )}
         </section>
       </div>
+      <RivalNetwork p={p} name={name || "이 업체"} />
       {mine && <Diagnosis p={p} st={st} />}
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-6">
           <h3 className="font-bold">지역별 낙찰 <span className="text-sm font-normal text-ink-400">공고 참가 지역 기준</span></h3>
-          <ol className="mt-3 divide-y divide-ink-100 rounded-xl border border-ink-100">
-            {p.regions.map(([n, c, a]) => (
-              <li key={n} className="flex items-baseline justify-between gap-2 px-3 py-1.5 text-sm"><span className="font-semibold">{n === "전국" ? "지역 제한 없음" : n}</span><span className="text-xs text-ink-500">{c}건 · {won(a)}</span></li>
-            ))}
-          </ol>
+          <HBarList rows={p.regions.map(([n, c, a]) => ({ label: n === "전국" ? "지역 제한 없음" : n, value: c, text: `${c}건 · ${won(a)}` }))} />
         </section>
         <section className="card p-6">
           <h3 className="font-bold">금액 구간별 낙찰 <span className="text-sm font-normal text-ink-400">기초금액 기준</span></h3>
-          <ol className="mt-3 divide-y divide-ink-100 rounded-xl border border-ink-100">
-            {p.bands.map(([n, c, r]) => (
-              <li key={n} className="flex items-baseline justify-between gap-2 px-3 py-1.5 text-sm"><span className="font-semibold">{n}</span><span className="text-xs text-ink-500">{c}건{r ? ` · 낙찰률 가운데 ${pct(r)}` : ""}</span></li>
-            ))}
-          </ol>
+          <HBarList rows={p.bands.map(([n, c, r]) => ({ label: n, value: c, text: `${c}건${r ? ` · 낙찰률 가운데 ${pct(r)}` : ""}` }))} />
         </section>
       </div>
       <section className="card p-6">
@@ -287,6 +277,37 @@ function Diagnosis({ p, st }: { p: RivalProfile; st: ReturnType<typeof assessSta
       <ul className="mt-3 space-y-2 text-sm leading-relaxed">
         {lines.map((l) => <li key={l} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-mint" />{l}</li>)}
       </ul>
+    </section>
+  );
+}
+
+/** 관계도: 이 업체 ― 주요 발주처 ― 그 기관 공고에서 개찰 1~5위에 함께 든 업체 */
+function RivalNetwork({ p, name }: { p: RivalProfile; name: string }) {
+  const g = useMemo(() => {
+    const ags = new Set(p.agencies.map(([a]) => a));
+    const rivals = p.rivals.slice(0, 10);
+    const nodes: NetNode[] = [
+      { id: "me", label: name, group: "me", weight: p.n, tip: [name, `낙찰 ${p.n.toLocaleString()}건`] },
+      ...p.agencies.map(([a, c, amt]): NetNode => ({ id: `a:${a}`, label: a, group: "agency", weight: c, tip: [a, `${name} 낙찰 ${c}건 · ${won(amt)}`] })),
+      ...rivals.map(([r, c]): NetNode => ({ id: `r:${r}`, label: r, group: "rival", weight: c, tip: [r, `${name} 낙찰 공고에서 개찰 1~5위에 함께 든 횟수 ${c}회`] })),
+    ];
+    const edges: NetEdge[] = p.agencies.map(([a, c]) => ({ a: "me", b: `a:${a}`, w: c }));
+    for (const [r, c] of rivals) {
+      const ls = p.links.filter(([n, a]) => n === r && ags.has(a));
+      for (const [, a, k] of ls) edges.push({ a: `r:${r}`, b: `a:${a}`, w: k });
+      if (!ls.length) edges.push({ a: "me", b: `r:${r}`, w: c });
+    }
+    return { nodes, edges };
+  }, [p, name]);
+  if (!p.agencies.length) return null;
+  return (
+    <section className="card p-6">
+      <h3 className="font-bold">발주처·경쟁 업체 관계도 <span className="text-sm font-normal text-ink-400">원 크기 = 건수, 선 굵기 = 함께 나온 횟수</span></h3>
+      <NetworkGraph
+        nodes={g.nodes} edges={g.edges} centerId="me" ariaLabel="발주처와 경쟁 업체 관계도"
+        groups={[{ key: "agency", label: "주요 발주처 (낙찰 건수)", color: CHART.cat[0] }, { key: "rival", label: "개찰 1~5위에 함께 든 업체 (횟수)", color: CHART.cat[1] }]}
+      />
+      <p className="mt-2 text-xs leading-relaxed text-ink-500">업체와 기관을 잇는 선은 그 기관 공고에서 이 업체가 낙찰받을 때 그 업체가 개찰 1~5위에 함께 든 경우입니다. 개찰 순위는 받아 둔 공고만 셉니다. 원을 누르면 이어진 곳만 진하게 보입니다.</p>
     </section>
   );
 }

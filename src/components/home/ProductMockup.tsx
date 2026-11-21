@@ -63,9 +63,9 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
             ))}
           </ul>
           <div className="mt-6 rounded-2xl bg-ink p-3 text-white">
-            <p className="text-[11px] text-ink-300">담당 매니저</p>
-            <p className="mt-0.5 text-sm font-semibold">입찰메이트LAB 매니저</p>
-            <p className="mt-2 text-[11px] leading-relaxed text-ink-200">관심 공고 서류를 마감 전 함께 확인해 드려요.</p>
+            <p className="text-[11px] text-ink-300">마감 알림</p>
+            <p className="mt-0.5 text-sm font-semibold">관심 공고 3건 마감 임박</p>
+            <p className="mt-2 text-[11px] leading-relaxed text-ink-200">제출서류 체크리스트로 빠진 서류를 확인하세요.</p>
           </div>
         </aside>
 

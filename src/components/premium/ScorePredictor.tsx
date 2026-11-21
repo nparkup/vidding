@@ -575,7 +575,7 @@ export function ScorePredictor() {
               {corpLoading ? <LoadingBar label="국세청·나라장터·금융위원회 기업 정보를 조회하는 중" /> : <p className="mt-1 text-xs text-ink-500">
                 {corpMsg || (CORP_API
                   ? "국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업기본정보·재무정보를 한 번에 조회합니다."
-                  : "공개 미리보기에서는 직접 입력합니다. 이용 고객은 담당 매니저가 사업자번호로 기업 정보를 조회해 채워 드립니다.")}
+                  : "공개 미리보기에서는 직접 입력합니다.")}
               </p>}
               {corp && <EligibilityPanel result={eligibility} />}
               {corp && <CorpPanel corp={corp} />}

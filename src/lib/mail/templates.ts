@@ -26,7 +26,7 @@ function shell(title: string, body: string) {
 <tr><td style="background:${C.ink};padding:20px 24px;color:#fff;font-size:18px;font-weight:800">입찰메이트LAB</td></tr>
 <tr><td style="padding:24px">${body}</td></tr>
 <tr><td style="padding:16px 24px;border-top:1px solid ${C.line};font-size:12px;color:${C.sub};line-height:1.6">
-본 메일의 분석은 참고용이며 최종 판단은 공고문 원문으로 확인해 주세요. 공고 데이터 출처: 조달청 나라장터(공공데이터포털).<br>수신 조건 변경은 담당 매니저에게 회신해 주세요.</td></tr>
+본 메일의 분석은 참고용이며 최종 판단은 공고문 원문으로 확인해 주세요. 공고 데이터 출처: 조달청 나라장터(공공데이터포털).<br>수신 조건 변경은 이 메일에 회신해 주세요.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 

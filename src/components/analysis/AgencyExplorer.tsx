@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { BookOpen, Building, Building2, Ellipsis, Factory, Handshake, HeartHandshake, Landmark, LayoutGrid, School, Shield, type LucideIcon } from "lucide-react";
 import { AgencyLogo } from "@/components/AgencyLogo";
+import { Tile as KindTile } from "@/components/CategoryTiles";
+import { AGENCY_KINDS, KIND_LABEL, REGION_ORDER, agencyKind, agencyRegion, type AgencyKind } from "@/lib/agencyKind";
 import { DistChart } from "@/components/BidPriceAnalysis";
 import { METHOD_NAME } from "@/lib/awards/analysis";
 import type { AgencySummary } from "@/lib/awards/agency";
@@ -21,14 +24,32 @@ async function loadJson<T>(path: string): Promise<T | null> {
   return r.ok ? ((await r.json()) as T) : null;
 }
 
-/** 발주처 분석: 수요기관 검색 → 그 기관의 10년치 낙찰 요약 */
+type Row = { name: string; id: string; n: number; open: number; kind: AgencyKind; region?: string };
+
+const KIND_ICON: Record<AgencyKind, LucideIcon> = {
+  gov: Landmark, local1: Building2, local2: Building, edu: BookOpen, school: School, corp: Factory,
+  mil: Shield, welfare: HeartHandshake, biz: Handshake, etc: Ellipsis,
+};
+
+const SORTS = [
+  { key: "", label: "지금 공고 많은 순" },
+  { key: "awards", label: "낙찰 건수 많은 순" },
+  { key: "name", label: "이름순" },
+];
+const PAGE = 100;
+
+/** 발주처 분석: 전체·구분·지역으로 수요기관 고르기 → 그 기관의 10년치 낙찰 요약 */
 export function AgencyExplorer() {
   const sp = useSearchParams();
   const router = useRouter();
   const id = sp.get("id") ?? "";
+  const kind = (sp.get("kind") ?? "") as AgencyKind | "";
+  const region = sp.get("region") ?? "";
+  const sort = sp.get("sort") ?? "";
   const { bids } = useBids();
   const [list, setList] = useState<[string, string, number][] | null>(null);
   const [q, setQ] = useState("");
+  const [shown, setShown] = useState(PAGE);
   const [sum, setSum] = useState<AgencySummary | null | undefined>();
 
   useEffect(() => { loadJson<[string, string, number][]>("/agency-data/index.json").then((l) => setList(l ?? [])).catch(() => setList([])); }, []);
@@ -39,46 +60,139 @@ export function AgencyExplorer() {
     loadJson<AgencySummary>(`/agency-data/${id}.json`).then((s) => alive && setSum(s)).catch(() => alive && setSum(null));
     return () => { alive = false; };
   }, [id]);
+  useEffect(() => { setShown(PAGE); }, [kind, region, sort, q]);
 
   const openCount = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of bids ?? []) m.set(b.demandAgency, (m.get(b.demandAgency) ?? 0) + 1);
     return m;
   }, [bids]);
+  const rows = useMemo<Row[]>(
+    () => (list ?? []).map(([name, aid, n]) => ({ name, id: aid, n, open: openCount.get(name) ?? 0, kind: agencyKind(name), region: agencyRegion(name) })),
+    [list, openCount],
+  );
+  const t = q.replace(/\s+/g, "");
+  const byText = useMemo(() => rows.filter((r) => !t || r.name.replace(/\s+/g, "").includes(t)), [rows, t]);
+  /** 구분 타일 숫자: 지역·검색어는 적용하고 구분은 빼고 센다 */
+  const kindCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const r of byText) if (!region || r.region === region) c[r.kind] = (c[r.kind] ?? 0) + 1;
+    return c;
+  }, [byText, region]);
+  const regions = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const r of byText) if (r.region && (!kind || r.kind === kind)) c.set(r.region, (c.get(r.region) ?? 0) + 1);
+    return REGION_ORDER.filter((g) => c.has(g) || g === region).map((g) => [g, c.get(g) ?? 0] as const);
+  }, [byText, kind, region]);
   const matches = useMemo(() => {
-    const t = q.replace(/\s+/g, "");
-    return (list ?? [])
-      .filter(([name]) => !t || name.replace(/\s+/g, "").includes(t))
-      .sort((a, b) => (openCount.get(b[0]) ?? 0) - (openCount.get(a[0]) ?? 0) || b[2] - a[2])
-      .slice(0, 60);
-  }, [list, q, openCount]);
-  const pick = (aid: string) => { router.replace(`/analysis/agency?id=${aid}`, { scroll: false }); };
+    const f = byText.filter((r) => (!kind || r.kind === kind) && (!region || r.region === region));
+    const cmp: Record<string, (a: Row, b: Row) => number> = {
+      "": (a, b) => b.open - a.open || b.n - a.n,
+      awards: (a, b) => b.n - a.n || b.open - a.open,
+      name: (a, b) => a.name.localeCompare(b.name, "ko"),
+    };
+    return f.sort(cmp[sort] ?? cmp[""]);
+  }, [byText, kind, region, sort]);
+
+  const setParam = (patch: Record<string, string>) => {
+    const p = new URLSearchParams(sp.toString());
+    for (const [k, v] of Object.entries(patch)) { if (v) p.set(k, v); else p.delete(k); }
+    const qs = p.toString();
+    router.replace(`/analysis/agency${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
+  const pick = (aid: string) => setParam({ id: aid });
+  const total = Object.values(kindCounts).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="container-x grid gap-6 py-8 lg:grid-cols-[320px_1fr]">
-      <aside className="min-w-0">
-        <label className="label" htmlFor="agency-q">수요기관 검색</label>
-        <input id="agency-q" className="input" placeholder="예: 서울특별시교육청, 한국도로공사" value={q} onChange={(e) => setQ(e.target.value)} />
-        <p className="mt-2 text-xs text-ink-500">지금 공고를 낸 수요기관 {list ? list.length.toLocaleString() : "…"}곳. 지금 공고가 많은 순입니다.</p>
-        <ul className="mt-3 max-h-[28rem] divide-y divide-ink-100 overflow-y-auto rounded-2xl border border-ink-100 bg-white">
-          {matches.map(([name, aid, n]) => (
-            <li key={aid}>
-              <button type="button" onClick={() => pick(aid)} className={`flex w-full min-w-0 items-baseline justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-paper ${aid === id ? "bg-mint-50" : ""}`}>
-                <span className="min-w-0 truncate font-semibold">{name}</span>
-                <span className="shrink-0 text-xs text-ink-500">공고 {openCount.get(name) ?? 0} · 낙찰 {n.toLocaleString()}</span>
-              </button>
-            </li>
+    <div className="container-x py-8">
+      <section className="card p-4 sm:p-5" aria-label="기관 구분 선택">
+        <p className="text-sm font-bold">기관 구분으로 찾기</p>
+        <div className="mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2 lg:grid-cols-11">
+          <KindTile icon={LayoutGrid} label="전체" title="전체 수요기관" count={total} on={!kind} onClick={() => setParam({ kind: "" })} />
+          {AGENCY_KINDS.map((k) => (
+            <KindTile key={k.key} icon={KIND_ICON[k.key]} label={k.label} title={k.title} count={kindCounts[k.key] ?? 0} on={kind === k.key} onClick={() => setParam({ kind: kind === k.key ? "" : k.key })} />
           ))}
-          {list && !matches.length && <li className="px-3 py-3 text-sm text-ink-500">찾는 기관이 없습니다.</li>}
-          {!list && <li className="px-3 py-3 text-sm text-ink-400">불러오는 중…</li>}
-        </ul>
-      </aside>
-      <div className="min-w-0">
-        {!id && <p className="card p-6 text-sm text-ink-500">왼쪽에서 수요기관을 고르세요. 공고 상세의 수요기관 이름에서도 바로 올 수 있습니다.</p>}
-        {id && sum === undefined && <p className="card p-6 text-sm text-ink-400">불러오는 중…</p>}
-        {id && sum === null && <p className="card p-6 text-sm text-ink-500">이 기관의 낙찰 기록을 찾지 못했습니다.</p>}
-        {sum && <AgencyDetail s={sum} bids={(bids ?? []).filter((b) => b.demandAgency === sum.name)} />}
-      </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_10rem_11rem]">
+          <div className="min-w-0">
+            <label className="label" htmlFor="agency-q">기관 이름 검색</label>
+            <input id="agency-q" className="input" placeholder="예: 서울특별시교육청, 한국도로공사" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="min-w-0">
+            <label className="label" htmlFor="agency-region">지역</label>
+            <select id="agency-region" className="input" value={region} onChange={(e) => setParam({ region: e.target.value })}>
+              <option value="">전체 지역</option>
+              {regions.map(([g, n]) => <option key={g} value={g}>{g} ({n.toLocaleString()})</option>)}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="label" htmlFor="agency-sort">정렬</label>
+            <select id="agency-sort" className="input" value={sort} onChange={(e) => setParam({ sort: e.target.value })}>
+              {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-ink-500">
+          지금 공고를 낸 수요기관 {list ? list.length.toLocaleString() : "…"}곳 중 {list ? matches.length.toLocaleString() : "…"}곳.
+          {region && " 지역은 기관 이름에 든 시·도로 나눠, 이름에 시·도가 없는 기관(중앙행정기관 본부, 대학 등)은 지역을 고르면 빠집니다."}
+          {" "}구분은 기관 이름으로 나눈 것이라 일부 기관은 다른 구분에 들어갈 수 있습니다.
+        </p>
+      </section>
+
+      {!id ? (
+        <section className="card mt-6 overflow-hidden" aria-label="수요기관 목록">
+          <div className="hidden grid-cols-[1fr_9rem_5rem_6rem_7rem] gap-3 border-b border-ink-100 bg-paper px-4 py-2 text-xs font-semibold text-ink-500 sm:grid">
+            <span>수요기관</span><span>구분</span><span>지역</span><span className="text-right">지금 공고</span><span className="text-right">낙찰 (10년)</span>
+          </div>
+          <ul className="divide-y divide-ink-100">
+            {matches.slice(0, shown).map((r) => (
+              <li key={r.id}>
+                <button type="button" onClick={() => pick(r.id)} className="grid w-full min-w-0 grid-cols-1 gap-0.5 px-4 py-2.5 text-left text-sm hover:bg-paper sm:grid-cols-[1fr_9rem_5rem_6rem_7rem] sm:items-center sm:gap-3">
+                  <span className="min-w-0 break-keep font-semibold">{r.name}</span>
+                  <span className="text-xs text-ink-500 sm:text-sm sm:text-ink-600">
+                    <span className="sm:hidden">{[KIND_LABEL[r.kind], r.region, `공고 ${r.open}`, `낙찰 ${r.n.toLocaleString()}`].filter(Boolean).join(" · ")}</span>
+                    <span className="hidden sm:inline">{KIND_LABEL[r.kind]}</span>
+                  </span>
+                  <span className="hidden text-ink-600 sm:inline">{r.region ?? "-"}</span>
+                  <span className="hidden text-right tabular-nums sm:inline">{r.open.toLocaleString()}</span>
+                  <span className="hidden text-right tabular-nums sm:inline">{r.n.toLocaleString()}</span>
+                </button>
+              </li>
+            ))}
+            {list && !matches.length && <li className="px-4 py-4 text-sm text-ink-500">조건에 맞는 기관이 없습니다.</li>}
+            {!list && <li className="px-4 py-4 text-sm text-ink-400">불러오는 중…</li>}
+          </ul>
+          {matches.length > shown && (
+            <div className="border-t border-ink-100 p-3 text-center">
+              <button type="button" className="btn-ghost text-sm" onClick={() => setShown((n) => n + PAGE)}>
+                더 보기 ({shown.toLocaleString()} / {matches.length.toLocaleString()}곳)
+              </button>
+            </div>
+          )}
+        </section>
+      ) : (
+        <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+          <aside className="hidden min-w-0 lg:block">
+            <p className="text-xs text-ink-500">{matches.length.toLocaleString()}곳 · {SORTS.find((s) => s.key === sort)?.label ?? SORTS[0].label}</p>
+            <ul className="mt-2 max-h-[40rem] divide-y divide-ink-100 overflow-y-auto rounded-2xl border border-ink-100 bg-white">
+              {matches.slice(0, 300).map((r) => (
+                <li key={r.id}>
+                  <button type="button" onClick={() => pick(r.id)} className={`flex w-full min-w-0 items-baseline justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-paper ${r.id === id ? "bg-mint-50" : ""}`}>
+                    <span className="min-w-0 truncate font-semibold" title={r.name}>{r.name}</span>
+                    <span className="shrink-0 text-xs text-ink-500">공고 {r.open} · 낙찰 {r.n.toLocaleString()}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+          <div className="min-w-0">
+            <button type="button" className="btn-ghost mb-3 text-sm" onClick={() => setParam({ id: "" })}>목록으로</button>
+            {sum === undefined && <p className="card p-6 text-sm text-ink-400">불러오는 중…</p>}
+            {sum === null && <p className="card p-6 text-sm text-ink-500">이 기관의 낙찰 기록을 찾지 못했습니다.</p>}
+            {sum && <AgencyDetail s={sum} bids={(bids ?? []).filter((b) => b.demandAgency === sum.name)} />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

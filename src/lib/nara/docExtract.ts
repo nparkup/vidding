@@ -3,7 +3,7 @@ import type { Bid, BidAttachment } from "../types";
 import { extractQuantBlock, extractSheet, templateSheet, type EvalItem, type EvalSheet } from "../evalscore";
 import { readNoticeCriteria, type NoticeCriteria } from "../noticeCriteria";
 import type { AiInput } from "./aiSheet";
-import { download, rankFiles, textOf } from "./attachText";
+import { download, dropRepeatedEntries, rankFiles, textOf } from "./attachText";
 
 /**
  * 배포(빌드) 때 공고 첨부파일을 내려받아 평가표를 미리 추출한다.
@@ -36,6 +36,10 @@ export interface TextCache {
   set(url: string, text: string): void;
 }
 
+/** 본문 캐시 키: 첨부 주소. 압축은 풀기 방식이 바뀌면 다시 읽도록 판 번호를 붙인다 (다른 형식의 캐시는 그대로 둔다) */
+export const ZIP_TEXT_VERSION = 2;
+export const textCacheKey = (f: BidAttachment) => (/\.zip$/i.test(f.name) ? `${f.url}#zip${ZIP_TEXT_VERSION}` : f.url);
+
 export async function extractSheetsForBids(
   bids: Bid[],
   attachments: Record<string, BidAttachment[]>,
@@ -49,7 +53,7 @@ export async function extractSheetsForBids(
   const budget = Date.now() + (opts.budgetMs ?? 8 * 60_000);
   const targets = bids.filter((b) => (b.contractMethod === "적격심사" || b.contractMethod === "협상에 의한 계약") && attachments[b.id]?.length);
   // 캐시에 본문이 다 있는 공고를 먼저 (내려받지 않아 금방 끝난다), 나머지는 새 공고부터
-  const uncached = (b: Bid) => rankFiles(attachments[b.id]).filter((f) => opts.textCache?.get(f.url) === undefined).length;
+  const uncached = (b: Bid) => rankFiles(attachments[b.id]).filter((f) => opts.textCache?.get(textCacheKey(f)) === undefined).length;
   targets.sort((a, b) => Number(uncached(a) > 0) - Number(uncached(b) > 0) || b.postedAt.localeCompare(a.postedAt));
   const sheets: Record<string, ExtractedSheet> = {};
   const stats = { bids: targets.length, done: 0, files: 0, cached: 0, downloadFailed: 0, found: 0, notice: 0, timedOut: false };
@@ -59,23 +63,25 @@ export async function extractSheetsForBids(
     while (next < targets.length) {
       const bid = targets[next];
       const files = rankFiles(attachments[bid.id]);
-      if (Date.now() > budget && files.some((f) => opts.textCache?.get(f.url) === undefined)) { stats.timedOut = true; return; }
+      if (Date.now() > budget && files.some((f) => opts.textCache?.get(textCacheKey(f)) === undefined)) { stats.timedOut = true; return; }
       next++;
       const texts: string[] = [];
       const named: string[] = [];
       const read: string[] = [];
       let failed = 0;
       let best: ExtractedSheet | undefined;
+      // 같은 파일명은 하나만: 압축 안 문서가 다른 첨부(또는 앞서 읽은 압축 안 문서)와 이름이 같으면 뺀다
+      const seen = new Set(files.map((f) => f.name.trim()));
       for (const f of files) {
         stats.files++;
-        let t = opts.textCache?.get(f.url);
+        let t = opts.textCache?.get(textCacheKey(f));
         if (t !== undefined) stats.cached++;
         else {
           try {
             const buf = await download(f.url, 20_000);
             if (!buf) { stats.downloadFailed++; failed++; continue; }
             t = await textOf(f, buf);
-            opts.textCache?.set(f.url, t);
+            opts.textCache?.set(textCacheKey(f), t);
           } catch {
             stats.downloadFailed++;
             failed++;
@@ -83,6 +89,7 @@ export async function extractSheetsForBids(
           }
         }
         read.push(f.name);
+        t = dropRepeatedEntries(t, seen);
         if (!t.trim()) continue;
         texts.push(t);
         named.push(`=== 파일: ${f.name} ===\n${t}`);

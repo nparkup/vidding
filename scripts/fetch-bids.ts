@@ -8,7 +8,7 @@ import { dirname } from "path";
 import { buildMockBids } from "../src/lib/mock/bids";
 import { fetchAllBidsWithChanges, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
-import { extractSheetsForBids } from "../src/lib/nara/docExtract";
+import { extractSheetsForBids, textCacheKey } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
@@ -101,7 +101,7 @@ async function main() {
     const textCache = makeTextCache();
     const r = await extractSheetsForBids(items, attachments, { collect: ai.collect, textCache, budgetMs: 10 * 60_000 });
     sheets = r.sheets;
-    const pruned = textCache.prune((Object.values(attachments) as BidAttachment[][]).flat().map((f) => f.url));
+    const pruned = textCache.prune((Object.values(attachments) as BidAttachment[][]).flat().map(textCacheKey));
     console.log(`평가표 추출: 대상 ${r.stats.bids}건 중 ${r.stats.done}건 읽음, 파일 ${r.stats.files}개(캐시 ${r.stats.cached}, 새로 받음 ${textCache.stats().added}, 실패 ${r.stats.downloadFailed}), 배점표 ${r.stats.found}건, 공고 기준 문장 ${r.stats.notice}건${r.stats.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서 (화면에서 고르면 그 자리에서 읽음)" : ""}, 캐시 정리 ${pruned}개`);
   } catch (e) {
     console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);

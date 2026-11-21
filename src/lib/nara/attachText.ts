@@ -9,7 +9,7 @@ import { hwpText } from "./hwpText";
  *   그 밖의 형식(이미지 등)은 글을 읽을 수 없어 건너뛴다.
  */
 
-const READABLE = /\.(pdf|hwpx|hwp|docx|xlsx|zip)$/i;
+export const READABLE = /\.(pdf|hwpx|hwp|docx|xlsx|zip)$/i;
 
 /** 읽을 순서: 평가기준이 있을 법한 파일부터 (모두 읽지만, 시간 한도에 걸리면 앞의 파일이 남도록) */
 export function rankFiles(files: BidAttachment[]): BidAttachment[] {
@@ -62,28 +62,107 @@ async function pdfText(buf: Buffer): Promise<string> {
   return out.join("\n");
 }
 
-/** ZIP 항목 (HWPX·DOCX·XLSX·ZIP 공통) */
-function zipEntries(buf: Buffer): { name: string; data: () => Buffer }[] {
+/**
+ * 압축 풀기 한도 (압축 폭탄·빌드 메모리 대비). 공고 첨부 압축은 보통 문서 몇 개, 수십 MB 안쪽이다.
+ * - 항목은 앞에서부터 ZIP_MAX_ENTRIES 개까지만 본다. 한 항목은 풀린 크기 ZIP_MAX_ENTRY 까지, 압축 하나에서 푸는 양은 모두 ZIP_MAX_TOTAL 까지.
+ * - 압축률이 비정상(1000배 넘게 줄어든 항목)이면 풀지 않는다.
+ */
+export const ZIP_MAX_ENTRIES = 500;
+export const ZIP_MAX_ENTRY = 60_000_000;
+export const ZIP_MAX_TOTAL = 150_000_000;
+
+export interface ZipEntry { name: string; method: number; flags: number; csize: number; usize: number; data: () => Buffer }
+
+/**
+ * 압축 파일명 읽기. UTF-8 표시 비트가 있거나 올바른 UTF-8이면 UTF-8(맥·리눅스에서 만든 압축은 표시 없이 UTF-8),
+ * 아니면 윈도우 한글 압축의 EUC-KR(CP949). 0x7075(유니코드 경로) 확장 필드가 있으면 그것을 쓴다.
+ */
+function entryName(raw: Buffer, flags: number, extra: Buffer): string {
+  for (let q = 0; q + 4 <= extra.length;) {
+    const id = extra.readUInt16LE(q), len = extra.readUInt16LE(q + 2);
+    if (id === 0x7075 && len > 5 && q + 4 + len <= extra.length) return extra.subarray(q + 9, q + 4 + len).toString("utf8");
+    q += 4 + len;
+  }
+  if (flags & 0x800) return raw.toString("utf8");
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(raw); } catch { /* UTF-8 아님 */ }
+  try { return new TextDecoder("euc-kr").decode(raw); } catch { /* 이 환경에 EUC-KR 해독기가 없으면 */ }
+  // 해독기가 없으면 바이트를 그대로 16진수로 (같은 이름 가리기는 그대로 맞고, 확장자는 ASCII라 남는다)
+  const dot = raw.lastIndexOf(0x2e);
+  return dot >= 0 && raw.subarray(dot).every((c) => c < 0x80) ? `${raw.subarray(0, dot).toString("hex")}${raw.subarray(dot).toString("latin1")}` : raw.toString("hex");
+}
+
+/** 풀린 크기가 cap 을 넘으면 멈춘다. maxOutputLength 를 모르는 환경(중계 서버의 zlib 호환층)이면 풀고 나서 크기를 본다 */
+function inflateCapped(raw: Buffer, cap: number): Buffer {
+  let data: Buffer;
+  try {
+    data = inflateRawSync(raw, { maxOutputLength: cap });
+  } catch (e) {
+    if ((e as { code?: string }).code === "ERR_BUFFER_TOO_LARGE" || e instanceof RangeError) throw new Error("압축 항목이 너무 큼");
+    data = inflateRawSync(raw);
+  }
+  if (data.length > cap) throw new Error("압축 항목이 너무 큼");
+  return data;
+}
+
+/** ZIP 항목 (HWPX·DOCX·XLSX·ZIP 공통). ZIP64 머리와 확장 필드도 읽는다 */
+function zipEntries(buf: Buffer): ZipEntry[] {
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
   if (eocd < 0) return [];
-  const count = buf.readUInt16LE(eocd + 10);
+  let count = buf.readUInt16LE(eocd + 10);
   let p = buf.readUInt32LE(eocd + 16);
-  const out: { name: string; data: () => Buffer }[] = [];
-  for (let n = 0; n < count && p + 46 <= buf.length && buf.readUInt32LE(p) === 0x02014b50; n++) {
-    const flags = buf.readUInt16LE(p + 8), method = buf.readUInt16LE(p + 10), csize = buf.readUInt32LE(p + 20);
+  // ZIP64: 항목 수나 목록 위치가 넘쳤으면 ZIP64 끝 레코드에서 읽는다
+  if ((count === 0xffff || p === 0xffffffff) && eocd >= 20 && buf.readUInt32LE(eocd - 20) === 0x07064b50) {
+    const r = Number(buf.readBigUInt64LE(eocd - 12));
+    if (r + 56 <= buf.length && buf.readUInt32LE(r) === 0x06064b50) { count = Number(buf.readBigUInt64LE(r + 32)); p = Number(buf.readBigUInt64LE(r + 48)); }
+  }
+  const out: ZipEntry[] = [];
+  let unpacked = 0;
+  for (let n = 0; n < Math.min(count, ZIP_MAX_ENTRIES) && p + 46 <= buf.length && buf.readUInt32LE(p) === 0x02014b50; n++) {
+    const flags = buf.readUInt16LE(p + 8), method = buf.readUInt16LE(p + 10);
+    let csize = buf.readUInt32LE(p + 20), usize = buf.readUInt32LE(p + 24);
     const nlen = buf.readUInt16LE(p + 28), elen = buf.readUInt16LE(p + 30), clen = buf.readUInt16LE(p + 32);
-    const local = buf.readUInt32LE(p + 42);
+    let local = buf.readUInt32LE(p + 42);
     const rawName = buf.subarray(p + 46, p + 46 + nlen);
-    // 윈도우에서 만든 ZIP은 파일명이 EUC-KR(CP949)이다 (UTF-8 표시 비트가 없으면)
-    let name = rawName.toString("utf8");
-    if (!(flags & 0x800)) { try { name = new TextDecoder("euc-kr").decode(rawName); } catch { /* 확장자만 보면 된다 */ } }
+    const extra = buf.subarray(p + 46 + nlen, p + 46 + nlen + elen);
+    // ZIP64 확장 필드(0x0001): 넘친 값만 차례대로 들어 있다
+    for (let q = 0; q + 4 <= extra.length;) {
+      const id = extra.readUInt16LE(q), len = extra.readUInt16LE(q + 2);
+      if (id === 0x0001) {
+        let r = q + 4;
+        const big = () => { const v = r + 8 <= q + 4 + len ? Number(extra.readBigUInt64LE(r)) : -1; r += 8; return v; };
+        if (usize === 0xffffffff) usize = big();
+        if (csize === 0xffffffff) csize = big();
+        if (local === 0xffffffff) local = big();
+      }
+      q += 4 + len;
+    }
+    const name = entryName(rawName, flags, extra);
     p += 46 + nlen + elen + clen;
-    if (local + 30 > buf.length) continue;
+    if (local < 0 || local + 30 > buf.length || buf.readUInt32LE(local) !== 0x04034b50) continue;
     const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
-    out.push({ name, data: () => { const raw = buf.subarray(start, start + csize); return method === 8 ? inflateRawSync(raw) : Buffer.from(raw); } });
+    if (csize < 0 || start + csize > buf.length) continue;
+    out.push({
+      name, method, flags, csize, usize,
+      data: () => {
+        if (flags & 1) throw new Error("암호가 걸린 압축 항목");
+        if (method !== 0 && method !== 8) throw new Error(`지원하지 않는 압축 방식 ${method}`);
+        if (usize > ZIP_MAX_ENTRY || (csize > 0 && usize / csize > 1000)) throw new Error("압축 항목이 너무 큼");
+        if (unpacked + usize > ZIP_MAX_TOTAL) throw new Error("압축 안 파일 전체가 너무 큼");
+        const raw = buf.subarray(start, start + csize);
+        // 머리에 적힌 크기를 믿지 않고 실제로 풀리는 양도 막는다
+        const data = method === 8 ? inflateCapped(raw, Math.min(ZIP_MAX_ENTRY, ZIP_MAX_TOTAL - unpacked)) : Buffer.from(raw);
+        unpacked += data.length;
+        return data;
+      },
+    });
   }
   return out;
+}
+
+/** 압축 항목 정보 (시험·진단용) */
+export function zipInfo(buf: Buffer): Omit<ZipEntry, "data">[] {
+  return zipEntries(buf).map(({ data: _d, ...e }) => e);
 }
 
 /** 표 셀(tc)·행(tr)·문단(p)과 글자(t) 태그로 XML 본문을 줄로 (HWPX·DOCX 공통) */
@@ -144,18 +223,49 @@ function xlsxText(buf: Buffer): string {
 
 const decode = (t: string) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 
-/** 압축 파일 안의 문서들: 각 문서 앞에 이름 머리글을 붙인다. 같은 이름은 하나만, 압축 안의 압축은 한 단계만 */
+/** 압축 안에서 읽을 문서 수 한도 (도면 묶음처럼 문서가 아주 많은 압축) */
+const ZIP_MAX_DOCS = 40;
+export const ZIP_HEAD = "--- 압축 안 파일: ";
+
+/**
+ * 압축 파일 안의 문서들: 각 문서 앞에 이름 머리글(ZIP_HEAD)을 붙인다.
+ * 평가기준이 있을 법한 문서부터 읽고, 같은 이름은 하나만, 압축 안의 압축은 한 단계만 더 연다.
+ * 맥에서 만든 압축의 __MACOSX·._ 부속 파일은 건너뛴다.
+ */
 async function zipText(buf: Buffer, depth: number): Promise<string> {
-  const seen = new Set<string>();
+  const entries = zipEntries(buf).filter((e) => !/(^|\/)__MACOSX\//.test(e.name) && !/(^|\/)\._/.test(e.name) && !e.name.endsWith("/"));
+  const byName = new Map(entries.map((e) => [baseName(e.name), e]));
+  const files = rankFiles([...byName.keys()].map((name) => ({ name, url: name, kind: "규격서·기타" as const })))
+    .filter((f) => depth === 0 || !/\.zip$/i.test(f.name))
+    .slice(0, ZIP_MAX_DOCS);
   const out: string[] = [];
-  for (const e of zipEntries(buf)) {
-    const base = e.name.split("/").pop() ?? e.name;
-    if (!READABLE.test(base) || seen.has(base) || (depth > 0 && /\.zip$/i.test(base))) continue;
-    seen.add(base);
+  for (const f of files) {
     try {
-      const t = await textOfName(base, e.data(), depth + 1);
-      if (t.trim()) out.push(`--- 압축 안 파일: ${base} ---\n${t}`);
-    } catch { /* 읽지 못한 파일은 건너뛴다 */ }
+      const t = await textOfName(f.name, byName.get(f.name)!.data(), depth + 1);
+      if (t.trim()) out.push(`${ZIP_HEAD}${f.name} ---\n${t}`);
+    } catch { /* 읽지 못한 파일(암호·너무 큼·깨짐)은 건너뛴다 */ }
+  }
+  return out.join("\n");
+}
+
+const baseName = (n: string) => (n.split("/").pop() ?? n).trim();
+
+/**
+ * 같은 파일명은 하나만 읽는다: 압축 밖 첨부나 앞서 읽은 다른 압축에 같은 이름이 있는 압축 안 문서(같은 공고문이 따로도,
+ * 압축 안에도 올라온 경우)는 본문에서 뺀다. seen 에는 공고의 첨부 이름을 넣어 두고, 남긴 압축 안 문서 이름이 더해진다.
+ * 압축 본문은 캐시에 통째로 두고 공고마다 합칠 때 이것으로 거른다.
+ */
+export function dropRepeatedEntries(text: string, seen: Set<string>): string {
+  if (!text.startsWith(ZIP_HEAD)) return text;
+  const out: string[] = [];
+  let keep = true;
+  for (const line of text.split("\n")) {
+    if (line.startsWith(ZIP_HEAD) && line.endsWith(" ---")) {
+      const name = line.slice(ZIP_HEAD.length, -4).trim();
+      keep = !seen.has(name);
+      seen.add(name);
+    }
+    if (keep) out.push(line);
   }
   return out.join("\n");
 }

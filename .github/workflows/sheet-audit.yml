@@ -10,6 +10,9 @@ on:
       ids:
         description: "AI 배점표 판독 시험할 공고번호 (쉼표로 여러 개, 예: R26BK01826659)"
         required: false
+      zip:
+        description: "압축 첨부 시험: 최근 영업일 수,최대 공고 수 (예: 10,40)"
+        required: false
       per:
         description: "묶음(업무 × 지자체/국가)당 공고 수"
         default: "4"
@@ -36,13 +39,21 @@ jobs:
           AI_SHEET_MODEL: ${{ vars.AI_SHEET_MODEL }}
           IDS: ${{ inputs.ids }}
         run: npx tsx --conditions=react-server scripts/score/ai-sheet-try.ts "$IDS"
+      - name: 압축 첨부 시험
+        if: inputs.zip != ''
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_SHEET_MODEL: ${{ vars.AI_SHEET_MODEL }}
+          ZIP: ${{ inputs.zip }}
+        run: npx tsx --conditions=react-server scripts/score/zip-audit.ts "${ZIP%%,*}" "${ZIP##*,}"
       - name: 대조
-        if: inputs.days != '' || inputs.ids == ''
+        if: inputs.zip == '' && (inputs.days != '' || inputs.ids == '')
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: npx tsx --conditions=react-server scripts/score/sheet-audit.ts "${{ inputs.days || '20261112,20261113,20261116,20261117' }}" "${{ inputs.per || '8' }}"
       - uses: actions/upload-artifact@v4
-        if: inputs.days != '' || inputs.ids == ''
+        if: inputs.zip == '' && (inputs.days != '' || inputs.ids == '')
         with:
           name: sheet-audit
           path: sheet-audit.json.gz

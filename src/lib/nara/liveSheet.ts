@@ -4,7 +4,7 @@ import type { Bid, BidAttachment } from "../types";
 import { adoptable, type EvalBasis } from "../criteria";
 import { extractSheet, templateSheet } from "../evalscore";
 import { AI_SHEET_VERSION, excerpt, hasTableSignal, readSheetWithAI, type AiSheetResult } from "./aiSheet";
-import { download, rankFiles, textOf } from "./attachText";
+import { download, dropRepeatedEntries, rankFiles, textOf } from "./attachText";
 
 /**
  * 빌드에서 첨부를 다 읽지 못한 공고: 평가점수 예측에서 공고를 고르면 중계 서버(worker/corp-lookup ?aisheet=)가
@@ -63,6 +63,9 @@ export async function readSheetLive(
   }));
   const read = files.filter((_, i) => got[i]).map((f) => f.name);
   const failed = files.flatMap((f, i) => (got[i] ? [] : [`${f.name} (${why[i]})`]));
+  // 같은 파일명은 하나만: 압축 안 문서가 다른 첨부(또는 앞의 압축 안 문서)와 이름이 같으면 뺀다
+  const seen = new Set(files.map((f) => f.name.trim()));
+  for (const g of got) if (g) g.text = dropRepeatedEntries(g.text, seen);
   const docsRead = got.filter((g): g is { name: string; text: string } => !!g && !!g.text.trim());
   if (!docsRead.length) return { ...base, status: failed.length ? "error" : "none", reason: failed.length ? "첨부를 받지 못함" : "첨부에서 글을 읽지 못함", read, failed };
   const all = docsRead.map((d) => d.text).join("\n");

@@ -6,6 +6,7 @@ name: 낙찰 저장소 수집
 # 필요한 저장소 Secrets: DATA_GO_KR_SERVICE_KEY, CLOUDFLARE_API_TOKEN (Workers R2 Storage Write 권한), CLOUDFLARE_ACCOUNT_ID
 # 개찰 순위 1~5위는 매일 00:40 KST 예약 실행(mode rank)이 따로 받는다. 공고마다 불러야 해서 하루 호출 한도(RANK_DAILY_CALLS) 안에서
 # 최근 주부터 채우고, 수집 실행과 상태 파일이 달라 동시에 돌아도 된다. 다음 수집 실행의 합치기가 샤드에 붙인다.
+# 아파트(K-apt) 공고·낙찰: 수집 실행이 먼저 scripts/awards/apt.ts 로 지난 공고(한 달씩)·낙찰(한 해씩)을 받아 apt/ 아래에 쌓는다.
 # 용량 한도: R2 사용량이 승인 용량(저장소 변수 R2_APPROVED_BYTES, 기본 5GB)의 90%에 닿거나 예상 최종 용량이 넘으면 올리지 않고 실패로 끝난다.
 on:
   schedule:
@@ -20,10 +21,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "collect = 수집, raw = 원자료만 받기(샤드·통계는 그대로), rank = 개찰 순위만 받기, index = 낙찰 결과 분석 색인만 다시 만들기, check = R2 권한만 확인"
+        description: "collect = 수집(아파트 공고·낙찰 포함), apt = 아파트 공고·낙찰만, raw = 원자료만 받기(샤드·통계는 그대로), rank = 개찰 순위만 받기, index = 낙찰 결과 분석 색인만 다시 만들기, check = R2 권한만 확인"
         default: collect
         type: choice
-        options: [collect, raw, rank, index, check]
+        options: [collect, apt, raw, rank, index, check]
       max_minutes:
         description: "이번 실행에서 받는 시간 (분, 최대 300)"
         default: "100"
@@ -88,8 +89,13 @@ jobs:
           path: .cache/awards
           key: awards-raw-${{ github.run_id }}
           restore-keys: awards-raw-
+      # 아파트(K-apt) 지난 공고·낙찰을 쌓고 누적 건수를 쓴다 (scripts/awards/apt.ts). 실패해도 나라장터 수집은 한다
+      - name: 아파트 공고·낙찰
+        if: github.event_name != 'pull_request' && (env.MODE == 'collect' || env.MODE == 'apt')
+        continue-on-error: true
+        run: npx tsx scripts/awards/apt.ts
       - name: 수집
-        if: github.event_name != 'pull_request' && env.MODE != 'check' && env.MODE != 'rank'
+        if: github.event_name != 'pull_request' && env.MODE != 'check' && env.MODE != 'rank' && env.MODE != 'apt'
         run: npx tsx scripts/awards/collect.ts ${{ (inputs.mode == 'raw' || inputs.mode == 'index') && inputs.mode || '' }}
       - name: 원자료 캐시 저장
         if: always() && github.event_name != 'pull_request' && env.MODE != 'check' && env.MODE != 'rank'

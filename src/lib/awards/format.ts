@@ -66,6 +66,10 @@ export interface AwardMeta {
   /** 낙찰·공고·지역·업종 자료를 저장 기간을 모두 받았는지 */
   complete: boolean;
   rows: number;
+  /** 저장소에 쌓인 나라장터 공고 수 (공고번호 기준, 낙찰 기간보다 몇 주 앞선 공고까지) */
+  notices?: number;
+  /** 아파트(K-apt) 공고 중 이 나라장터 공고와 번호가 겹치는 수 (누적입찰공고에서 한 번만 센다) */
+  aptDup?: number;
   /** 개찰 순위(1~5위)를 받은 낙찰 주 수 (업무별 주 합 / 3), 없으면 0 */
   rankWeeks?: number;
   /** R2에 올린 파일 크기 합 (바이트) */
@@ -119,3 +123,16 @@ export function rateMethodOf(method?: string): RateMethod | undefined {
 
 /** 업종제한 문자열의 첫 업종명 ("의료기기판매업/5312, ..." → "의료기기판매업") */
 export const firstLicense = (lic?: string) => (lic ?? "").split(/\s*,\s*/)[0]?.replace(/\/\d+$/, "").trim() ?? "";
+
+/** 메인 현황 줄 누적 건수 (빌드 때 bids.json 에 담는다) */
+export interface AwardCount {
+  /** 나라장터 낙찰 누적 */
+  rows: number;
+  builtAt: string;
+  /** 나라장터 공고 누적, 아파트 공고와 겹치는 번호 수 */
+  notices?: number;
+  aptDup?: number;
+  /** 아파트(K-apt) 공고·낙찰 누적 */
+  aptNotices?: number;
+  aptAwards?: number;
+}

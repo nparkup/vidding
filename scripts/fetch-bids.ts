@@ -13,7 +13,8 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, rateTableFromR2, agencySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, aptMeta, rateTableFromR2, agencySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
+import type { AwardCount } from "../src/lib/awards/format";
 import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
@@ -212,12 +213,20 @@ async function main() {
     console.warn("계약현황 건너뜀:", e instanceof Error ? e.message : e);
   }
   // 메인 상단 현황 줄의 '낙찰정보 N건' (낙찰 저장소에 쌓인 낙찰 건수)
-  let awardCount: { rows: number; builtAt: string } | undefined;
+  // '누적입찰공고' (저장소의 나라장터 공고 + 아파트 공고, 겹치는 번호는 한 번), '누적낙찰정보'에 더할 아파트 누적 낙찰
+  let awardCount: AwardCount | undefined;
   try {
     const m = await awardMeta();
-    if (m?.rows) awardCount = { rows: m.rows, builtAt: m.builtAt };
+    if (m?.rows) awardCount = { rows: m.rows, builtAt: m.builtAt, notices: m.notices, aptDup: m.aptDup };
   } catch (e) {
     console.warn("낙찰 저장소 건수 읽기 실패:", e instanceof Error ? e.message : e);
+  }
+  try {
+    const a = await aptMeta();
+    if (a && awardCount) Object.assign(awardCount, { aptNotices: a.notices, aptAwards: a.awards });
+    if (awardCount) console.log(`누적: 나라장터 공고 ${awardCount.notices ?? "?"} + 아파트 공고 ${a?.notices ?? "?"} - 겹침 ${awardCount.aptDup ?? 0}, 나라장터 낙찰 ${awardCount.rows} + 아파트 낙찰 ${a?.awards ?? "?"}`);
+  } catch (e) {
+    console.warn("아파트 누적 건수 읽기 실패:", e instanceof Error ? e.message : e);
   }
   // 기준표 화면: 발주 기준·금액 구간별 낙찰하한율. 낙찰 저장소 최근 26주 공고, 없으면 지금 공고(참가자격 자료의 낙찰방법·하한율)
   let rateTable: RateTable | undefined;

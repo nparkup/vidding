@@ -7,7 +7,7 @@ import { BidRow } from "@/components/BidRow";
 import { GradeBadge, ScoreBar } from "@/components/Badges";
 import { FeatureTabs } from "@/components/home/FeatureTabs";
 import { ProductMockup } from "@/components/home/ProductMockup";
-import { HeroStats, type CloseMarks } from "@/components/home/HeroStats";
+import { HeroStats } from "@/components/home/HeroStats";
 import { AnalysisEngine } from "@/components/home/AnalysisEngine";
 import { AgencyMark, AGENCY_KINDS } from "@/components/home/AgencyMark";
 import { MatchDemo } from "@/components/MatchDemo";
@@ -60,31 +60,16 @@ const FAQ = [
   { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트LAB은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
 
-/** 빌드 시각 이후 마감하는 공고를 마감 분(分)별로 묶는다. 화면이 지금 시각보다 늦게 마감하는 것만 더해 입찰 가능 공고 수를 낸다 */
-function closeMarks(bids: { closeAt: string }[], now: number): CloseMarks {
-  const base = Math.floor(now / 60_000);
-  const by = new Map<number, number>();
-  for (const b of bids) {
-    const t = Date.parse(b.closeAt);
-    if (!(t > now)) continue;
-    const m = Math.floor(t / 60_000) - base;
-    by.set(m, (by.get(m) ?? 0) + 1);
-  }
-  const at = [...by.keys()].sort((a, b) => a - b);
-  return { base, at, n: at.map((m) => by.get(m)!) };
-}
-
 export default async function Home() {
   const bids = await getBids();
   const builtAt = Date.now();
-  // 현황 줄은 나라장터와 아파트(K-apt) 공고·낙찰을 합친 숫자다
+  // 현황 줄은 나라장터와 아파트(K-apt) 공고·낙찰을 합친 누적 숫자다 (낙찰 저장소에 쌓인 것)
   const apt = await getAptBids();
-  // 조달청(나라장터)으로 낸 아파트 공고가 나라장터 목록에도 있으면 한 번만 센다
-  const naraNos = new Set(bids.map((b) => b.id.split("-")[0]));
-  const marks = closeMarks([...bids, ...apt.items.filter((a) => !naraNos.has(a.no.split("-")[0]))], builtAt);
   const awardCount = getAwardCount();
-  // 아파트 낙찰(입찰결과)과 수의계약을 모두 더한다
-  const aptAwards = (apt.awards ?? 0) + (apt.privates ?? 0);
+  // 아파트 공고 중 나라장터 공고와 번호가 겹치는 것은 한 번만 센다
+  const aptNotices = Math.max(0, (awardCount?.aptNotices ?? 0) - (awardCount?.aptDup ?? 0));
+  // 아파트 낙찰(입찰결과 누적, 없으면 빌드 때 받은 최근 3개 연도)과 수의계약을 모두 더한다
+  const aptAwards = (awardCount?.aptAwards ?? apt.awards ?? 0) + (apt.privates ?? 0);
   // 업종이 다른 예시 고객사들: [0] 전기·통신공사, [1] IT 용역, [2] 의료 물품, [3] 시설관리 용역, [4] 건축공사
   const client = SEED_CLIENTS[0];
   const digest = buildDigest(client, bids);
@@ -322,7 +307,7 @@ export default async function Home() {
           <p className="lead mx-auto mt-6 max-w-2xl">
             입찰 특화 알고리즘이 나라장터 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해, 점수와 근거를 매일 아침 보내 드립니다.
           </p>
-          <HeroStats marks={marks} builtAt={builtAt} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
+          <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/apply" className="btn-mint px-7 text-base">2주 무료로 시작하기</Link>
             <Link href="/bids" className="btn-ghost px-7 text-base">오늘의 공고 둘러보기</Link>

@@ -23,6 +23,15 @@ export async function awardMeta(): Promise<AwardMeta | null> {
   return b ? (JSON.parse(b.toString()) as AwardMeta) : null;
 }
 
+/** 아파트(K-apt) 누적 공고·낙찰 건수 (scripts/awards/apt.ts 가 쓴다) */
+export async function aptMeta(): Promise<{ notices: number; awards: number; noticeFrom: string; builtAt: string } | null> {
+  if (!canUse()) return null;
+  const b = await r2Get("stats/apt-meta.json");
+  if (!b) return null;
+  const m = JSON.parse(b.toString()) as { notices: number; awards: number; noticeFrom: string; builtAt: string };
+  return { notices: m.notices, awards: m.awards, noticeFrom: m.noticeFrom, builtAt: m.builtAt };
+}
+
 /** 저장소에 최근 1년 낙찰이 다 있으면 통계를 만들고, 아니면 null */
 export async function awardStatsFromR2(targets: PriorTarget[]): Promise<AwardStats | null> {
   const meta = await awardMeta();

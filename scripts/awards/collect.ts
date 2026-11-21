@@ -535,6 +535,17 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
   }
   console.log(`낙찰 ${rows.toLocaleString()}건 (공고 정보 붙은 건 ${matched.toLocaleString()}건, 기초금액 ${withBase.toLocaleString()}건, 예정가격 ${withPlan.toLocaleString()}건, 개찰 순위 ${withTop.toLocaleString()}건), 공고 ${notices.size.toLocaleString()}건`);
 
+  // 메인 현황 줄 누적입찰공고: 아파트 공고 중 조달청 시스템으로 낸 것이 이 나라장터 공고와 겹치는 수 (scripts/awards/apt.ts 가 번호를 남긴다)
+  let aptDup = 0;
+  try {
+    const am = await r2Get("stats/apt-meta.json");
+    if (am) for (const no of (JSON.parse(am.toString()) as { g2b?: string[] }).g2b ?? []) if (notices.has(no.split("-")[0])) aptDup++;
+  } catch (e) {
+    console.warn(`아파트 공고 겹침 확인 실패: ${(e as Error).message}`);
+  }
+  const counts = { notices: notices.size, aptDup };
+  console.log(`누적 공고 ${counts.notices.toLocaleString()}건, 아파트 공고와 겹침 ${aptDup.toLocaleString()}건`);
+
   const keys = [...shards.keys()].sort();
   if (opts.indexOnly) {
     // 색인만: 샤드·통계·수집 상태는 건드리지 않는다 (동시에 도는 수집 실행의 manifest.json 을 덮지 않게 바로 올린다)
@@ -547,12 +558,12 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
       const sm = rows?.length ? agencySummary(name, rows, iso(ymd(kstNow()))) : undefined;
       console.log(`AGENCY_SUMMARY ${JSON.stringify(sm ?? { name, none: true })}`);
     }
-    if (process.env.SKIP_TRIALS) return { rows, shards: keys.length };
+    if (process.env.SKIP_TRIALS) return { rows, shards: keys.length, ...counts };
     const { trial, relTrial } = backtest(ix);
     await checkNotices(ix);
     await relateTrial(trial);
     await relateKindTrial(relTrial, ix.kw);
-    return { rows, shards: keys.length };
+    return { rows, shards: keys.length, ...counts };
   }
   let uploaded = 0;
   let next = 0;
@@ -632,7 +643,7 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
 
   await buildIndexes(all, (key, body) => put(key, body));
 
-  return { rows, shards: keys.length };
+  return { rows, shards: keys.length, ...counts };
 }
 
 /* ---------- 낙찰 결과 분석 색인 (src/lib/awards/analysis.ts) ---------- */
@@ -1193,7 +1204,7 @@ async function main() {
   }
 
   let quota = stopped && /승인 용량/.test(stopped) ? stopped : undefined;
-  let built = { rows: 0, shards: 0 };
+  let built: { rows: number; shards: number; notices?: number; aptDup?: number } = { rows: 0, shards: 0 };
   if (!quota) {
     try {
       built = await build(awardWeeks, leadWeeks);
@@ -1217,7 +1228,7 @@ async function main() {
   }
   const meta: AwardMeta = {
     builtAt: new Date().toISOString(), from, to: iso(addDays(mondayOf(today), 6)), weeks: awardPerOp, totalWeeks: awardWeeks.length,
-    complete, rows: built.rows, bytes: usedBytes(),
+    complete, rows: built.rows, bytes: usedBytes(), notices: built.notices, aptDup: built.aptDup,
     rankWeeks: Math.floor(Object.values(rankState.weeks).filter((x) => x.awardAt).length / 3),
   };
   if (!quota) await put("stats/meta.json", Buffer.from(JSON.stringify(meta)), "application/json").catch((e) => { if (e instanceof QuotaStop) quota = e.message; else throw e; });

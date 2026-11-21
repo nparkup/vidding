@@ -16,6 +16,7 @@ import { SEED_CLIENTS, SEED_INQUIRIES, SEED_REPORTS } from "./mock/seed";
 import { fetchAllBidsWithChanges, hasServiceKey } from "./nara/client";
 import type { NoticeChange } from "./noticeChanges";
 import type { RateTable } from "./rateTable";
+import type { AwardCount } from "./awards/format";
 
 /**
  * 데이터 저장소.
@@ -49,7 +50,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; awardCount?: { rows: number; builtAt: string }; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; awardCount?: AwardCount; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {

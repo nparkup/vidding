@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import { RELAY_API, usePresence } from "@/lib/presence";
 
-/** 마감 시각 목록을 분 단위로 묶은 것: 마감 시각(분, base 기준) 오름차순과 그때 마감하는 공고 수 */
-export interface CloseMarks { base: number; at: number[]; n: number[] }
-
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 
 /** 한국 시간 기준 YYYY-MM-DD (요일) */
@@ -15,23 +12,18 @@ function kstToday(now: number): string {
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} (${WEEK[d.getUTCDay()]})`;
 }
 
-/** 지금 마감 전인 공고 수 */
-function openCount(m: CloseMarks, now: number): number {
-  const min = Math.floor(now / 60_000) - m.base;
-  let s = 0;
-  for (let i = m.at.length - 1; i >= 0 && m.at[i] > min; i--) s += m.n[i];
-  return s;
-}
-
 /**
- * 메인 상단 현황 줄. 날짜와 입찰공고 수는 화면을 연 시각 기준으로 1분마다 다시 센다(빌드 때 받은 공고의 마감 시각으로).
- * 입찰공고는 나라장터와 아파트(K-apt) 공고를 합친 수다.
- * 낙찰정보는 나라장터 낙찰 저장소 누적 건수(빌드 값, 중계 서버가 있으면 최신 값)에 아파트 입찰결과 낙찰·수의계약 건수(빌드 값)를 더한 값,
- * 이용자 수는 중계 서버가 센 값이다. 모르는 값은 빼고 보여 준다.
+ * 메인 상단 현황 줄. 날짜는 화면을 연 시각 기준으로 1분마다 다시 센다.
+ * 누적입찰공고: 낙찰 저장소에 쌓인 나라장터 공고(2016~) + 아파트(K-apt) 공고(겹치는 공고번호는 한 번).
+ * 누적낙찰정보: 나라장터 낙찰 저장소 누적 건수 + 아파트 입찰결과 낙찰 누적·수의계약 건수.
+ * 나라장터 값은 빌드 값이고 중계 서버가 있으면 최신 값으로 바꾼다. 이용자 수는 중계 서버가 센 값이다. 모르는 값은 빼고 보여 준다.
  */
-export function HeroStats({ marks, builtAt, awards, aptAwards = 0 }: { marks: CloseMarks; builtAt: number; awards: number | null; aptAwards?: number }) {
+export function HeroStats({ builtAt, notices, aptNotices = 0, awards, aptAwards = 0 }: {
+  builtAt: number; notices: number | null; aptNotices?: number; awards: number | null; aptAwards?: number;
+}) {
   const [now, setNow] = useState(builtAt);
   const [awardRows, setAwardRows] = useState(awards);
+  const [noticeRows, setNoticeRows] = useState(notices);
   const users = usePresence();
 
   useEffect(() => {
@@ -44,14 +36,20 @@ export function HeroStats({ marks, builtAt, awards, aptAwards = 0 }: { marks: Cl
     if (!RELAY_API) return;
     fetch(`${RELAY_API}?awardmeta=1`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { const n = j?.meta?.rows; if (typeof n === "number" && n > 0) setAwardRows(n); })
+      .then((j) => {
+        const n = j?.meta?.rows;
+        if (typeof n === "number" && n > 0) setAwardRows(n);
+        const b = j?.meta?.notices;
+        if (typeof b === "number" && b > 0) setNoticeRows(b);
+      })
       .catch(() => {});
   }, []);
 
+  const fmt = (n: number) => `${n.toLocaleString("ko-KR")}건`;
   const awardTotal = (awardRows ?? 0) + aptAwards;
   const items: [string, string][] = [
-    ["입찰공고", `${openCount(marks, now).toLocaleString("ko-KR")}건`],
-    ...(awardTotal ? [["낙찰정보", `${awardTotal.toLocaleString("ko-KR")}건`] as [string, string]] : []),
+    ...(noticeRows ? [["누적입찰공고", fmt(noticeRows + aptNotices)] as [string, string]] : []),
+    ...(awardTotal ? [["누적낙찰정보", fmt(awardTotal)] as [string, string]] : []),
     ...(users !== null ? [["실시간 이용자수", `${users.toLocaleString("ko-KR")}명`] as [string, string]] : []),
   ];
 

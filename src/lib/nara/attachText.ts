@@ -86,6 +86,25 @@ function zipEntries(buf: Buffer): { name: string; data: () => Buffer }[] {
   return out;
 }
 
+/** 압축 항목 정보 (시험·진단용) */
+export function zipInfo(buf: Buffer): { name: string; method: number; flags: number; csize: number; usize: number }[] {
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) return [];
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  const out: { name: string; method: number; flags: number; csize: number; usize: number }[] = [];
+  for (let n = 0; n < count && p + 46 <= buf.length && buf.readUInt32LE(p) === 0x02014b50; n++) {
+    const flags = buf.readUInt16LE(p + 8), nlen = buf.readUInt16LE(p + 28);
+    const raw = buf.subarray(p + 46, p + 46 + nlen);
+    let name = raw.toString("utf8");
+    if (!(flags & 0x800)) { try { name = new TextDecoder("euc-kr").decode(raw); } catch { /* */ } }
+    out.push({ name, method: buf.readUInt16LE(p + 10), flags, csize: buf.readUInt32LE(p + 20), usize: buf.readUInt32LE(p + 24) });
+    p += 46 + nlen + buf.readUInt16LE(p + 30) + buf.readUInt16LE(p + 32);
+  }
+  return out;
+}
+
 /** 표 셀(tc)·행(tr)·문단(p)과 글자(t) 태그로 XML 본문을 줄로 (HWPX·DOCX 공통) */
 function xmlLines(xmls: string[], tags: { t: string; tc: string; tr: string; p: string }): string[] {
   const lines: string[] = [];

@@ -1,5 +1,6 @@
 import { call } from "../../src/lib/nara/client";
 const d = "20261119";
+async function main() {
 for (const op of ["getCntrctInfoListServc", "getCntrctInfoListCnstwk", "getCntrctInfoListThng"]) {
   const r = await call("/ao/CntrctInfoService", op, { inqryDiv: "1", inqryBgnDt: `${d}0000`, inqryEndDt: `${d}2359`, numOfRows: "200", pageNo: "1" });
   const items = r.items as Record<string, string>[];
@@ -9,3 +10,5 @@ for (const op of ["getCntrctInfoListServc", "getCntrctInfoListCnstwk", "getCntrc
   console.log(`== ${op} total ${r.total} sample ${items.length}`);
   for (const k of keys) console.log(`${k}\tfilled ${filled[k] ?? 0}\t${/Ofcl|Tel|Fax/.test(k) ? "(masked)" : String(pick[k] ?? "").slice(0, 160)}`);
 }
+}
+main().catch((e) => { console.error(e); process.exit(1); });

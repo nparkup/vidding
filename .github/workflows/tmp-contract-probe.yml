@@ -11,6 +11,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: npm ci
-      - run: npx tsx scripts/tmp/contract-probe.ts
+      - run: npx tsx --conditions=react-server scripts/tmp/contract-probe.ts
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}

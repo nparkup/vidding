@@ -54,8 +54,8 @@ export default async function ServicePage() {
         </ol>
       </section>
 
-      <section className="container-x grid items-start gap-12 overflow-x-clip py-24 lg:grid-cols-2">
-        <div className="lg:sticky lg:top-24">
+      <section className="container-x grid items-center gap-12 overflow-x-clip py-24 lg:grid-cols-2">
+        <div>
           <p className="eyebrow">매일 받는 것</p>
           <h2 className="h-section mt-3">영업일 아침 7시,<br />오늘 볼 공고만.</h2>
           <ul className="mt-8 space-y-3">

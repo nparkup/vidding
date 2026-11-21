@@ -59,7 +59,7 @@ function parseClient(form: FormData, base?: ClientProfile): ClientProfile {
     maxAmount: Number(s("maxAmount")) * 10000 || 10_000_000_000,
     pastPerformance: Number(s("pastPerformance")) * 10000 || 0,
     creditGrade: (s("creditGrade") || "BBB") as ClientProfile["creditGrade"],
-    plan: (s("plan") || "basic") as PlanId,
+    plan: (s("plan") || "monthly") as PlanId,
     status: (s("status") || "체험") as ClientProfile["status"],
     joinedAt: base?.joinedAt ?? new Date().toISOString(),
     watchlist: base?.watchlist ?? [],

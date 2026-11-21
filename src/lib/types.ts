@@ -113,7 +113,7 @@ export interface ClientProfile {
   creditGrade: "A" | "BBB" | "BB" | "B" | "CCC";
 }
 
-export type PlanId = "basic" | "pro" | "partner";
+export type PlanId = "monthly" | "annual";
 
 export interface Inquiry {
   id: string;

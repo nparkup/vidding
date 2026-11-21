@@ -7,6 +7,7 @@ import { BidRow } from "./BidRow";
 import { LicensePicker } from "./LicensePicker";
 import { rank, type MatchResult } from "@/lib/analysis";
 import { won } from "@/lib/format";
+import { planName } from "@/lib/plans";
 import { REGIONS, type License, type Region } from "@/lib/types";
 import { loadBids } from "@/lib/useBids";
 import { keywordHits, parseKeywords, type KeywordHit } from "@/lib/keywords";
@@ -97,7 +98,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
   return (
         <form action={action} onSubmit={action ? undefined : onStatic} className="card space-y-5 p-6 sm:p-8">
           {error && <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">회사명, 이메일, 연락처는 꼭 입력해 주세요.</p>}
-          {plan && <input type="hidden" name="message" value={`관심 요금제: ${plan}`} />}
+          {plan && <input type="hidden" name="message" value={`관심 결제 방식: ${planName(plan)}`} />}
           <div className="grid gap-4 sm:grid-cols-2">
             <div><label className="label" htmlFor="company">회사명 *</label><input id="company" name="company" required className="input" placeholder="(주)한빛클린서비스" /></div>
             <div><label className="label" htmlFor="contactName">담당자</label><input id="contactName" name="contactName" className="input" placeholder="홍길동 대표" /></div>

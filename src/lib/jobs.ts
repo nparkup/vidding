@@ -80,7 +80,7 @@ export async function sendWeeklyReport(reportId: string) {
 export async function createWeeklyDrafts() {
   const k = new Date(Date.now() + 9 * 3600 * 1000);
   const weekLabel = `${k.getUTCMonth() + 1}월 ${Math.ceil(k.getUTCDate() / 7)}주차`;
-  const clients = (await listClients()).filter((c) => c.plan !== "basic" && c.status !== "일시중지");
+  const clients = (await listClients()).filter((c) => c.status !== "일시중지");
   const made = [];
   for (const c of clients) made.push(await addReport({ clientId: c.id, weekLabel, note: "", status: "초안", highlightBidIds: [] }));
   return { created: made.length, weekLabel };

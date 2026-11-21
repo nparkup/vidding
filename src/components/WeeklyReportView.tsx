@@ -199,7 +199,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
               <h4 className="text-sm font-semibold text-ink-500">업종별</h4>
               <ul className="mt-3 space-y-2.5">
                 {cats.slice(0, 8).map(([c, n]) => (
-                  <li key={c} className="grid grid-cols-[84px_1fr_28px] items-center gap-3 text-sm">
+                  <li key={c} className="grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-3 text-sm">
                     <span className="truncate">{c}</span>
                     <span className="h-2.5 overflow-hidden rounded-full bg-ink-100"><span className="block h-full rounded-full bg-mint" style={{ width: `${(n / maxCat) * 100}%` }} /></span>
                     <span className="text-right font-semibold tabular-nums">{n}</span>

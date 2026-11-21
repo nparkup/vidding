@@ -69,6 +69,11 @@ export function CategoryTiles({ value, counts, onPick }: { value: string; counts
   );
 }
 
+/** 띄어쓰기·가운뎃점 없는 긴 이름(중앙행정기관 등)은 좁은 타일에서 칸 밖으로 넘치므로 뒤 네 글자 앞에서 줄바꿈을 허용한다 */
+function softBreak(label: string) {
+  return label.length >= 6 && !/[\s·]/.test(label) ? `${label.slice(0, -4)}\u200b${label.slice(-4)}` : label;
+}
+
 export function Tile({ icon: Icon, label, title, count, on, onClick }: { icon: LucideIcon; label: string; title?: string; count: number; on: boolean; onClick: () => void }) {
   return (
     <button
@@ -81,7 +86,7 @@ export function Tile({ icon: Icon, label, title, count, on, onClick }: { icon: L
       }`}
     >
       <Icon className={`h-6 w-6 ${on ? "text-mint-600" : count ? "text-ink-500" : "text-ink-200"}`} strokeWidth={1.6} aria-hidden />
-      <span className="w-full break-keep text-[12px] font-semibold leading-tight sm:text-[13px]">{label}</span>
+      <span className="w-full break-keep text-[12px] font-semibold leading-tight [overflow-wrap:anywhere] sm:text-[13px]">{softBreak(label)}</span>
       <span className="text-[11px] tabular-nums text-ink-400">{count.toLocaleString()}</span>
     </button>
   );

@@ -13,7 +13,7 @@ import { keywordHits, parseKeywords, type KeywordHit } from "@/lib/keywords";
 import { bidHref } from "@/lib/links";
 import { normalizeBizno, validBizno } from "@/lib/corpLookup";
 import { readMember, saveMember } from "@/lib/member";
-import { TRIAL_LIMIT } from "@/lib/trial";
+import { TrialN } from "@/components/Cfg";
 
 const SIZES = [
   ["0-100000000", "1억 이하"],
@@ -97,7 +97,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
           <span className="grid h-12 w-12 place-items-center rounded-full bg-mint text-white"><Check className="h-6 w-6" strokeWidth={3} /></span>
           <p className="mt-4 text-2xl font-extrabold">{done.status === "exists" ? "이미 가입된 사업자번호입니다" : "회원가입이 완료되었습니다"}</p>
           <p className="mt-2 text-sm text-ink-500">
-            {done.company || "귀사"}의 무료 체험이 시작되었습니다. 입찰공고 {TRIAL_LIMIT}건을 골라 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 써 보세요.
+            {done.company || "귀사"}의 무료 체험이 시작되었습니다. 입찰공고 <TrialN />건을 골라 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 써 보세요.
             {done.status === "exists" ? " 처음 가입하신 정보는 그대로 두었고, 체험 건수는 같은 사업자번호로 이어서 셉니다." : ""}
           </p>
           {done.status === "local" && (

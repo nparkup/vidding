@@ -6,6 +6,7 @@ import { AuthError, makeCall, type Member } from "./adminApi";
 import { MembersTab } from "./MembersTab";
 import { BillingTab } from "./BillingTab";
 import { UsageTab } from "./UsageTab";
+import { SettingsTab } from "./SettingsTab";
 
 /** 로그인 토큰(12시간)은 이 탭에만 둔다. 비밀번호는 저장하지 않는다 */
 const TOKEN_KEY = "bm-admin-token";
@@ -14,6 +15,7 @@ const TABS = [
   { id: "members", label: "회원정보" },
   { id: "billing", label: "결제정보" },
   { id: "usage", label: "회원 사용량" },
+  { id: "settings", label: "페이지 설정" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -151,6 +153,7 @@ export function AdminConsole({ api }: { api: string }) {
             {tab === "members" && <MembersTab {...shared} />}
             {tab === "billing" && <BillingTab {...shared} />}
             {tab === "usage" && <UsageTab {...shared} />}
+            {tab === "settings" && <SettingsTab {...shared} />}
           </main>
         </div>
       )}

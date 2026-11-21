@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
+import { useSiteConfig } from "@/lib/siteConfig";
+import { MYBOX_ENABLED } from "@/lib/mybox";
 
-type Item = { href: string; label: string; desc: string };
+type Item = { href: string; label: string; desc: string; /** 관리자 화면에서 서류함을 켰을 때만 */ mybox?: boolean };
 type Entry = { label: string; href: string } | { label: string; items: Item[] };
 
 /** 상단 메뉴. 하위 화면이 많은 메뉴는 묶어서 펼침 메뉴로 보여 준다 */
@@ -30,6 +32,7 @@ export const NAV: Entry[] = [
       { href: "/plans", label: "발주계획", desc: "기관이 미리 올린 발주 예정 사업" },
       { href: "/prespecs", label: "사전규격 미리보기", desc: "본공고 전에 공개된 규격" },
       { href: "/contracts", label: "계약현황", desc: "최근 2주 계약업체·금액·기간" },
+      { href: "/mybox", label: "내 서류함", desc: "담아 둔 관심공고와 제출서류", mybox: true },
     ],
   },
   {
@@ -48,6 +51,9 @@ const isOn = (path: string, href: string) => (href === "/premium" ? path === hre
 const entryOn = (path: string, e: Entry) => ("href" in e ? isOn(path, e.href) : e.items.some((i) => isOn(path, i.href)));
 
 export function SiteHeader() {
+  const cfg = useSiteConfig();
+  const myboxOn = MYBOX_ENABLED || cfg.features.mybox;
+  const nav = NAV.map((e) => ("items" in e ? { ...e, items: e.items.filter((i) => !i.mybox || myboxOn) } : e));
   const path = clean(usePathname() || "/");
   const [open, setOpen] = useState<string | null>(null);
   const [mobile, setMobile] = useState(false);
@@ -94,7 +100,7 @@ export function SiteHeader() {
         <Logo />
 
         <nav ref={navRef} aria-label="주요 메뉴" className="hidden items-center gap-0.5 text-[15px] font-semibold text-ink-500 lg:flex">
-          {NAV.map((e) => {
+          {nav.map((e) => {
             const on = entryOn(path, e);
             const base = `rounded-full px-3 py-2 transition hover:bg-paper hover:text-ink ${on ? "text-ink" : ""}`;
             if ("href" in e)
@@ -165,7 +171,7 @@ export function SiteHeader() {
         <div id="mobile-menu" className="fixed inset-x-0 bottom-0 top-16 z-40 overflow-y-auto border-t border-ink-100 bg-white lg:hidden">
           <nav aria-label="주요 메뉴" className="container-x space-y-6 py-5 pb-24">
             <div className="grid grid-cols-2 gap-2">
-              {NAV.filter((e): e is { label: string; href: string } => "href" in e).map((e) => {
+              {nav.filter((e): e is { label: string; href: string } => "href" in e).map((e) => {
                 const on = isOn(path, e.href);
                 return (
                   <Link key={e.href} href={e.href} aria-current={on ? "page" : undefined} className={`rounded-xl border px-3 py-3 text-[15px] font-bold ${on ? "border-mint bg-mint-50 text-mint-600" : "border-ink-100 text-ink"}`}>
@@ -174,7 +180,7 @@ export function SiteHeader() {
                 );
               })}
             </div>
-            {NAV.filter((e): e is { label: string; items: Item[] } => "items" in e).map((g) => (
+            {nav.filter((e): e is { label: string; items: Item[] } => "items" in e).map((g) => (
               <section key={g.label}>
                 <p className="px-1 text-xs font-bold tracking-wide text-ink-400">{g.label}</p>
                 <ul className="mt-2 divide-y divide-ink-100 rounded-2xl border border-ink-100">

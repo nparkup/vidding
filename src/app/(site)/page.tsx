@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Price, TrialN } from "@/components/Cfg";
 import { Check, Plus, X } from "lucide-react";
 import { HeroCity } from "@/components/art/HeroCity";
 import { ConstructionArt, ITArt, SupplyArt } from "@/components/art/Sectors";
@@ -63,7 +64,7 @@ const FAQ = [
   { q: "공고 데이터는 어디서 오나요?", a: "조달청 나라장터가 공공데이터포털로 공개하는 입찰공고·낙찰·사전규격·발주계획·계약 정보와, 국토교통부 공동주택관리정보시스템(K-apt)의 아파트 입찰공고·입찰결과·수의계약 정보를 매일 수집해 분석합니다." },
   { q: "아파트 관리 입찰도 볼 수 있나요?", a: "네. 아파트 청소·경비·소독·승강기 유지·위탁관리·공사 공고를 업종별로 모아 보여 드리고, 같은 단지의 직전 낙찰·수의계약 금액과 아파트 입찰가격 예측을 함께 제공합니다." },
   { q: "입찰 가능성 점수는 어떻게 계산하나요?", a: "입찰 특화 알고리즘이 6개 항목을 가중 채점합니다. 면허 요건 30점, 참가 지역 20점, 사업 규모 15점은 필수 조건으로 먼저 판정하고, 하나라도 맞지 않으면 39점 이하로 제한해 제외합니다. 통과한 공고는 유사 공고 평균 참여업체 수로 본 경쟁 강도 15점, 기초금액 대비 실적 10점, 남은 준비 기간 10점을 더해 100점 만점으로 산출하고, 85점 이상 S, 72점 이상 A, 58점 이상 B, 그 아래는 C 등급을 붙입니다." },
-  { q: "무료 체험은 무엇을 해 볼 수 있나요?", a: "입찰공고 3건을 골라 평가점수 예측(나라장터·아파트), 배점표 판독, 낙찰 결과로 본 예측을 요금 없이 써 보실 수 있습니다. 이미 분석한 공고는 다시 열어도 차감되지 않으며, 카드 등록이 없어 자동으로 결제되지 않습니다." },
+  { q: "무료 체험은 무엇을 해 볼 수 있나요?", a: <>입찰공고 <TrialN />건을 골라 평가점수 예측(나라장터·아파트), 배점표 판독, 낙찰 결과로 본 예측을 요금 없이 써 보실 수 있습니다. 이미 분석한 공고는 다시 열어도 차감되지 않으며, 카드 등록이 없어 자동으로 결제되지 않습니다.</> },
   { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트LAB은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
 
@@ -380,8 +381,8 @@ export default async function Home() {
             <Link href="/bids" className="btn-ghost px-7 text-base">공고 검색 둘러보기</Link>
           </div>
           <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-ink-400">
-            {["입찰공고 3건 무료 분석", "카드 등록 없음", "약정 없음", "조건 등록 3분"].map((t) => (
-              <li key={t} className="flex items-center gap-1.5"><Check className="h-4 w-4 text-mint" />{t}</li>
+            {[<>입찰공고 <TrialN />건 무료 분석</>, "카드 등록 없음", "약정 없음", "조건 등록 3분"].map((t, i) => (
+              <li key={i} className="flex items-center gap-1.5"><Check className="h-4 w-4 text-mint" />{t}</li>
             ))}
           </ul>
 
@@ -708,7 +709,7 @@ export default async function Home() {
         <div className="text-center">
           <p className="eyebrow">요금제</p>
           <h2 className="h-section mt-3">입찰 담당자 한 명 인건비의 일부로.</h2>
-          <p className="mt-4 text-ink-500">연간 월 29,000원 · 월간 월 33,000원 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 3건</p>
+          <p className="mt-4 text-ink-500">연간 월 <Price k="annualMonthly" />원 · 월간 월 <Price k="monthly" />원 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 <TrialN />건</p>
         </div>
         <div className="mx-auto mt-12 max-w-4xl">
           <PricingCards dark={false} />
@@ -744,14 +745,14 @@ export default async function Home() {
           <div className="container-x relative grid items-center gap-6 py-16 sm:py-20 lg:grid-cols-[1.1fr_1fr]">
             <div>
               <h2 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl sm:leading-[1.15]">입찰 업무,<br />오늘부터 맡겨 보세요.</h2>
-              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 그중 입찰공고 3건은 평가점수 예측으로 무료 분석해 보실 수 있습니다.</p>
+              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 그중 입찰공고 <TrialN />건은 평가점수 예측으로 무료 분석해 보실 수 있습니다.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/apply" className="btn-mint px-7 text-base">무료 체험 시작하기</Link>
                 <Link href="/pricing" className="btn-glass px-7 text-base">요금제 보기</Link>
               </div>
               <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-300">
-                {["약정 없음", "카드 등록 없음", "입찰공고 3건 무료"].map((t) => (
-                  <li key={t} className="flex items-center gap-1.5"><Check className="h-4 w-4 text-mint-400" />{t}</li>
+                {["약정 없음", "카드 등록 없음", <>입찰공고 <TrialN />건 무료</>].map((t, i) => (
+                  <li key={i} className="flex items-center gap-1.5"><Check className="h-4 w-4 text-mint-400" />{t}</li>
                 ))}
               </ul>
             </div>

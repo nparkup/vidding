@@ -19,6 +19,9 @@ on:
       - "src/lib/criteria.ts"
       - "src/lib/evalscore.ts"
       - "src/lib/trustscore.ts"
+      - "src/lib/siteConfigCore.ts"
+      - "src/lib/plans.ts"
+      - "src/lib/trialLimit.ts"
       - ".github/workflows/corp-worker.yml"
   # PR에서는 배포하지 않고 Cloudflare 토큰·계정 ID가 맞는지만 확인한다
   pull_request:
@@ -34,6 +37,9 @@ on:
       - "src/lib/criteria.ts"
       - "src/lib/evalscore.ts"
       - "src/lib/trustscore.ts"
+      - "src/lib/siteConfigCore.ts"
+      - "src/lib/plans.ts"
+      - "src/lib/trialLimit.ts"
       - ".github/workflows/corp-worker.yml"
   workflow_dispatch:
 

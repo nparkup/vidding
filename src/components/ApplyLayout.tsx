@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { TRIAL_LIMIT } from "@/lib/trialLimit";
+import { Price, TrialN } from "@/components/Cfg";
 
 /** 무료 체험에서 쓸 수 있는 분석 (요금제와 같은 기능, 공고 3건까지) */
 const BENEFITS = [
@@ -9,9 +9,9 @@ const BENEFITS = [
   { t: "아파트 공고 예측", d: "같은 단지·같은 업종 직전 계약으로 아파트 관리 입찰의 예상 낙찰금액과 구간을 계산합니다." },
 ];
 
-const STEPS = [
+const STEPS: [React.ReactNode, string][] = [
   ["회원가입", "사업자등록번호와 연락처만 넣으면 1분이면 끝납니다."],
-  [`공고 ${TRIAL_LIMIT}건 분석`, "나라장터·아파트 공고 중 관심 공고를 골라 분석합니다."],
+  [<>공고 <TrialN />건 분석</>, "나라장터·아파트 공고 중 관심 공고를 골라 분석합니다."],
   ["계속 이용", "마음에 드시면 요금제를 고르세요. 자동 결제는 없습니다."],
 ];
 
@@ -24,8 +24,8 @@ export function ApplyLayout({ children }: { children: React.ReactNode }) {
           <div className="pointer-events-none absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-mint/25 blur-[100px]" />
           <div className="relative">
             <p className="text-sm font-semibold text-mint-400">무료 체험</p>
-            <h1 className="mt-3 text-3xl font-extrabold leading-[1.2] tracking-[-0.04em] sm:text-4xl">가입하고<br />입찰공고 {TRIAL_LIMIT}건을<br />무료로 분석해 보세요.</h1>
-            <p className="mt-4 leading-relaxed text-ink-300">요금제와 같은 분석을 공고 {TRIAL_LIMIT}건까지 그대로 써 보실 수 있습니다. 나라장터와 아파트 공고를 합쳐 {TRIAL_LIMIT}건이며, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
+            <h1 className="mt-3 text-3xl font-extrabold leading-[1.2] tracking-[-0.04em] sm:text-4xl">가입하고<br />입찰공고 <TrialN />건을<br />무료로 분석해 보세요.</h1>
+            <p className="mt-4 leading-relaxed text-ink-300">요금제와 같은 분석을 공고 <TrialN />건까지 그대로 써 보실 수 있습니다. 나라장터와 아파트 공고를 합쳐 <TrialN />건이며, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
             <ul className="mt-6 space-y-3">
               {BENEFITS.map((b) => (
                 <li key={b.t} className="glass flex gap-3 rounded-2xl p-4">
@@ -38,7 +38,7 @@ export function ApplyLayout({ children }: { children: React.ReactNode }) {
               ))}
             </ul>
             <a href="#signup" className="btn-mint mt-6 w-full lg:hidden">회원가입하고 시작하기</a>
-            <p className="mt-5 text-xs text-ink-300">카드 등록 없음 · 자동 결제 없음 · 체험 뒤 연간 월 29,000원 · 월간 월 33,000원, VAT 포함</p>
+            <p className="mt-5 text-xs text-ink-300">카드 등록 없음 · 자동 결제 없음 · 체험 뒤 연간 월 <Price k="annualMonthly" />원 · 월간 월 <Price k="monthly" />원, VAT 포함</p>
           </div>
         </div>
 
@@ -46,7 +46,7 @@ export function ApplyLayout({ children }: { children: React.ReactNode }) {
           <p className="text-sm font-bold">무료 체험은 이렇게 진행됩니다</p>
           <ol className="mt-4 space-y-3">
             {STEPS.map(([k, v], i) => (
-              <li key={k} className="flex gap-3">
+              <li key={i} className="flex gap-3">
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white tabular-nums">{i + 1}</span>
                 <span className="min-w-0 text-sm"><b>{k}</b><span className="block text-ink-500">{v}</span></span>
               </li>

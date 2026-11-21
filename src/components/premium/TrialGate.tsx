@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { allowedTrial, readTrial, TRIAL_LIMIT, type TrialEntry, type TrialState } from "@/lib/trial";
+import { allowedTrial, readTrial, type TrialEntry, type TrialState } from "@/lib/trial";
+import { useSiteConfig } from "@/lib/siteConfig";
 
 /** 고른 공고 아래: 무료 체험 사용 건수 */
 export function TrialNote({ state }: { state: TrialState | null }) {
+  const TRIAL_LIMIT = useSiteConfig().trialLimit;
   if (!state || state.status !== "ok") return null;
   const n = state.used.length || TRIAL_LIMIT - state.left;
   return (
@@ -19,8 +21,9 @@ export function TrialNote({ state }: { state: TrialState | null }) {
 
 /** 공고를 고르기 전 안내 */
 export function TrialIntro() {
+  const TRIAL_LIMIT = useSiteConfig().trialLimit;
   const [used, setUsed] = useState<TrialEntry[]>([]);
-  useEffect(() => { setUsed(allowedTrial(readTrial())); }, []);
+  useEffect(() => { setUsed(allowedTrial(readTrial())); }, [TRIAL_LIMIT]);
   const left = Math.max(0, TRIAL_LIMIT - used.length);
   return (
     <p className="mt-3 text-xs text-ink-500">
@@ -31,6 +34,7 @@ export function TrialIntro() {
 
 /** 무료 체험 3건을 다 쓴 뒤 새 공고를 고르면 분석 대신 보여 준다 */
 export function TrialLocked({ used, onPick }: { used: TrialEntry[]; onPick: (e: TrialEntry) => void }) {
+  const TRIAL_LIMIT = useSiteConfig().trialLimit;
   return (
     <aside className="card min-w-0 p-6">
       <p className="font-bold">무료 체험 {TRIAL_LIMIT}건을 모두 사용했습니다</p>

@@ -34,7 +34,7 @@ import { RELATE_VERSION, relateAll, relateHash, type RelateResult } from "../../
 import type { AwardAnalysis } from "../../src/lib/awards/analysis";
 import { AI_SHEET_VERSION, readAiInput, type AiInput, type AiSheetResult } from "../../src/lib/nara/aiSheet";
 import { liveKey, readSheetLive, type LiveDocs } from "../../src/lib/nara/liveSheet";
-import { handleAdmin } from "./admin";
+import { handleAdmin, readSiteConfig } from "./admin";
 import { metricsStub, patchFetch, takePending, truncIp, type MetricsNs, type RecBody } from "./metrics";
 export { Metrics } from "./metrics";
 
@@ -81,8 +81,6 @@ export class Presence {
 }
 
 const CACHE_SECONDS = 12 * 3600;
-/** 무료 체험으로 분석할 수 있는 공고 수 (src/lib/trial.ts TRIAL_LIMIT 와 같게) */
-const TRIAL_LIMIT = 3;
 
 patchFetch();
 
@@ -118,7 +116,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       const sp0 = new URL(req.url).searchParams;
       if (sp0.has("admin") || sp0.has("adminlogin") || sp0.has("members")) {
         if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
-        return handleAdmin(req, env, json, ctx, TRIAL_LIMIT);
+        return handleAdmin(req, env, json, ctx);
       }
       if (sp0.has("pv")) {
         // 페이지 조회 (src/components/PageBeacon.tsx). 경로·유입 사이트만 받고, 순 방문은 그날만 쓰는 해시로 센다
@@ -143,9 +141,15 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       const r = await stub.fetch(`https://presence/?id=${id}`);
       return json(await r.json(), 200, { "Cache-Control": "no-store" });
     }
+    if (sp.has("config")) {
+      // 사이트 설정 (공개 값만: 공지 띠·요금·무료 체험 건수·기능). 관리자 화면에서 바꾸면 1~2분 안에 반영된다
+      const c = await readSiteConfig(env.AWARDS);
+      return json(c, 200, { "Cache-Control": "public, max-age=60" });
+    }
     if (sp.has("trial")) {
       // 무료 체험 사용 공고 (src/lib/trial.ts): 사업자번호마다 처음 분석한 공고 3건까지만 남긴다. 저장 값은 공고 키와 시각뿐
       const bizno = sp.get("trial") ?? "";
+      const TRIAL_LIMIT = (await readSiteConfig(env.AWARDS)).trialLimit;
       const keys = (sp.get("bids") ?? "").split(",").filter((k) => /^(nara|apt):[A-Za-z0-9._-]{1,60}$/.test(k)).slice(0, 6);
       if (!/^\d{10}$/.test(bizno)) return json({ error: "잘못된 사업자번호" }, 400);
       if (!env.AWARDS) return json({ error: "off" }, 503);
@@ -296,7 +300,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
 function routeOf(req: Request): string {
   const sp = new URL(req.url).searchParams;
   if (sp.has("admin") || sp.has("adminlogin") || sp.has("members")) return `admin:${(sp.get("admin") ?? (sp.has("adminlogin") ? "login" : "members")).slice(0, 20)}`;
-  for (const k of ["pv", "signup", "trial", "awards", "awardmeta", "aisheet", "relate", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
+  for (const k of ["pv", "config", "signup", "trial", "awards", "awardmeta", "aisheet", "relate", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
   return "other";
 }
 

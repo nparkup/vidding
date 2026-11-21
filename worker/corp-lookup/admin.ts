@@ -10,10 +10,25 @@
  * - GET  hits&days=&kinds=    : 날짜별 집계 (요청·API·페이지 조회 등, metrics.ts)
  * - GET  logs[&errors=1]      : 최근 요청 기록
  * - GET  audit                : 관리자 로그인·변경 기록
+ * - GET  settings / POST settings : 사이트 설정 (공지 띠·요금·무료 체험 건수·기능). 사이트는 공개 주소 ?config=1 로 읽는다
  *
  * R2 저장 위치: members/{사업자번호}.json, trial/{사업자번호}.json, billing/{사업자번호}.json
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
+import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../../src/lib/siteConfigCore";
+
+/** 사이트 설정 (R2 config/site.json). 한 인스턴스 안에서 1분 동안 다시 읽지 않는다 */
+let cfgCache: { at: number; v: SiteConfig } | null = null;
+export async function readSiteConfig(bucket: AdminBucket | undefined): Promise<SiteConfig> {
+  if (cfgCache && Date.now() - cfgCache.at < 60_000) return cfgCache.v;
+  let v = DEFAULT_CONFIG;
+  if (bucket) {
+    const o = await bucket.get("config/site.json");
+    if (o) { try { v = normalizeConfig(JSON.parse(new TextDecoder().decode(await o.arrayBuffer()))); } catch { /* 기본값 */ } }
+  }
+  cfgCache = { at: Date.now(), v };
+  return v;
+}
 
 export interface AdminBucket {
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
@@ -41,7 +56,7 @@ const readJson = async (bucket: AdminBucket, key: string) => {
 };
 const putJson = (bucket: AdminBucket, key: string, v: unknown) => bucket.put(key, JSON.stringify(v), { httpMetadata: { contentType: "application/json" } });
 
-export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: { waitUntil(p: Promise<unknown>): void }, trialLimit: number): Promise<Response> {
+export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
   const sp = new URL(req.url).searchParams;
   // 예전 화면 주소(?adminlogin, ?members)도 받는다
   const action = sp.get("admin") ?? (sp.has("adminlogin") ? "login" : sp.has("delete") ? "member-delete" : "members");
@@ -82,7 +97,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
   switch (action) {
     case "members": {
       if (post) break;
-      return json(await listMembers(bucket, env, trialLimit), 200, noStore);
+      return json(await listMembers(bucket, env, (await readSiteConfig(bucket)).trialLimit), 200, noStore);
     }
     case "member": {
       if (!post || !needBizno()) break;
@@ -120,6 +135,18 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       await putJson(bucket, `billing/${bizno}.json`, { ...rec, updatedAt: new Date().toISOString() });
       audit("billing", `${bizno} ${rec.plan || "-"} ${rec.status}`);
       return json({ status: "ok", billing: rec }, 200, noStore);
+    }
+    case "settings": {
+      if (!post) return json({ config: await readSiteConfig(bucket), defaults: DEFAULT_CONFIG }, 200, noStore);
+      let b: unknown;
+      try { b = await req.json(); } catch { return json({ error: "잘못된 요청" }, 400); }
+      const prev = await readSiteConfig(bucket);
+      const next = { ...normalizeConfig(b), updatedAt: new Date().toISOString() };
+      await putJson(bucket, "config/site.json", next);
+      cfgCache = { at: Date.now(), v: next };
+      const changed = (["banner", "pricing", "trialLimit", "features"] as const).filter((k) => JSON.stringify(prev[k]) !== JSON.stringify(next[k]));
+      audit("settings", changed.length ? `바뀐 항목: ${changed.join(", ")}` : "변경 없음");
+      return json({ status: "ok", config: next }, 200, noStore);
     }
     case "hits":
     case "logs":

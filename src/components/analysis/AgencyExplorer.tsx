@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { AgencyLogo } from "@/components/AgencyLogo";
 import { DistChart } from "@/components/BidPriceAnalysis";
 import { METHOD_NAME } from "@/lib/awards/analysis";
 import type { AgencySummary } from "@/lib/awards/agency";
@@ -89,7 +90,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
   return (
     <div className="space-y-6">
       <section className="card p-6">
-        <h2 className="text-2xl font-extrabold tracking-tight">{s.name}</h2>
+        <h2 className="text-2xl font-extrabold tracking-tight"><AgencyLogo name={s.name} size={30} maxW={170} className="mr-3 -mt-1" />{s.name}</h2>
         <p className="mt-1 text-sm text-ink-500">나라장터 낙찰 {s.n.toLocaleString()}건 · {s.from} ~ {s.to}</p>
         <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Tile k="최근 4년 낙찰" v={`${recent4.toLocaleString()}건`} />

@@ -16,7 +16,7 @@ import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
-import { getAwardCount, getBids } from "@/lib/store";
+import { getAptBids, getAwardCount, getBids } from "@/lib/store";
 import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
 import { bidHref } from "@/lib/links";
 
@@ -77,8 +77,13 @@ function closeMarks(bids: { closeAt: string }[], now: number): CloseMarks {
 export default async function Home() {
   const bids = await getBids();
   const builtAt = Date.now();
-  const marks = closeMarks(bids, builtAt);
+  // 현황 줄은 나라장터와 아파트(K-apt) 공고·낙찰을 합친 숫자다
+  const apt = await getAptBids();
+  // 조달청(나라장터)으로 낸 아파트 공고가 나라장터 목록에도 있으면 한 번만 센다
+  const naraNos = new Set(bids.map((b) => b.id.split("-")[0]));
+  const marks = closeMarks([...bids, ...apt.items.filter((a) => !naraNos.has(a.no.split("-")[0]))], builtAt);
   const awardCount = getAwardCount();
+  const aptAwards = apt.awards ?? 0;
   // 업종이 다른 예시 고객사들: [0] 전기·통신공사, [1] IT 용역, [2] 의료 물품, [3] 시설관리 용역, [4] 건축공사
   const client = SEED_CLIENTS[0];
   const digest = buildDigest(client, bids);
@@ -316,7 +321,7 @@ export default async function Home() {
           <p className="lead mx-auto mt-6 max-w-2xl">
             입찰 특화 알고리즘이 나라장터 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해, 점수와 근거를 매일 아침 보내 드립니다.
           </p>
-          <HeroStats marks={marks} builtAt={builtAt} awards={awardCount?.rows ?? null} />
+          <HeroStats marks={marks} builtAt={builtAt} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/apply" className="btn-mint px-7 text-base">2주 무료로 시작하기</Link>
             <Link href="/bids" className="btn-ghost px-7 text-base">오늘의 공고 둘러보기</Link>

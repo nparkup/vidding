@@ -13,12 +13,11 @@ export interface Plan {
   /** 한 달 공고 예측 건수. null = 무제한 */
   quota: number | null;
   tagline: string;
-  highlight?: boolean;
 }
 
 export const PLANS: Plan[] = [
   { id: "lite", name: "라이트", price: 29000, quota: 100, tagline: "관심 업종 공고를 꾸준히 보는 회사" },
-  { id: "standard", name: "스탠다드", price: 49000, quota: 200, tagline: "여러 업종·지역에 참가하는 회사", highlight: true },
+  { id: "standard", name: "스탠다드", price: 49000, quota: 200, tagline: "여러 업종·지역에 참가하는 회사" },
   { id: "unlimited", name: "무제한", price: 69000, quota: null, tagline: "참가 공고가 많은 회사" },
 ];
 

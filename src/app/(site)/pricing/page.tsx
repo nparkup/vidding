@@ -115,7 +115,7 @@ export default function Pricing() {
               <td className="text-xs text-ink-400">무료 체험 공고 <TrialN />건 · 카드 등록 없음</td>
               <td className="text-center"><Link href="/apply" className="inline-block rounded-full border border-ink-100 px-2.5 py-1.5 text-xs font-bold text-ink sm:px-4">체험</Link></td>
               {(["lite", "standard", "unlimited"] as const).map((k) => (
-                <td key={k} className="text-center"><Link href={`/apply?plan=${k}`} className={`inline-block rounded-full px-2.5 py-1.5 text-xs font-bold sm:px-4 ${k === "standard" ? "bg-mint text-white" : "border border-ink-100 text-ink"}`}>시작</Link></td>
+                <td key={k} className="text-center"><Link href={`/apply?plan=${k}`} className={`inline-block rounded-full px-2.5 py-1.5 text-xs font-bold sm:px-4 bg-mint text-white`}>시작</Link></td>
               ))}
             </tr>
           </tfoot>

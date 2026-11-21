@@ -83,7 +83,8 @@ export default async function Home() {
   const naraNos = new Set(bids.map((b) => b.id.split("-")[0]));
   const marks = closeMarks([...bids, ...apt.items.filter((a) => !naraNos.has(a.no.split("-")[0]))], builtAt);
   const awardCount = getAwardCount();
-  const aptAwards = apt.awards ?? 0;
+  // 아파트 낙찰(입찰결과)과 수의계약을 모두 더한다
+  const aptAwards = (apt.awards ?? 0) + (apt.privates ?? 0);
   // 업종이 다른 예시 고객사들: [0] 전기·통신공사, [1] IT 용역, [2] 의료 물품, [3] 시설관리 용역, [4] 건축공사
   const client = SEED_CLIENTS[0];
   const digest = buildDigest(client, bids);

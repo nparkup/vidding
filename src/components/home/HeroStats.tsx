@@ -26,7 +26,7 @@ function openCount(m: CloseMarks, now: number): number {
 /**
  * 메인 상단 현황 줄. 날짜와 입찰공고 수는 화면을 연 시각 기준으로 1분마다 다시 센다(빌드 때 받은 공고의 마감 시각으로).
  * 입찰공고는 나라장터와 아파트(K-apt) 공고를 합친 수다.
- * 낙찰정보는 나라장터 낙찰 저장소 누적 건수(빌드 값, 중계 서버가 있으면 최신 값)에 아파트 입찰결과 낙찰 건수(빌드 값)를 더한 값,
+ * 낙찰정보는 나라장터 낙찰 저장소 누적 건수(빌드 값, 중계 서버가 있으면 최신 값)에 아파트 입찰결과 낙찰·수의계약 건수(빌드 값)를 더한 값,
  * 이용자 수는 중계 서버가 센 값이다. 모르는 값은 빼고 보여 준다.
  */
 export function HeroStats({ marks, builtAt, awards, aptAwards = 0 }: { marks: CloseMarks; builtAt: number; awards: number | null; aptAwards?: number }) {

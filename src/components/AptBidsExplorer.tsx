@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { APT_CATEGORIES, APT_REGIONS, aptDetailUrl, aptFileUrl, type AptBid, type AptBidsFile } from "@/lib/apt";
-import { dateTime, shortDate, won, wonFull } from "@/lib/format";
+import { APT_CATEGORIES, APT_REGIONS, type AptBid, type AptBidsFile } from "@/lib/apt";
+import { shortDate, won } from "@/lib/format";
+import { aptBidHref } from "@/lib/links";
 import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "./Badges";
 import { CloseDay } from "./CloseDay";
@@ -34,7 +36,7 @@ interface Saved { cats: string[]; region: string }
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 const hoursLeft = (iso: string) => (new Date(iso).getTime() - Date.now()) / 3600e3;
 
-/** 아파트(공동주택) 입찰공고 검색: 분야·지역·검색어로 거르고, 펼치면 일정·서류·첨부·직전 낙찰을 본다 */
+/** 아파트(공동주택) 입찰공고 검색: 분야·지역·검색어로 거르고, 누르면 공고 상세(/apt-bids/view)로 간다 */
 export function AptBidsExplorer() {
   const [data, setData] = useState<AptBidsFile | null>(null);
   const [error, setError] = useState(false);
@@ -142,84 +144,51 @@ export function AptBidsExplorer() {
   );
 }
 
-function Fact({ k, v }: { k: string; v?: string }) {
-  if (!v) return null;
-  return (
-    <div className="grid min-w-0 grid-cols-[6.5rem_1fr] gap-2 py-1.5 text-sm">
-      <dt className="text-ink-500">{k}</dt>
-      <dd className="min-w-0 [overflow-wrap:anywhere]">{v}</dd>
-    </div>
-  );
-}
-
 function AptRow({ bid: b }: { bid: AptBid }) {
+  const router = useRouter();
   return (
-    <li className="min-w-0 rounded-2xl border border-ink-100 bg-white transition hover:border-mint">
-      <details className="group">
-        <summary className="grid min-w-0 cursor-pointer list-none grid-cols-1 gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <CloseDdayBadge iso={b.closeAt} />
-              <span className="chip">{b.category}</span>
-              {b.region && <span className="chip">{b.region}</span>}
-              {b.award && <span className="chip">{b.award}</span>}
-              {b.kind && b.kind !== "일반경쟁" && <span className="chip">{b.kind}</span>}
-              {b.state !== "신규공고" && <span className="chip border-amber/40 bg-amber-100/60 text-ink">{b.state}</span>}
-              {b.urgent && <span className="chip border-coral/30 bg-coral-100/60 text-coral">긴급</span>}
-            </div>
-            <p className="mt-2 text-[16px] font-semibold leading-snug group-hover:text-mint-600 [overflow-wrap:anywhere]">
-              <CloseDay iso={b.closeAt} />
-              {b.title}
-            </p>
-            <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">{b.apt}{b.system ? ` · ${b.system}` : ""}{b.way ? ` ${b.way}` : ""}</p>
+    <li className="min-w-0">
+      <Link
+        href={aptBidHref(b.no)}
+        className="group grid min-w-0 grid-cols-1 gap-3 rounded-2xl border border-ink-100 bg-white p-4 transition hover:border-mint hover:shadow-card sm:grid-cols-[1fr_auto] sm:items-center sm:p-5"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <CloseDdayBadge iso={b.closeAt} />
+            <span className="chip">{b.category}</span>
+            {b.region && <span className="chip">{b.region}</span>}
+            {b.award && <span className="chip">{b.award}</span>}
+            {b.kind && b.kind !== "일반경쟁" && <span className="chip">{b.kind}</span>}
+            {b.state !== "신규공고" && <span className="chip border-amber/40 bg-amber-100/60 text-ink">{b.state}</span>}
+            {b.urgent && <span className="chip border-coral/30 bg-coral-100/60 text-coral">긴급</span>}
           </div>
-          <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
-            {b.prior ? (
-              <div>
-                <p className="text-xs text-ink-500">{b.prior.via === "수의계약" ? "직전 수의계약" : "직전 낙찰"}</p>
-                <p className="text-lg font-bold tabular-nums">{won(b.prior.amount)}</p>
-              </div>
-            ) : COMPARABLE.has(b.category) ? (
-              <p className="text-sm text-ink-300">직전 계약 자료 없음</p>
-            ) : <span />}
-            <p className="text-xs text-ink-300">마감 {shortDate(b.closeAt)} · 펼쳐 보기</p>
-            {COMPARABLE.has(b.category) && (
-              <Link href={`/premium?apt=${encodeURIComponent(b.no)}#apt-price`} onClick={(e) => e.stopPropagation()} className="btn-mint btn-sm mt-2 shrink-0">입찰가격 예측</Link>
-            )}
-          </div>
-        </summary>
-        <div className="grid min-w-0 gap-4 border-t border-ink-100 p-4 sm:grid-cols-2 sm:p-5">
-          <dl className="min-w-0 divide-y divide-ink-100/70">
-            <Fact k="입찰번호" v={b.no} />
-            <Fact k="입찰분류" v={b.classLabel} />
-            <Fact k="공고일" v={b.postedAt} />
-            <Fact k="입찰 마감" v={dateTime(b.closeAt)} />
-            <Fact k="현장설명" v={[b.briefingAt && dateTime(b.briefingAt), b.briefingPlace].filter(Boolean).join(" · ") || undefined} />
-            <Fact k="서류 마감" v={b.docsBy && b.docsBy !== b.closeAt ? dateTime(b.docsBy) : undefined} />
-            <Fact k="구비서류" v={b.docs} />
-            <Fact k="입찰보증금" v={b.guarantee ? "입찰가격의 5% 이상 제출" : undefined} />
-            <Fact k="지급조건" v={b.payTerms} />
-          </dl>
-          <div className="min-w-0 space-y-3">
-            {b.prior && (
-              <div className="rounded-xl bg-paper p-3 text-sm">
-                <p className="font-semibold">같은 단지 직전 {b.category} {b.prior.via === "수의계약" ? "수의계약" : "낙찰"}</p>
-                <p className="mt-1 text-ink-500 [overflow-wrap:anywhere]">{b.prior.title}</p>
-                <p className="mt-1 tabular-nums"><b>{wonFull(b.prior.amount)}</b>{b.prior.company ? ` · ${b.prior.company}` : ""}</p>
-                {b.prior.start && b.prior.end && <p className="tabular-nums text-ink-500">계약 {b.prior.start} ~ {b.prior.end}</p>}
-              </div>
-            )}
-            {b.content && <p className="whitespace-pre-line text-sm text-ink-700 [overflow-wrap:anywhere]">{b.content}</p>}
-            <div className="flex flex-wrap gap-2">
-              {(b.files ?? []).map((f, i) => (
-                <a key={f} href={aptFileUrl(f)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">공고 첨부{(b.files?.length ?? 0) > 1 ? ` ${i + 1}` : ""} 내려받기</a>
-              ))}
-              {b.link && <a href={b.link} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">{b.system ?? "입찰 시스템"}에서 보기</a>}
-              <a href={aptDetailUrl(b.no)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">K-apt 원문 보기</a>
-            </div>
-          </div>
+          <p className="mt-2 text-[16px] font-semibold leading-snug group-hover:text-mint-600 [overflow-wrap:anywhere]">
+            <CloseDay iso={b.closeAt} />
+            {b.title}
+          </p>
+          <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">{b.apt}{b.system ? ` · ${b.system}` : ""}{b.way ? ` ${b.way}` : ""}</p>
         </div>
-      </details>
+        <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
+          {b.prior ? (
+            <div>
+              <p className="text-xs text-ink-500">{b.prior.via === "수의계약" ? "직전 수의계약" : "직전 낙찰"}</p>
+              <p className="text-lg font-bold tabular-nums">{won(b.prior.amount)}</p>
+            </div>
+          ) : COMPARABLE.has(b.category) ? (
+            <p className="text-sm text-ink-300">직전 계약 자료 없음</p>
+          ) : <span />}
+          <p className="text-xs text-ink-300">마감 {shortDate(b.closeAt)}</p>
+          {COMPARABLE.has(b.category) && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/premium?apt=${encodeURIComponent(b.no)}#apt-price`); }}
+              className="btn-mint btn-sm mt-2 shrink-0"
+            >
+              입찰가격 예측
+            </button>
+          )}
+        </div>
+      </Link>
     </li>
   );
 }

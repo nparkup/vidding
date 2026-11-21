@@ -1,0 +1,243 @@
+/**
+ * 관리자 화면(/admin) API. 모든 요청은 ?admin=동작 이고, 로그인(login)만 빼고 Authorization: Bearer 토큰이 있어야 한다.
+ *
+ * - POST login                : 아이디·비밀번호 → 12시간 서명 토큰
+ * - GET  members              : 가입자 전부 + 무료 체험 사용 공고 + 결제 요약 + 마지막 조회 시각
+ * - POST member&bizno=        : 가입 정보 고치기 (회사명·담당자·연락처·이메일·업종·지역·규모·키워드·메일 수신·상태·메모)
+ * - POST member-delete&bizno= : 탈퇴 처리 (가입 정보·결제 기록 삭제, 무료 체험 사용 기록은 남긴다)
+ * - POST trial-reset&bizno=   : 무료 체험 사용 기록 초기화
+ * - GET  billing&bizno=       : 결제 기록 / POST billing&bizno= : 결제 기록 저장 (결제 대행사 연동 전이라 손으로 적는다)
+ * - GET  hits&days=&kinds=    : 날짜별 집계 (요청·API·페이지 조회 등, metrics.ts)
+ * - GET  logs[&errors=1]      : 최근 요청 기록
+ * - GET  audit                : 관리자 로그인·변경 기록
+ *
+ * R2 저장 위치: members/{사업자번호}.json, trial/{사업자번호}.json, billing/{사업자번호}.json
+ */
+import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
+
+export interface AdminBucket {
+  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+  put(key: string, value: string, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+  delete(key: string): Promise<unknown>;
+  list(opts: { prefix: string; cursor?: string; limit?: number }): Promise<{ objects: { key: string; size?: number }[]; truncated: boolean; cursor?: string }>;
+}
+
+export interface AdminEnv {
+  AWARDS?: AdminBucket;
+  ADMIN_ID?: string;
+  ADMIN_PASSWORD?: string;
+  METRICS?: MetricsNs;
+}
+
+/** 관리자 로그인 유지 시간 */
+const ADMIN_SESSION_MS = 12 * 3600_000;
+
+type Json = (body: unknown, status?: number, extra?: Record<string, string>) => Response;
+
+const readJson = async (bucket: AdminBucket, key: string) => {
+  const o = await bucket.get(key);
+  if (!o) return null;
+  try { return JSON.parse(new TextDecoder().decode(await o.arrayBuffer())) as Record<string, unknown>; } catch { return null; }
+};
+const putJson = (bucket: AdminBucket, key: string, v: unknown) => bucket.put(key, JSON.stringify(v), { httpMetadata: { contentType: "application/json" } });
+
+export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: { waitUntil(p: Promise<unknown>): void }, trialLimit: number): Promise<Response> {
+  const sp = new URL(req.url).searchParams;
+  // 예전 화면 주소(?adminlogin, ?members)도 받는다
+  const action = sp.get("admin") ?? (sp.has("adminlogin") ? "login" : sp.has("delete") ? "member-delete" : "members");
+  const noStore = { "Cache-Control": "no-store" };
+  const ip = truncIp(req.headers.get("CF-Connecting-IP") ?? "");
+  const audit = (action2: string, detail: string) => {
+    if (!env.METRICS) return;
+    const row: AuditRow = { ts: Date.now(), action: action2, detail, ip };
+    ctx.waitUntil(metricsStub(env.METRICS).fetch("https://metrics/rec", { method: "POST", body: JSON.stringify({ audit: [row] }) }).catch(() => undefined));
+  };
+  if (!env.AWARDS) return json({ error: "off" }, 503);
+  if (!env.ADMIN_ID || !env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 10) return json({ error: "관리자 계정이 아직 설정되지 않았습니다." }, 503);
+  const bucket = env.AWARDS;
+
+  if (action === "login") {
+    if (req.method !== "POST") return json({ error: "POST만 지원합니다." }, 405);
+    let b: { id?: unknown; password?: unknown } = {};
+    try { b = (await req.json()) as typeof b; } catch { /* 빈 입력 */ }
+    const idOk = await sameSecret(String(b.id ?? ""), env.ADMIN_ID);
+    const pwOk = await sameSecret(String(b.password ?? ""), env.ADMIN_PASSWORD);
+    if (!idOk || !pwOk) {
+      audit("login-fail", idOk ? "비밀번호 틀림" : "아이디 틀림");
+      await new Promise((r) => setTimeout(r, 1000)); // 비밀번호 대입을 느리게
+      return json({ error: "아이디 또는 비밀번호가 맞지 않습니다." }, 401, noStore);
+    }
+    audit("login", "로그인");
+    const exp = Date.now() + ADMIN_SESSION_MS;
+    return json({ token: await signAdmin(exp, env), exp }, 200, noStore);
+  }
+
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!(await checkAdmin(token, env))) return json({ error: "로그인이 필요합니다." }, 401, noStore);
+
+  const bizno = sp.get("bizno") ?? sp.get("delete") ?? "";
+  const needBizno = () => /^\d{10}$/.test(bizno);
+  const post = req.method === "POST";
+
+  switch (action) {
+    case "members": {
+      if (post) break;
+      return json(await listMembers(bucket, env, trialLimit), 200, noStore);
+    }
+    case "member": {
+      if (!post || !needBizno()) break;
+      const cur = await readJson(bucket, `members/${bizno}.json`);
+      if (!cur) return json({ error: "가입 정보가 없습니다." }, 404);
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
+      const next: Record<string, unknown> = { ...cur, ...cleanMember(b), bizno, updatedAt: new Date().toISOString() };
+      if (!next.company || !next.name) return json({ error: "회사명과 담당자 이름은 비울 수 없습니다." }, 400);
+      if (next.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(next.email))) return json({ error: "이메일 주소를 확인해 주세요." }, 400);
+      await putJson(bucket, `members/${bizno}.json`, next);
+      audit("member-edit", `${bizno}${cur.status !== next.status ? ` 상태 ${next.status === "suspended" ? "이용 정지" : "정상"}` : ""}`);
+      return json({ status: "ok", member: next }, 200, noStore);
+    }
+    case "member-delete": {
+      if (!post || !needBizno()) break;
+      await bucket.delete(`members/${bizno}.json`);
+      await bucket.delete(`billing/${bizno}.json`);
+      audit("member-delete", bizno);
+      return json({ status: "deleted" }, 200, noStore);
+    }
+    case "trial-reset": {
+      if (!post || !needBizno()) break;
+      await bucket.delete(`trial/${bizno}.json`);
+      audit("trial-reset", bizno);
+      return json({ status: "ok" }, 200, noStore);
+    }
+    case "billing": {
+      if (!needBizno()) break;
+      if (!post) return json({ billing: (await readJson(bucket, `billing/${bizno}.json`)) ?? null }, 200, noStore);
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
+      const rec = cleanBilling(b);
+      if ("error" in rec) return json(rec, 400);
+      await putJson(bucket, `billing/${bizno}.json`, { ...rec, updatedAt: new Date().toISOString() });
+      audit("billing", `${bizno} ${rec.plan || "-"} ${rec.status}`);
+      return json({ status: "ok", billing: rec }, 200, noStore);
+    }
+    case "hits":
+    case "logs":
+    case "audit": {
+      if (post) break;
+      if (!env.METRICS) return json({ error: "지표 저장소가 아직 없습니다." }, 503);
+      const q = new URLSearchParams();
+      for (const k of ["days", "kinds", "limit", "errors"]) { const v = sp.get(k); if (v) q.set(k, v); }
+      const r = await metricsStub(env.METRICS).fetch(`https://metrics/${action}?${q}`);
+      return json(await r.json(), r.status, noStore);
+    }
+  }
+  return json({ error: "지원하지 않는 요청입니다." }, 400);
+}
+
+const s = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+const list = (v: unknown, max: number) => (Array.isArray(v) ? v.map((x) => s(x, 60)).filter(Boolean).slice(0, max) : undefined);
+
+/** 관리자가 고칠 수 있는 가입 정보만 골라 다듬는다 (사업자번호·가입일은 못 바꾼다) */
+function cleanMember(b: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const str: [string, number][] = [["company", 100], ["name", 40], ["email", 120], ["phone", 30], ["size", 40], ["keywords", 200], ["plan", 20], ["memo", 1000]];
+  for (const [k, max] of str) if (k in b) out[k] = s(b[k], max);
+  for (const [k, max] of [["licenses", 40], ["regions", 20]] as [string, number][]) { const l = list(b[k], max); if (l) out[k] = l; }
+  if ("agreeMail" in b) out.agreeMail = b.agreeMail === true;
+  if ("status" in b) out.status = b.status === "suspended" ? "suspended" : "active";
+  return out;
+}
+
+export interface Payment { id: string; date: string; kind: "pay" | "refund"; amount: number; method: string; memo: string }
+export interface Billing {
+  plan: "" | "monthly" | "annual";
+  status: "none" | "active" | "cancelled" | "expired" | "refunded";
+  start: string;
+  end: string;
+  memo: string;
+  payments: Payment[];
+}
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+function cleanBilling(b: Record<string, unknown>): Billing | { error: string } {
+  const plan = b.plan === "monthly" || b.plan === "annual" ? b.plan : "";
+  const status = (["none", "active", "cancelled", "expired", "refunded"] as const).find((x) => x === b.status) ?? "none";
+  const start = s(b.start, 10);
+  const end = s(b.end, 10);
+  if ((start && !DATE.test(start)) || (end && !DATE.test(end))) return { error: "날짜는 YYYY-MM-DD 로 적어 주세요." };
+  if (start && end && end < start) return { error: "종료일이 시작일보다 빠릅니다." };
+  const raw = Array.isArray(b.payments) ? b.payments.slice(0, 200) : [];
+  const payments: Payment[] = [];
+  for (const p of raw as Record<string, unknown>[]) {
+    const date = s(p?.date, 10);
+    const amount = Math.round(Number(p?.amount));
+    if (!DATE.test(date) || !Number.isFinite(amount) || amount < 0 || amount > 100_000_000) return { error: "결제 내역의 날짜·금액을 확인해 주세요." };
+    payments.push({ id: s(p.id, 40) || crypto.randomUUID(), date, kind: p.kind === "refund" ? "refund" : "pay", amount, method: s(p.method, 30), memo: s(p.memo, 200) });
+  }
+  payments.sort((a, z) => a.date.localeCompare(z.date));
+  return { plan, status, start, end, memo: s(b.memo, 1000), payments };
+}
+
+/** 가입자 목록: members/ 전부와 사업자번호별 무료 체험 사용 공고(trial/), 결제 기록(billing/), 마지막 조회(Metrics seen) */
+async function listMembers(bucket: AdminBucket, env: AdminEnv, trialLimit: number) {
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const r = await bucket.list({ prefix: "members/", cursor, limit: 1000 });
+    keys.push(...r.objects.map((o) => o.key));
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor && keys.length < 5000);
+  // 결제 기록이 있는 번호만 읽는다
+  const billed = new Set<string>();
+  cursor = undefined;
+  do {
+    const r = await bucket.list({ prefix: "billing/", cursor, limit: 1000 });
+    for (const o of r.objects) billed.add(o.key.slice(8, 18));
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor && billed.size < 5000);
+  let seen: Record<string, { last: number; n: number }> = {};
+  if (env.METRICS) {
+    try {
+      const r = (await (await metricsStub(env.METRICS).fetch("https://metrics/seen")).json()) as { rows: { bizno: string; last: number; n: number }[] };
+      seen = Object.fromEntries(r.rows.map((x) => [x.bizno, { last: x.last, n: x.n }]));
+    } catch { /* 지표가 없으면 비워 둔다 */ }
+  }
+  const out: unknown[] = [];
+  for (let i = 0; i < keys.length; i += 20) {
+    const part = await Promise.all(keys.slice(i, i + 20).map(async (k) => {
+      const m = await readJson(bucket, k);
+      if (!m) return null;
+      const no = String(m.bizno);
+      const [t, bill] = await Promise.all([readJson(bucket, `trial/${no}.json`), billed.has(no) ? readJson(bucket, `billing/${no}.json`) : null]);
+      return { ...m, trial: (t?.used as unknown[]) ?? [], billing: bill, seen: seen[no] ?? null };
+    }));
+    out.push(...part.filter(Boolean));
+  }
+  return { members: out, limit: trialLimit, at: new Date().toISOString() };
+}
+
+/** 관리자 비밀번호 비교: 해시끼리 끝까지 비교해 응답 시간으로 맞힌 글자 수를 알 수 없게 한다 */
+async function sameSecret(a: string, b: string): Promise<boolean> {
+  const h = async (x: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(x)));
+  const [x, y] = await Promise.all([h(a), h(b)]);
+  let d = a.length ? 0 : 1;
+  for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i];
+  return d === 0;
+}
+
+/** 관리자 토큰 서명 키: 아이디·비밀번호에서 만든다. 비밀번호를 바꾸면 이전 토큰은 모두 무효가 된다 */
+async function adminKey(env: AdminEnv) {
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`bidmate-admin:${env.ADMIN_ID}:${env.ADMIN_PASSWORD}`));
+  return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+}
+const hex = (b: ArrayBuffer) => Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, "0")).join("");
+async function signAdmin(exp: number, env: AdminEnv): Promise<string> {
+  const sig = await crypto.subtle.sign("HMAC", await adminKey(env), new TextEncoder().encode(`admin.${exp}`));
+  return `${exp}.${hex(sig)}`;
+}
+export async function checkAdmin(token: string, env: AdminEnv): Promise<boolean> {
+  const m = /^(\d{10,16})\.([0-9a-f]{64})$/.exec(token);
+  if (!m || Number(m[1]) < Date.now()) return false;
+  return sameSecret(token, await signAdmin(Number(m[1]), env));
+}

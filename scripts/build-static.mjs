@@ -5,7 +5,7 @@
  *
  * 환경변수: BIDS_FILE(필수, fetch-bids 결과), PAGES_BASE_PATH(예: /vidding), NEXT_PUBLIC_APPLY_EMAIL
  */
-import { cpSync, existsSync, rmSync, symlinkSync } from "fs";
+import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync } from "fs";
 import { execSync } from "child_process";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
@@ -32,6 +32,9 @@ for (const p of [
   "src/app/(site)/bids/[id]",
 ]) rmSync(join(work, p), { recursive: true, force: true });
 cpSync(join(work, "src/static/apply-page.tsx"), join(work, "src/app/(site)/apply/page.tsx"));
+// 관리자: 서버용 화면 대신 가입자 목록 화면 하나 (비밀번호는 중계 서버가 확인한다)
+mkdirSync(join(work, "src/app/admin"), { recursive: true });
+cpSync(join(work, "src/static/admin-page.tsx"), join(work, "src/app/admin/page.tsx"));
 
 if (!process.env.BIDS_FILE || !existsSync(process.env.BIDS_FILE)) {
   console.error("BIDS_FILE 이 없습니다. 먼저 scripts/fetch-bids.ts 를 실행하세요.");

@@ -184,7 +184,7 @@ function AptRow({ bid: b }: { bid: AptBid }) {
             ) : <span />}
             <p className="text-xs text-ink-300">마감 {shortDate(b.closeAt)} · 펼쳐 보기</p>
             {COMPARABLE.has(b.category) && (
-              <Link href={`/premium?apt=${encodeURIComponent(b.no)}#apt-price`} onClick={(e) => e.stopPropagation()} className="btn-mint btn-sm mt-2 shrink-0">입찰가격 예측</Link>
+              <Link href={`/premium/apt?apt=${encodeURIComponent(b.no)}`} onClick={(e) => e.stopPropagation()} className="btn-mint btn-sm mt-2 shrink-0">입찰가격 예측</Link>
             )}
           </div>
         </summary>

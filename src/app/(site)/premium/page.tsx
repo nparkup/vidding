@@ -3,18 +3,19 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { PageHero } from "@/components/PageHero";
 import { ScorePredictor } from "@/components/premium/ScorePredictor";
-import { AptPricePredictor } from "@/components/premium/AptPricePredictor";
+import { AptPriceRedirect } from "@/components/premium/AptPriceRedirect";
 
 export const metadata: Metadata = {
-  title: "평가점수 예측",
+  title: "나라장터 예측",
   description: "공고 첨부파일의 평가기준과 나라장터 기업 정보로 적격심사·협상계약 예상 점수를 계산합니다.",
 };
 
 export default function PremiumPage() {
   return (
     <>
+      <AptPriceRedirect />
       <PageHero
-        eyebrow="프리미엄 · 평가점수 예측"
+        eyebrow="프리미엄 · 평가점수 예측 · 나라장터 예측"
         title={<>공고를 고르면,<br />우리 회사 점수가 나옵니다.</>}
         lead="입찰공고에 첨부된 공고서·규격서에서 평가기준과 배점을 추출하고, 나라장터에 등록된 기업 정보와 신용평가 서류를 결합해 이 공고에서 받을 예상 점수와 통과 여부를 계산합니다."
       >
@@ -25,23 +26,12 @@ export default function PremiumPage() {
       </PageHero>
 
       <section id="predict" className="container-x scroll-mt-20 pt-12">
-        <p className="eyebrow">평가점수 예측</p>
+        <p className="eyebrow">나라장터 예측</p>
         <h2 className="h-section mt-3">공고 하나로 직접 계산해 보세요</h2>
         <p className="lead mt-3 max-w-3xl">공고를 고르면 그 공고의 첨부파일에서 읽어 둔 평가표가 바로 적용됩니다. 기업 정보를 입력하면 오른쪽에 항목별 예상 점수가 계산됩니다.</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
             <ScorePredictor />
-          </Suspense>
-        </div>
-      </section>
-
-      <section id="apt-price" className="container-x scroll-mt-20 pt-12">
-        <p className="eyebrow">아파트 입찰가격 예측</p>
-        <h2 className="h-section mt-3">K-APT 아파트 공고의 예상 낙찰금액</h2>
-        <p className="lead mt-3 max-w-3xl">공동주택관리정보시스템(K-apt)의 입찰결과·수의계약 공지에서 같은 단지·같은 분야의 직전 계약금액을 찾고, 과거에 직전 계약 다음 낙찰이 얼마나 달라졌는지로 이번 공고의 예상 낙찰금액과 구간을 계산합니다.</p>
-        <div className="mt-8">
-          <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
-            <AptPricePredictor />
           </Suspense>
         </div>
       </section>

@@ -39,6 +39,10 @@ on:
         description: "index 모드: 사정율 되짚어 보기까지만 하고 '같은 사업' 확인 시험(토큰 사용)은 건너뛴다"
         type: boolean
         default: false
+      check_only:
+        description: "index 모드: 색인을 만든 뒤 확인 대상 공고(묶음 공고 업무별 나눔 포함)만 확인하고 끝낸다"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,6 +65,9 @@ jobs:
       MAX_MINUTES: ${{ inputs.max_minutes || (github.event.schedule == '40 15 * * *' && '300') || '100' }}
       RANK_DRY: ${{ inputs.rank_dry && '1' || '' }}
       SKIP_TRIALS: ${{ inputs.skip_trials && '1' || '' }}
+      CHECK_ONLY: ${{ inputs.check_only && '1' || '' }}
+      # 확인 대상에 더할 묶음 공고(업무 둘 이상을 함께 뽑는 공고) 수
+      CHECK_BUNDLES: ${{ inputs.mode == 'index' && '9' || '' }}
       SAMPLE_AGENCIES: ${{ inputs.sample_agencies }}
       NODE_OPTIONS: --max-old-space-size=11264
       # 색인만 다시 만들 때 '같은 사업' 확인을 실제로 몇 건 시험해 토큰을 찍는다 (공고당 약 0.3원)

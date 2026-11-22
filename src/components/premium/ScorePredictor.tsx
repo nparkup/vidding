@@ -21,7 +21,7 @@ import { sheetPerfPeriod } from "@/lib/perfLookup";
 import { PerfLookup, type PerfSummary } from "./PerfLookup";
 import { LoadingBar } from "./LoadingBar";
 import { AwardAnalysisSection, ForecastCard, loadAwardAnalysis } from "./AwardAnalysis";
-import { forecast, winChance, withConfirmed, withKind, type AwardAnalysis } from "@/lib/awards/analysis";
+import { forecast, winChance, withConfirmed, withKind, withParts, type AwardAnalysis } from "@/lib/awards/analysis";
 import { CloseDay } from "../CloseDay";
 import { TrustPicker } from "./TrustPicker";
 import { applyTrustAuto, trustFromCorp, type TrustAuto } from "@/lib/trustAuto";
@@ -73,19 +73,21 @@ async function loadAiSheet(bid: Bid): Promise<EvalSheet | null> {
 
 /**
  * 같은 사업인지 애매한 과거 낙찰 후보가 있으면 중계 서버에 확인을 부탁해 같은 사업으로 확인된 것만 이력에 넣는다.
- * 실패하거나 8초 안에 답이 없으면 확실한 이력만 쓴다.
+ * 묶음 공고(따로 맡는 업무를 함께 뽑는 공고)면 업무별로 나눈 낙찰도 함께 받는다.
+ * 실패하거나 12초 안에 답이 없으면 확실한 이력만 쓴다.
  */
 async function confirmRelated(bid: Bid, a: AwardAnalysis | null): Promise<AwardAnalysis | null> {
   if ((!a?.maybe?.length && !a?.related?.rows?.length) || !STATIC || !CORP_API) return a;
   try {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 8000);
+    const timer = setTimeout(() => ctl.abort(), 12000);
     const r = await fetch(`${CORP_API}?${new URLSearchParams({ relate: bid.id })}`, { signal: ctl.signal });
     clearTimeout(timer);
     if (!r.ok) return a;
-    const j = (await r.json()) as { status: string; same?: string[]; kind?: string[] };
+    const j = (await r.json()) as { status: string; same?: string[]; kind?: string[]; parts?: string[]; partOf?: Record<string, number> };
     if (j.status !== "ok") return a;
-    let out = j.same?.length ? withConfirmed(a, j.same, a.subject?.postedAt ?? bid.postedAt.slice(0, 10)) : a;
+    let out = withParts(a, j.parts, j.partOf);
+    out = j.same?.length ? withConfirmed(out, j.same, a.subject?.postedAt ?? bid.postedAt.slice(0, 10)) : out;
     if (j.kind) out = withKind(out, j.kind);
     return out;
   } catch {

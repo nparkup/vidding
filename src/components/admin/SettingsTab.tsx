@@ -89,7 +89,7 @@ export function SettingsTab({ call, guard }: TabProps) {
           <Field label="무제한 공고 예측 건수"><input className="input text-right" value="무제한" disabled /></Field>
         </div>
         {!(cfg.pricing.lite < cfg.pricing.standard && cfg.pricing.standard < cfg.pricing.unlimited) && <p className="mt-2 text-sm text-coral">윗 단계 이용권이 아래 단계보다 싸거나 같습니다. 금액을 다시 확인해 주세요.</p>}
-        <p className="mt-2 text-xs text-ink-400">이미 결제한 회원의 금액은 바뀌지 않습니다. 결제정보에 적힌 금액으로 환불을 계산합니다.</p>
+        <p className="mt-2 text-xs text-ink-400">이미 결제한 회원의 금액은 바뀌지 않습니다.</p>
       </section>
 
       <section className="card mt-5 p-5 sm:p-6">

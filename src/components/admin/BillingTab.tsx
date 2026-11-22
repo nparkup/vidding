@@ -14,7 +14,7 @@ const empty = (): Billing => ({ plan: "", status: "none", start: "", end: "", me
 const net = (b?: Billing | null) => (b?.payments ?? []).reduce((s, p) => s + (p.kind === "refund" ? -p.amount : p.amount), 0);
 const paidSum = (b?: Billing | null) => (b?.payments ?? []).filter((p) => p.kind === "pay").reduce((s, p) => s + p.amount, 0);
 
-/** 회원 결제정보: 결제 대행사 연동 전이라 결제·환불을 손으로 적고, 중도 해지 환불액을 요금 정책대로 계산한다 */
+/** 회원 결제정보: 결제 대행사 연동 전이라 결제·환불을 손으로 적고, 중도 해지는 요금 정책대로 다음 결제만 멈춘다(환불 없음) */
 export function BillingTab({ call, guard, members, busy, reload, updateMember }: TabProps) {
   const [q, setQ] = useState("");
   const [only, setOnly] = useState(true);
@@ -56,7 +56,7 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold">결제정보</h1>
-          <p className="mt-1 text-sm text-ink-500">회원별 이용권·이용 기간·결제 내역과 중도 해지 환불 계산.</p>
+          <p className="mt-1 text-sm text-ink-500">회원별 이용권·이용 기간·결제 내역과 중도 해지 처리(일할 환불 없음).</p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={reload} className="btn-ghost btn-sm" disabled={busy}>{busy ? "불러오는 중…" : "새로 불러오기"}</button>
@@ -197,8 +197,8 @@ function BillingEditor({ m, call, guard, onSaved }: { m: Member; call: TabProps[
       </div>
 
       <div className="rounded-2xl border border-ink-100 bg-paper p-4">
-        <p className="text-sm font-bold">중도 해지 환불 계산</p>
-        <p className="mt-1 text-xs text-ink-500">월간 이용권: 결제한 달은 끝까지 이용, 환불 없음. (예전 연간 결제 기록만 쓴 기간을 결제액 ÷ 12 기준으로 계산해 환불)</p>
+        <p className="text-sm font-bold">중도 해지 처리</p>
+        <p className="mt-1 text-xs text-ink-500">모든 이용권: 결제한 기간은 끝까지 이용하고 다음 결제부터 청구하지 않음. 일할 환불 없음.</p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
           <Field label="해지일"><input className="input sm:w-44" type="date" value={cancel} onChange={(e) => setCancel(e.target.value)} /></Field>
           {refund ? (

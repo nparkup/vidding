@@ -232,6 +232,20 @@ export interface AwardAnalysis {
   regional?: { label: string; n: number; q: [number, number, number] };
   /** 사정율 분석 표본: 같은 수요기관 최근 4년 낙찰의 예정가격 ÷ 기초금액 (가격 경쟁 공고만). src/lib/awards/assess.ts */
   assess?: AssessData;
+  /**
+   * 묶음 공고(따로 맡는 업무를 함께 뽑는 공고, 예: 선택적복지 위탁운영 및 복지카드 발급)의 업무별 낙찰.
+   * 화면에서 중계 서버 확인 결과로 채운다 (withParts). 업무가 하나면 없음
+   */
+  parts?: PartGroup[];
+}
+
+export interface PartGroup {
+  /** 업무 이름 (예: 복지카드 발급) */
+  name: string;
+  /** 같은 수요기관이 이 업무만 따로 뽑았던 과거 낙찰 (최근 순) */
+  own: PastAward[];
+  /** 다른 기관 포함 공고명이 비슷한 낙찰 가운데 이 업무의 것 */
+  related?: Related;
 }
 
 export interface AnalyzeTarget {
@@ -523,8 +537,8 @@ function summarizeRelated({ n, tw, top }: NonNullable<ReturnType<typeof relatedR
   return relatedFromRows(n, [...usedT].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 4), top.map((x) => x.r));
 }
 
-function relatedFromRows(n: number, terms: string[], rows: KwRow[]): Related | undefined {
-  if (rows.length < 3) return undefined;
+function relatedFromRows(n: number, terms: string[], rows: KwRow[], min = 3): Related | undefined {
+  if (rows.length < min) return undefined;
   const cnt = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
   const wins = new Map<string, number>(), ranked = new Map<string, number>();
   for (const r of rows) {
@@ -562,6 +576,25 @@ export function withKind(a: AwardAnalysis, nos: string[]): AwardAnalysis {
   if (next) out.related = next; else delete out.related;
   return out;
 }
+/**
+ * 묶음 공고를 업무별로 나눈다 (중계 서버 확인 결과: 업무 이름과 후보 공고번호 → 업무 번호).
+ * 다른 기관 핵심어 낙찰과, 같은 기관이 그 업무만 따로 뽑았던 애매한 후보를 업무마다 모은다.
+ * withKind 보다 먼저 부른다 (withKind 가 핵심어 낙찰을 3건 미만이면 지우기 때문)
+ */
+export function withParts(a: AwardAnalysis, parts: string[] | undefined, partOf: Record<string, number> | undefined): AwardAnalysis {
+  if (!parts || parts.length < 2 || !partOf) return a;
+  const rows = a.related?.rows ?? [];
+  const groups: PartGroup[] = parts.map((name, i) => {
+    const own = (a.maybe ?? []).filter((m) => partOf[m.no] === i).sort((x, y) => y.date.localeCompare(x.date));
+    const mine = rows.filter((r) => partOf[r[0]] === i);
+    const related = relatedFromRows(mine.length, a.related?.terms ?? [], mine, 1);
+    return related ? { name, own, related } : { name, own };
+  });
+  // 업무 하나에만 자료가 있으면 나누어 보여 줄 것이 없다
+  if (groups.filter((g) => g.own.length || g.related).length < 2) return a;
+  return { ...a, parts: groups };
+}
+
 /** 사업 종류만 본다 (다른 기관끼리는 권역·노선 같은 구분어가 달라도 비슷한 공고다) */
 function kindsDiffer(a: string, b: string): boolean {
   for (const [, re] of EXCLUSIVE) if (re.test(a) !== re.test(b)) return true;
@@ -621,6 +654,8 @@ export interface Forecast {
   incumbent?: { name: string; count: number; total: number };
   /** 참가 예상 기업: 과거 같은 사업에서 낙찰받거나 개찰 1~5위에 든 업체, 모자라면 비슷한 공고에 자주 낙찰·상위에 든 업체 */
   likely?: LikelyBidder[];
+  /** 묶음 공고: 업무별 참가 예상 기업 */
+  likelyParts?: { name: string; likely: LikelyBidder[] }[];
 }
 
 export interface LikelyBidder {
@@ -779,6 +814,12 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   // 비슷한 공고는 공고명 핵심어로 찾은 것 우선. 업무·금액대만 같은 넓은 묶음의 업체는 쓰지 않는다
   const likely = likelyBidders(all, rel ? { winners: rel.winners, ranked: rel.ranked } : a.similar && !a.similar.key.endsWith("|*") ? st : undefined);
   if (likely.length) out.likely = likely;
+  if (a.parts) {
+    const lp = a.parts
+      .map((p) => ({ name: p.name, likely: likelyBidders(p.own, p.related ? { winners: p.related.winners, ranked: p.related.ranked } : undefined, 5) }))
+      .filter((p) => p.likely.length);
+    if (lp.length) out.likelyParts = lp;
+  }
   return out;
 }
 

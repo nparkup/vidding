@@ -560,6 +560,7 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
       const sm = rows?.length ? agencySummary(name, rows, iso(ymd(kstNow()))) : undefined;
       console.log(`AGENCY_SUMMARY ${JSON.stringify(sm ?? { name, none: true })}`);
     }
+    if (process.env.CHECK_ONLY) { await checkNotices(ix); return { rows, shards: keys.length, ...counts }; }
     if (process.env.SKIP_TRIALS) return { rows, shards: keys.length, ...counts };
     const { trial, relTrial } = backtest(ix);
     await checkNotices(ix);
@@ -1027,6 +1028,22 @@ async function checkNotices(ix: Awaited<ReturnType<typeof buildIndexes>>) {
     return;
   }
   const range = { from: "", to: "" };
+  // 묶음 공고(업무 둘 이상을 함께 뽑는 공고)로 보이는 공고를 업무 종류별로 몇 건 더 골라 업무별 나눔을 확인한다
+  const nBundles = Number(process.env.CHECK_BUNDLES || 0);
+  if (nBundles > 0) {
+    const seenBiz = new Map<string, number>();
+    for (const x of items as unknown as (Parameters<typeof analyzeBid>[0])[]) {
+      if (nos.length >= nBundles + 1) break;
+      if (!x.title.includes("및") || nos.includes(x.bidNtceNo)) continue;
+      const k = x.bizType ?? "";
+      if ((seenBiz.get(k) ?? 0) >= Math.ceil(nBundles / 3)) continue;
+      const rows = ix.buckets[Number(agencyBucket(x.demandAgency))]?.agencies[x.demandAgency];
+      const a = analyzeBid(x, rows, ix.similar.groups, range, { kw: ix.kw });
+      if ((a.related?.rows?.length ?? 0) < 4) continue;
+      seenBiz.set(k, (seenBiz.get(k) ?? 0) + 1);
+      nos.push(x.bidNtceNo);
+    }
+  }
   for (const no of nos) {
     const b = items.find((x) => x.bidNtceNo === no) as unknown as Parameters<typeof analyzeBid>[0] & { lowerLimitRate?: number } | undefined;
     if (!b) { console.log(`CHECK ${no}: 사이트에 없음`); continue; }
@@ -1043,15 +1060,18 @@ async function checkNotices(ix: Awaited<ReturnType<typeof buildIndexes>>) {
       try {
         const { default: Anthropic } = await import("@anthropic-ai/sdk");
         const { relateAll } = await import("../../src/lib/awards/relate");
-        const { withConfirmed, withKind } = await import("../../src/lib/awards/analysis");
+        const { withConfirmed, withKind, withParts } = await import("../../src/lib/awards/analysis");
         const a = analyzeBid(b, rows, ix.similar.groups, range, { kw: ix.kw });
         if (a.subject) {
           const r = await relateAll(new Anthropic({ maxRetries: 2 }), a);
-          let x = r.same.length ? withConfirmed(a, r.same, a.subject.postedAt) : a;
+          let x = withParts(a, r.parts, r.partOf);
+          x = r.same.length ? withConfirmed(x, r.same, a.subject.postedAt) : x;
           if (r.kind) x = withKind(x, r.kind);
           const fc = forecast(x, b);
           const kept = new Set(r.kind ?? []);
           console.log(`CHECK 확인후 ${no} | 같은 종류 ${r.kind?.length ?? "-"}/${a.related?.rows?.length ?? 0}건 (뺀 것: ${(a.related?.rows ?? []).filter((y) => !kept.has(y[0])).map((y) => `${y[1]}(${y[10]})`).join(" / ").slice(0, 500)}) | 참가 예상: ${(fc.likely ?? []).slice(0, 6).map((y) => y.name).join(", ")}`);
+          console.log(`CHECK 업무별 ${no} ${b.title} (${b.bizType}) | 업무 ${r.parts?.join(" / ") ?? "하나"} | ${(x.parts ?? []).map((p) => `[${p.name}] 같은 기관 ${p.own.length}건, 다른 기관 ${p.related?.rows?.length ?? 0}건: ${[...p.own.map((o) => `${o.title}(${o.winner})`), ...(p.related?.rows ?? []).map((y) => `${y[1]}(${y[10]})`)].slice(0, 6).join(" / ")}`).join(" || ").slice(0, 2500)} | 업무별 참가 예상: ${(fc.likelyParts ?? []).map((p) => `${p.name}: ${p.likely.slice(0, 4).map((y) => y.name).join(", ")}`).join(" / ")}`);
+          if (no === nos[0]) console.log(`CHECK_JSON ${JSON.stringify({ target: b, analysis: a, relate: r })}`);
         }
       } catch (e) {
         console.log(`CHECK 확인 실패: ${(e as Error).message.slice(0, 200)}`);

@@ -3,7 +3,7 @@
 import { LineChart } from "@/components/charts/LineChart";
 import { CHART } from "@/components/charts/useWidth";
 import { won, wonFull } from "@/lib/format";
-import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PastAward, type Related, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
+import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PartGroup, type PastAward, type Related, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 
@@ -27,6 +27,8 @@ const LEVEL_TONE: Record<string, string> = {
   "매우 높음": "bg-coral-100 text-ink",
 };
 
+const exRow = ([no, title, , date, amount, rate, bidders, winner, wr]: NonNullable<SimilarStat["ex"]>[number]) => ({ key: no, date, winner, wr: wr ?? 0, amount, rate, bidders, title });
+
 /** 결과 패널 옆: 낙찰 결과로 본 경쟁 강도·낙찰 가능성·가격 기준 */
 export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis }: { fc: Forecast; chance?: WinChance; isNego: boolean; bidRate: number; baseAmount: number; analysis?: AwardAnalysis | null }) {
   if (!fc.competition && !fc.winRate) return null;
@@ -38,7 +40,11 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
   const years = analysis?.cycleYears ?? 1;
   const recent: { key: string; date: string; winner: string; wr: number; amount: number; rate: number; bidders: number; title?: string }[] = analysis?.history.length
     ? analysis.history.filter((h) => h.no !== prior?.no).slice(0, 3).map((h) => ({ key: h.no, date: h.date, winner: h.winner, wr: h.wr, amount: h.amount, rate: h.rate, bidders: h.bidders }))
-    : (analysis?.related?.ex ?? analysis?.similar?.stat.ex ?? []).slice(0, 3).map(([no, title, , date, amount, rate, bidders, winner, wr]) => ({ key: no, date, winner, wr: wr ?? 0, amount, rate, bidders, title }));
+    : (analysis?.related?.ex ?? analysis?.similar?.stat.ex ?? []).slice(0, 3).map(exRow);
+  // 묶음 공고이고 같은 사업 이력이 없으면 업무마다 최근 낙찰 2건
+  const recentGroups = !analysis?.history.length && analysis?.parts
+    ? analysis.parts.map((p) => ({ label: `${p.name} 최근 낙찰`, rows: [...ownEx(p.own), ...(p.related?.ex ?? [])].sort((a, b) => b[3].localeCompare(a[3])).slice(0, 2).map(exRow) }))
+    : [{ label: analysis?.history.length ? "같은 사업 최근 낙찰" : "비슷한 공고 최근 낙찰", rows: recent }];
   return (
     <section className="card mt-4 p-6">
       <h3 className="font-bold">낙찰 결과로 본 예측</h3>
@@ -89,7 +95,27 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
             <dd className="text-right"><b className="tabular-nums">{pct(fc.suggestRate.value)}{amountOf(fc.suggestRate.value)}</b> <span className="block text-xs text-ink-300">{pct(fc.suggestRate.low)} ~ {pct(fc.suggestRate.high)} · 투찰률 기본값</span></dd>
           </div>
         )}
-        {fc.likely && fc.likely.length > 0 && (
+        {fc.likelyParts ? (
+          <div>
+            <dt className="text-ink-500">참가 예상 기업 (업무별)</dt>
+            <dd className="mt-1 space-y-2">
+              {fc.likelyParts.map((p) => (
+                <div key={p.name}>
+                  <p className="mb-1 text-xs font-semibold text-ink-500">{p.name}</p>
+                  <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
+                    {p.likely.slice(0, 4).map((b) => (
+                      <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
+                        <span className="min-w-0 truncate font-semibold">{b.name}</span>
+                        <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              <p className="text-xs text-ink-300">이 공고는 맡는 업체가 서로 다른 업무를 함께 뽑아, 업무마다 과거 낙찰받았거나 개찰 1~5위에 든 업체를 따로 모았습니다.</p>
+            </dd>
+          </div>
+        ) : fc.likely && fc.likely.length > 0 && (
           <div>
             <dt className="text-ink-500">참가 예상 기업</dt>
             <dd className="mt-1">
@@ -105,12 +131,12 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
             </dd>
           </div>
         )}
-        {recent.length > 0 && (
-          <div>
-            <dt className="text-ink-500">{analysis?.history.length ? "같은 사업 최근 낙찰" : "비슷한 공고 최근 낙찰"}</dt>
+        {recentGroups.map((g) => g.rows.length > 0 && (
+          <div key={g.label}>
+            <dt className="text-ink-500">{g.label}</dt>
             <dd className="mt-1">
               <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
-                {recent.map((r) => (
+                {g.rows.map((r) => (
                   <li key={r.key} className="min-w-0 px-3 py-1.5">
                     <div className="flex min-w-0 items-baseline justify-between gap-2">
                       <span className="min-w-0 truncate font-semibold">{r.winner}</span>
@@ -125,7 +151,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
               </ul>
             </dd>
           </div>
-        )}
+        ))}
         {chance && (
           <div>
             <dt className="flex items-center justify-between gap-2">
@@ -168,7 +194,16 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
         <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <PriorCard prior={analysis.prior} years={analysis.cycleYears ?? 1} />
           <HistoryCard history={analysis.history} fc={fc} />
-          {analysis.related && (
+          {analysis.parts ? (
+            <div className="min-w-0 space-y-4 lg:col-span-2">
+              <p className="rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">
+                이 공고는 {analysis.parts.map((p) => p.name).join(", ")} 업무를 함께 뽑는 공고라, 맡는 업체가 서로 다릅니다. 과거 낙찰을 업무별로 나누어 보여 줍니다. 여러 업무를 묶어 뽑았던 과거 공고는 실제 낙찰업체가 하는 업무 쪽에 넣었습니다.
+              </p>
+              <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                {analysis.parts.map((p) => <PartCard key={p.name} part={p} base={baseAmount} />)}
+              </div>
+            </div>
+          ) : analysis.related && (
             <div className="min-w-0 lg:col-span-2">
               <RelatedCard related={analysis.related} base={baseAmount} />
             </div>
@@ -396,6 +431,39 @@ function RelatedCard({ related: r, base }: { related: Related; base?: number }) 
         <NameCounts title="개찰 1~5위에 자주 든 업체" rows={r.ranked} unit="회" />
       </div>
       <ExList ex={r.ex} title="공고명이 가장 비슷한 낙찰" />
+    </Box>
+  );
+}
+
+/** 같은 기관 과거 낙찰을 최근 낙찰 예와 같은 꼴로 */
+const ownEx = (h: PastAward[]): NonNullable<SimilarStat["ex"]> => h.map((x) => [x.no, x.title, "같은 수요기관", x.date, x.amount, x.rate, x.bidders, x.winner, x.wr, x.top]);
+
+/** 묶음 공고의 업무 하나: 같은 기관이 그 업무만 따로 뽑았던 낙찰과 다른 기관의 같은 업무 낙찰 */
+function PartCard({ part: p, base }: { part: PartGroup; base?: number }) {
+  const r = p.related;
+  const n = p.own.length + (r?.rows?.length ?? 0);
+  return (
+    <Box title={`${p.name} 낙찰 결과`} sub={n ? [p.own.length ? `같은 수요기관 ${p.own.length}건` : "", r ? `최근 3년 다른 기관 포함 ${r.rows?.length ?? r.n}건` : ""].filter(Boolean).join(" · ") : undefined}>
+      {!n ? (
+        <p className="text-sm text-ink-500">이 업무만 따로 본 과거 낙찰을 찾지 못했습니다.</p>
+      ) : (
+        <>
+          {r && (r.rate || r.bidders) && (
+            <div className="grid grid-cols-2 gap-2">
+              <Fact label="낙찰률 중앙값" value={r.rate ? pct(r.rate.q[1]) : "-"} note={r.rate ? [atBase(base, r.rate.q[1]) && `이 공고 기준 ${atBase(base, r.rate.q[1])}`, `가운데 절반 ${pct(r.rate.q[0], 2)} ~ ${pct(r.rate.q[2], 2)}`].filter(Boolean).join(" · ") : "낙찰률 자료 부족"} />
+              <Fact label="참가업체 수" value={r.bidders ? `${Math.round(r.bidders.q[1])}곳` : "-"} note={r.bidders ? `보통 ${Math.round(r.bidders.q[0])} ~ ${Math.round(r.bidders.q[2])}곳` : undefined} />
+            </div>
+          )}
+          {r && (
+            <div className="mt-4 grid min-w-0 grid-cols-1 gap-4">
+              <NameCounts title="자주 낙찰받은 업체" rows={r.winners} unit="건" />
+              <NameCounts title="개찰 1~5위에 자주 든 업체" rows={r.ranked} unit="회" />
+            </div>
+          )}
+          {p.own.length > 0 && <ExList ex={ownEx(p.own)} title="같은 수요기관이 이 업무만 따로 뽑은 낙찰" />}
+          {r && r.ex.length > 0 && <ExList ex={r.ex} title="다른 기관의 같은 업무 낙찰" />}
+        </>
+      )}
     </Box>
   );
 }

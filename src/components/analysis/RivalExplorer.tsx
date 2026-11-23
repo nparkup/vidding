@@ -288,7 +288,7 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
           {wins.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15).map((w) => (
             <li key={`${w.bidNtceNo}-${w.bidNtceOrd}`} className="py-2 text-sm">
               <p className="font-semibold">{w.title}</p>
-              <p className="text-xs text-ink-500">{[w.date, w.agency, won(w.amount), w.rate ? `낙찰률 ${pct(w.rate)}` : "", w.lwlt ? `하한율 ${pct(w.lwlt)}` : "", w.bidders ? `${w.bidders}곳` : ""].filter(Boolean).join(" · ")}</p>
+              <p className="text-xs text-ink-500">{[w.date, w.agency, `낙찰금액 ${won(w.amount)}${w.rate ? ` (낙찰률 ${pct(w.rate)})` : ""}`, w.lwlt ? `하한율 ${pct(w.lwlt)}` : "", w.bidders ? `${w.bidders}곳` : ""].filter(Boolean).join(" · ")}</p>
             </li>
           ))}
         </ul>

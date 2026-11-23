@@ -12,6 +12,7 @@
 import type { Bid, ContractMethod } from "./types";
 import { estimatedRule, generalServiceRule, parseTrustRule, scoreTrust, type TrustRule, type TrustScore } from "./trustscore";
 import { criteriaSheet, type CriteriaRef, type EvalBasis } from "./criteria";
+import { won } from "./format";
 
 /* ---------- 신용평가등급 ---------- */
 
@@ -757,7 +758,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
       if (!(amt > 0)) return { ...it, score: 0, ratio: 0, lost: 0, unknown: true, reason: `${amtLabel}이 없는 공고라 실적계수를 계산할 수 없습니다` };
       const coef = Math.min(1, c.pastPerformance / (amt * it.perfLinear));
       const s = it.max * coef;
-      return { ...it, score: round2(s), ratio: coef, reason: `실적계수 ${coef.toFixed(3)} = 실적 ${Math.round(c.pastPerformance / 1e6).toLocaleString()}백만 원 ÷ (${amtLabel} × ${it.perfLinear})${c.perfSource ? `, ${c.perfSource}` : ""}`, lost: round2(it.max - s) };
+      return { ...it, score: round2(s), ratio: coef, reason: `실적계수 ${coef.toFixed(3)} = 실적 ${won(c.pastPerformance)} ÷ (${amtLabel} × ${it.perfLinear})${c.perfSource ? `, ${c.perfSource}` : ""}`, lost: round2(it.max - s) };
     }
     const bv = it.bands?.length ? bandValue(it, c, amt) : undefined;
     if (bv !== undefined && it.bands && it.max > 0) {
@@ -905,7 +906,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   const losers = [...items].filter((i) => i.kind !== "price" && i.lost > 0).sort((a, b) => b.lost - a.lost).slice(0, 3);
   for (const l of losers) {
     const up = l.bands && l.bands[0].unit === "%" ? [...l.bands].sort((a, b) => a.min - b.min).find((b) => b.points > l.score && b.min > 0) : undefined;
-    if (l.kind === "performance" && up) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. ${sheet.source === "extracted" ? "공고" : "기준표"} 구간상 유사 실적이 ${amtLabel}의 ${up.min}%(${Math.round((amt * up.min) / 100 / 1e6).toLocaleString()}백만 원) 이상이면 ${up.points}점입니다. 공동수급 지분 합산도 검토하세요.`);
+    if (l.kind === "performance" && up) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. ${sheet.source === "extracted" ? "공고" : "기준표"} 구간상 유사 실적이 ${amtLabel}의 ${up.min}%(${won(Math.round((amt * up.min) / 100))}) 이상이면 ${up.points}점입니다. 공동수급 지분 합산도 검토하세요.`);
     else if (l.kind === "performance") tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공동수급으로 실적을 합산하면 만점에 가까워질 수 있습니다.`);
     else if (l.kind === "credit") tips.push(c.creditGrade === "없음" ? `${l.label}에서 ${l.lost}점이 빠집니다. 유효한 신용평가등급확인서가 없으면 최저등급(공사는 0점)으로 평가하니 공고일 전 신용평가를 받으세요.` : `${l.label}에서 ${l.lost}점이 빠집니다. 공고일 전 신용평가 재평가 일정을 확인하세요.`);
     else if (l.kind === "capability") tips.push(`사업수행능력 평가점수가 ${c.pqScore}점이라 ${l.lost}점이 빠집니다. 참여기술인·유사 용역 실적 서류를 보강하세요.`);

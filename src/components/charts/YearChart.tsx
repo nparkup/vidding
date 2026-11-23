@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { won } from "@/lib/format";
+import { won, wonAxis } from "@/lib/format";
 import { ColumnChart, MetricToggle } from "./ColumnChart";
 
 /** 연도별 낙찰 건수·금액 (전환 버튼으로 하나씩). years: [연도, 건수, 금액(원), 평균 참가업체?] */
@@ -17,7 +17,7 @@ export function YearChart({ years, title }: { years: (readonly [number, number, 
       </div>
       <ColumnChart
         ariaLabel={`${title} ${m === "n" ? "건수" : "금액"}`}
-        fmt={m === "n" ? (v) => `${Math.round(v).toLocaleString()}건` : (v) => (v ? won(v) : "0")}
+        fmt={m === "n" ? (v) => `${Math.round(v).toLocaleString()}건` : wonAxis}
         cols={years.map(([y, n, a, avg]) => ({
           key: String(y), label: `${String(y).slice(2)}년`, value: m === "n" ? n : a, hot: y === thisYear,
           tip: [`${y}년${y === thisYear ? " (올해, 진행 중)" : ""}`, `낙찰 ${n.toLocaleString()}건`, `낙찰금액 ${won(a)}`, ...(avg ? [`평균 참가 ${avg}곳`] : [])],

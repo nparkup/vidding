@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { ColumnChart } from "@/components/charts/ColumnChart";
 import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
 import { CHART } from "@/components/charts/useWidth";
-import { won, wonFull } from "@/lib/format";
+import { won, wonAxis, wonFull } from "@/lib/format";
 
 /**
  * 아파트 예측의 낙찰 결과 화면. 나라장터 예측의 ForecastCard·AwardAnalysisSection 과 같은 순서·모양으로 둔다.
@@ -21,7 +21,6 @@ const LEVEL_TONE: Record<string, string> = {
 };
 const signed = (r: number) => `${r >= 1 ? "+" : ""}${((r - 1) * 100).toFixed(1)}%`;
 const round = (x: number) => Math.round(x / 1000) * 1000;
-const eok = (n: number) => (n >= 1e8 ? `${(Math.round(n / 1e6) / 100).toLocaleString()}억 원` : won(n));
 const period = (d: AptPastDeal) => {
   if (!d.start || !d.end) return "";
   const m = contractMonths(d.start, d.end);
@@ -76,7 +75,7 @@ export function AptForecastCard({ bid, f }: { bid: AptBid; f?: AptPriceForecast 
         {f && (
           <div className="flex items-baseline justify-between gap-2">
             <dt className="shrink-0 text-ink-500">직전 대비 낙찰금액 변화</dt>
-            <dd className="text-right"><b className="tabular-nums">{signed(f.stat.median)}<span className="ml-2">{wonFull(round(f.mid))}</span></b> <span className="block text-xs text-ink-300">{f.basis} 낙찰 {f.stat.n.toLocaleString()}건의 가운데값{f.scale !== 1 ? ` · 직전 대비 ${Math.round(f.scale * 100) / 100}배 규모` : ""}</span></dd>
+            <dd className="text-right"><b className="tabular-nums">{won(round(f.mid))}</b> <span className="text-xs font-semibold tabular-nums text-ink-500">({signed(f.stat.median)})</span> <span className="block text-xs text-ink-300">{f.basis} 낙찰 {f.stat.n.toLocaleString()}건의 가운데값{f.scale !== 1 ? ` · 직전 대비 ${Math.round(f.scale * 100) / 100}배 규모` : ""}</span></dd>
           </div>
         )}
         {f && (
@@ -210,7 +209,7 @@ function SameCard({ same }: { same: AptPastDeal[] }) {
     <Box title="같은 단지 직전 계약" sub={`${d.date} ${label(d)} · 번호 ${d.no}`}>
       <p className="text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{d.title}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Fact label={d.via === "수의계약" ? "계약금액" : "낙찰금액"} value={eok(d.amount)} note={wonFull(d.amount)} />
+        <Fact label={d.via === "수의계약" ? "계약금액" : "낙찰금액"} value={won(d.amount)} />
         <Fact label="응찰 업체" value={d.bidders ? `${d.bidders}곳` : "-"} note={d.via === "수의계약" ? "수의계약" : undefined} />
         <Fact label={d.via === "수의계약" ? "계약 업체" : "낙찰 업체"} value={<span className="block truncate">{d.winner || "-"}</span>} />
         <Fact label="계약 기간" value={d.start && d.end ? `${contractMonths(d.start, d.end) ?? "-"}개월` : "-"} note={d.start && d.end ? `${d.start} ~ ${d.end}` : "공지에 기간 없음"} />
@@ -233,7 +232,7 @@ function TrendCard({ same }: { same: AptPastDeal[] }) {
     <Box title="같은 단지 계약 추이" sub={`최근 ${same.length}건, 최근순`}>
       <ColumnChart
         ariaLabel="같은 단지 계약 금액 추이" height={160}
-        fmt={(v) => (v ? won(v) : "0")}
+        fmt={wonAxis}
         cols={[...same].reverse().map((d, i, xs) => ({
           key: d.no, label: d.date.slice(2, 7).replace("-", "."), value: d.amount, hot: i === xs.length - 1,
           tip: [`${d.date} ${label(d)}`, d.winner || "업체명 확인 중", `금액 ${wonFull(d.amount)}`, ...(i > 0 ? [`이전 대비 ${signed(d.amount / xs[i - 1].amount)}`] : []), ...(period(d) ? [period(d)] : [])],

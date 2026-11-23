@@ -9,6 +9,8 @@
  * 적격심사 점수(실적 합산·경영상태 지분 가중)는 평가점수 예측의 공동수급 입력(src/lib/joint.ts)이 따로 계산한다.
  */
 
+import { won as eok } from "@/lib/format";
+
 export interface JointCalcBid {
   /** 추정가격(원) */
   est: number;
@@ -67,7 +69,6 @@ export interface JointCalcResult {
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
-const eok = (n: number) => (n >= 1e8 ? `${(n / 1e8).toFixed(2).replace(/\.?0+$/, "")}억원` : `${Math.round(n / 1e4).toLocaleString("ko-KR")}만원`);
 
 export function estAmountOf(b: JointCalcBid): number {
   return b.estAmt > 0 ? b.estAmt : Math.round(b.est * 1.1);

@@ -287,7 +287,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
           {s.recent.map(([no, title, date, biz, m, amount, rate, bidders, winner]) => (
             <li key={no} className="min-w-0 py-2 text-sm">
               <p className="font-semibold">{title}</p>
-              <p className="text-xs text-ink-500">{[date, `${biz} ${METHOD_NAME[m]}`, winner, amount > 100 ? won(amount) : "", rate ? `낙찰률 ${pct(rate)}` : "", bidders ? `${bidders}곳 참가` : ""].filter(Boolean).join(" · ")}</p>
+              <p className="text-xs text-ink-500">{[date, `${biz} ${METHOD_NAME[m]}`, winner, amount > 100 ? `낙찰금액 ${won(amount)}${rate ? ` (낙찰률 ${pct(rate)})` : ""}` : rate ? `낙찰률 ${pct(rate)}` : "", bidders ? `${bidders}곳 참가` : ""].filter(Boolean).join(" · ")}</p>
             </li>
           ))}
         </ul>

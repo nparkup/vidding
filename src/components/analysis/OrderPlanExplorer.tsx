@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ColumnChart, MetricToggle } from "@/components/charts/ColumnChart";
-import { won, wonFull } from "@/lib/format";
+import { won, wonAxis } from "@/lib/format";
 import { bidHref } from "@/lib/links";
 import { orderPlanUrl, type OrderPlan } from "@/lib/orderPlans";
 
@@ -131,7 +131,7 @@ export function OrderPlanExplorer() {
             </div>
             <h3 className="mt-2 font-bold leading-snug [overflow-wrap:anywhere]">{p.title}</h3>
             <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">
-              {[p.top && !p.agency.startsWith(p.top) ? `${p.top} ${p.agency}` : p.agency, p.amount ? `발주 예정 금액 ${won(p.amount)} (${wonFull(p.amount)})` : "금액 미공개", p.site ? `현장 ${p.site}` : "", p.work ? `${p.work}공사` : "", p.item ? `품목 ${p.item}` : "", p.kind ?? ""].filter(Boolean).join(" · ")}
+              {[p.top && !p.agency.startsWith(p.top) ? `${p.top} ${p.agency}` : p.agency, p.amount ? `발주 예정 금액 ${won(p.amount)}` : "금액 미공개", p.site ? `현장 ${p.site}` : "", p.work ? `${p.work}공사` : "", p.item ? `품목 ${p.item}` : "", p.kind ?? ""].filter(Boolean).join(" · ")}
             </p>
             <p className="mt-0.5 text-xs text-ink-400">
               {[`게시 ${kstDay(p.postedAt)}`, p.dept ? `담당 ${p.dept}` : "", p.tel ?? ""].filter(Boolean).join(" · ")}
@@ -168,7 +168,7 @@ function MonthChart({ plans, month, onPick }: { plans: OrderPlan[]; month: strin
       </div>
       <ColumnChart
         ariaLabel="발주 예정월별 발주계획" height={170} onPick={onPick}
-        fmt={m === "n" ? (v) => `${Math.round(v).toLocaleString()}건` : (v) => (v ? won(v) : "0")}
+        fmt={m === "n" ? (v) => `${Math.round(v).toLocaleString()}건` : wonAxis}
         cols={rows.map(([mo, [n, a, priced]]) => ({ key: mo, label: `${Number(mo.slice(5))}월`, value: m === "n" ? n : a, hot: mo === month, tip: [monthLabel(mo), `${n.toLocaleString()}건`, `금액 합계 ${won(a)}${priced < n ? ` (금액 공개 ${priced.toLocaleString()}건)` : ""}`] }))}
       />
     </section>

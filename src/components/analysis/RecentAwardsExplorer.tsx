@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AwardsCharts } from "@/components/analysis/AwardsCharts";
-import { won, wonFull } from "@/lib/format";
+import { won } from "@/lib/format";
 import { assessRate, methodGroup, type RecentAwardRow, type RecentAwardsFile } from "@/lib/recentAwards";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
@@ -142,12 +142,11 @@ function AwardCard({ r }: { r: RecentAwardRow }) {
   const [no, ord, biz, title, agency, date, bidders, winner, bizno, amount, rate, base, plnprc, method, lwlt, top] = r;
   const ar = assessRate(r);
   const cells: [string, string, string?][] = [
-    ["기초금액", base ? won(base) : "-", base ? wonFull(base) : undefined],
-    ["낙찰금액", won(amount), wonFull(amount)],
-    ["낙찰률", rate ? pct(rate) : "-", rate && plnprc ? `예정가격 ${wonFull(plnprc)} 기준` : undefined],
-    ["사정율", ar ? pct(ar, 4) : "-", ar ? "예정가격 ÷ 기초금액" : undefined],
+    ["낙찰금액", won(amount), rate ? `낙찰률 ${pct(rate)}` : undefined],
+    ["기초금액", base ? won(base) : "-", undefined],
+    ["예정가격", plnprc ? won(plnprc) : "-", ar ? `사정율 ${pct(ar, 4)}` : undefined],
     ["참가업체", bidders ? `${bidders.toLocaleString()}곳` : "-"],
-    ["낙찰하한율", lwlt ? pct(lwlt) : "-", lwlt && base ? `기초금액 기준 ${wonFull(Math.round((base * lwlt) / 100))}` : undefined],
+    ["낙찰하한 금액", lwlt && base ? won(Math.round((base * lwlt) / 100)) : lwlt ? pct(lwlt) : "-", lwlt && base ? `낙찰하한율 ${pct(lwlt)} · 기초금액 기준` : undefined],
   ];
   return (
     <li className="card p-4 sm:p-5">
@@ -162,7 +161,7 @@ function AwardCard({ r }: { r: RecentAwardRow }) {
         {cells.map(([k, v, sub]) => (
           <div key={k} className="min-w-0">
             <dt className="text-xs text-ink-400">{k}</dt>
-            <dd className="font-semibold tabular-nums">{v}</dd>
+            <dd className="font-semibold tabular-nums [overflow-wrap:anywhere]">{v}</dd>
             {sub && <dd className="truncate text-[11px] text-ink-400" title={sub}>{sub}</dd>}
           </div>
         ))}
@@ -175,7 +174,7 @@ function AwardCard({ r }: { r: RecentAwardRow }) {
               <li key={rank} className="flex min-w-0 gap-2">
                 <span className="w-8 shrink-0 text-ink-400">{rank}위</span>
                 <span className="min-w-0 flex-1 truncate">{name}</span>
-                <span className="shrink-0 tabular-nums">{wonFull(amt)}{rt ? ` (${pct(rt)})` : ""}</span>
+                <span className="shrink-0 tabular-nums">{won(amt)}{rt ? <span className="ml-1 text-xs text-ink-500">({pct(rt)})</span> : ""}</span>
               </li>
             ))}
           </ol>

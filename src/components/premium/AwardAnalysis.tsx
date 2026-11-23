@@ -127,7 +127,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다. 모자라면 공고명이 비슷한 다른 낙찰에서 자주 낙찰·상위에 든 업체로 채웁니다. 개찰 순위는 1~5위까지만 모읍니다.</p>
+              <p className="mt-1 text-xs text-ink-300">과거 같은 사업에서 낙찰받았거나 개찰 1~5위에 든 업체 순서입니다.<br />모자라면 공고명이 비슷한 다른 낙찰에서 자주 낙찰·상위에 든 업체로 채웁니다.<br />개찰 순위는 1~5위까지만 모읍니다.</p>
             </dd>
           </div>
         )}
@@ -184,12 +184,12 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
     <section className="card min-w-0 p-6">
       <h3 className="text-lg font-bold">낙찰 결과 분석</h3>
       <p className="mt-1 text-sm text-ink-500">
-        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다. 권역·노선·학년 같은 대상이나 사업 종류(유지관리·구축·감리 등)가 다르거나 금액이 3배 넘게 차이 나는 공고는 같은 사업에서 뺐습니다. 아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.{baseAmount ? " 비율 옆 금액은 이 공고 기초금액에 그 비율을 곱한 값입니다." : ""}
+        나라장터 낙찰 10년치에서 같은 수요기관의 같은 사업과 비슷한 공고의 낙찰 결과를 찾았습니다.<br />권역·노선·학년 같은 대상이나 사업 종류(유지관리·구축·감리 등)가 다르거나 금액이 3배 넘게 차이 나는 공고는 같은 사업에서 뺐습니다.<br />아래 값은 위 예상 점수의 가격점수 기본값과 경쟁 강도·낙찰 가능성에 반영됩니다.{baseAmount ? " 비율 옆 금액은 이 공고 기초금액에 그 비율을 곱한 값입니다." : ""}
       </p>
       {loading ? (
         <p className="mt-4 text-sm text-ink-300">낙찰 결과를 불러오는 중…</p>
       ) : !analysis ? (
-        <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 아직 낙찰 결과 분석이 없습니다. 사이트가 다시 만들어질 때(영업일 하루 세 번) 채워집니다.</p>
+        <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 아직 낙찰 결과 분석이 없습니다.<br />사이트가 다시 만들어질 때(영업일 하루 세 번) 채워집니다.</p>
       ) : (
         <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <PriorCard prior={analysis.prior} years={analysis.cycleYears ?? 1} />
@@ -197,7 +197,7 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
           {analysis.parts ? (
             <div className="min-w-0 space-y-4 lg:col-span-2">
               <p className="rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">
-                이 공고는 {analysis.parts.map((p) => p.name).join(", ")} 업무를 함께 뽑는 공고라, 맡는 업체가 서로 다릅니다. 과거 낙찰을 업무별로 나누어 보여 줍니다. 여러 업무를 묶어 뽑았던 과거 공고는 실제 낙찰업체가 하는 업무 쪽에 넣었습니다.
+                이 공고는 {analysis.parts.map((p) => p.name).join(", ")} 업무를 함께 뽑는 공고라, 맡는 업체가 서로 다릅니다.<br />과거 낙찰을 업무별로 나누어 보여 줍니다.<br />여러 업무를 묶어 뽑았던 과거 공고는 실제 낙찰업체가 하는 업무 쪽에 넣었습니다.
               </p>
               <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
                 {analysis.parts.map((p) => <PartCard key={p.name} part={p} base={baseAmount} />)}
@@ -268,7 +268,7 @@ function PriorCard({ prior, years }: { prior?: PastAward; years: number }) {
   if (!prior) {
     return (
       <Box title={title} sub={years > 1 ? `지금 공고 약 ${years}년 전, 같은 수요기관의 같은 사업` : "지금 공고 8~20개월 전, 같은 수요기관의 같은 사업"}>
-        <p className="text-sm text-ink-500">이 기간에 같은 수요기관이 낸 비슷한 이름의 공고를 찾지 못했습니다. 올해 처음 발주했거나 이름이 크게 바뀐 사업일 수 있습니다.</p>
+        <p className="text-sm text-ink-500">이 기간에 같은 수요기관이 낸 비슷한 이름의 공고를 찾지 못했습니다.<br />올해 처음 발주했거나 이름이 크게 바뀐 사업일 수 있습니다.</p>
       </Box>
     );
   }

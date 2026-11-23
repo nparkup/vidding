@@ -384,7 +384,7 @@ export default async function Home() {
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님이.</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
-            입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해 매일 아침 보내 드립니다. 아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.
+            입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해 매일 아침 보내 드립니다.<br />아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.
           </p>
           <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -688,7 +688,7 @@ export default async function Home() {
         <div className="text-center">
           <p className="eyebrow">30초 체험</p>
           <h2 className="h-section mt-3">우리 회사 조건이면,<br className="sm:hidden" /> 지금 몇 건이나 될까요?</h2>
-          <p className="lead mx-auto mt-4 max-w-xl">면허와 지역, 규모를 골라 보세요. 매일 하는 1차 선별을 실제 공고로 그대로 체험할 수 있습니다.</p>
+          <p className="lead mx-auto mt-4 max-w-xl">면허와 지역, 규모를 골라 보세요.<br />매일 하는 1차 선별을 실제 공고로 그대로 체험할 수 있습니다.</p>
         </div>
         <div className="mx-auto mt-10 max-w-5xl">
           <MatchDemo />

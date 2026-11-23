@@ -145,9 +145,9 @@ export function AptPredictor() {
     </div>
   );
 
-  if (error) return <p className="card p-6 text-sm text-coral">아파트 공고 자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
+  if (error) return <p className="card p-6 text-sm text-coral">아파트 공고 자료를 불러오지 못했습니다.<br />잠시 후 다시 시도해 주세요.</p>;
   if (!data) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
-  if (!model) return <p className="card p-6 text-sm text-ink-500">아파트 예측 자료가 아직 준비되지 않았습니다. 다음 갱신 뒤에 다시 확인해 주세요.</p>;
+  if (!model) return <p className="card p-6 text-sm text-ink-500">아파트 예측 자료가 아직 준비되지 않았습니다.<br />다음 갱신 뒤에 다시 확인해 주세요.</p>;
 
   // 무료 체험 3건을 다 쓴 뒤 새 공고를 고른 경우
   if (trialLocked && pickedBid && trial) {
@@ -179,8 +179,8 @@ export function AptPredictor() {
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
           <Step n={1} title="공고 선택" />
-          <p className="mt-2 text-sm text-ink-500">분석할 아파트 공고를 검색해 고르세요. 청소·경비·소독·승강기유지·전기안전관리·정화조·저수조·위탁관리 진행 중 공고 {open.length.toLocaleString("ko-KR")}건에서 찾습니다.</p>
-          {picked && <p className="mt-2 text-sm text-coral">고른 공고({picked})는 마감됐거나 목록에서 빠졌습니다. 다른 공고를 골라 주세요.</p>}
+          <p className="mt-2 text-sm text-ink-500">분석할 아파트 공고를 검색해 고르세요.<br />청소·경비·소독·승강기유지·전기안전관리·정화조·저수조·위탁관리 진행 중 공고 {open.length.toLocaleString("ko-KR")}건에서 찾습니다.</p>
+          {picked && <p className="mt-2 text-sm text-coral">고른 공고({picked})는 마감됐거나 목록에서 빠졌습니다.<br />다른 공고를 골라 주세요.</p>}
           {searchBox}
           <TrialIntro />
           {quick.length > 0 && (
@@ -321,7 +321,7 @@ export function AptPredictor() {
                   </label>
                 )}
               </div>
-              <p className="mt-3 text-xs leading-relaxed text-ink-500">공고서의 계약기간·과업 범위가 직전과 다르면 계약기간이나 규모를 바꿔 보세요. 계약기간이 1년에서 2년으로 늘면 금액도 거의 두 배가 됩니다.</p>
+              <p className="mt-3 text-xs leading-relaxed text-ink-500">공고서의 계약기간·과업 범위가 직전과 다르면 계약기간이나 규모를 바꿔 보세요.<br />계약기간이 1년에서 2년으로 늘면 금액도 거의 두 배가 됩니다.</p>
             </section>
           )}
 
@@ -342,7 +342,7 @@ export function AptPredictor() {
           <div id="forecast" className="scroll-mt-24"><AptForecastCard bid={bid} f={f} /></div>
           {/* 좁은 화면: 예상 금액 다음에 계산 기준·정확도 */}
           {basis && <div className="space-y-4 lg:hidden">{basis}</div>}
-          <p className="text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 업종 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 예측값은 과거 자료로 낸 추정치입니다.</p>
+          <p className="text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 업종 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다.<br />예측값은 과거 자료로 낸 추정치입니다.</p>
         </aside>
       </div>
 

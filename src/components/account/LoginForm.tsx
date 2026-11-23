@@ -96,7 +96,7 @@ export function LoginForm({ email }: { email: string }) {
           <>
             <p>아직 회원이 아니신가요? <Link href="/apply" className="font-semibold text-mint-600 hover:underline">회원가입하고 무료 체험</Link></p>
             <p>비밀번호 없이 가입하셨나요? <button type="button" onClick={() => { setMode("claim"); setMsg(""); }} className="font-semibold text-mint-600 hover:underline">비밀번호 처음 정하기</button></p>
-            <p className="text-xs text-ink-400">비밀번호를 잊으셨으면 {email}로 회사명과 사업자등록번호를 보내 주세요. 임시 비밀번호를 보내 드립니다.</p>
+            <p className="text-xs text-ink-400">비밀번호를 잊으셨으면 {email}로 회사명과 사업자등록번호를 보내 주세요.<br />임시 비밀번호를 보내 드립니다.</p>
           </>
         ) : (
           <p><button type="button" onClick={() => { setMode("login"); setMsg(""); }} className="font-semibold text-mint-600 hover:underline">로그인으로 돌아가기</button></p>

@@ -243,7 +243,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-ink-400">하한율 위 폭은 낙찰률에서 그 공고 낙찰하한율을 뺀 값의 가운데 값입니다. 참가업체는 가운데 값입니다.</p>
+        <p className="mt-2 text-xs text-ink-400">하한율 위 폭은 낙찰률에서 그 공고 낙찰하한율을 뺀 값의 가운데 값입니다.<br />참가업체는 가운데 값입니다.</p>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -356,7 +356,7 @@ function AgencyNetwork({ s }: { s: AgencySummary }) {
         nodes={g.nodes} edges={g.edges} centerId="ag" ariaLabel="수요기관 업무와 업체 관계도"
         groups={[{ key: "biz", label: "업무 (낙찰 건수)", color: CHART.cat[2] }, { key: "win", label: "자주 낙찰받은 업체", color: CHART.cat[0] }, { key: "rank", label: "개찰 1~5위에 자주 든 업체", color: CHART.cat[1] }]}
       />
-      <p className="mt-2 text-xs leading-relaxed text-ink-500">업체는 최근 낙찰 20건에서 맡은 업무에 잇고, 그 안에 없으면 기관에 바로 잇습니다. 원을 누르면 이어진 곳만 진하게 보입니다.</p>
+      <p className="mt-2 text-xs leading-relaxed text-ink-500">업체는 최근 낙찰 20건에서 맡은 업무에 잇고, 그 안에 없으면 기관에 바로 잇습니다.<br />원을 누르면 이어진 곳만 진하게 보입니다.</p>
     </section>
   );
 }

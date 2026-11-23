@@ -186,10 +186,10 @@ export function AptAwardSection({ bid }: { bid: AptBid }) {
     <section className="card min-w-0 p-6">
       <h3 className="text-lg font-bold">낙찰 결과 분석</h3>
       <p className="mt-1 text-sm text-ink-500">
-        K-apt 입찰결과·수의계약 공지 최근 3개 연도에서 같은 단지·같은 업종의 지난 계약과, 같은 지역·업종에서 금액이 직전 계약의 0.5~2배인 최근 낙찰을 찾았습니다. 응찰 업체는 입찰결과의 응찰업체 목록에서 업체명만 가져옵니다. K-apt는 낙찰 업체의 낙찰금액만 공개하고 다른 응찰 업체의 입찰가격과 순위는 공개하지 않아, 낙찰 업체 옆에만 금액을 표시합니다.
+        K-apt 입찰결과·수의계약 공지 최근 3개 연도에서 같은 단지·같은 업종의 지난 계약과, 같은 지역·업종에서 금액이 직전 계약의 0.5~2배인 최근 낙찰을 찾았습니다.<br />응찰 업체는 입찰결과의 응찰업체 목록에서 업체명만 가져옵니다.<br />K-apt는 낙찰 업체의 낙찰금액만 공개하고 다른 응찰 업체의 입찰가격과 순위는 공개하지 않아, 낙찰 업체 옆에만 금액을 표시합니다.
       </p>
       {!h ? (
-        <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 비교할 지난 낙찰이 없습니다. 같은 단지·같은 지역의 같은 업종 낙찰이 최근 3개 연도에 없거나 사이트가 다시 만들어질 때 채워집니다.</p>
+        <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 비교할 지난 낙찰이 없습니다.<br />같은 단지·같은 지역의 같은 업종 낙찰이 최근 3개 연도에 없거나 사이트가 다시 만들어질 때 채워집니다.</p>
       ) : (
         <div className="mt-4 grid min-w-0 grid-cols-1 gap-4">
           {/* 응찰 업체 목록 길이가 공고마다 달라 두 칸으로 나누면 빈 자리가 생긴다. 위아래로 쌓는다 */}
@@ -212,7 +212,7 @@ function SameCard({ same }: { same: AptPastDeal[] }) {
   if (!d) {
     return (
       <Box title="같은 단지 직전 계약" sub="같은 단지·같은 업종, 최근 3개 연도">
-        <p className="text-sm text-ink-500">같은 단지의 같은 업종 계약을 찾지 못했습니다. 처음 입찰하는 단지이거나 3년 넘게 같은 업체와 계약한 경우일 수 있습니다.</p>
+        <p className="text-sm text-ink-500">같은 단지의 같은 업종 계약을 찾지 못했습니다.<br />처음 입찰하는 단지이거나 3년 넘게 같은 업체와 계약한 경우일 수 있습니다.</p>
       </Box>
     );
   }
@@ -357,7 +357,7 @@ function AptNetwork({ apt, h }: { apt: string; h: AptHistory }) {
         nodes={g.nodes} edges={g.edges} centerId="me" height={380} ariaLabel="단지와 업체 관계도"
         groups={[{ key: "win", label: "이 단지 낙찰 업체", color: CHART.cat[0] }, { key: "bid", label: "이 단지 응찰 업체", color: CHART.cat[1] }, { key: "apt", label: "비슷한 단지", color: CHART.cat[2] }, { key: "sim", label: "비슷한 단지 낙찰 업체", color: CHART.cat[3] }]}
       />
-      <p className="mt-2 text-xs text-ink-500">업체 이름만 씁니다. 원을 누르면 이어진 곳만 진하게 보입니다.</p>
+      <p className="mt-2 text-xs text-ink-500">업체 이름만 씁니다.<br />원을 누르면 이어진 곳만 진하게 보입니다.</p>
     </div>
   );
 }

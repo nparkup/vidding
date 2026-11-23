@@ -33,7 +33,7 @@ export function PerfCapCard({ sheet, bid, co }: { sheet: EvalSheet; bid: Bid; co
           <dd className={`font-bold tabular-nums ${cap.full && cap.current > cap.full ? "text-coral" : ""}`}>{won(cap.current)}</dd>
         </div>
       </dl>
-      {cap.full && cap.current > cap.full && <p className="mt-2 text-xs text-coral">이 공고는 실적 만점 금액을 넘습니다. 공동수급으로 실적을 합치면 만점에 가까워질 수 있습니다.</p>}
+      {cap.full && cap.current > cap.full && <p className="mt-2 text-xs text-coral">이 공고는 실적 만점 금액을 넘습니다.<br />공동수급으로 실적을 합치면 만점에 가까워질 수 있습니다.</p>}
     </section>
   );
 }

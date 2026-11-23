@@ -132,7 +132,7 @@ export function RecentAwardsExplorer() {
       {!shown.length && <div className="card mt-3 p-6 text-sm text-ink-500">조건에 맞는 낙찰이 없습니다. 기간을 늘리거나 검색어를 줄여 보세요.</div>}
       <p className="mt-6 text-xs leading-relaxed text-ink-400">
         나라장터 낙찰정보를 매일 아침 모아 최근 한 달 치를 보여 줍니다 (오늘 {kstToday()} 기준). 낙찰률은 예정가격 대비, 사정율은 예정가격 ÷ 기초금액입니다.
-        재입찰·분류가 여럿인 공고는 건마다 따로 나옵니다. 개찰 순위는 받아 둔 공고만 나옵니다.
+        재입찰·분류가 여럿인 공고는 건마다 따로 나옵니다.<br />개찰 순위는 받아 둔 공고만 나옵니다.
       </p>
     </div>
   );

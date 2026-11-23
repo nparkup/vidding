@@ -40,7 +40,7 @@ export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: Not
         {st && <span className="chip">{bid.demandAgency} {analysis?.assess?.scope === "agency" ? "전체 업무" : bid.bizType ?? "용역"} {st.n}건</span>}
       </div>
       <p className="mt-1 text-sm text-ink-500">
-        사정율은 예정가격 ÷ 기초금액입니다. 같은 수요기관의 최근 4년 낙찰에서 사정율이 어디에 많이 모였는지 보고, 그 값으로 투찰금액을 계산합니다.
+        사정율은 예정가격 ÷ 기초금액입니다.<br />같은 수요기관의 최근 4년 낙찰에서 사정율이 어디에 많이 모였는지 보고, 그 값으로 투찰금액을 계산합니다.
       </p>
 
       {st ? (
@@ -79,8 +79,8 @@ export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: Not
                 );
               })}
             </ol>
-            <p className="mt-1 text-xs text-ink-400">구간을 누르면 아래 계산기에 그 가운데 값이 들어갑니다. 최근 낙찰일수록 무겁게(2년마다 절반) 셉니다.</p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-400">예정가격은 복수예비가격 추첨으로 정해져 해마다 크게 기울지 않습니다. 지난 낙찰 3만여 건을 되짚어 보면 1순위 구간에 실제 사정율이 든 비율은 10% 안팎으로, 100%를 가운데에 둔 같은 폭 구간(11%)과 비슷했습니다. 구간은 참고로 보시고, 금액은 하한율과 A값을 정확히 넣는 데 쓰세요.</p>
+            <p className="mt-1 text-xs text-ink-400">구간을 누르면 아래 계산기에 그 가운데 값이 들어갑니다.<br />최근 낙찰일수록 무겁게(2년마다 절반) 셉니다.</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-400">예정가격은 복수예비가격 추첨으로 정해져 해마다 크게 기울지 않습니다.<br />지난 낙찰 3만여 건을 되짚어 보면 1순위 구간에 실제 사정율이 든 비율은 10% 안팎으로, 100%를 가운데에 둔 같은 폭 구간(11%)과 비슷했습니다.<br />구간은 참고로 보시고, 금액은 하한율과 A값을 정확히 넣는 데 쓰세요.</p>
           </div>
         </>
       ) : (
@@ -129,7 +129,7 @@ export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: Not
         )}
       </div>
       <p className="mt-3 text-xs leading-relaxed text-ink-400">
-        예정가격은 개찰 때 복수예비가격 15개 중 4개를 추첨해 정해지므로 미리 알 수 없습니다. 과거 분포는 참고 자료이며, 하한율에 못 미치면 탈락하므로 금액은 원 단위로 올렸습니다. 최종 금액은 공고문과 나라장터 기초금액 공개 내용을 확인하세요.
+        예정가격은 개찰 때 복수예비가격 15개 중 4개를 추첨해 정해지므로 미리 알 수 없습니다.<br />과거 분포는 참고 자료이며, 하한율에 못 미치면 탈락하므로 금액은 원 단위로 올렸습니다.<br />최종 금액은 공고문과 나라장터 기초금액 공개 내용을 확인하세요.
       </p>
     </section>
   );

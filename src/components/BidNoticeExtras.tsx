@@ -32,7 +32,7 @@ export function BidChangeBanner({ bid }: { bid: Bid }) {
           ))}
         </dl>
       ) : (
-        <p className="mt-1 text-sm text-ink-500">공고 목록 항목(금액·일정·자격)은 그대로이고 공고서 내용이 정정되었습니다. 첨부파일의 정정 내용을 확인해 주세요.</p>
+        <p className="mt-1 text-sm text-ink-500">공고 목록 항목(금액·일정·자격)은 그대로이고 공고서 내용이 정정되었습니다.<br />첨부파일의 정정 내용을 확인해 주세요.</p>
       )}
       {list.length > 1 && <p className="mt-2 text-xs text-ink-500">최근 14일 동안 {list.length}번 정정되었습니다.</p>}
       <Link href="/changes" className="mt-2 inline-block text-xs font-semibold text-ink-500 underline-offset-2 hover:underline">정정·취소 공고 전체 보기</Link>
@@ -83,7 +83,7 @@ export function BidCriteriaCard({ bid, qual, notice }: { bid: Bid; qual?: BidQua
         )}
       </dl>
       {same === false && (
-        <p className="mt-3 rounded-xl bg-amber-100/60 p-3 text-xs leading-relaxed">이 공고의 하한율 {pct(lwlt)}는 같은 기준 공고에서 가장 많이 쓴 {pct(row!.rate)}와 다릅니다. 특례나 정정 여부를 공고서에서 확인해 주세요.</p>
+        <p className="mt-3 rounded-xl bg-amber-100/60 p-3 text-xs leading-relaxed">이 공고의 하한율 {pct(lwlt)}는 같은 기준 공고에서 가장 많이 쓴 {pct(row!.rate)}와 다릅니다.<br />특례나 정정 여부를 공고서에서 확인해 주세요.</p>
       )}
       {perf ? (
         <div className="mt-4 text-sm">

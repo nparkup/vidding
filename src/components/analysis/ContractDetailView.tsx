@@ -181,7 +181,7 @@ export function ContractDetailView({ contract: c, list }: { contract: Contract; 
               {c.bidNo && <span className="chip">공고번호 {c.bidNo}</span>}
             </div>
             {!c.bidNo ? (
-              <p className="mt-3 text-sm text-ink-500">계약정보에 입찰공고번호가 없습니다. 조달요청·다른 시스템을 거친 계약일 수 있습니다.</p>
+              <p className="mt-3 text-sm text-ink-500">계약정보에 입찰공고번호가 없습니다.<br />조달요청·다른 시스템을 거친 계약일 수 있습니다.</p>
             ) : award === undefined ? (
               <p className="mt-3 text-sm text-ink-500">낙찰 결과를 찾는 중…</p>
             ) : (
@@ -214,7 +214,7 @@ export function ContractDetailView({ contract: c, list }: { contract: Contract; 
                     )}
                   </>
                 ) : (
-                  <p className="mt-3 text-sm text-ink-500">최근 한 달 낙찰 결과에 이 공고가 없습니다. 낙찰이 한 달보다 오래됐거나 개찰 결과가 아직 공개되지 않았을 수 있습니다.</p>
+                  <p className="mt-3 text-sm text-ink-500">최근 한 달 낙찰 결과에 이 공고가 없습니다.<br />낙찰이 한 달보다 오래됐거나 개찰 결과가 아직 공개되지 않았을 수 있습니다.</p>
                 )}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {bidId && <Link href={bidHref(bidId)} className="btn-mint btn-sm">공고 분석 보기</Link>}
@@ -268,7 +268,7 @@ export function ContractDetailView({ contract: c, list }: { contract: Contract; 
       </div>
 
       <p className="mt-8 text-xs leading-relaxed text-ink-400">
-        조달청 나라장터 계약정보를 매일 받아 보여 줍니다. 계약 담당자 이름·연락처는 싣지 않습니다. 최종 내용은 나라장터 계약 원문으로 확인하세요.
+        조달청 나라장터 계약정보를 매일 받아 보여 줍니다.<br />계약 담당자 이름·연락처는 싣지 않습니다.<br />최종 내용은 나라장터 계약 원문으로 확인하세요.
       </p>
     </div>
   );

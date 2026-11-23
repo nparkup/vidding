@@ -61,7 +61,7 @@ export function NoticeChangesList() {
       </div>
       <p className="mt-4 text-sm text-ink-500">{list.length.toLocaleString()}건 · 갱신 {dateTime(data.builtAt)}</p>
       {scope === "mine" && mine.size === 0 && (
-        <p className="mt-3 rounded-xl bg-paper p-4 text-sm text-ink-500">관심공고 서류함에 담은 공고가 없습니다. 공고 상세에서 관심공고로 담으면 정정·취소가 여기에 모입니다.</p>
+        <p className="mt-3 rounded-xl bg-paper p-4 text-sm text-ink-500">관심공고 서류함에 담은 공고가 없습니다.<br />공고 상세에서 관심공고로 담으면 정정·취소가 여기에 모입니다.</p>
       )}
       <ul className="mt-3 space-y-3">
         {list.slice(0, shown).map((c) => <ChangeCard key={`${c.no}-${c.ord}`} c={c} mine={mine.has(c.no)} />)}

@@ -1,0 +1,39 @@
+name: nuri-probe (temporary)
+on:
+  push:
+    branches: [claude/project-thread-gjn4s8]
+    paths: [".github/workflows/nuri-probe.yml"]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: |
+          cat > p.mjs <<'JS'
+          const B = "https://apis.data.go.kr/1230000/ao";
+          const BAD = /tel|ofclNm|ceo|adrs|email|fax|Ofcl/i;
+          const q = async (svc, op, p) => { const t = await fetch(`${B}/${svc}/${op}?` + new URLSearchParams({ serviceKey: process.env.KEY, type: "json", pageNo: "1", numOfRows: "3", ...p })).then(r => r.text()); try { const j = JSON.parse(t); const b = j?.response?.body ?? j?.body; let it = b?.items; it = it?.item ?? it; it = Array.isArray(it) ? it : it ? [it] : []; return { total: b?.totalCount, head: JSON.stringify(j?.response?.header ?? j?.header), it }; } catch { return { raw: t.slice(0, 300), it: [] }; } };
+          const show = (x) => Object.fromEntries(Object.entries(x).filter(([k, v]) => !BAD.test(k) && v !== "" && v != null).map(([k, v]) => [k, String(v).slice(0, 160)]));
+          const d = (n) => { const t = new Date(Date.now() + 9 * 3600e3 - n * 864e5); return t.toISOString().slice(0, 10).replace(/-/g, ""); };
+          const W = { inqryDiv: "1", inqryBgnDt: d(6) + "0000", inqryEndDt: d(0) + "2359" };
+          const W30 = { inqryDiv: "1", inqryBgnDt: d(29) + "0000", inqryEndDt: d(0) + "2359" };
+          const run = async (label, svc, op, p) => { const r = await q(svc, op, p); console.log(`\n=== ${label} ${op} total=${r.total} ${r.head ?? ""} ${r.raw ?? ""}`); for (const x of r.it.slice(0, 2)) console.log(JSON.stringify(show(x))); return r; };
+          await run("law", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", {});
+          await run("law-use", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", { indstrytyUseYn: "Y" });
+          await run("law-name", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", { indstrytyNm: "토목건축공사업" });
+          await run("law-name2", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", { indstrytyNm: "건물위생관리업" });
+          for (const k of ["Servc", "Cnstwk", "Thng", "Etc"]) { await run("bid7", "PrvtBidNtceService", `getPrvtBidPblancListInfo${k}`, W); await run("bid30", "PrvtBidNtceService", `getPrvtBidPblancListInfo${k}`, W30); }
+          for (const div of ["2"]) await run("bid-div2", "PrvtBidNtceService", "getPrvtBidPblancListInfoServc", { ...W, inqryDiv: div });
+          await run("lic", "PrvtBidNtceService", "getPrvtBidPblancListInfoLicenseLimit", W);
+          await run("rgn", "PrvtBidNtceService", "getPrvtBidPblancListInfoPrtcptPsblRgn", W);
+          await run("award", "PrvtScsbidInfoService", "getPrvtScsbidListSttus", W);
+          await run("award30", "PrvtScsbidInfoService", "getPrvtScsbidListSttus", W30);
+          await run("open", "PrvtScsbidInfoService", "getPrvtOpengResultListInfo", W);
+          await run("open-compt", "PrvtScsbidInfoService", "getPrvtOpengResultListInfoOpengCompt", W);
+          await run("cntrct", "PrvtCntrctInfoService", "getPrvtCntrctInfoList", W);
+          await run("cntrct30", "PrvtCntrctInfoService", "getPrvtCntrctInfoList", W30);
+          JS
+          node p.mjs

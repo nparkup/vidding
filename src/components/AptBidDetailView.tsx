@@ -18,19 +18,9 @@ interface Cell {
   wide?: boolean;
 }
 
-/** 큰 금액은 '3,600만원' 옆에 원 단위 전체 금액을 붙이고 두 칸을 쓴다 (나라장터 핵심 요약과 같은 모양) */
+/** 금액은 원 단위 전체로 쓰고, 1억 원 이상이면 한 줄에 들어가게 두 칸을 쓴다 (나라장터 핵심 요약과 같은 모양) */
 function amountCell(k: string, n: number, sub?: string): Cell {
-  return {
-    k,
-    v: (
-      <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-        <span>{won(n)}</span>
-        <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-ink-500">{wonFull(n)}</span>
-      </span>
-    ),
-    sub,
-    wide: true,
-  };
+  return { k, v: <span className="tabular-nums">{won(n)}</span>, sub, wide: n >= 100_000_000 };
 }
 
 /** 입찰방법 → 참가할 수 있는 업체 */

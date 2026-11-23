@@ -574,18 +574,28 @@ export function ScorePredictor() {
       ? { label: "예상 평가점수", value: "계산하지 않음", tone: "coral", sub: "현재 등록 정보로는 참가할 수 없는 공고입니다." }
       : { label: "예상 평가점수", value: `평가항목 ${active.items.length}개`, tone: "muted", sub: `${result.passLabel ? `통과 기준 ${result.passLabel}. ` : ""}사업자번호를 조회하면 항목별 점수를 계산합니다.` });
   const baseAmt = bid.baseAmount > 0 ? bid.baseAmount : 0;
-  const atRate = (r: number) => (baseAmt ? wonFull(Math.floor((baseAmt * r) / 100)) : "");
+  // 비율은 금액을 기준으로: 값 = 기초금액 × 비율(원), 비율은 보조값. 기초금액이 없으면 비율만
+  const atRateN = (r: number) => (baseAmt ? Math.floor((baseAmt * r) / 100) : 0);
+  const amtVal = (r: number) => <span className="text-base sm:text-lg">{wonFull(atRateN(r))}</span>;
   if (isNego) {
     tiles.push(scoreStage === "score"
       ? { label: "기술 점수", value: <>{result.techScore}<span className="text-sm font-semibold text-ink-500"> / {result.techMax}점</span></>, sub: `가격 ${Math.round((result.total - result.techScore) * 10) / 10}점 · 투찰률 ${co.bidRate.toFixed(2)}%`, tone: "ink" }
-      : { label: "예상 최저 경쟁 투찰률", value: `${co.rivalRate.toFixed(2)}%`, sub: atRate(co.rivalRate) ? `기초금액 기준 ${atRate(co.rivalRate)}` : undefined, tone: "ink" });
+      : baseAmt
+        ? { label: "예상 최저 경쟁 투찰금액", value: amtVal(co.rivalRate), sub: `투찰률 ${co.rivalRate.toFixed(2)}% · 기초금액 기준`, tone: "ink" }
+        : { label: "예상 최저 경쟁 투찰률", value: `${co.rivalRate.toFixed(2)}%`, tone: "ink" });
   } else if (scoreStage === "score" && result.rateWindow) {
-    tiles.push({ label: "통과 가능한 투찰률", value: `${result.rateWindow.low}~${result.rateWindow.high}%`, tone: "ink", sub: atRate(result.rateWindow.low) ? `기초금액 기준 ${atRate(result.rateWindow.low)}부터` : undefined });
+    tiles.push(baseAmt
+      ? { label: "통과 가능한 투찰금액", value: <>{amtVal(result.rateWindow.low)}<span className="text-sm font-semibold text-ink-500"> 부터</span></>, tone: "ink", sub: `투찰률 ${result.rateWindow.low}~${result.rateWindow.high}% · 기초금액 기준` }
+      : { label: "통과 가능한 투찰률", value: `${result.rateWindow.low}~${result.rateWindow.high}%`, tone: "ink" });
   } else if (fc.suggestRate) {
-    tiles.push({ label: "과거 낙찰자 투찰률", value: `${fc.suggestRate.value}%`, tone: "ink", sub: `가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%` });
+    tiles.push(baseAmt
+      ? { label: "과거 낙찰자 투찰금액", value: amtVal(fc.suggestRate.value), tone: "ink", sub: `투찰률 ${fc.suggestRate.value}% · 가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}% · 기초금액 기준` }
+      : { label: "과거 낙찰자 투찰률", value: `${fc.suggestRate.value}%`, tone: "ink", sub: `가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%` });
   } else {
     const lw = active.lowerLimit ?? bid.lowerLimitRate;
-    tiles.push({ label: "낙찰하한율", value: lw ? `${lw}%` : "공고에 없음", tone: lw ? "ink" : "muted", sub: lw && atRate(lw) ? `기초금액 기준 ${atRate(lw)}` : undefined });
+    tiles.push(lw && baseAmt
+      ? { label: "낙찰하한 금액", value: amtVal(lw), tone: "ink", sub: `낙찰하한율 ${lw}% · 기초금액 기준` }
+      : { label: "낙찰하한율", value: lw ? `${lw}%` : "공고에 없음", tone: lw ? "ink" : "muted" });
   }
   tiles.push(chance && scoreStage === "score"
     ? { label: "낙찰 가능성", value: `${chance.low}~${chance.high}%`, tone: chance.low > 0 ? "ink" : "coral", sub: `${fc.competition ? `경쟁 강도 ${fc.competition.level} · ` : ""}${chance.ifPassed ? `통과 기준을 채우면 ${chance.ifPassed.low}~${chance.ifPassed.high}%` : "같은 조건 과거 낙찰로 낸 범위"}` }
@@ -1238,8 +1248,10 @@ function Range({ label, value, onChange, hint, base }: { label: string; value: n
     <div className="sm:col-span-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <span className="label">{label}</span>
-        <span className="text-sm font-bold tabular-nums">
-          {value.toFixed(2)}%{amount !== undefined && <span className="ml-2 text-ink">{wonFull(amount)}</span>}
+        <span className="min-w-0 text-right tabular-nums">
+          {amount !== undefined
+            ? <><b className="text-base [overflow-wrap:anywhere]">{wonFull(amount)}</b><span className="ml-1.5 whitespace-nowrap text-xs font-semibold text-ink-500">({value.toFixed(2)}%)</span></>
+            : <b className="text-sm">{value.toFixed(2)}%</b>}
         </span>
       </div>
       <input type="range" min={80} max={100} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#12B886]" />

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ColumnChart, MetricToggle } from "@/components/charts/ColumnChart";
 import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
 import { CHART } from "@/components/charts/useWidth";
-import { won } from "@/lib/format";
+import { won, wonAxis } from "@/lib/format";
 import type { RecentAwardRow } from "@/lib/recentAwards";
 
 /** 최근 낙찰 결과: 지금 조건에 맞는 낙찰의 날짜별 건수·금액, 낙찰률 분포, 수요기관·낙찰업체 관계도 */
@@ -39,7 +39,7 @@ export function AwardsCharts({ rows }: { rows: RecentAwardRow[] }) {
           </div>
           <ColumnChart
             ariaLabel="낙찰일별 낙찰" height={170}
-            fmt={m === "n" ? (v) => `${Math.round(v).toLocaleString()}건` : (v) => (v ? won(v) : "0")}
+            fmt={m === "n" ? (v) => `${Math.round(v).toLocaleString()}건` : wonAxis}
             cols={days.map(([d, [n, a]]) => ({ key: d, label: `${Number(d.slice(5, 7))}.${Number(d.slice(8))}`, value: m === "n" ? n : a, tip: [d, `낙찰 ${n.toLocaleString()}건`, `낙찰금액 ${won(a)}`] }))}
           />
         </div>

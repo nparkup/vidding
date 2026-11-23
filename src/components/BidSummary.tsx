@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { won, wonFull } from "@/lib/format";
+import { won } from "@/lib/format";
 import type { BidQual } from "@/lib/eligibility";
 import type { NoticeInfo } from "@/lib/noticeInfo";
 import { jointAllowed } from "@/lib/noticeInfo";
@@ -14,18 +14,9 @@ interface Cell {
   wide?: boolean;
 }
 
-/** 큰 금액은 '3.1억원' 옆에 원 단위 전체 금액을 붙이고 두 칸을 쓴다 */
+/** 금액은 원 단위 전체로 쓰고, 1억 원 이상이면 한 줄에 들어가게 두 칸을 쓴다 */
 function amount(n: number): { v: ReactNode; wide: boolean } {
-  if (n < 10_000) return { v: won(n), wide: false };
-  return {
-    v: (
-      <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-        <span>{won(n)}</span>
-        <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-ink-500">{wonFull(n)}</span>
-      </span>
-    ),
-    wide: true,
-  };
+  return { v: <span className="tabular-nums">{won(n)}</span>, wide: n >= 100_000_000 };
 }
 
 const pct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}%`;
@@ -91,7 +82,7 @@ export function BidSummary({ bid, qual }: { bid: Bid; qual?: BidQual }) {
     info?.govSupply && { k: "관급자재", v: won(info.govSupply) },
     info?.product && { k: "세부품명", v: info.product, sub: info.quantity },
     (info?.deliverDays || info?.deliverTerms) && { k: "납품", v: info?.deliverDays ? `계약 후 ${info.deliverDays}일` : info!.deliverTerms!, sub: info?.deliverDays ? info.deliverTerms : undefined },
-    info?.fee && { k: "입찰참가수수료", v: wonFull(info.fee) },
+    info?.fee && { k: "입찰참가수수료", v: won(info.fee) },
     bid.stats && { k: "유사공고 평균 참여", v: `${bid.stats.avgBidders}개사` },
   ];
   const shown = cells.filter((c): c is Cell => !!c);

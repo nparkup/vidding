@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { won, wonFull } from "@/lib/format";
+import { won } from "@/lib/format";
 import { contractHref, contractUrl, type Contract } from "@/lib/contracts";
 import { loadSiteJson } from "@/lib/useSiteJson";
 
@@ -111,7 +111,7 @@ export function ContractExplorer() {
               </div>
               <h3 className="mt-2 font-bold leading-snug [overflow-wrap:anywhere]"><Link href={contractHref(c.no)} className="hover:text-mint-700">{c.title}</Link></h3>
               <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">
-                {[c.demand === c.agency ? c.demand : `${c.demand} (계약 ${c.agency})`, `계약금액 ${won(c.amount)} (${wonFull(c.amount)})`, c.total ? `총 ${won(c.total)}` : "", end ? `계약 끝 ${end}` : c.period ? `기간 ${c.period}` : ""].filter(Boolean).join(" · ")}
+                {[c.demand === c.agency ? c.demand : `${c.demand} (계약 ${c.agency})`, `계약금액 ${won(c.amount)}`, c.total ? `총 ${won(c.total)}` : "", end ? `계약 끝 ${end}` : c.period ? `기간 ${c.period}` : ""].filter(Boolean).join(" · ")}
               </p>
               <p className="mt-1 text-sm">
                 {c.corps.map((k, i) => (

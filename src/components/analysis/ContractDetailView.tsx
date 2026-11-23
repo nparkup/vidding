@@ -31,18 +31,9 @@ function daysLeft(end?: string): number | undefined {
   return Math.round((Date.parse(end) - Date.parse(today)) / 86400e3);
 }
 
+/** 금액은 원 단위 전체로 쓰고, 1억 원 이상이면 한 줄에 들어가게 두 칸을 쓴다 (나라장터 핵심 요약과 같은 모양) */
 function amountCell(k: string, n: number, sub?: string): Cell {
-  return {
-    k,
-    v: (
-      <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-        <span>{won(n)}</span>
-        <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-ink-500">{wonFull(n)}</span>
-      </span>
-    ),
-    sub,
-    wide: true,
-  };
+  return { k, v: <span className="tabular-nums">{won(n)}</span>, sub, wide: n >= 100_000_000 };
 }
 
 /** 계약 상세: 계약현황 목록의 한 건을 사이트 안에서 바로 보여 준다 (계약정보 API 항목 + 연결된 공고·낙찰 결과) */
@@ -215,7 +206,7 @@ export function ContractDetailView({ contract: c, list }: { contract: Contract; 
                           {award[15].map(([rank, name, amt, rate]) => (
                             <li key={rank} className="flex flex-wrap items-baseline justify-between gap-x-3 rounded-lg bg-paper px-3 py-2">
                               <span className="min-w-0 [overflow-wrap:anywhere]"><span className="mr-2 font-bold">{rank}위</span>{name}</span>
-                              <span className="tabular-nums text-ink-500">{wonFull(amt)}{rate ? ` · ${pct(rate)}` : ""}</span>
+                              <span className="tabular-nums text-ink-500"><b className="text-ink">{won(amt)}</b>{rate ? ` (${pct(rate)})` : ""}</span>
                             </li>
                           ))}
                         </ol>

@@ -115,9 +115,9 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
             ["A등급 이상", `${highGrade.length}건`],
             ["7일 내 마감", `${closingSoon.length}건`],
           ].map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-white/5 p-3">
+            <div key={k} className={`min-w-0 rounded-xl bg-white/5 p-3${k === "총 사업 규모" ? " max-sm:col-span-2" : ""}`}>
               <p className="text-xs text-ink-300">{k}</p>
-              <p className="mt-1 text-lg font-bold tabular-nums sm:text-xl">{v}</p>
+              <p className="mt-1 text-lg font-bold tabular-nums [overflow-wrap:anywhere] sm:text-xl">{v}</p>
             </div>
           ))}
         </div>

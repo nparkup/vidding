@@ -237,17 +237,22 @@ export function tidyItemLabel(s: string, preferInner = false): string {
  * "협상에 의한 계약 낙찰자 결정기준에 의하여 기술능력 평가" → "기술능력 평가", "는 양평군에서 평가하며, 정성적 평가" → "정성적 평가"
  */
 function tailPhrase(s: string): string {
+  // 표 한 줄에 배점이 여럿인 경우("① 최근 3년 … 실적 10점 …")는 이름을 그대로 두고, 문장일 때만 끝 구를 쓴다
+  if (!SENTENCE_RE.test(s)) return s;
   const words = lastPhrase(s).split(" ").filter(Boolean);
   const out: string[] = [];
   for (let i = words.length - 1; i >= 0; i--) {
     const w = words[i];
     // 조사·어미로 끝나는 낱말(…에, …하여, …하되, …으로, …에서, …하며) 앞에서 멈춘다
-    if (out.length && /(에|은|는|로|여|되|며|고|서|면|중|따라|대한|의한)$/.test(w)) break;
+    if (out.length && /(에|에서|은|는|로|여|되|며|고|면|중|따라|의한)$/.test(w)) break;
     out.unshift(w);
-    if (out.length >= 5) break;
+    if (out.length >= 8) break;
   }
   return out.join(" ") || s;
 }
+
+/** 배점을 설명하는 문장의 표지 (…하되, …에 의하여, …으로 구분, 평가는, 비중은, 콜론) */
+const SENTENCE_RE = /(하되|하여|하며|하고|되며|의하여|에\s*의한|따라|으로\s*(?:하|구분|평가|한다|함)|에서|평가는|제안서는|비중은|기준으로|\s중\s|[:：])/;
 
 /** 묶음 이름: "기준 기술능력평가", "기술능력 평가" → "기술능력평가" */
 const groupName = (s: string) => {

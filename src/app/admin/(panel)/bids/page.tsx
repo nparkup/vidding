@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PageHead } from "@/components/AdminUI";
-import { DdayBadge } from "@/components/Badges";
+import { CloseDdayBadge } from "@/components/Badges";
 import { daysLeft, evaluate } from "@/lib/analysis";
 import { dateTime, won } from "@/lib/format";
 import { getBids, getSyncInfo, listClients } from "@/lib/store";
@@ -54,7 +54,7 @@ export default async function AdminBids({ searchParams }: { searchParams: Promis
               const matched = clients.filter((c) => evaluate(b, c).eligible);
               return (
                 <tr key={b.id} className={daysLeft(b.closeAt) <= 0 ? "opacity-40" : ""}>
-                  <td><DdayBadge days={daysLeft(b.closeAt)} /></td>
+                  <td><CloseDdayBadge iso={b.closeAt} /></td>
                   <td className="md:max-w-[280px]">
                     <Link href={`/bids/${b.id}`} target="_blank" className="block font-semibold leading-snug hover:text-mint-600 md:truncate">{b.title}</Link>
                     <p className="text-xs text-ink-300 md:truncate">{b.bidNtceNo} · {b.demandAgency}</p>

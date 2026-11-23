@@ -14,7 +14,7 @@ const kday = (iso: string | number) => new Date(new Date(iso).getTime() + 9 * 36
 const hm = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3600e3).toISOString().slice(11, 16);
 const dday = (iso: string) => {
   const d = Math.round((Date.parse(`${kday(iso)}T00:00:00Z`) - Date.parse(`${kday(Date.now())}T00:00:00Z`)) / DAY);
-  return d < 0 ? "마감" : d === 0 ? "D-day" : `D-${d}`;
+  return d < 0 ? "마감" : d === 0 ? "오늘마감" : `D-${d}`;
 };
 
 /** 관심공고 서류함: 담은 공고 목록(라벨·메모·서류 준비 진행), 달력, 캘린더 파일 */
@@ -89,7 +89,7 @@ function Row({ x, labels }: { x: RowT; labels: string[] }) {
   return (
     <li className="card p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`chip ${d === "D-day" || /^D-[0-3]$/.test(d) ? "border-coral/30 bg-coral-100/60 text-coral" : ""}`}>{d}</span>
+        <span className={`chip ${d === "오늘마감" || /^D-[0-3]$/.test(d) ? "border-coral/30 bg-coral-100/60 text-coral" : ""}`}>{d}</span>
         {x.label && <span className="chip border-ink-300 text-ink">{x.label}</span>}
         {x.changed && <span className="chip border-amber bg-amber-100 text-ink">차수 바뀜</span>}
         <NoticeChangeBadge no={x.no} />

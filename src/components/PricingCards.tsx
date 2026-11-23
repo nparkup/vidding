@@ -20,11 +20,11 @@ export function PricingCards() {
   const site = useSiteConfig();
   const cfg = plansOf(site);
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div className="flex min-w-0 flex-col rounded-3xl border border-ink-100 bg-white p-7 shadow-card">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex min-w-0 flex-col rounded-3xl border border-ink-100 bg-white p-7 shadow-card lg:p-6 xl:p-7">
         <p className="text-lg font-bold">FREE</p>
         <p className="mt-1 text-sm text-ink-500">가입하고 먼저 써 보는 무료 체험</p>
-        <p className="mt-6 text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl">
+        <p className="mt-6 text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl lg:text-4xl xl:text-5xl">
           0<span className="text-lg font-bold">원</span>
         </p>
         <p className="mt-3 rounded-xl bg-mint-50 px-3 py-2 text-sm font-bold text-mint-700">
@@ -41,10 +41,10 @@ export function PricingCards() {
       {PLANS.map((p) => {
         const c = cfg.find((x) => x.id === p.id)!;
         return (
-          <div key={p.id} className="flex min-w-0 flex-col rounded-3xl border border-ink-100 bg-white p-7 shadow-card">
+          <div key={p.id} className="flex min-w-0 flex-col rounded-3xl border border-ink-100 bg-white p-7 shadow-card lg:p-6 xl:p-7">
             <p className="text-lg font-bold">{p.name}</p>
             <p className="mt-1 text-sm text-ink-500">{p.tagline}</p>
-            <p className="mt-6 text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl">
+            <p className="mt-6 text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl lg:text-4xl xl:text-5xl">
               {won(c.price)}<span className="text-lg font-bold">원</span>
               <span className="ml-1 text-sm font-medium text-ink-400">/ 월</span>
             </p>

@@ -44,7 +44,7 @@ const cell = (v: Cell) => (v === true ? <span className="mx-auto grid h-6 w-6 pl
 export default function Pricing() {
   return (
     <>
-    <PageHero center eyebrow="요금제" title="입찰 담당자 채용보다 가볍게" lead={<>월간 이용권 월 <Price k="lite" />원부터 · VAT 포함 · 약정 없음 · 무료 체험 입찰공고 <TrialN />건</>} />
+    <PageHero center eyebrow="요금제" title={<>입찰공고 <TrialN />건은 무료,<br />이후 월 <Price k="lite" />원부터</>} lead={<>가입하면 바로 입찰공고 <TrialN />건을 무료로 분석해 볼 수 있습니다.<br />이후에는 필요한 공고 예측 건수에 맞춰 월간 이용권을 고르세요.<br />VAT 포함 · 약정 없음 · 언제든 해지</>} />
     <div className="container-x">
       <div className="relative z-10 -mt-6">
         <PricingCards />

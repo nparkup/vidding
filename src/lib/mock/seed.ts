@@ -4,7 +4,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString()
 
 export const SEED_CLIENTS: ClientProfile[] = [
   {
-    id: "c-001", company: "(주)한빛전기통신", contactName: "김민수 대표", email: "bid@hanbit-elec.example", phone: "032-555-0101",
+    id: "c-001", company: "(주)OOOOO", contactName: "김민수 대표", email: "bid@hanbit-elec.example", phone: "032-555-0101",
     licenses: ["전기공사업", "정보통신공사업"], regions: ["서울", "경기", "인천", "대전", "대구", "충남"], minAmount: 30_000_000, maxAmount: 1_500_000_000,
     categories: [], plan: "lite", status: "활성", joinedAt: daysAgo(94), watchlist: [], keywords: ["CCTV", "가로등", "-설계"], pastPerformance: 2_400_000_000, creditGrade: "BBB",
   },

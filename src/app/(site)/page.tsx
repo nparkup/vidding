@@ -68,6 +68,15 @@ const FAQ = [
   { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트LAB은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
 ];
 
+/** 학교 이름을 "OOO 초등학교"처럼 가린다. "기초·최초·당초" 같은 낱말은 건드리지 않는다 */
+function maskSchool(text: string): string {
+  return text.replace(/(^|[\s(])([가-힣]{1,6}?)(초등학교|초|중학교|고등학교)(?=[\s)]|$)/g, (m, pre: string, name: string, kind: string) => {
+    if (kind === "초" && /^(기|최|당|연|월|년)$/.test(name)) return m;
+    const label = kind === "초" || kind === "초등학교" ? "초등학교" : kind;
+    return `${pre}OOO ${label}`;
+  });
+}
+
 export default async function Home() {
   const bids = await getBids();
   const builtAt = Date.now();
@@ -99,8 +108,10 @@ export default async function Home() {
   });
   // 분석 예시 공고는 IT 용역 고객사 기준
   const itClient = SEED_CLIENTS[1];
-  const featured = cases[1].top?.bid ?? digest.recommended[0]?.bid ?? bids[0];
-  const featuredEval = evaluate(featured, itClient);
+  const featuredBid = cases[1].top?.bid ?? digest.recommended[0]?.bid ?? bids[0];
+  // 메인 예시 화면은 실제 공고를 쓰므로 학교 이름을 가린다 ("효천초 석면병행 통신공사" → "OOO 초등학교 석면병행 통신공사")
+  const featured = { ...featuredBid, title: maskSchool(featuredBid.title), demandAgency: maskSchool(featuredBid.demandAgency) };
+  const featuredEval = evaluate(featuredBid, itClient);
   const docs = documentChecklist(featured);
   const docCount = docs.reduce((s, g) => s + g.items.length, 0);
   const guide = bidPriceGuide(featured);
@@ -508,7 +519,7 @@ export default async function Home() {
           <div className="min-w-0">
             <p className="eyebrow">아파트 관리 입찰</p>
             <h3 className="mt-3 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
-            <p className="mt-4 leading-relaxed text-ink-500">공동주택관리정보시스템(K-apt)에 올라온 아파트 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다. 아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
+            <p className="mt-4 leading-relaxed text-ink-500">공동주택관리정보시스템(K-apt)에 올라온 아파트 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
               <Link href="/apt-bids" className="btn-primary">아파트 공고 보기</Link>
               <Link href="/premium/apt" className="btn-ghost">아파트 입찰가격 예측</Link>

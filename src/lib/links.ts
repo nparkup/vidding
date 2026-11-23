@@ -9,6 +9,10 @@ export function bidHref(id: string, qs?: string): string {
 }
 
 /** 아파트(K-apt) 공고 상세: /apt-bids/view?no=입찰번호 한 페이지가 /apt-bids-data.json 에서 공고를 찾아 그린다 */
+export function nuriBidHref(no: string): string {
+  return `/nuri-bids/view?${new URLSearchParams({ no })}`;
+}
+
 export function aptBidHref(no: string): string {
   return `/apt-bids/view?${new URLSearchParams({ no })}`;
 }

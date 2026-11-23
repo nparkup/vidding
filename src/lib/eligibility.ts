@@ -14,11 +14,30 @@ import type { EvalBasis } from "./criteria";
 import type { CorpLookup } from "./corpLookup";
 import type { NoticeInfo } from "./noticeInfo";
 
+/** 업종의 근거법령 (조달청 업종 및 근거법규서비스) */
+export interface IndustryLaw {
+  /** 근거법령명 (예: 건설산업기본법) */
+  law?: string;
+  /** 조항 (예: 제9조) */
+  clause?: string;
+}
+
 export interface LicenseReq {
   name: string;
   code: string;
-  /** 이 업종 대신 인정되는 허용업종 */
-  alt: { name: string; code: string }[];
+  /**
+   * 이 업종 대신 인정되는 업종. 공고가 적은 허용업종과,
+   * 조달청 업종 기준에서 이 업종을 포함하는 업종(via: "포함", 예: 토목건축공사업은 건축공사업을 포함)
+   */
+  alt: { name: string; code: string; via?: "포함" }[];
+  /** 근거법령 (빌드 때 lib/nara/industryLaw 가 붙인다) */
+  law?: IndustryLaw;
+}
+
+/** 법령명·조항 → 국가법령정보센터 주소 */
+export function lawUrl(l: IndustryLaw): string | undefined {
+  if (!l.law) return undefined;
+  return `https://www.law.go.kr/법령/${encodeURIComponent(l.law.replace(/\s+/g, ""))}${l.clause && /^제\d+조(의\d+)?$/.test(l.clause) ? `/${encodeURIComponent(l.clause)}` : ""}`;
 }
 
 export interface BidQual {
@@ -98,8 +117,14 @@ export function describeGroups(groups: LicenseReq[][]): string {
 interface HeldIndustry { name: string; code: string; expiresAt?: string }
 
 function satisfies(req: LicenseReq, held: Map<string, HeldIndustry>): HeldIndustry | undefined {
-  if (req.code && held.has(req.code)) return held.get(req.code);
-  for (const a of req.alt) if (a.code && held.has(a.code)) return held.get(a.code);
+  return satisfiedBy(req, held)?.held;
+}
+
+/** 어떤 등록 업종으로 충족하는지: 같은 업종, 공고의 허용업종, 이 업종을 포함하는 업종 순으로 찾는다 */
+function satisfiedBy(req: LicenseReq, held: Map<string, HeldIndustry>): { held: HeldIndustry; via?: "허용" | "포함"; name?: string } | undefined {
+  if (req.code && held.has(req.code)) return { held: held.get(req.code)! };
+  for (const a of req.alt) if (!a.via && a.code && held.has(a.code)) return { held: held.get(a.code)!, via: "허용", name: a.name };
+  for (const a of req.alt) if (a.via === "포함" && a.code && held.has(a.code)) return { held: held.get(a.code)!, via: "포함", name: a.name };
   return undefined;
 }
 
@@ -169,7 +194,12 @@ export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizTy
     const any = new Map(all.map((i) => [i.code, i]));
     const okGroup = q.licenseGroups.find((g) => g.every((r) => satisfies(r, valid)));
     if (okGroup) {
-      const used = okGroup.map((r) => { const h = satisfies(r, valid)!; return h.code === r.code ? fmtReq(r) : `${h.name || h.code}(${h.code}, ${r.name} 허용업종)`; });
+      const used = okGroup.map((r) => {
+        const s = satisfiedBy(r, valid)!;
+        const name = s.held.name || s.name || s.held.code;
+        if (!s.via) return fmtReq(r);
+        return s.via === "허용" ? `${name}(${s.held.code}, ${r.name} 허용업종)` : `${name}(${s.held.code}, 조달청 업종 기준상 ${r.name}을 포함하는 업종)`;
+      });
       checks.push({ label: "업종 제한", verdict: "가능", detail: `등록 업종 ${used.join(", ")}으로 충족합니다. 필요 업종: ${describeGroups(q.licenseGroups)}.` });
     } else if (q.licenseGroups.some((g) => g.every((r) => satisfies(r, any)))) {
       checks.push({ label: "업종 제한", verdict: "확인 필요", detail: `필요 업종: ${describeGroups(q.licenseGroups)}. 해당 업종이 등록되어 있지만 유효기간이 지났습니다. 갱신 여부를 확인하세요.` });

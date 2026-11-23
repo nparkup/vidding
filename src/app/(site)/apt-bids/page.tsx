@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AptBidsExplorer } from "@/components/AptBidsExplorer";
 import { BidSourceTabs } from "@/components/BidSourceTabs";
 import { dateTime } from "@/lib/format";
-import { getAptBids, getBids } from "@/lib/store";
+import { getAptBids, getBids, getNuriBids } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "아파트 공고",
@@ -12,6 +12,7 @@ export const revalidate = 600;
 
 export default async function AptBidsPage() {
   const data = await getAptBids();
+  const nuri = (await getNuriBids()).items.filter((b) => new Date(b.closeAt).getTime() > Date.now()).length;
   const g2bOpen = (await getBids()).filter((b) => new Date(b.closeAt).getTime() > Date.now()).length;
   return (
     <div className="container-x py-10 sm:py-14">
@@ -25,7 +26,7 @@ export default async function AptBidsPage() {
           {data.items.length ? "공동주택관리정보시스템 연동" : "자료 준비 중"} · 갱신 {dateTime(data.builtAt)}
         </p>
       </div>
-      <BidSourceTabs active="apt" counts={{ g2b: g2bOpen, apt: data.items.length }} />
+      <BidSourceTabs active="apt" counts={{ g2b: g2bOpen, apt: data.items.length, nuri }} />
       <AptBidsExplorer />
     </div>
   );

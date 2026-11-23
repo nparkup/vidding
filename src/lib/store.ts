@@ -8,6 +8,7 @@ import type { AwardAnalysis } from "./awards/analysis";
 import type { AgencySummary } from "./awards/agency";
 import type { PreSpec } from "./preSpecs";
 import type { AptBidsFile, AptHistory } from "./apt";
+import type { NuriBidsFile } from "./nuri";
 import type { RecentAwardsFile } from "./recentAwards";
 import type { OrderPlan } from "./orderPlans";
 import type { Contract } from "./contracts";
@@ -50,7 +51,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; awardCount?: AwardCount; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; nuriBids?: NuriBidsFile; awardCount?: AwardCount; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -151,6 +152,12 @@ export async function getAptBids(): Promise<AptBidsFile> {
   if (!f) return { builtAt: new Date().toISOString(), items: [] };
   // 낙찰 결과로 본 예측(history)은 아파트 예측 화면만 쓰므로 따로 보낸다 (/apt-history-data.json)
   return { ...f, items: f.items.map(({ history: _h, ...b }) => b) };
+}
+
+/** 빌드 때 받은 누리장터 민간 입찰 (서버 배포·키 없음이면 빈 목록) */
+export async function getNuriBids(): Promise<NuriBidsFile> {
+  const f = process.env.BIDS_FILE ? fileBids()?.nuriBids : undefined;
+  return f ?? { builtAt: new Date().toISOString(), items: [], results: [], contracts: [], rates: [] };
 }
 
 /** 아파트 예측의 낙찰 결과로 본 예측 (키: K-apt 입찰번호) */

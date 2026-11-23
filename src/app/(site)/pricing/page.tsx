@@ -38,13 +38,6 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   },
 ];
 
-/** 분석에 쓰는 데이터 (낙찰 저장소 실측치, 2026-11 기준) */
-const DATA = [
-  { n: "305만 건", t: "낙찰 결과", d: "최근 10년치 용역·공사·물품" },
-  { n: "436만 건", t: "입찰공고", d: "같은 기간 나라장터 공고" },
-  { n: "하루 3회", t: "공고 갱신", d: "영업일 06:40 · 11:40 · 16:40" },
-];
-
 const FAQ = [
   { q: "이용권은 무엇이 다른가요?", a: <>세 이용권 모두 기능은 같고, 한 달에 쓸 수 있는 공고 예측 건수만 다릅니다. 라이트는 월 <Price k="liteQuota" />건(월 <Price k="lite" />원), 스탠다드는 월 <Price k="standardQuota" />건(월 <Price k="standard" />원), 무제한은 건수 제한이 없습니다(월 <Price k="unlimited" />원).</> },
   { q: "공고 예측 건수는 어떻게 세나요?", a: "공고 하나를 골라 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 보면 1건입니다. 나라장터와 아파트 공고를 합쳐 세고, 이미 분석한 공고는 다시 열어도 차감되지 않습니다. 건수는 결제일마다 새로 채워지며, 남은 건수는 다음 달로 넘어가지 않습니다." },
@@ -65,17 +58,6 @@ export default function Pricing() {
         <PricingCards />
         <p className="mt-3 text-center text-xs text-ink-400">세 이용권은 기능이 같고 한 달 공고 예측 건수만 다릅니다. 모두 매달 결제하는 월간 이용권입니다.</p>
       </div>
-
-      <div className="mt-6 grid gap-px overflow-hidden rounded-3xl border border-ink-100 bg-ink-100 sm:grid-cols-3">
-        {DATA.map((x) => (
-          <div key={x.t} className="bg-white px-6 py-5">
-            <p className="text-xs font-semibold text-ink-400">{x.t}</p>
-            <p className="mt-1 text-2xl font-extrabold tracking-tight tabular-nums">{x.n}</p>
-            <p className="mt-1 text-xs text-ink-400">{x.d}</p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-2 text-xs text-ink-400">분석은 모두 같은 데이터를 씁니다. 조달청 나라장터(공공데이터포털) 기준이며 매일 늘어납니다.</p>
 
       <h2 className="mt-20 text-2xl font-extrabold tracking-tight">기능 한눈에 비교</h2>
       <div className="card mt-6 overflow-x-auto">
@@ -129,10 +111,6 @@ export default function Pricing() {
         <div className="card p-7">
           <p className="text-lg font-bold">약정 없는 월간 이용권</p>
           <p className="mt-2 text-sm leading-relaxed text-ink-500">원하는 달까지만 쓰시면 됩니다. 해지하면 다음 달부터 결제되지 않고, 이미 결제한 달은 그달 끝까지 이용하실 수 있습니다.</p>
-        </div>
-        <div className="card p-7 md:col-span-2">
-          <p className="text-lg font-bold">여러 사업장·면허 운영 중이신가요?</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink-500">법인 여러 개나 지사별 조건을 따로 관리해야 한다면 맞춤 견적을 안내해 드립니다. <Link href="/apply" className="font-semibold text-mint-600">문의하기</Link></p>
         </div>
       </div>
 

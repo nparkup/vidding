@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { AgencyLogo } from "./AgencyLogo";
 import { Suspense, useEffect, useState } from "react";
-import { DdayBadge } from "@/components/Badges";
+import { CloseDdayBadge } from "@/components/Badges";
 import { ProfileScore } from "@/components/ProfileScore";
 import { DocList } from "@/components/DocList";
-import { bidPriceGuide, daysLeft, documentChecklist, keyPoints } from "@/lib/analysis";
+import { bidPriceGuide, documentChecklist, keyPoints } from "@/lib/analysis";
 import { loadBidExtra } from "@/lib/attachments";
 import { BidContact, BidSummary, kstIso } from "@/components/BidSummary";
 import type { BidQual } from "@/lib/eligibility";
@@ -72,7 +72,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
       <header className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
         <div className="min-w-0 lg:flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <DdayBadge days={daysLeft(bid.closeAt)} />
+            <CloseDdayBadge iso={bid.closeAt} />
             <span className="chip">{bid.bizType ?? "용역"} · {bid.category}</span>
             <span className="chip">{bid.contractMethod}</span>
             {!profile.open && <span className="chip border-coral/30 bg-coral-100/60 text-coral">참가 불가</span>}

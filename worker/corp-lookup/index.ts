@@ -8,6 +8,7 @@
  * - GET /?ntce=공고번호,공고번호&biz=용역 : 공고번호별 세부품명·중분류 (30일 캐시)
  *
  * 낙찰 저장소 (R2 버킷 bidmate-awards, scripts/awards/collect.ts 가 매일 채운다):
+ * - GET /?corps=기업명 : 기업명 앞부분(법인 형태 글자 빼고)으로 낙찰·개찰 상위 업체 후보를 찾는다 (src/lib/awards/corps.ts, 1시간 캐시)
  * - GET /?awards=사업자번호&biz=용역 : 그 업체의 최근 3년 낙찰을 공고 분류와 함께. 조달청 API를 부르지 않는다 (6시간 캐시)
  * - GET /?awardmeta=1 : 저장소 수집 범위·완료 여부
  *
@@ -30,6 +31,7 @@
 import { lookupCompany, normalizeBizno, validBizno } from "../../src/lib/corpLookup";
 import { fetchNtceClasses, fetchWins, perfBizOf } from "../../src/lib/perfLookup";
 import { readAwards, type R2BucketLike } from "../../src/lib/awards/read";
+import { searchCorps } from "../../src/lib/awards/corps";
 import Anthropic from "@anthropic-ai/sdk";
 import { RELATE_VERSION, relateAll, relateHash, type RelateResult } from "../../src/lib/awards/relate";
 import type { AwardAnalysis } from "../../src/lib/awards/analysis";
@@ -178,6 +180,14 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       if (used.length !== before) await env.AWARDS.put(key, JSON.stringify({ used }), { httpMetadata: { contentType: "application/json" } });
       return json({ used, limit: TRIAL_LIMIT, ...(suspended ? { suspended: true } : {}) }, 200, { "Cache-Control": "no-store" });
     }
+    if (sp.has("corps")) {
+      try {
+        const r = await searchCorps(env.AWARDS, (sp.get("corps") ?? "").slice(0, 40));
+        return json(r, r.error ? 400 : 200, { "Cache-Control": "public, max-age=3600" });
+      } catch (e) {
+        return json({ error: (e as Error).message, ready: false, hits: [] }, 400);
+      }
+    }
     if (sp.has("awards") || sp.has("awardmeta")) {
       try {
         const r = await readAwards(env.AWARDS, sp.get("awards") ?? "", sp.get("biz") ?? "");
@@ -310,7 +320,7 @@ function routeOf(req: Request): string {
   const sp = new URL(req.url).searchParams;
   if (sp.has("admin") || sp.has("adminlogin") || sp.has("members")) return `admin:${(sp.get("admin") ?? (sp.has("adminlogin") ? "login" : "members")).slice(0, 20)}`;
   if (sp.has("account")) return `account:${(sp.get("account") ?? "").slice(0, 20)}`;
-  for (const k of ["pv", "config", "signup", "trial", "awards", "awardmeta", "aisheet", "relate", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
+  for (const k of ["pv", "config", "signup", "trial", "awards", "awardmeta", "corps", "aisheet", "relate", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
   return "other";
 }
 

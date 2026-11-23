@@ -12,6 +12,7 @@ import { adoptable, bidSheet, TECH_GRADES } from "@/lib/criteria";
 import type { NoticeCriteria } from "@/lib/noticeCriteria";
 import { won, wonFull } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
+import { CorpSearch } from "@/components/CorpSearch";
 import { judgeEligibility, type BidQual, type Eligibility, type Verdict } from "@/lib/eligibility";
 import type { Bid, BidAttachment } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
@@ -372,8 +373,8 @@ export function ScorePredictor() {
     }
   }
 
-  async function lookup() {
-    const no = normalizeBizno(bizno);
+  async function lookup(input = bizno) {
+    const no = normalizeBizno(input);
     if (!validBizno(no)) { setCorpMsg("올바른 사업자등록번호가 아닙니다. 숫자를 다시 확인해 주세요."); return; }
     setCorpLoading(true);
     setCorp(null);
@@ -672,14 +673,10 @@ export function ScorePredictor() {
         {/* 2. 우리 회사 조회: 참가자격·기업 정보·유사 실적 */}
         <section id="corp" className="card scroll-mt-24 p-6">
           <Step n={2} title="우리 회사 조회" />
-          <p className="mt-2 text-sm text-ink-500">사업자번호 하나로 참가자격을 확인하고, 업력·종업원 수·유사 실적을 아래 3번에 채웁니다.</p>
+          <p className="mt-2 text-sm text-ink-500">사업자번호나 기업명 하나로 참가자격을 확인하고, 업력·종업원 수·유사 실적을 아래 3번에 채웁니다.</p>
           <div className="mt-4">
             <div className="min-w-0">
-              <span className="label">사업자등록번호</span>
-              <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); lookup(); }}>
-                <input className="input" inputMode="numeric" placeholder="000-00-00000" value={bizno} onChange={(e) => setBizno(e.target.value)} />
-                <button className="btn-primary btn-sm shrink-0" disabled={!CORP_API || corpLoading || normalizeBizno(bizno).length !== 10}>{corpLoading ? "조회 중" : "조회"}</button>
-              </form>
+              <CorpSearch id="corp-no" label="사업자등록번호 또는 기업명" value={bizno} onChange={setBizno} onBizno={(no) => lookup(no)} busy={corpLoading} disabled={!CORP_API} />
               {corpLoading ? <LoadingBar label="국세청·나라장터·금융위원회 기업 정보를 조회하는 중" /> : <p className="mt-1 text-xs text-ink-500">
                 {corpMsg || (CORP_API
                   ? "국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업기본정보·재무정보를 한 번에 조회합니다."

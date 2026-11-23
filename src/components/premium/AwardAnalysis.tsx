@@ -396,7 +396,7 @@ function ExList({ ex, title = "최근 낙찰 예" }: { ex: NonNullable<SimilarSt
           <li key={no} className="min-w-0 px-3 py-2">
             <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
             <p className="mt-0.5 text-xs text-ink-500">{[date, agency, amount > 100 ? `낙찰금액 ${wonRate(amount, rate, "낙찰률")}` : rate ? `낙찰률 ${pct(rate)}` : "", `${bidders}곳`, `${winner}${wr ? ` (개찰 ${wr}위)` : ""}`].filter(Boolean).join(" · ")}</p>
-            {top && top.length > 0 && <p className="mt-0.5 text-xs text-ink-300">1~{top.length}위: {top.map(([n, r], i) => `${i + 1}위 ${n} ${r ? pct(r) : ""}`).join(" · ")}</p>}
+            {top && top.length > 0 && <p className="mt-0.5 text-xs text-ink-300">1~{top.length}위: {top.map(([n, r, a], i) => `${i + 1}위 ${n} ${a ? `${won(a)}${r ? ` (투찰률 ${pct(r)})` : ""}` : r ? `투찰률 ${pct(r)}` : ""}`).join(" · ")}</p>}
           </li>
         ))}
       </ul>

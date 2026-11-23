@@ -59,7 +59,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
           <section className="card overflow-hidden">
             <div className="flex items-center justify-between p-5">
               <h2 className="font-bold">추천 공고 <span className="text-mint-600">{ok.length}</span><span className="text-ink-300"> / {ranked.length}</span></h2>
-              <p className="text-xs text-ink-300">별표 = 관심 공고 (서류 체크리스트 제공)</p>
+              <p className="text-xs text-ink-300">별표 = 관심 공고 (제출 서류 제공)</p>
             </div>
             <div className="overflow-x-auto">
               <table className="table-x sm:min-w-[640px]">
@@ -102,7 +102,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
                   return (
                     <li key={r.bid.id} className="flex items-center justify-between gap-3 py-3">
                       <div className="min-w-0"><p className="truncate text-sm font-semibold">{r.bid.title}</p><p className="text-xs text-ink-300">필수서류 {req}종 · {r.bid.contractMethod}</p></div>
-                      <Link href={`/bids/${r.bid.id}?${qs}`} target="_blank" className="btn-ghost btn-sm shrink-0">체크리스트</Link>
+                      <Link href={`/bids/${r.bid.id}?${qs}`} target="_blank" className="btn-ghost btn-sm shrink-0">제출 서류</Link>
                     </li>
                   );
                 })}

@@ -28,7 +28,7 @@ export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && (P
 export const FEATURES: string[] = [
   "영업일 매일 아침 맞춤 공고 요약 이메일",
   "면허·지역·금액 기준 1차 선별,\n참가조건·마감일 정리",
-  "관심 공고 제출서류 체크리스트 무제한",
+  "관심 공고 제출 서류 목록 무제한",
   "공고별 입찰 가능성 점수와 투찰 가이드",
   "사전규격·발주계획 단계부터 선제 알림",
   "주 1회 주요 공고 분석보고서",

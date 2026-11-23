@@ -53,7 +53,7 @@ export function BidCriteriaCard({ bid, qual, notice }: { bid: Bid; qual?: BidQua
   const same = row && lwlt !== undefined ? Math.abs(row.rate - lwlt) < 0.0005 : undefined;
   const pass = sheet.pass?.kind === "total" ? sheet.pass.score : undefined;
   return (
-    <section className="card p-6">
+    <section className="card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-bold">하한율·실적 기준</h2>
         <Link href="/rates" className="text-xs font-semibold text-ink-500 hover:text-ink">기준표 전체</Link>

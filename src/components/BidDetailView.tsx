@@ -5,7 +5,7 @@ import { AgencyLogo } from "./AgencyLogo";
 import { Suspense, useEffect, useState } from "react";
 import { DdayBadge } from "@/components/Badges";
 import { ProfileScore } from "@/components/ProfileScore";
-import { Checklist } from "@/components/Checklist";
+import { DocList } from "@/components/DocList";
 import { bidPriceGuide, daysLeft, documentChecklist, keyPoints } from "@/lib/analysis";
 import { loadBidExtra } from "@/lib/attachments";
 import { BidContact, BidSummary, kstIso } from "@/components/BidSummary";
@@ -66,10 +66,10 @@ export function BidDetailView({ bid }: { bid: Bid }) {
   ].sort((a, b) => +new Date(a.at) - +new Date(b.at)) as { label: string; at: string; strong?: boolean; note?: string }[];
 
   return (
-    <div className="container-x py-10 sm:py-14">
+    <div className="container-x py-6 sm:py-8">
       <Link href="/bids" className="text-sm text-ink-500 hover:text-ink">공고 목록으로</Link>
 
-      <header className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <header className="mt-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <DdayBadge days={daysLeft(bid.closeAt)} />
@@ -85,7 +85,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <MyBoxButton bid={bid} />
           <a href={bid.detailUrl} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">나라장터 원문</a>
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>
@@ -94,10 +94,10 @@ export function BidDetailView({ bid }: { bid: Bid }) {
 
       <BidChangeBanner bid={bid} />
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <div className="min-w-0 space-y-6">
+      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <div className="min-w-0 space-y-4">
           {/* 요약 */}
-          <section className="card p-6">
+          <section className="card p-5">
             <h2 className="text-lg font-bold">핵심 요약</h2>
             <BidSummary bid={bid} qual={qual} />
             {/* 입찰·낙찰 방식: 누가 참가하고 낙찰자를 어떻게 정하는지 */}
@@ -123,7 +123,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           <BidCriteriaCard bid={bid} qual={qual} notice={notice} />
 
           {/* 일정 */}
-          <section className="card p-6">
+          <section className="card p-5">
             <h2 className="text-lg font-bold">일정</h2>
             <ol className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {timeline.map((t) => (
@@ -139,7 +139,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           {priceBid && <BidPriceAnalysis bid={bid} info={info} analysis={award} />}
 
           {files.length > 0 && (
-            <section className="card p-6">
+            <section className="card p-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold">첨부파일</h2>
                 <span className="chip">{files.length}건 · 나라장터</span>
@@ -157,20 +157,20 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             </section>
           )}
 
-          {/* 체크리스트 */}
-          <section className="card p-6">
+          {/* 제출 서류 */}
+          <section className="card p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">제출서류 체크리스트</h2>
+              <h2 className="text-lg font-bold">제출 서류</h2>
               <span className="chip">{bid.contractMethod} 기준</span>
             </div>
-            <p className="mt-1 mb-5 text-sm text-ink-500">체크한 항목은 이 브라우저에 저장됩니다.<br />최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
-            <Checklist bidId={bid.id} groups={docs} />
+            <p className="mt-1 mb-3 text-sm text-ink-500">최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
+            <DocList groups={docs} />
           </section>
         </div>
 
-        <aside className="min-w-0 space-y-6">
+        <aside className="min-w-0 space-y-4">
           {/* 가능성 */}
-          <section className="card p-6">
+          <section className="card p-5">
             <h2 className="text-lg font-bold">입찰 가능성</h2>
             <p className="mt-1 text-xs text-ink-400">알고리즘 분석 · 6개 항목 가중 채점</p>
             <Suspense fallback={<p className="mt-4 text-sm text-ink-300">계산 중…</p>}>
@@ -179,7 +179,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           </section>
 
           {/* 투찰 가이드: 가격 경쟁 공고는 왼쪽 사정율 분석·투찰금액이 대신한다 */}
-          {!priceBid && <section className="card p-6">
+          {!priceBid && <section className="card p-5">
             <h2 className="text-lg font-bold">투찰 금액 가이드</h2>
             <p className="mt-1 text-sm text-ink-500">기초금액 × 예정가격 범위(±2%) × 낙찰하한율 {guide.rate.toFixed(3)}%</p>
             <div className="mt-4 rounded-xl bg-ink p-4 text-white">
@@ -192,7 +192,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             </p>
           </section>}
 
-          <section className="card p-6">
+          <section className="card p-5">
             <p className="text-xs font-semibold text-mint-600">프리미엄</p>
             <h2 className="mt-1 text-lg font-bold">평가점수 예측</h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
@@ -201,7 +201,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <Link href={`/premium?bid=${encodeURIComponent(bid.id)}#predict`} className="btn-primary mt-4 w-full">이 공고 점수 예측하기</Link>
           </section>
 
-          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-6 text-white shadow-glow">
+          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-5 text-white shadow-glow">
             <p className="font-bold">이 공고, 함께 준비할까요?</p>
             <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 이 공고 같은 조건의 새 공고를 매일 아침 메일로 받고, 평가점수 예측을 공고 수 제한 없이 쓰실 수 있습니다.</p>
             <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>

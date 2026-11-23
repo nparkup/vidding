@@ -22,7 +22,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
     { t: "아파트 공고" },
     { t: "정정·취소 알림" },
     { t: "평가점수 예측" },
-    { t: "서류 체크리스트" },
+    { t: "제출 서류" },
   ];
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white text-left shadow-lift sm:rounded-3xl">
@@ -66,7 +66,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
           <div className="mt-6 rounded-2xl bg-ink p-3 text-white">
             <p className="text-[11px] text-ink-300">마감 알림</p>
             <p className="mt-0.5 text-sm font-semibold">관심 공고 3건 마감 임박</p>
-            <p className="mt-2 text-[11px] leading-relaxed text-ink-200">제출서류 체크리스트로 빠진 서류를 확인하세요.</p>
+            <p className="mt-2 text-[11px] leading-relaxed text-ink-200">제출 서류 목록으로 빠진 서류를 확인하세요.</p>
           </div>
         </aside>
 

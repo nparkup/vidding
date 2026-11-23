@@ -13,7 +13,9 @@ const fmt = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `△${-n}` : "0");
  * 같은 묶음(여성기업 존속기간 등)은 하나만 고를 수 있게 한다.
  * 사업자번호를 조회하면 공공데이터 API로 확인되는 항목은 자동으로 체크하고 근거를 보여 준다. 고객이 고치면 '수정됨'.
  */
-export function TrustPicker({ rule, selected, onChange, score, auto = {}, checked = false }: {
+export function TrustPicker({ rule, selected, onChange, score, auto = {}, checked = false, hideTitle = false }: {
+  /** 접는 상자 안에 넣어 제목을 상자 머리에 둘 때 */
+  hideTitle?: boolean;
   rule?: TrustRule;
   selected: string[];
   onChange: (ids: string[]) => void;
@@ -32,8 +34,8 @@ export function TrustPicker({ rule, selected, onChange, score, auto = {}, checke
 
   return (
     <div className="min-w-0 sm:col-span-3">
-      <span className="label">신뢰도 가감점(신인도) 해당 항목</span>
-      <div className="rounded-2xl border border-ink-100 bg-white/60 p-3">
+      {!hideTitle && <span className="label">신뢰도 가감점(신인도) 해당 항목</span>}
+      <div className={hideTitle ? "" : "rounded-2xl border border-ink-100 bg-white/60 p-3"}>
         <p className="text-xs text-ink-500">
           {rule ? <>기준: {rule.name}. 가점 상한 +{rule.plusCap}, 감점 하한 △{rule.minusCap}.</> : "공고를 고르면 평가 기준표의 항목별 점수를 보여 드립니다."}
           {rule?.fromNotice && <> 공고서에서 읽은 값: {rule.fromNotice.join(", ")}.</>}

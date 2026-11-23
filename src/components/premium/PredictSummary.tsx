@@ -32,7 +32,7 @@ const STEP_STATUS: Record<StepState, string> = { done: "완료", now: "지금 �
 
 /**
  * 진행 단계 표시. 사이트 카드(.card) 한 장 안에 세 단계를 나란히 두고,
- * 위쪽 막대가 진행 정도를 민트색으로 채운다. 지금 단계는 민트 원, 끝난 단계는 연한 민트 원.
+ * 위쪽 막대가 진행 정도를 민트색으로 채운다. 지금 단계는 민트 네모, 끝난 단계는 연한 민트 네모.
  */
 export function StepBar({ steps }: { steps: { label: string; state: StepState; href?: string }[] }) {
   const nowAt = steps.findIndex((s) => s.state === "now");
@@ -42,7 +42,7 @@ export function StepBar({ steps }: { steps: { label: string; state: StepState; h
         {steps.map((s, n) => {
           const body = (
             <>
-              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums transition ${
+              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold tabular-nums transition ${
                 s.state === "now" ? "bg-mint text-white ring-4 ring-mint-100"
                   : s.state === "done" ? "bg-mint-50 text-mint-700 ring-1 ring-inset ring-mint/40"
                   : "bg-white text-ink-300 ring-1 ring-inset ring-ink-100"}`}>{n + 1}</span>

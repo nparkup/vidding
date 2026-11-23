@@ -301,7 +301,8 @@ function cleanLabel(s: string): string {
  * "=", "□", "①" 처럼 산식·등급 줄을 알려 주는 글자는 남겨 둔다 (criteria.ts adoptable 이 본다).
  */
 function displayLabel(label: string, group: string): { label: string; group: string } {
-  let t = tidyItemLabel(label);
+  // 40자에서 자른 뒤 짝 없이 열린 괄호·끝 쉼표가 남으면 한 번 더 다듬는다
+  let t = tidyItemLabel(tidyItemLabel(label).slice(0, 40));
   let g = group;
   // "정량적 평가 20점" 을 구분 열로 잘못 떼어 낸 경우 ("평가" + 묶음 "정량적")
   if (/^평가$/.test(t) && /^(정량|정성|계량|비계량)적?$/.test(g)) { t = `${g} 평가`; g = /정성|비계량/.test(g) ? "기술(정성)" : "기술(정량)"; }

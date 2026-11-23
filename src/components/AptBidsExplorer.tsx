@@ -133,7 +133,6 @@ export function AptBidsExplorer() {
         </button>
       )}
       <p className="mt-6 text-xs leading-relaxed text-ink-300">
-        출처: 국토교통부 공동주택관리정보시스템(K-apt) 입찰공고·입찰결과공지·수의계약 공지. K-apt와 조달청·민간 전자입찰을 거친 공고가 함께 들어옵니다.
         직전 계약은 같은 단지·같은 업종의 최근 3개 연도 낙찰·수의계약 중 가장 최근 건입니다.<br />투찰 전 반드시 공고문 원문을 확인하세요.
       </p>
     </>

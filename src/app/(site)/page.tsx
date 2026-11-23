@@ -83,7 +83,7 @@ export default async function Home() {
   const aptOpen = apt.items.filter((b) => new Date(b.closeAt).getTime() > builtAt);
   const aptCats = APT_CATEGORIES.map((c) => ({ c, n: aptOpen.filter((b) => b.category === c).length })).filter((x) => x.n > 0);
   const aptWithPrior = aptOpen.filter((b) => b.prior && b.prior.amount > 0);
-  const aptSamples = [...aptWithPrior.filter((b) => b.category !== "공사"), ...aptOpen.filter((b) => !b.prior)].slice(0, 3);
+  const aptSamples = [...aptWithPrior.filter((b) => b.category !== "공사"), ...aptOpen.filter((b) => !b.prior)].slice(0, 1);
   // 아파트 공고 중 나라장터 공고와 번호가 겹치는 것은 한 번만 센다
   const aptNotices = Math.max(0, (awardCount?.aptNotices ?? 0) - (awardCount?.aptDup ?? 0));
   // 아파트 낙찰(입찰결과 누적, 없으면 빌드 때 받은 최근 3개 연도)과 수의계약을 모두 더한다
@@ -265,7 +265,7 @@ export default async function Home() {
       desc: "업무 구분·업종·지역·마감 임박으로 거르고, 내 조건을 넣으면 공고마다 참가 가능 여부와 점수가 바로 붙습니다.",
       href: "/bids",
       cta: "공고 검색 열기",
-      preview: <div className="space-y-2">{clientEligible.slice(0, 3).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} />)}</div>,
+      preview: <div className="space-y-2">{clientEligible.slice(0, 1).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} />)}</div>,
     },
     {
       label: "공고 분석",

@@ -203,7 +203,7 @@ const BARE_FIELD: Record<string, string> = { 정량: "정량평가", 정량적: 
 const OPEN_RE = /[(（[［【「『{｛]/g;
 const CLOSE_RE = /[)）\]］】」』}｝]/g;
 /** 문장 앞 접속어·조사 ("…10점과 입찰가격평가 20점" 을 자르면 "과 입찰가격평가" 가 남는다) */
-const LEAD_RE = /^(?:[,，、;；/·ㆍ∙+＋&:：\])）\]］❑❍▣◦○●▪•※*∘‧・\-–—]+\s*|(?:및|와|과|는|은|을|를|이며|이고|으로|로|중|그리고|또는)\s+)/;
+const LEAD_RE = /^(?:[,，、;；/·ㆍ∙+＋&:：\])）\]］❑❍▣◦○●▪•※*∘‧・}｝\-–—]+\s*|(?:및|와|과|는|은|을|를|이며|이고|으로|로|중|그리고|또는)\s+)/;
 
 /**
  * 항목 이름 앞뒤에 남은 문장 부호를 지운다.
@@ -238,7 +238,10 @@ export function tidyItemLabel(s: string, preferInner = false): string {
  */
 function tailPhrase(s: string): string {
   // 표 한 줄에 배점이 여럿인 경우("① 최근 3년 … 실적 10점 …")는 이름을 그대로 두고, 문장일 때만 끝 구를 쓴다
-  if (!SENTENCE_RE.test(s)) return s;
+  if (!SENTENCE_RE.test(s)) {
+    const lp = lastPhrase(s);
+    return lp !== s.trim() && /(평가|가격|정량|정성|계량)/.test(lp) ? lp : s;
+  }
   const words = lastPhrase(s).split(" ").filter(Boolean);
   const out: string[] = [];
   for (let i = words.length - 1; i >= 0; i--) {

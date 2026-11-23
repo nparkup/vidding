@@ -158,14 +158,24 @@ function Entrants({ d }: { d: AptPastDeal }) {
   if (!d.entrants?.length) return <p className="text-xs text-ink-300">{d.via === "수의계약" ? "수의계약은 응찰 업체가 없습니다." : "응찰 업체는 다음 갱신 때 채워집니다."}</p>;
   const list = [...d.entrants].sort((a, b) => Number(b === d.winner) - Number(a === d.winner));
   return (
-    <ul className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
-      {list.map((n) => (
-        <li key={n} className={`flex min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-1.5 ${n === d.winner ? "bg-mint-50" : "bg-paper"}`}>
-          <span className={`min-w-0 ${n === d.winner ? "font-bold" : ""}`}>{n}</span>
-          {n === d.winner && <span className="shrink-0 rounded bg-mint-50 px-1.5 text-xs font-semibold text-mint-700">낙찰</span>}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
+        {list.map((n) => (
+          <li key={n} className={`flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-0.5 rounded-lg px-3 py-1.5 ${n === d.winner ? "bg-mint-50 sm:col-span-2" : "bg-paper"}`}>
+            <span className={`min-w-0 [overflow-wrap:anywhere] ${n === d.winner ? "font-bold" : ""}`}>{n}</span>
+            {n === d.winner ? (
+              <span className="ml-auto flex shrink-0 items-center gap-2">
+                {d.amount > 0 && <b className="tabular-nums">{won(d.amount)}</b>}
+                <span className="rounded bg-white px-1.5 text-xs font-semibold text-mint-700">낙찰</span>
+              </span>
+            ) : (
+              <span className="ml-auto shrink-0 text-xs text-ink-300">입찰가격 비공개</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 text-xs text-ink-300">K-apt 입찰결과는 낙찰 업체의 낙찰금액만 공개하고, 다른 응찰 업체의 입찰가격과 순위는 공개하지 않습니다.</p>
+    </>
   );
 }
 
@@ -176,7 +186,7 @@ export function AptAwardSection({ bid }: { bid: AptBid }) {
     <section className="card min-w-0 p-6">
       <h3 className="text-lg font-bold">낙찰 결과 분석</h3>
       <p className="mt-1 text-sm text-ink-500">
-        K-apt 입찰결과·수의계약 공지 최근 3개 연도에서 같은 단지·같은 업종의 지난 계약과, 같은 지역·업종에서 금액이 직전 계약의 0.5~2배인 최근 낙찰을 찾았습니다. 응찰 업체는 입찰결과의 응찰업체 목록에서 업체명만 가져옵니다. K-apt는 업체별 투찰금액과 순위를 공개하지 않아 낙찰 업체만 표시합니다.
+        K-apt 입찰결과·수의계약 공지 최근 3개 연도에서 같은 단지·같은 업종의 지난 계약과, 같은 지역·업종에서 금액이 직전 계약의 0.5~2배인 최근 낙찰을 찾았습니다. 응찰 업체는 입찰결과의 응찰업체 목록에서 업체명만 가져옵니다. K-apt는 낙찰 업체의 낙찰금액만 공개하고 다른 응찰 업체의 입찰가격과 순위는 공개하지 않아, 낙찰 업체 옆에만 금액을 표시합니다.
       </p>
       {!h ? (
         <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 비교할 지난 낙찰이 없습니다. 같은 단지·같은 지역의 같은 업종 낙찰이 최근 3개 연도에 없거나 사이트가 다시 만들어질 때 채워집니다.</p>

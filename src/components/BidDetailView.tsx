@@ -9,6 +9,7 @@ import { DocList } from "@/components/DocList";
 import { bidPriceGuide, documentChecklist, keyPoints } from "@/lib/analysis";
 import { loadBidExtra } from "@/lib/attachments";
 import { BidContact, BidSummary, kstIso } from "@/components/BidSummary";
+import { LicenseLaws } from "@/components/LicenseLaws";
 import type { BidQual } from "@/lib/eligibility";
 import { dateTime, won, wonFull } from "@/lib/format";
 import type { Bid, BidAttachment } from "@/lib/types";
@@ -119,6 +120,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
               </ul>
             )}
           </section>
+
+          <LicenseLaws groups={qual?.licenseGroups} />
 
           <BidCriteriaCard bid={bid} qual={qual} notice={notice} />
 

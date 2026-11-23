@@ -112,6 +112,14 @@ jobs:
           path: .cache/apt
           key: apt-${{ github.run_id }}
           restore-keys: apt-
+      # 누리장터 지난 주 공고·개찰 결과·계약과 업종 근거법규는 캐시에 두고 다음 빌드는 새 기간만 묻는다 (src/lib/nara/nuri.ts)
+      - name: 누리장터 캐시 복원
+        if: steps.mode.outputs.mode == 'fetch'
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/nuri
+          key: nuri-${{ github.run_id }}
+          restore-keys: nuri-
       - name: 나라장터 공고 수집
         if: steps.mode.outputs.mode == 'fetch'
         env:
@@ -146,6 +154,12 @@ jobs:
         with:
           path: .cache/apt
           key: apt-${{ github.run_id }}
+      - name: 누리장터 캐시 저장
+        if: always() && steps.mode.outputs.mode == 'fetch'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/nuri
+          key: nuri-${{ github.run_id }}
       # 다음 머지 배포가 다시 쓸 수 있게 새로 받은 공고 자료를 캐시에 둔다 (오래된 항목은 GitHub이 7일 뒤·10GB 넘으면 지운다)
       - name: 배포 자료 저장
         if: steps.mode.outputs.mode == 'fetch'

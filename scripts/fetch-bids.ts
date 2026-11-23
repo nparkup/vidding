@@ -12,6 +12,9 @@ import { fetchAllBidsWithChanges, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids, textCacheKey } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
+import { applyIndustryLaws, fetchIndustryLaws, type IndustryLawTable } from "../src/lib/nara/industryLaw";
+import { fetchNuriBids } from "../src/lib/nara/nuri";
+import type { NuriBidsFile } from "../src/lib/nuri";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
@@ -92,6 +95,18 @@ async function main() {
       console.log(`공동도급: 공동수급 방식으로 ${joint}건 바꿈, 기초금액 공개 ${s.withBase}건${s.baseFailedDays ? ` (기초금액 조회 실패 ${s.baseFailedDays}일분)` : ""}`);
     } catch (e) {
       console.warn("참가자격 수집 건너뜀:", e instanceof Error ? e.message : e);
+    }
+  }
+  // 업종 및 근거법규: 제한 업종마다 근거법령을 붙이고, 그 업종을 포함하는 업종(예: 토목건축공사업 → 건축공사업)을 허용업종에 더한다. 실패해도 배포는 계속
+  let laws: IndustryLawTable | undefined;
+  try { laws = await fetchIndustryLaws(); } catch (e) { console.warn("업종 근거법규 받기 실패:", e instanceof Error ? e.message : e); }
+  if (Object.keys(quals).length && laws) {
+    try {
+      const t = laws;
+      const r = applyIndustryLaws(quals, t);
+      console.log(`업종 근거법규: 업종 ${Object.keys(t.laws).length.toLocaleString()}개(포함 관계 ${Object.values(t.includedBy).flat().length}개), 공고 제한 업종 ${r.reqs.toLocaleString()}개 중 근거법령 ${r.withLaw.toLocaleString()}개, 포함 업종으로 더한 허용업종 ${r.added.toLocaleString()}개`);
+    } catch (e) {
+      console.warn("업종 근거법규 건너뜀:", e instanceof Error ? e.message : e);
     }
   }
   // 첨부를 내려받아 평가표를 미리 추출 (평가점수 예측이 공고 선택만으로 원문 배점을 쓰도록). 실패해도 배포는 계속
@@ -205,6 +220,15 @@ async function main() {
   } catch (e) {
     console.warn("공동주택 입찰 건너뜀:", e instanceof Error ? e.message : e);
   }
+  // 누리장터 민간 입찰 (/nuri-bids): 민간입찰공고·개찰 결과·계약. 실패해도 배포는 계속
+  let nuriBids: NuriBidsFile | undefined;
+  try {
+    const r = await fetchNuriBids(laws);
+    nuriBids = r.file;
+    console.log(r.log);
+  } catch (e) {
+    console.warn("누리장터 건너뜀:", e instanceof Error ? e.message : e);
+  }
   // 발주계획 모아보기 (/plans): 이번 달부터 넉 달 발주 예정. 실패해도 배포는 계속
   let orderPlans;
   try {
@@ -258,7 +282,7 @@ async function main() {
   } catch (e) {
     console.warn("최근 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, orderPlans, contracts, aptBids, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, orderPlans, contracts, aptBids, nuriBids, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

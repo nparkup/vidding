@@ -33,8 +33,8 @@ export default function CiCreditsPage() {
                 <img src={`${base}/agency-logos/${c.file}`} alt={`${name} CI`} loading="lazy" className="max-h-10 max-w-24 object-contain" />
               </span>
               <span className="min-w-0 text-sm">
-                <span className="block truncate font-semibold">{name === "정부상징" ? "대한민국 정부상징 (중앙행정기관)" : name}</span>
-                <a href={c.page} target="_blank" rel="noreferrer" className="block truncate text-xs text-ink-500 underline-offset-2 hover:underline">
+                <span className="block font-semibold">{name === "정부상징" ? "대한민국 정부상징 (중앙행정기관)" : name}</span>
+                <a href={c.page} target="_blank" rel="noreferrer" className="block break-all text-xs text-ink-500 underline-offset-2 hover:underline">
                   {c.license || "라이선스 표기 없음"}{c.artist ? ` · ${c.artist}` : ""}
                 </a>
               </span>

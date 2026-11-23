@@ -42,7 +42,7 @@ export function FinanceAvgView() {
                       <tr key={a.name} onClick={() => setPick(a.name)} className={`cursor-pointer ${a.name === pick ? "bg-mint-50" : "hover:bg-paper"}`}>
                         <td className="px-3 py-2.5">
                           <p className="font-semibold">{a.name}</p>
-                          {a.aliases?.length ? <p className="truncate text-[11px] text-ink-400">{a.aliases.join(", ")}</p> : null}
+                          {a.aliases?.length ? <p className="text-[11px] text-ink-400">{a.aliases.join(", ")}</p> : null}
                           {!a.verified && <p className="text-[11px] text-coral">협회 원문 대조 전 값</p>}
                         </td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{pct(a.debt)}</td>

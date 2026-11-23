@@ -182,7 +182,7 @@ export function AgencyExplorer() {
               {matches.slice(0, 300).map((r) => (
                 <li key={r.id}>
                   <button type="button" onClick={() => pick(r.id)} className={`flex w-full min-w-0 items-baseline justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-paper ${r.id === id ? "bg-mint-50" : ""}`}>
-                    <span className="min-w-0 truncate font-semibold" title={r.name}>{r.name}</span>
+                    <span className="min-w-0 font-semibold">{r.name}</span>
                     <span className="shrink-0 text-xs text-ink-500">공고 {r.open} · 낙찰 {r.n.toLocaleString()}</span>
                   </button>
                 </li>
@@ -211,7 +211,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
         <p className="mt-1 text-sm text-ink-500">나라장터 낙찰 {s.n.toLocaleString()}건 · {s.from} ~ {s.to}</p>
         <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Tile k="최근 4년 낙찰" v={`${recent4.toLocaleString()}건`} />
-          <Tile k="최근 4년 낙찰금액" v={won(s.groups.reduce((a, g) => a + g.amount, 0))} />
+          <Tile wide k="최근 4년 낙찰금액" v={won(s.groups.reduce((a, g) => a + g.amount, 0))} />
           <Tile k="단독 참가 비율" v={`${Math.round(s.single * 100)}%`} sub="참가 1곳 낙찰" />
           <Tile k="지금 공고" v={`${bids.length}건`} />
         </dl>
@@ -296,11 +296,12 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
   );
 }
 
-function Tile({ k, v, sub }: { k: string; v: string; sub?: string }) {
+/** wide: 원 단위 전체 금액은 휴대폰에서 두 칸을 쓴다 */
+function Tile({ k, v, sub, wide }: { k: string; v: string; sub?: string; wide?: boolean }) {
   return (
-    <div className="rounded-xl bg-paper px-3 py-2">
+    <div className={`min-w-0 rounded-xl bg-paper px-3 py-2${wide ? " col-span-2" : ""}`}>
       <dt className="text-xs text-ink-500">{k}</dt>
-      <dd className="mt-0.5 text-lg font-bold tabular-nums">{v}</dd>
+      <dd className="mt-0.5 text-lg font-bold tabular-nums [overflow-wrap:anywhere]">{v}</dd>
       {sub && <dd className="text-xs text-ink-400">{sub}</dd>}
     </div>
   );

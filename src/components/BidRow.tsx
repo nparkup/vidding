@@ -30,7 +30,7 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
           <CloseDay iso={bid.closeAt} />
           {bid.title}
         </p>
-        <p className="mt-1 line-clamp-1 text-sm text-ink-500">
+        <p className="mt-1 text-sm text-ink-500">
           <AgencyLogo name={bid.demandAgency} size={16} maxW={72} className="mr-1.5 -mt-0.5" />
           {bid.demandAgency} · 면허 {bid.licenseRaw || bid.licenses.join(", ") || "제한없음"}
         </p>

@@ -141,7 +141,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
                 <ul className="mt-2 divide-y divide-ink-100 text-sm">
                   {done.match.kw.map((k) => (
                     <li key={k.keyword} className="flex items-center justify-between gap-3 py-2">
-                      <span className="min-w-0 truncate font-semibold">{k.keyword}</span>
+                      <span className="min-w-0 font-semibold">{k.keyword}</span>
                       <Link href={`/bids?q=${encodeURIComponent(k.keyword)}`} className="shrink-0 text-mint-600 hover:underline">{k.bids.length.toLocaleString()}건 보기</Link>
                     </li>
                   ))}

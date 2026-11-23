@@ -98,7 +98,7 @@ export function MatchDemo() {
             {eligible.slice(0, 3).map((r) => (
               <li key={r.bid.id} className="rounded-xl border border-ink-100 bg-white p-3">
                 <div className="flex min-w-0 items-center justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-semibold">{r.bid.title}</p>
+                  <p className="min-w-0 text-sm font-semibold">{r.bid.title}</p>
                   <GradeBadge grade={r.grade} />
                 </div>
                 <p className="mt-1 text-xs text-ink-500">

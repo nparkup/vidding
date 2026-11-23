@@ -17,7 +17,7 @@ export function HBarList({ rows, color = CHART.bar }: { rows: HBar[]; color?: st
       {rows.map((r) => (
         <li key={r.label} className="min-w-0 text-sm" title={r.title}>
           <div className="flex min-w-0 items-baseline justify-between gap-2">
-            <span className="min-w-0 truncate font-semibold">{r.label}</span>
+            <span className="min-w-0 font-semibold">{r.label}</span>
             <span className="shrink-0 text-xs tabular-nums text-ink-500">{r.text}</span>
           </div>
           <span className="mt-1 block h-2 rounded-full bg-paper">

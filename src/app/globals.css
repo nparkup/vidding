@@ -4,7 +4,7 @@
 
 @layer base {
   html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
-  body { @apply bg-white text-ink font-sans; word-break: keep-all; overflow-x: clip; }
+  body { @apply bg-white text-ink font-sans; word-break: keep-all; overflow-wrap: break-word; overflow-x: clip; }
   ::selection { @apply bg-mint-100; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; }

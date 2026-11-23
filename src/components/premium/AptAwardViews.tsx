@@ -61,11 +61,11 @@ export function AptForecastCard({ bid, f }: { bid: AptBid; f?: AptPriceForecast 
           {prior ? (
             <dd className="mt-1 rounded-xl border border-ink-100 bg-ink-50 px-3 py-2">
               <div className="flex min-w-0 items-baseline justify-between gap-2">
-                <span className="min-w-0 truncate text-base font-bold">{prior.winner || "업체명 확인 중"}</span>
+                <span className="min-w-0 text-base font-bold">{prior.winner || "업체명 확인 중"}</span>
                 <span className="shrink-0 text-base font-bold tabular-nums">{won(prior.amount)}</span>
               </div>
               <p className="mt-0.5 text-xs text-ink-500">{[prior.date, label(prior), prior.bidders ? `${prior.bidders}곳 응찰` : "", period(prior)].filter(Boolean).join(" · ")}</p>
-              <p className="truncate text-xs text-ink-300">{prior.title}</p>
+              <p className="text-xs text-ink-300">{prior.title}</p>
               {keep && <p className="mt-1 text-xs font-semibold text-ink-700">최근 두 번 모두 {sameWins[0].winner}이(가) 맡았습니다.</p>}
             </dd>
           ) : (
@@ -91,7 +91,7 @@ export function AptForecastCard({ bid, f }: { bid: AptBid; f?: AptPriceForecast 
               <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
                 {h.likely.map((b) => (
                   <li key={b.name} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 px-3 py-1.5">
-                    <span className="min-w-0 truncate font-semibold">{b.name}</span>
+                    <span className="min-w-0 font-semibold">{b.name}</span>
                     <span className="text-xs text-ink-500">{likelyText(b)}</span>
                   </li>
                 ))}
@@ -108,11 +108,11 @@ export function AptForecastCard({ bid, f }: { bid: AptBid; f?: AptPriceForecast 
                 {recent.map((r) => (
                   <li key={r.no} className="min-w-0 px-3 py-1.5">
                     <div className="flex min-w-0 items-baseline justify-between gap-2">
-                      <span className="min-w-0 truncate font-semibold">{r.winner || "업체명 확인 중"}</span>
+                      <span className="min-w-0 font-semibold">{r.winner || "업체명 확인 중"}</span>
                       <span className="shrink-0 font-bold tabular-nums">{won(r.amount)}</span>
                     </div>
                     <p className="text-xs text-ink-500">{[r.date, label(r), r.bidders ? `${r.bidders}곳 응찰` : ""].filter(Boolean).join(" · ")}</p>
-                    <p className="truncate text-xs text-ink-300">{r.apt ? `${r.apt} · ` : ""}{r.title}</p>
+                    <p className="text-xs text-ink-300">{r.apt ? `${r.apt} · ` : ""}{r.title}</p>
                   </li>
                 ))}
               </ul>
@@ -143,11 +143,12 @@ function Box({ title, sub, children }: { title: string; sub?: string; children: 
   );
 }
 
-function Fact({ label, value, note }: { label: string; value: React.ReactNode; note?: string }) {
+/** wide: 원 단위 전체 금액이 휴대폰에서도 한 줄에 들어가게 두 칸을 쓴다 */
+function Fact({ label, value, note, wide }: { label: string; value: React.ReactNode; note?: string; wide?: boolean }) {
   return (
-    <div className="min-w-0 rounded-xl bg-paper px-3 py-2">
+    <div className={`min-w-0 rounded-xl bg-paper px-3 py-2${wide ? " col-span-2" : ""}`}>
       <p className="text-xs text-ink-500">{label}</p>
-      <p className="mt-0.5 font-bold tabular-nums">{value}</p>
+      <p className="mt-0.5 font-bold tabular-nums [overflow-wrap:anywhere]">{value}</p>
       {note && <p className="text-xs text-ink-300">{note}</p>}
     </div>
   );
@@ -219,9 +220,9 @@ function SameCard({ same }: { same: AptPastDeal[] }) {
     <Box title="같은 단지 직전 계약" sub={`${d.date} ${label(d)} · 번호 ${d.no}`}>
       <p className="text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{d.title}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Fact label={d.via === "수의계약" ? "계약금액" : "낙찰금액"} value={won(d.amount)} />
+        <Fact wide label={d.via === "수의계약" ? "계약금액" : "낙찰금액"} value={won(d.amount)} />
+        <Fact wide label={d.via === "수의계약" ? "계약 업체" : "낙찰 업체"} value={d.winner || "-"} />
         <Fact label="응찰 업체" value={d.bidders ? `${d.bidders}곳` : "-"} note={d.via === "수의계약" ? "수의계약" : undefined} />
-        <Fact label={d.via === "수의계약" ? "계약 업체" : "낙찰 업체"} value={<span className="block truncate">{d.winner || "-"}</span>} />
         <Fact label="계약 기간" value={d.start && d.end ? `${contractMonths(d.start, d.end) ?? "-"}개월` : "-"} note={d.start && d.end ? `${d.start} ~ ${d.end}` : "공지에 기간 없음"} />
       </div>
       <p className="mb-2 mt-4 text-xs font-semibold text-ink-500">응찰 업체</p>
@@ -254,7 +255,7 @@ function TrendCard({ same }: { same: AptPastDeal[] }) {
           return (
             <li key={d.no} className="min-w-0 px-3 py-2">
               <div className="flex min-w-0 items-baseline justify-between gap-2">
-                <span className="min-w-0 truncate font-semibold">{d.winner || "업체명 확인 중"}</span>
+                <span className="min-w-0 font-semibold">{d.winner || "업체명 확인 중"}</span>
                 <span className="shrink-0 font-bold tabular-nums">{won(d.amount)}</span>
               </div>
               <p className="text-xs text-ink-500">{[d.date, label(d), d.bidders ? `${d.bidders}곳 응찰` : "", older ? `이전 대비 ${signed(d.amount / older.amount)}` : ""].filter(Boolean).join(" · ")}</p>

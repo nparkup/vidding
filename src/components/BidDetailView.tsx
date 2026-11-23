@@ -148,7 +148,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
                 {files.map((f) => (
                   <li key={f.url} className="min-w-0">
                     <a href={f.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-paper px-3 py-2.5 text-sm hover:bg-ink-100/60">
-                      <span className="truncate font-medium">{f.name}</span>
+                      <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{f.name}</span>
                       <span className="shrink-0 text-xs text-ink-300">{f.kind}</span>
                     </a>
                   </li>

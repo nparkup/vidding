@@ -137,9 +137,9 @@ export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: Not
 
 function Stat({ k, v, sub }: { k: string; v: string; sub?: string }) {
   return (
-    <div className="rounded-xl bg-paper px-3 py-2">
+    <div className="min-w-0 rounded-xl bg-paper px-3 py-2">
       <dt className="text-xs text-ink-500">{k}</dt>
-      <dd className="mt-0.5 font-bold tabular-nums">{v}</dd>
+      <dd className="mt-0.5 font-bold tabular-nums [overflow-wrap:anywhere]">{v}</dd>
       {sub && <dd className="text-xs text-ink-400">{sub}</dd>}
     </div>
   );

@@ -96,7 +96,7 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
               </div>
               <div className="px-5 pt-5">
                 <p className="text-xs text-ink-300">{bid.demandAgency} · {bid.contractMethod}</p>
-                <p className="mt-1 line-clamp-2 font-bold">{bid.title}</p>
+                <p className="mt-1 font-bold">{bid.title}</p>
               </div>
               <ol className="mt-4 divide-y divide-white/5 font-mono text-[13px]">
                 {ev.factors.map((f, i) => (
@@ -104,7 +104,7 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
                     <span className="tabular-nums text-ink-400">0{i + 1}</span>
                     <span className="min-w-0">
                       <span className="block font-sans font-semibold">{f.label}</span>
-                      <span className="block truncate font-sans text-xs text-ink-300">{f.note}</span>
+                      <span className="block font-sans text-xs text-ink-300">{f.note}</span>
                     </span>
                     <span className="text-right tabular-nums">
                       <span className={f.ok ? "text-mint-300" : "text-coral"}>{String(f.score).padStart(2, " ")}</span>

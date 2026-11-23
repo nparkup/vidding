@@ -443,7 +443,7 @@ export function ScorePredictor() {
                   {matches.map((m) => (
                     <li key={m.id}>
                       <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
-                        <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
+                        <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
                         <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
                       </button>
                     </li>
@@ -524,7 +524,7 @@ export function ScorePredictor() {
                 {quick.map((m) => (
                   <li key={m.id}>
                     <button type="button" className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm hover:bg-ink-100/60" onClick={() => setBidId(m.id)}>
-                      <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
+                      <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
                       <span className="text-xs text-ink-500">{m.category} · {m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
                     </button>
                   </li>
@@ -666,7 +666,7 @@ export function ScorePredictor() {
                     {docs.files.map((f) => (
                       <li key={f.url} className="min-w-0">
                         <a href={f.url} target="_blank" rel="noreferrer" className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm hover:bg-ink-100/60 ${f.name === docs.sheetFile ? "bg-mint-50 font-semibold" : "bg-paper"}`}>
-                          <span className="min-w-0 truncate">{f.name}</span>
+                          <span className="min-w-0 [overflow-wrap:anywhere]">{f.name}</span>
                           <span className="shrink-0 text-xs text-ink-300">{f.name === docs.sheetFile ? "평가표 출처" : f.kind}</span>
                         </a>
                       </li>
@@ -917,7 +917,7 @@ export function ScorePredictor() {
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <div className="min-w-[10rem] flex-1">
                   <p className="text-sm font-semibold">{i.label}</p>
-                  <p className="truncate text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
+                  <p className="text-xs text-ink-300">{i.group}{active.source === "template" && i.basis ? ` · ${i.basis}` : ""}</p>
                 </div>
                 <select aria-label="항목 유형" className="shrink-0 rounded-lg border border-ink-100 bg-white px-2 py-1 text-xs" value={i.kind} onChange={(e) => editItem(i.id, { kind: e.target.value as ItemKind })}>
                   {(Object.keys(KIND_LABEL) as ItemKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
@@ -1030,7 +1030,7 @@ function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: str
           <li key={i.id} className="flex min-w-0 items-baseline justify-between gap-3 px-6 py-3 text-sm">
             <span className="min-w-0">
               <span className="block font-semibold">{i.label}</span>
-              {i.group && <span className="block truncate text-xs text-ink-300">{i.group}</span>}
+              {i.group && <span className="block text-xs text-ink-300">{i.group}</span>}
             </span>
             <span className="shrink-0 tabular-nums text-ink-500">{i.max > 0 ? `${i.max}점` : "가·감점"}</span>
           </li>

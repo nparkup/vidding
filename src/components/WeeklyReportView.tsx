@@ -200,7 +200,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
               <ul className="mt-3 space-y-2.5">
                 {cats.slice(0, 8).map(([c, n]) => (
                   <li key={c} className="grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-3 text-sm">
-                    <span className="truncate">{c}</span>
+                    <span className="min-w-0">{c}</span>
                     <span className="h-2.5 overflow-hidden rounded-full bg-ink-100"><span className="block h-full rounded-full bg-mint" style={{ width: `${(n / maxCat) * 100}%` }} /></span>
                     <span className="text-right font-semibold tabular-nums">{n}</span>
                   </li>
@@ -219,7 +219,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
               <h4 className="text-sm font-semibold text-ink-500">주요 발주기관 (규모순)</h4>
               <ul className="mt-3 divide-y divide-ink-100 text-sm">
                 {topAgencies.map(([a, v]) => (
-                  <li key={a} className="flex justify-between gap-3 py-2"><span className="truncate">{a}</span><span className="shrink-0 tabular-nums"><b>{won(v.amount)}</b><span className="ml-1 text-xs text-ink-300">{v.n}건</span></span></li>
+                  <li key={a} className="flex justify-between gap-3 py-2"><span className="min-w-0">{a}</span><span className="shrink-0 tabular-nums"><b>{won(v.amount)}</b><span className="ml-1 text-xs text-ink-300">{v.n}건</span></span></li>
                 ))}
               </ul>
             </div>

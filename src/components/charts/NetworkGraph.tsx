@@ -183,7 +183,7 @@ export function NetworkGraph({ nodes, edges, groups, centerId, height = 420, ari
       </div>
       {touched && fi !== undefined && openable(nodes[fi]) && (
         <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-ink-100 bg-white px-3 py-2 text-sm">
-          <span className="min-w-0 truncate font-semibold">{nodes[fi].label}</span>
+          <span className="min-w-0 font-semibold">{nodes[fi].label}</span>
           <button type="button" className="btn-primary btn-sm shrink-0" onClick={() => onOpen!(nodes[fi])}>{openLabel}</button>
         </div>
       )}

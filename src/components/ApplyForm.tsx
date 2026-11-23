@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { SignupCompanyFields } from "@/components/account/SignupCompanyFields";
 import { BidRow } from "./BidRow";
 import { LicensePicker } from "./LicensePicker";
 import { rank, type MatchResult } from "@/lib/analysis";
@@ -176,11 +177,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
           <fieldset className="space-y-4">
             <legend className="text-sm font-bold">기본 정보</legend>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="label" htmlFor="company">회사명 *</label><input id="company" name="company" required maxLength={100} className="input" placeholder="(주)한빛종합건설" /></div>
-              <div>
-                <label className="label" htmlFor="bizno">사업자등록번호 *</label>
-                <input id="bizno" name="bizno" required inputMode="numeric" maxLength={14} className="input" placeholder="000-00-00000" />
-              </div>
+              <SignupCompanyFields />
               <div><label className="label" htmlFor="contactName">담당자 이름 *</label><input id="contactName" name="contactName" required maxLength={40} className="input" placeholder="홍길동" /></div>
               <div><label className="label" htmlFor="phone">연락처 *</label><input id="phone" name="phone" required maxLength={30} className="input" placeholder="010-0000-0000" /></div>
               <div className="sm:col-span-2"><label className="label" htmlFor="email">이메일 * <span className="font-normal text-ink-300">(로그인 아이디)</span></label><input id="email" name="email" type="email" required autoComplete="username" maxLength={120} className="input" placeholder="안내를 받고 로그인할 이메일" /></div>

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Bid } from "../types";
 import { adoptable } from "../criteria";
-import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type ScoreBand } from "../evalscore";
+import { CREDIT_GRADES, tidyItemLabel, type EvalItem, type EvalSheet, type ItemKind, type ScoreBand } from "../evalscore";
 
 /**
  * 규칙 파서가 배점표를 못 읽은 공고의 첨부 본문을 Claude에 보내 그 공고의 배점표를 읽는다.
@@ -13,7 +13,7 @@ import { CREDIT_GRADES, type EvalItem, type EvalSheet, type ItemKind, type Score
  */
 
 /** 프롬프트·검증 규칙을 바꾸면 올린다 (캐시가 새로 만들어진다) */
-export const AI_SHEET_VERSION = 9;
+export const AI_SHEET_VERSION = 10;
 export const DEFAULT_AI_MODEL = "claude-haiku-5-5";
 
 /** 빌드가 공고마다 만들어 두는 AI 판독 입력 (/ai-input/{공고}.json) */
@@ -342,7 +342,7 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
       id: `ai${++seq}`,
       group: i.group.slice(0, 20) || "기타",
       // 머리의 번호·글머리표(①, □, 1., 가.)는 떼어 낸다. 남겨 두면 산식 줄로 오인되어 화면 사용 검사에서 빠진다
-      label: i.label.replace(/\s+/g, " ").trim().replace(/^(?:[①-⑳□■◦○▪•※-]|\(?\d{1,2}[.)]|[가-하][.)])\s*/, "").trim().slice(0, 40) || i.label.slice(0, 40),
+      label: tidyItemLabel(i.label.replace(/\s+/g, " ").trim().replace(/^(?:[①-⑳□■◦○▪•※-]|\(?\d{1,2}[.)]|[가-하][.)])\s*/, "").trim()).slice(0, 40) || i.label.slice(0, 40),
       max: Math.round(i.max * 100) / 100,
       kind,
       basis: i.quote.replace(/\s+/g, " ").trim().slice(0, 90) || undefined,

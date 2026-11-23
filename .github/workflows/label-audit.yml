@@ -1,0 +1,19 @@
+name: label-audit (temp)
+on:
+  push:
+    branches: [claude/project-thread-tqa2n4]
+    paths: [".github/workflows/label-audit.yml", "scripts/score/label-audit.ts", "src/lib/evalscore.ts"]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: git show origin/main:src/lib/evalscore.ts > src/lib/evalscore.old.ts
+      - run: npx tsx --conditions=react-server scripts/score/label-audit.ts

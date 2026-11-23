@@ -197,17 +197,88 @@ export function templateSheet(bid: Pick<Bid, "contractMethod" | "bizType" | "bas
 const POINT_RE = /(\d{1,2}(?:\.\d{1,2})?)\s*점/g;
 const SKIP_RE = /(합\s*계|총\s*계|총\s*점|^계$|소\s*계|만점|이상인\s*자|이상\s*득점|평점\s*산식|배점\s*한도|감점\s*한도)/;
 
-function cleanLabel(s: string): string {
-  return s
+/** 이름만 쓴 분야 ("정량", "정성", "가격")는 표 머리글처럼 "…평가"로 쓴다 */
+const BARE_FIELD: Record<string, string> = { 정량: "정량평가", 정량적: "정량적 평가", 정성: "정성평가", 정성적: "정성적 평가", 가격: "가격평가", 기술: "기술평가", 계량: "계량평가", 비계량: "비계량평가" };
+
+const OPEN_RE = /[(（[［【「『{｛]/g;
+const CLOSE_RE = /[)）\]］】」』}｝]/g;
+/** 문장 앞 접속어·조사 ("…10점과 입찰가격평가 20점" 을 자르면 "과 입찰가격평가" 가 남는다) */
+const LEAD_RE = /^(?:[,，、;；/·ㆍ∙+＋&:：\])）\]］❑❍▣□■◦○●▪•※*\-–—]+\s*|(?:및|와|과|는|은|을|를|이며|이고|으로|로|중|그리고|또는)\s+)/;
+
+/**
+ * 항목 이름 앞뒤에 남은 문장 부호를 지운다.
+ * "기술능력평가(정량 10점, 정성 80점), 가격평가 10점" 을 점수마다 자르면 "(정량", ", 정성", ", 가격평가" 가 남는다.
+ * 앞의 쉼표·가운뎃점·접속어, 짝이 없는 괄호를 떼고, 이름만 쓴 분야는 "정량평가"처럼 쓴다.
+ */
+export function tidyItemLabel(s: string, preferInner = false): string {
+  let t = s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  for (let i = 0; i < 5; i++) {
+    const before = t;
+    t = t.replace(LEAD_RE, "").replace(/\s*[,，、;；/·ㆍ∙+＋&:：=]+$/, "").replace(/\s+(?:및|와|과|또는|그리고)$/, "").trim();
+    const open = (t.match(OPEN_RE) ?? []).length, close = (t.match(CLOSE_RE) ?? []).length;
+    if (open > close) {
+      // "기술능력평가(정량" → 괄호 안 "정량" 이 항목 (괄호 앞은 묶음 이름).
+      // 괄호 안이 길거나 쉼표가 있으면 40자에서 잘린 설명이라 괄호 앞까지만 쓴다 ("…최근 5년(창업기업, 소기업,")
+      let at = -1;
+      for (const m of t.matchAll(OPEN_RE)) at = m.index ?? at;
+      const inner = t.slice(at + 1).trim();
+      const field = preferInner && inner.replace(/[^가-힣A-Za-z]/g, "").length >= 2 && inner.length <= 12 && !/[,，、]/.test(inner) && /(정량|정성|계량|비계량|평가|가격|기술)/.test(inner);
+      t = field ? inner : t.slice(0, at).trim();
+    } else if (close > open) {
+      t = t.replace(/\s*[)）\]］】」』]\s*$/, "").trim();
+    }
+    if (t === before) break;
+  }
+  return BARE_FIELD[t] ?? t;
+}
+
+/**
+ * 한 줄에 여러 항목이 적힌 문장에서 점수 앞 구의 끝 명사구만 남긴다.
+ * "협상에 의한 계약 낙찰자 결정기준에 의하여 기술능력 평가" → "기술능력 평가", "는 양평군에서 평가하며, 정성적 평가" → "정성적 평가"
+ */
+function tailPhrase(s: string): string {
+  const words = lastPhrase(s).split(" ").filter(Boolean);
+  const out: string[] = [];
+  for (let i = words.length - 1; i >= 0; i--) {
+    const w = words[i];
+    // 조사·어미로 끝나는 낱말(…에, …하여, …하되, …으로, …에서, …하며) 앞에서 멈춘다
+    if (out.length && /(에|은|는|로|여|되|며|고|서|면|중|따라|대한|의한)$/.test(w)) break;
+    out.unshift(w);
+    if (out.length >= 5) break;
+  }
+  return out.join(" ") || s;
+}
+
+/** 문장 끝의 마지막 구 ("…진행하되, 기술능력평가" → "기술능력평가") */
+const lastPhrase = (s: string) => (s.split(/[,，、;；:：]/).map((p) => p.trim()).filter(Boolean).pop() ?? s).trim();
+
+/** "기술능력평가(정량" 처럼 괄호가 열린 채 끝나면 괄호 앞 이름 (묶음 이름) */
+function openParenParent(s: string): string | undefined {
+  // 끝에 빈 괄호가 열려 있으면 ("…[정량적 평가(" 의 "(") 떼고 본다
+  const t = s.replace(/^\s*[,，、;；/·ㆍ]\s*/, "").replace(/\s*[(（[［{｛]\s*$/, "").trim();
+  const open = (t.match(OPEN_RE) ?? []).length, close = (t.match(CLOSE_RE) ?? []).length;
+  if (open <= close) return undefined;
+  let at = -1;
+  for (const m of t.matchAll(OPEN_RE)) at = m.index ?? at;
+  if (t.slice(at + 1).replace(/[^가-힣A-Za-z]/g, "").length < 2) return undefined;
+  const head = tailPhrase(t.slice(0, at).replace(/\s*\d{1,3}(?:\.\d+)?\s*(?:점|%)?\s*$/, "").trim());
+  const name = tidyItemLabel(head.replace(/\s*[(（]\s*\d+(?:\.\d+)?\s*(?:%|점)?\s*[)）]/g, ""));
+  return name.replace(/[^가-힣A-Za-z]/g, "").length >= 2 && /(평가|능력|기술|가격)/.test(name) ? name.slice(0, 20) : undefined;
+}
+
+function cleanLabel(s: string, preferInner = false): string {
+  return tidyItemLabel(s
     .replace(/^[\s\d.)(①-⑳ㄱ-ㅎ가-하]{0,3}[.)]\s*/, "")
     .replace(/[|│┃\t]+/g, " ")
     .replace(/[○●◦·\-–—:：]+\s*$/g, "")
     .replace(/\(\s*\)/g, "")
     .replace(/[(\[（]\s*$/g, "")
     .replace(/\s{2,}/g, " ")
-    .trim()
+    .trim(), preferInner)
     .slice(0, 40);
 }
+/** 40자로 자른 뒤 괄호가 열린 채 끝나면 괄호 앞까지 쓴다 */
+const cleanLabelCut = (s: string, preferInner = false) => tidyItemLabel(cleanLabel(s, preferInner), preferInner);
 
 /** 공고문 텍스트에서 계약방법을 추정한다 */
 export function detectMethod(text: string): EvalSheet["method"] | undefined {
@@ -328,12 +399,13 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
   const lineOf = new Map<EvalItem, number>();
   const inline = new Map<EvalItem, ScoreBand[]>();
 
-  const push = (rawLabel: string, max: number, basis: string) => {
-    let label = cleanLabel(rawLabel).replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
+  const push = (rawLabel: string, max: number, basis: string, parent?: string, inner = false) => {
+    let label = cleanLabelCut(rawLabel, inner).replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
     // 표의 첫 열(구분)이 같은 줄에 붙어 오면 그룹 이름으로 떼어 낸다
     let group: string | undefined;
     const g = label.match(/^((?:정량|정성|기술|가격|신인도)\s*(?:적\s*)?(?:평가)?(?:\s*\(\s*\d+\s*\))?|수행\s*능력|경영\s*상태)\s+(.{2,})$/);
-    if (g) { group = g[1].replace(/\s|\(\d+\)/g, ""); label = g[2]; curGroup = group; }
+    if (g && !/^평가$/.test(g[2])) { group = g[1].replace(/\s|\(\d+\)/g, ""); label = g[2]; curGroup = group; }
+    else if (parent) group = parent;
     else if (window) group = curGroup;
     label = label.replace(/^[○●◦·•▪\-]\s*/, "").trim();
     if (!label || label.length < 2 || /^\d/.test(label) || SKIP_RE.test(label)) return;
@@ -345,6 +417,8 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
     seen.add(key);
     // 정성평가 묶음 안의 항목은 이름에 '기술능력'·'인력'이 있어도 위원이 매기는 정성 항목이다
     const k = kindOf(label);
+    // "정량평가"처럼 세부 항목 없이 묶음으로만 배점이 적힌 경우는 '기타'가 아니라 기술(정량)이다
+    if (!group && k === "other" && /(정량|계량)/.test(label) && !/비계량/.test(label)) group = "기술(정량)";
     const it = item(label, max, group && /정성/.test(group) && k !== "price" ? "qualitative" : k, basis.slice(0, 80), group);
     lineOf.set(it, cur);
     found.push(it);
@@ -380,11 +454,21 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
         lastLabel = "";
         continue;
       }
-      // "실적 15점 신용 15점" 처럼 한 줄에 여러 항목
+      // "실적 15점 신용 15점" 처럼 한 줄에 여러 항목.
+      // "기술능력평가(정량 10점, 정성 80점), 가격평가 10점" 은 괄호 안 항목이 괄호 앞 이름(기술능력평가) 묶음이다
       let start = 0;
+      let parent: string | undefined;
+      let prevSeg = "";
       for (const m of pts) {
         const seg = line.slice(start, m.index).trim();
-        if (seg) push(seg, Number(m[1]), line);
+        if (/^[)）\]］}｝]/.test(seg)) parent = undefined;
+        // "기술능력평가 90점(정량 10점, …": 괄호가 점수 뒤에서 열리면 바로 앞 항목이 묶음 이름이다
+        if (/^[(（[{]/.test(seg) && prevSeg) parent = tidyItemLabel(tailPhrase(prevSeg)).slice(0, 20);
+        parent = openParenParent(seg) ?? parent;
+        prevSeg = seg;
+        // 문장 속 항목은 점수 앞의 끝 명사구가 이름이다 (괄호가 열려 있으면 괄호 안)
+        if (seg) push(tailPhrase(tidyItemLabel(seg, true)), Number(m[1]), line, parent, true);
+        if (/[)）\]］}｝]/.test(line.slice((m.index ?? 0) + m[0].length).match(/^[^가-힣A-Za-z\d]*/)?.[0] ?? "")) parent = undefined;
         start = (m.index ?? 0) + m[0].length;
       }
       lastLabel = "";
@@ -839,7 +923,9 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
       case "qualitative":
       case "other":
         ratio = LEVEL_RATIO[c.proposal];
-        reason = `제안 준비 수준 '${c.proposal}' 기준 예상`;
+        reason = it.kind === "other" && /(정량|계량)/.test(it.label) && !/비계량/.test(it.label)
+          ? `공고에 정량평가 세부 배점이 없어 준비 수준 '${c.proposal}' 기준으로 예상`
+          : `제안 준비 수준 '${c.proposal}' 기준 예상`;
         break;
     }
     const score = round1(it.max * ratio);

@@ -106,7 +106,6 @@ export default function Pricing() {
         </div>
       </div>
 
-      <p className="mt-10 text-center text-sm text-ink-500">이용권·건수·해지·무료 체험에 관한 질문은 <Link href="/faq#pricing" className="font-semibold text-mint-600">자주 묻는 질문</Link>에 모아 두었습니다.</p>
     </div>
     </>
   );

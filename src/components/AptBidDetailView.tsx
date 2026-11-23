@@ -214,7 +214,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
                 {b.files!.map((f, i) => (
                   <li key={f} className="min-w-0">
                     <a href={aptFileUrl(f)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl bg-paper px-3 py-2.5 text-sm hover:bg-ink-100/60">
-                      <span className="truncate font-medium">공고 첨부{b.files!.length > 1 ? ` ${i + 1}` : ""}</span>
+                      <span className="min-w-0 font-medium">공고 첨부{b.files!.length > 1 ? ` ${i + 1}` : ""}</span>
                       <span className="shrink-0 text-xs text-ink-300">내려받기</span>
                     </a>
                   </li>

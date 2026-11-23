@@ -162,7 +162,7 @@ function AwardCard({ r }: { r: RecentAwardRow }) {
           <div key={k} className="min-w-0">
             <dt className="text-xs text-ink-400">{k}</dt>
             <dd className="font-semibold tabular-nums [overflow-wrap:anywhere]">{v}</dd>
-            {sub && <dd className="truncate text-[11px] text-ink-400" title={sub}>{sub}</dd>}
+            {sub && <dd className="text-[11px] text-ink-400">{sub}</dd>}
           </div>
         ))}
       </dl>
@@ -173,7 +173,7 @@ function AwardCard({ r }: { r: RecentAwardRow }) {
             {top.map(([rank, name, amt, rt]) => (
               <li key={rank} className="flex min-w-0 gap-2">
                 <span className="w-8 shrink-0 text-ink-400">{rank}위</span>
-                <span className="min-w-0 flex-1 truncate">{name}</span>
+                <span className="min-w-0 flex-1">{name}</span>
                 <span className="shrink-0 tabular-nums">{won(amt)}{rt ? <span className="ml-1 text-xs text-ink-500">({pct(rt)})</span> : ""}</span>
               </li>
             ))}

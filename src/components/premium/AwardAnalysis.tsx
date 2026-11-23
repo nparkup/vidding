@@ -64,13 +64,13 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
             {prior ? (
               <dd className="mt-1 rounded-xl border border-ink-100 bg-ink-50 px-3 py-2">
                 <div className="flex min-w-0 items-baseline justify-between gap-2">
-                  <span className="min-w-0 truncate text-base font-bold">{prior.winner || "업체명 없음"}</span>
+                  <span className="min-w-0 text-base font-bold">{prior.winner || "업체명 없음"}</span>
                   <span className="shrink-0 text-right text-base">{prior.amount > 100 ? <AmountRate amount={prior.amount} rate={prior.rate} label="낙찰률" stack /> : "금액 없음"}</span>
                 </div>
                 <p className="mt-0.5 text-xs text-ink-500">
                   {[prior.date, prior.wr ? `개찰 ${prior.wr}위` : "", prior.rate && !(prior.amount > 100) ? `낙찰률 ${pct(prior.rate)}` : "", prior.bidders ? `${prior.bidders.toLocaleString()}곳 참가` : ""].filter(Boolean).join(" · ")}
                 </p>
-                <p className="truncate text-xs text-ink-300">{prior.title}</p>
+                <p className="text-xs text-ink-300">{prior.title}</p>
               </dd>
             ) : (
               <dd className="mt-0.5 text-xs text-ink-500">같은 수요기관의 같은 사업 낙찰 기록을 찾지 못했습니다.</dd>
@@ -104,9 +104,9 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
                   <p className="mb-1 text-xs font-semibold text-ink-500">{p.name}</p>
                   <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
                     {p.likely.slice(0, 4).map((b) => (
-                      <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
-                        <span className="min-w-0 truncate font-semibold">{b.name}</span>
-                        <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
+                      <li key={b.name} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 px-3 py-1.5">
+                        <span className="min-w-0 font-semibold">{b.name}</span>
+                        <span className="ml-auto text-right text-xs text-ink-500">{likelyText(b)}</span>
                       </li>
                     ))}
                   </ul>
@@ -121,9 +121,9 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
             <dd className="mt-1">
               <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100">
                 {fc.likely.slice(0, 6).map((b) => (
-                  <li key={b.name} className="flex min-w-0 items-baseline justify-between gap-2 px-3 py-1.5">
-                    <span className="min-w-0 truncate font-semibold">{b.name}</span>
-                    <span className="shrink-0 text-xs text-ink-500">{likelyText(b)}</span>
+                  <li key={b.name} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 px-3 py-1.5">
+                    <span className="min-w-0 font-semibold">{b.name}</span>
+                    <span className="ml-auto text-right text-xs text-ink-500">{likelyText(b)}</span>
                   </li>
                 ))}
               </ul>
@@ -139,13 +139,13 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
                 {g.rows.map((r) => (
                   <li key={r.key} className="min-w-0 px-3 py-1.5">
                     <div className="flex min-w-0 items-baseline justify-between gap-2">
-                      <span className="min-w-0 truncate font-semibold">{r.winner}</span>
+                      <span className="min-w-0 font-semibold">{r.winner}</span>
                       <span className="shrink-0 text-right">{r.amount > 100 ? <AmountRate amount={r.amount} rate={r.rate} label="낙찰률" stack /> : "금액 없음"}</span>
                     </div>
                     <p className="text-xs text-ink-500">
                       {[r.date, r.wr ? `개찰 ${r.wr}위` : "순위 확인 중", r.rate && !(r.amount > 100) ? `낙찰률 ${pct(r.rate)}` : "", `${r.bidders}곳`].filter(Boolean).join(" · ")}
                     </p>
-                    {r.title && <p className="truncate text-xs text-ink-300">{r.title}</p>}
+                    {r.title && <p className="text-xs text-ink-300">{r.title}</p>}
                   </li>
                 ))}
               </ul>
@@ -251,7 +251,7 @@ function RankList({ top, winner, plnprc }: { top: PastAward["top"]; winner?: str
         <li key={`${i}-${name}`} className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-0.5 px-3 py-1.5">
           <span className="flex min-w-[9rem] flex-1 items-center gap-2">
             <span className="w-8 shrink-0 text-xs text-ink-300 tabular-nums">{i + 1}위</span>
-            <span className={`min-w-0 truncate ${name === winner ? "font-bold" : ""}`}>{name}</span>
+            <span className={`min-w-0 ${name === winner ? "font-bold" : ""}`}>{name}</span>
             {name === winner && <span className="shrink-0 rounded bg-mint-50 px-1.5 text-xs font-semibold text-mint-700">낙찰</span>}
           </span>
           <span className="ml-auto shrink-0 text-right">
@@ -278,7 +278,7 @@ function PriorCard({ prior, years }: { prior?: PastAward; years: number }) {
       <p className="text-sm font-semibold leading-snug">{prior.title}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Fact wide label="낙찰금액" value={prior.amount > 100 ? won(prior.amount) : "-"} note={[prior.rate ? `낙찰률 ${pct(prior.rate)}${prior.derived ? " (낙찰금액 ÷ 예정가격)" : ""}` : "", prior.lwlt ? `하한율 ${pct(prior.lwlt)}` : METHOD_NAME[prior.method]].filter(Boolean).join(" · ")} />
-        <Fact label="낙찰업체" value={<span className="block truncate">{prior.winner}</span>} note={prior.wr ? `개찰 ${prior.wr}위` : undefined} />
+        <Fact label="낙찰업체" value={prior.winner} note={prior.wr ? `개찰 ${prior.wr}위` : undefined} />
         <Fact label="참가업체" value={prior.bidders ? `${prior.bidders.toLocaleString()}곳` : "-"} />
         <Fact wide label="기초금액" value={prior.base ? won(prior.base) : "-"} />
         {pre > 0 && <Fact wide label="예정가격" value={won(prior.plnprc!)} note={`기초금액의 ${pct(pre)}`} />}
@@ -321,7 +321,7 @@ function HistoryCard({ history, fc }: { history: PastAward[]; fc: Forecast }) {
         {[...rows].reverse().map((r) => (
           <li key={r.no} className="min-w-0 text-sm">
             <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2">
-              <span className="min-w-0 max-w-full truncate"><span className="mr-1.5 text-xs text-ink-300 tabular-nums">{short(r.date)}</span>{r.winner}</span>
+              <span className="min-w-0 max-w-full"><span className="mr-1.5 text-xs text-ink-300 tabular-nums">{short(r.date)}</span>{r.winner}</span>
               <span className="ml-auto shrink-0 text-right text-xs tabular-nums text-ink-500">{r.amount > 100 ? <AmountRate amount={r.amount} rate={r.rate} className="text-sm text-ink" /> : <b className="text-ink">{r.rate ? pct(r.rate) : "-"}</b>} · {r.bidders}곳</span>
             </div>
           </li>
@@ -366,7 +366,7 @@ function SimilarCard({ similar, bidRate, floor, isNego, related, base }: { simil
             <p className="mb-2 text-xs font-semibold text-ink-500">자주 낙찰받은 업체</p>
             <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
               {s.winners.map(([name, c]) => (
-                <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0 truncate">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}건</span></li>
+                <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}건</span></li>
               ))}
             </ol>
           </div>
@@ -376,7 +376,7 @@ function SimilarCard({ similar, bidRate, floor, isNego, related, base }: { simil
             <p className="mb-2 text-xs font-semibold text-ink-500">개찰 1~5위에 자주 든 업체</p>
             <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
               {s.ranked.map(([name, c]) => (
-                <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0 truncate">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}회</span></li>
+                <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}회</span></li>
               ))}
             </ol>
           </div>
@@ -394,7 +394,7 @@ function ExList({ ex, title = "최근 낙찰 예" }: { ex: NonNullable<SimilarSt
       <ul className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
         {ex.slice(0, 5).map(([no, title, agency, date, amount, rate, bidders, winner, wr, top]) => (
           <li key={no} className="min-w-0 px-3 py-2">
-            <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
+            <p className="font-semibold leading-snug">{title}</p>
             <p className="mt-0.5 text-xs text-ink-500">{[date, agency, amount > 100 ? `낙찰금액 ${wonRate(amount, rate, "낙찰률")}` : rate ? `낙찰률 ${pct(rate)}` : "", `${bidders}곳`, `${winner}${wr ? ` (개찰 ${wr}위)` : ""}`].filter(Boolean).join(" · ")}</p>
             {top && top.length > 0 && <p className="mt-0.5 text-xs text-ink-300">1~{top.length}위: {top.map(([n, r], i) => `${i + 1}위 ${n} ${r ? pct(r) : ""}`).join(" · ")}</p>}
           </li>
@@ -411,7 +411,7 @@ function NameCounts({ title, rows, unit }: { title: string; rows: [string, numbe
       <p className="mb-2 text-xs font-semibold text-ink-500">{title}</p>
       <ol className="divide-y divide-ink-100 rounded-xl border border-ink-100 text-sm">
         {rows.slice(0, 6).map(([name, c]) => (
-          <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0 truncate">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}{unit}</span></li>
+          <li key={name} className="flex min-w-0 justify-between gap-3 px-3 py-1.5"><span className="min-w-0">{name}</span><span className="shrink-0 tabular-nums text-ink-500">{c}{unit}</span></li>
         ))}
       </ol>
     </div>

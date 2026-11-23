@@ -133,7 +133,7 @@ export function AptPredictor() {
               {matches.map((m) => (
                 <li key={m.no}>
                   <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => choose(m.no)}>
-                    <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
+                    <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
                     <span className="text-xs text-ink-500">{m.apt} · {m.category}{m.region ? ` · ${m.region}` : ""} · {priorLabel(m)}</span>
                   </button>
                 </li>
@@ -190,7 +190,7 @@ export function AptPredictor() {
                 {quick.map((m) => (
                   <li key={m.no}>
                     <button type="button" className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm hover:bg-ink-100/60" onClick={() => choose(m.no)}>
-                      <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
+                      <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
                       <span className="text-xs text-ink-500">{m.apt} · {m.category} · {priorLabel(m)}</span>
                     </button>
                   </li>

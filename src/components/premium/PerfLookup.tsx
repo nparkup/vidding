@@ -267,7 +267,7 @@ function WinList({ rows, included, toggle }: { rows: Row[]; included: (r: Row) =
           <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5">
             <input type="checkbox" className="mt-1 shrink-0" checked={included(r)} onChange={() => toggle(r)} />
             <span className="min-w-0 flex-1">
-              <span className="line-clamp-2 font-semibold">{r.title}</span>
+              <span className="font-semibold">{r.title}</span>
               <span className="block text-xs text-ink-500">{r.date} · {r.agency} · {r.why}</span>
             </span>
             <span className="shrink-0 text-right">

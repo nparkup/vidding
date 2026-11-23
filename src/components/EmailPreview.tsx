@@ -34,7 +34,7 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{i + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{r.bid.title}</p>
+                  <p className="text-sm font-semibold">{r.bid.title}</p>
                   <p className="mt-0.5 text-xs text-ink-500">
                     {r.bid.demandAgency} · {won(r.bid.baseAmount)} · {r.bid.contractMethod}
                   </p>
@@ -58,8 +58,8 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
                     <span className={`rounded-full px-2 py-0.5 font-bold ${w.change.kind === "취소" ? "bg-coral-100 text-coral" : "bg-amber-100 text-ink"}`}>{w.change.kind === "취소" ? "취소" : `정정 ${Number(w.change.ord)}차`}</span>
                     <span className="ml-1.5 text-ink-300">{w.reason}</span>
                   </p>
-                  <p className="mt-1 truncate text-sm font-semibold">{w.change.title}</p>
-                  <p className="mt-0.5 line-clamp-2 text-xs text-ink-500">{changeSummary(w.change)}</p>
+                  <p className="mt-1 text-sm font-semibold">{w.change.title}</p>
+                  <p className="mt-0.5 text-xs text-ink-500">{changeSummary(w.change)}</p>
                 </li>
               ))}
             </ul>
@@ -73,8 +73,8 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
                 <li key={k.keyword} className="rounded-xl border border-ink-100 p-3">
                   <p className="text-xs"><b className="text-sm text-ink">{k.keyword}</b> <span className="text-ink-500">새 공고 {k.fresh}건 · 진행 중 {k.total}건</span></p>
                   {k.items.slice(0, 2).map((r) => (
-                    <p key={r.bid.id} className="mt-1.5 flex min-w-0 gap-1 text-xs text-ink-500">
-                      <span className="min-w-0 truncate font-semibold text-ink">{r.bid.title}</span>
+                    <p key={r.bid.id} className="mt-1.5 text-xs text-ink-500">
+                      <span className="font-semibold text-ink">{r.bid.title}</span>{" "}
                       <span className="shrink-0 whitespace-nowrap">· {won(r.bid.baseAmount)} · {r.eligible ? <span className="text-mint-600">참가 가능</span> : <span className="text-coral">조건 확인</span>}</span>
                     </p>
                   ))}

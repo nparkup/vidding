@@ -97,8 +97,8 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
               <li key={r.bid.id} className={`flex items-center gap-3 px-3 py-3 sm:px-4 ${i === 0 ? "bg-mint-50/50" : ""}`}>
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">{i + 1}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{r.bid.title}</span>
-                  <span className="block truncate text-xs text-ink-400">{r.bid.demandAgency} · {won(r.bid.baseAmount)} · 마감 {dday(r.daysLeft)}</span>
+                  <span className="block text-sm font-semibold">{r.bid.title}</span>
+                  <span className="block text-xs text-ink-400">{r.bid.demandAgency} · {won(r.bid.baseAmount)} · 마감 {dday(r.daysLeft)}</span>
                 </span>
                 <GradeBadge grade={r.grade} />
               </li>
@@ -114,7 +114,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
               <p className="text-5xl font-extrabold leading-none tracking-tight text-mint-600">{top.score}</p>
               <GradeBadge grade={top.grade} />
             </div>
-            <p className="mt-3 line-clamp-2 text-sm font-semibold">{top.bid.title}</p>
+            <p className="mt-3 text-sm font-semibold">{top.bid.title}</p>
             <ul className="mt-4 space-y-3">
               {top.factors.slice(0, 5).map((f) => (
                 <li key={f.label}>

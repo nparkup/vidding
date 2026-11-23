@@ -162,7 +162,7 @@ export default async function Home() {
             {digest.recommended.slice(0, 4).map((r) => (
               <li key={r.bid.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                 <span className="min-w-0">
-                  <span className="block truncate font-medium">{r.bid.title}</span>
+                  <span className="block font-medium">{r.bid.title}</span>
                   <span className="text-xs text-ink-400">{won(r.bid.baseAmount)} · 마감 {dday(r.daysLeft)}</span>
                 </span>
                 <GradeBadge grade={r.grade} />
@@ -217,8 +217,8 @@ export default async function Home() {
             {featuredEval.factors.map((f) => (
               <li key={f.label}>
                 <div className="mb-1 flex justify-between gap-3 text-xs">
-                  <span className="font-semibold">{f.label} <span className="font-normal tabular-nums text-ink-300">{f.score}/{f.max}</span></span>
-                  <span className="truncate text-ink-400">{f.note}</span>
+                  <span className="shrink-0 font-semibold">{f.label} <span className="font-normal tabular-nums text-ink-300">{f.score}/{f.max}</span></span>
+                  <span className="min-w-0 text-right text-ink-400">{f.note}</span>
                 </div>
                 <ScoreBar value={f.score} max={f.max} />
               </li>
@@ -242,8 +242,8 @@ export default async function Home() {
             {docs.flatMap((g) => g.items).slice(0, 6).map((d, i) => (
               <li key={d.name} className="flex items-center gap-3 rounded-xl border border-ink-100 px-3 py-2.5 text-sm">
                 <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md ${i < 3 ? "bg-mint text-white" : "border border-ink-200"}`}>{i < 3 && <Check className="h-3.5 w-3.5" strokeWidth={3} />}</span>
-                <span className={`min-w-0 flex-1 truncate ${i < 3 ? "text-ink-400 line-through" : "font-medium"}`}>{d.name}</span>
-                {d.note && <span className="hidden truncate text-xs text-ink-300 sm:block">{d.note}</span>}
+                <span className={`min-w-0 flex-1 ${i < 3 ? "text-ink-400 line-through" : "font-medium"}`}>{d.name}</span>
+                {d.note && <span className="hidden max-w-[45%] text-right text-xs text-ink-300 sm:block">{d.note}</span>}
               </li>
             ))}
           </ul>
@@ -280,9 +280,9 @@ export default async function Home() {
               ["낙찰하한율", featured.lowerLimitRate ? `${featured.lowerLimitRate}%` : "해당 없음"],
               ["공동도급", featured.jointContract ? "허용" : "불가(단독)"],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-xl bg-paper p-3">
+              <div key={k} className="min-w-0 rounded-xl bg-paper p-3">
                 <dt className="text-[11px] text-ink-400">{k}</dt>
-                <dd className="mt-0.5 truncate text-sm font-bold">{v}</dd>
+                <dd className="mt-0.5 text-sm font-bold tabular-nums [overflow-wrap:anywhere]">{v}</dd>
               </div>
             ))}
           </dl>
@@ -307,7 +307,7 @@ export default async function Home() {
             ].map(([k, v], n) => (
               <div key={k} className={`min-w-0 rounded-xl bg-paper p-3 ${n === 2 ? "col-span-2" : ""}`}>
                 <dt className="text-[11px] text-ink-400">{k}</dt>
-                <dd className="mt-0.5 truncate text-sm font-bold">{v}</dd>
+                <dd className="mt-0.5 text-sm font-bold tabular-nums [overflow-wrap:anywhere]">{v}</dd>
               </div>
             ))}
           </dl>

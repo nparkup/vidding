@@ -92,7 +92,7 @@ export function RivalExplorer({ mode = "rival" }: { mode?: Mode }) {
           <ul className="mt-3 divide-y divide-ink-100 rounded-2xl border border-ink-100 bg-white">
             {saved.map((s) => (
               <li key={s.bizno} className={`flex items-center justify-between gap-2 px-3 py-2 text-sm ${s.bizno === bizno ? "bg-mint-50" : ""}`}>
-                <button type="button" className="min-w-0 truncate text-left font-semibold" onClick={() => { setInput(s.bizno); look(s.bizno); }}>
+                <button type="button" className="min-w-0 text-left font-semibold" onClick={() => { setInput(s.bizno); look(s.bizno); }}>
                   {s.name || "업체명 없음"} <span className="text-xs font-normal text-ink-500">{s.bizno.replace(/(\d{3})(\d{2})(\d{5})/, "$1-$2-$3")}</span>
                 </button>
                 <button type="button" className="shrink-0 text-xs text-ink-400 hover:text-coral" onClick={() => remove(s.bizno)}>빼기</button>

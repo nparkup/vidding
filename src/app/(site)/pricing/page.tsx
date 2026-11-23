@@ -7,7 +7,6 @@ import { Price, TrialN } from "@/components/Cfg";
 
 export const metadata: Metadata = { title: "요금제" };
 
-const CONTACT = "hello@ipchalmatelab.kr";
 
 type Cell = boolean | string | React.ReactNode;
 interface Row { k: string; d?: string; v: [Cell, Cell, Cell, Cell] }
@@ -137,11 +136,7 @@ export default function Pricing() {
         </div>
       </div>
 
-      <section className="mt-20 grid gap-10 lg:grid-cols-[1fr_1.6fr]">
-        <div>
-          <h2 className="text-2xl font-extrabold tracking-tight">요금 관련 질문</h2>
-          <p className="mt-3 text-sm leading-relaxed text-ink-500">더 궁금한 점은 메일로 보내 주세요.<br />평일 09:00–18:00 · <a href={`mailto:${CONTACT}`} className="font-semibold text-mint-600">{CONTACT}</a></p>
-        </div>
+      <section className="mx-auto mt-20 max-w-3xl">
         <div className="space-y-3">
           {FAQ.map((f, i) => (
             <details key={f.q} className="group rounded-2xl bg-paper px-6 py-5 open:bg-white open:shadow-card open:ring-1 open:ring-ink-100" open={i === 0}>

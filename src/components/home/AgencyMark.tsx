@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { agencyLogo, agencyLogoLabel } from "@/lib/agencyLogos";
 
 /**
@@ -44,44 +45,66 @@ function Emblem({ kind, ch }: { kind: Kind; ch: string }) {
   );
 }
 
-export function AgencyMark({ name }: { name: string }) {
-  const [top, main] = split(name);
-  const kind = kindOf(main);
-  const ch = main.replace(/^(국립|한국)/, "").charAt(0);
-  const logo = agencyLogo(name);
-  if (logo) {
-    // 흐르는 띠에서 이미지가 늦게 받아져 폭이 바뀌면 띠 전체가 덜컥이므로 비율로 폭을 미리 정한다
-    const w = Math.round(Math.min(150, 32 * logo.ratio));
-    return (
-      <span className="inline-flex h-[54px] items-center gap-2.5 whitespace-nowrap rounded-2xl border border-ink-100 bg-white py-2 pl-3 pr-4" title={name}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={logo.src}
-          alt={`${agencyLogoLabel(name)} CI`}
-          width={w}
-          height={32}
-          style={{ width: w, height: 32 }}
-          className="shrink-0 object-contain"
-          loading="eager"
-          decoding="async"
-          draggable={false}
-        />
-        <span className="flex flex-col leading-tight">
-          {top && <span className="text-[10px] font-medium text-ink-400">{top}</span>}
-          <span className="text-[14px] font-extrabold tracking-[-0.03em] text-ink-700">{main}</span>
-        </span>
-      </span>
-    );
-  }
+/** 아래 줄 이름에서 위 줄과 겹치는 시·도 이름을 뺀다. "전북특별자치도교육청" + "전북특별자치도전주교육지원청" → "전주교육지원청" */
+function trimRegion(top: string, main: string): string {
+  const m = main.match(/^\S+?(특별자치도|특별자치시|특별시|광역시|통합특별시|도)(?=\S)/);
+  if (!m || !top.startsWith(m[0])) return main;
+  const rest = main.slice(m[0].length);
+  return rest.length >= 2 ? rest : main;
+}
+
+/**
+ * 띠의 모든 칸을 같은 틀로 맞춘다: 칸 크기 고정, CI는 같은 크기 상자 안에 가운데 맞춤,
+ * 글자는 항상 두 줄(위: 상위 기관 또는 기관 유형, 아래: 기관 이름).
+ */
+function Card({ title, mark, top, main }: { title: string; mark: ReactNode; top: string; main: string }) {
   return (
-    <span className="inline-flex items-center gap-2.5 whitespace-nowrap rounded-2xl border border-ink-100 bg-white py-2 pl-2 pr-4" title={`${name} (${KIND[kind].label})`}>
-      <Emblem kind={kind} ch={ch} />
-      <span className="flex flex-col leading-tight">
-        {top && <span className="text-[10px] font-medium text-ink-400">{top}</span>}
-        <span className="text-[14px] font-extrabold tracking-[-0.03em] text-ink-700">{main}</span>
+    <span className="inline-flex h-[64px] w-[296px] items-center gap-3 rounded-2xl border border-ink-100 bg-white px-3" title={title}>
+      <span className="flex h-9 w-[80px] shrink-0 items-center justify-center">{mark}</span>
+      <span className="h-8 w-px shrink-0 bg-ink-100" aria-hidden />
+      <span className="flex min-w-0 flex-col justify-center gap-0.5 leading-tight">
+        <span className="truncate text-[11px] font-medium text-ink-400">{top}</span>
+        <span className="line-clamp-2 break-keep text-[14px] font-bold tracking-[-0.02em] text-ink-700">{main}</span>
       </span>
     </span>
   );
+}
+
+export function AgencyMark({ name }: { name: string }) {
+  const [rawTop, rawMain] = split(name);
+  const kind = kindOf(rawMain);
+  const top = rawTop || KIND[kind].label;
+  const main = rawTop ? trimRegion(rawTop, rawMain) : rawMain;
+  const ch = rawMain.replace(/^(국립|한국)/, "").charAt(0);
+  const logo = agencyLogo(name);
+  if (logo) {
+    // 흐르는 띠에서 이미지가 늦게 받아져 폭이 바뀌면 띠가 덜컥이므로 상자 크기는 고정하고, 그림은 비율대로 상자 안에 맞춘다
+    const ratio = logo.ratio || 1;
+    const h = ratio > 80 / 36 ? Math.round(80 / ratio) : 36;
+    const w = Math.round(h * ratio);
+    return (
+      <Card
+        title={name}
+        top={top}
+        main={main}
+        mark={
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logo.src}
+            alt={`${agencyLogoLabel(name)} CI`}
+            width={w}
+            height={h}
+            style={{ width: w, height: h }}
+            className="object-contain"
+            loading="eager"
+            decoding="async"
+            draggable={false}
+          />
+        }
+      />
+    );
+  }
+  return <Card title={`${name} (${KIND[kind].label})`} top={top} main={main} mark={<Emblem kind={kind} ch={ch} />} />;
 }
 
 export const AGENCY_KINDS = Object.values(KIND);

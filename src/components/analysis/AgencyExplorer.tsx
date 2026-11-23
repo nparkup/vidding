@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Building, Building2, Ellipsis, Factory, Handshake, HeartHandshake, Landmark, LayoutGrid, School, Shield, type LucideIcon } from "lucide-react";
 import { AgencyLogo } from "@/components/AgencyLogo";
+import { BidRow } from "@/components/BidRow";
 import { Tile as KindTile } from "@/components/CategoryTiles";
 import { AGENCY_KINDS, KIND_LABEL, REGION_ORDER, agencyKind, agencyRegion, type AgencyKind } from "@/lib/agencyKind";
-import { DistChart } from "@/components/BidPriceAnalysis";
+import { AssessDistWide } from "@/components/charts/AssessDistWide";
 import { YearChart } from "@/components/charts/YearChart";
 import { HBarList } from "@/components/charts/HBarList";
 import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
@@ -18,6 +19,7 @@ import { assessStats } from "@/lib/awards/assess";
 import { won } from "@/lib/format";
 import { bidHref } from "@/lib/links";
 import { useBids } from "@/lib/useBids";
+import type { Bid } from "@/lib/types";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 const BASE = STATIC ? process.env.NEXT_PUBLIC_BASE_PATH ?? "" : "";
@@ -201,7 +203,7 @@ export function AgencyExplorer() {
   );
 }
 
-function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title: string; closeAt: string; contractMethod: string }[] }) {
+function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
   const st = useMemo(() => assessStats(s.assess, undefined), [s]);
   const recent4 = s.groups.reduce((a, g) => a + g.n, 0);
   return (
@@ -246,38 +248,50 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: { id: string; title
         <p className="mt-2 text-xs text-ink-400">하한율 위 폭은 낙찰률에서 그 공고 낙찰하한율을 뺀 값의 가운데 값입니다.<br />참가업체는 가운데 값입니다.</p>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="card p-6">
-          <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">최근 4년</span></h3>
-          <HBarList rows={s.winners.map(([n, c, a], i) => ({ label: `${i + 1}. ${n}`, value: c, text: `${c}건 · ${won(a)}` }))} />
-          {s.ranked.length > 0 && (
-            <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
-          )}
-        </section>
-        <section className="card p-6">
-          <h3 className="font-bold">사정율 분포 <span className="text-sm font-normal text-ink-400">예정가격 ÷ 기초금액</span></h3>
-          {st ? (
-            <>
-              <DistChart st={st} />
-              <p className="mt-2 text-xs text-ink-500">{st.n}건 · 가운데 값 {pct(st.q[2])} · 최근 10건 평균 {pct(st.recent)}{st.winner ? ` · 낙찰자 사정율 가운데 ${pct(st.winner.q[1])}` : ""}</p>
-            </>
-          ) : <p className="mt-3 text-sm text-ink-500">예정가격·기초금액이 공개된 낙찰이 적어 분포를 만들지 못했습니다.</p>}
-        </section>
-      </div>
+      <section className="card p-6">
+        <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">최근 4년</span></h3>
+        <HBarList rows={s.winners.map(([n, c, a], i) => ({ label: `${i + 1}. ${n}`, value: c, text: `${c}건 · ${won(a)}` }))} />
+        {s.ranked.length > 0 && (
+          <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
+        )}
+      </section>
+
+      <section className="card p-6">
+        <h3 className="font-bold">사정율 분포 <span className="text-sm font-normal text-ink-400">예정가격 ÷ 기초금액</span></h3>
+        {st ? (
+          <>
+            <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Tile k="표본" v={`${st.n.toLocaleString()}건`} sub={`${st.from} ~ ${st.to}`} />
+              <Tile k="가운데 값" v={pct(st.q[2])} sub={`${pct(st.q[1], 2)} ~ ${pct(st.q[3], 2)}`} />
+              <Tile k="최근 10건 평균" v={pct(st.recent)} />
+              <Tile k="낙찰자 사정율" v={st.winner ? pct(st.winner.q[1]) : "자료 없음"} sub={st.winner ? `${st.winner.n}건 가운데 값` : undefined} />
+            </dl>
+            <AssessDistWide st={st} />
+            {st.windows.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold">낙찰이 많이 몰린 구간</p>
+                <ol className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {st.windows.map((w, i) => (
+                    <li key={w.lo} className="rounded-xl bg-paper px-3 py-2 text-sm">
+                      <span className="font-bold tabular-nums">{i + 1}. {pct(w.lo, 2)} ~ {pct(w.hi, 2)}</span>
+                      <span className="block text-xs text-ink-500">표본 {w.n}건 · 최근 가중 {Math.round(w.share * 100)}%</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </>
+        ) : <p className="mt-3 text-sm text-ink-500">예정가격·기초금액이 공개된 낙찰이 적어 분포를 만들지 못했습니다.</p>}
+      </section>
 
       <AgencyNetwork s={s} />
 
       {bids.length > 0 && (
         <section className="card p-6">
           <h3 className="font-bold">이 기관의 지금 공고</h3>
-          <ul className="mt-3 divide-y divide-ink-100">
-            {bids.slice(0, 12).map((b) => (
-              <li key={b.id} className="py-2 text-sm">
-                <Link href={bidHref(b.id)} className="font-semibold hover:underline">{b.title}</Link>
-                <span className="ml-2 text-xs text-ink-500">{b.contractMethod} · 마감 {b.closeAt.slice(0, 10)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-3 space-y-3">
+            {[...bids].sort((a, b) => a.closeAt.localeCompare(b.closeAt)).slice(0, 12).map((b) => <BidRow key={b.id} bid={b} />)}
+          </div>
         </section>
       )}
 

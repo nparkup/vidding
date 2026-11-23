@@ -18,15 +18,15 @@ jobs:
           const items = (t) => { try { const j = JSON.parse(t); let it = j?.response?.body?.items; it = it?.item ?? it; return Array.isArray(it) ? it : it ? [it] : []; } catch { console.log("RAW", t.slice(0, 300)); return []; } };
           const SAFE = /amt|amount|price|money|rank|rate|yn|cnt|count|num|date|de$|state|sttus|seq|order|rnk/i;
           const BAD = /tel|phone|hp|mobile|charge|manager|person|mail|fax|addr|ceo|rprsnt/i;
-          const aw = items(await q("getBidSttusSearchV3", { bidState: "5", searchYear: "2026", numOfRows: "8" }));
-          console.log("award keys:", Object.keys(aw[0] ?? {}).join(","));
-          for (const a of aw.slice(0, 8)) {
-            const no = a.bidNum;
-            const t = await q("getBidEntrpsInfoSearchV3", { bidNum: no, numOfRows: "50" });
-            const es = items(t);
-            console.log("\nBID", no, a.bidKaptname ?? "", "entrants", es.length);
-            if (es[0]) console.log("entrant keys:", Object.keys(es[0]).join(","));
-            for (const e of es) console.log(" ", Object.entries(e).filter(([k]) => !BAD.test(k) && (SAFE.test(k) || /company|corp|name/i.test(k) && !/kapt/i.test(k) === false ? SAFE.test(k) : SAFE.test(k) || /companyName/.test(k))).map(([k, v]) => `${k}=${v}`).join(" "));
+          let shown = 0, withNum = 0, total = 0;
+          for (const page of ["1","2","3"]) {
+            const aw = items(await q("getBidSttusSearchV3", { bidState: "5", searchYear: "2026", numOfRows: "100", pageNo: page }));
+            for (const a of aw) {
+              total++;
+              const c = String(a.bidResultContent ?? "").replace(/\d{2,4}[-) .]\d{3,4}[- .]\d{4}/g, "[전화]");
+              if (/\d{1,3}(,\d{3}){2,}|\d{7,}/.test(c)) { withNum++; if (shown++ < 25) console.log("RC", a.bidNum, "amount=", a.amount, "|", c.replace(/\s+/g, " ").slice(0, 300)); }
+            }
           }
+          console.log("total", total, "withNum", withNum);
           JS
           node p.mjs

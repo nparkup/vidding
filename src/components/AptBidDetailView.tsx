@@ -116,8 +116,8 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
     <div className="container-x py-6 sm:py-8">
       <Link href="/apt-bids" className="text-sm text-ink-500 hover:text-ink">아파트 공고 목록으로</Link>
 
-      <header className="mt-3">
-        <div className="min-w-0">
+      <header className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
+        <div className="min-w-0 lg:flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <CloseDdayBadge iso={b.closeAt} />
             <span className="chip">아파트 · {b.category}</span>
@@ -130,7 +130,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">{b.title}</h1>
           <p className="mt-2 text-ink-500 [overflow-wrap:anywhere]">{b.apt}{b.region ? ` · ${b.region}` : ""}</p>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap lg:justify-end">
           <a href={aptDetailUrl(b.no)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">K-apt 원문</a>
           {b.link && <a href={b.link} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">{b.system ?? "입찰 시스템"}에서 보기</a>}
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>

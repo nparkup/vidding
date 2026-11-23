@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { PageHero } from "@/components/PageHero";
 import { AptPredictor } from "@/components/premium/AptPredictor";
+import { TRIAL_LIMIT_ENABLED } from "@/lib/trialLimit";
 
 export const metadata: Metadata = {
   title: "아파트 예측",
@@ -26,7 +27,7 @@ export default function AptPredictPage() {
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">아파트 예측</p>
         <h2 className="h-section mt-3">아파트 공고 하나로 직접 계산해 보세요</h2>
-        <p className="lead mt-3 max-w-3xl">공고를 고르면 같은 단지의 직전 계약으로 예상 낙찰금액과 구간이 맨 위에 정리됩니다. 계약기간이나 규모가 직전과 다르면 2번에서 바꿔 보세요. 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터 예측과 합산).</p>
+        <p className="lead mt-3 max-w-3xl">공고를 고르면 같은 단지의 직전 계약으로 예상 낙찰금액과 구간이 맨 위에 정리됩니다. 계약기간이나 규모가 직전과 다르면 2번에서 바꿔 보세요.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터 예측과 합산)."}</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
             <AptPredictor />

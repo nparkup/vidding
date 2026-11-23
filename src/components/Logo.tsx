@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { hardGo } from "@/lib/hardGo";
 
 /** 입찰메이트LAB 심볼: M 자형 분석 라인 + 판정 노드 */
 export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
@@ -17,9 +20,10 @@ export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
   );
 }
 
-export function Logo({ href = "/", light = false }: { href?: string; light?: boolean }) {
+/** reset: 누르면 모든 화면의 선택·조회·저장 조건을 지우고 첫 화면을 새로 연다 (사이트 헤더·푸터) */
+export function Logo({ href = "/", light = false, reset = false }: { href?: string; light?: boolean; reset?: boolean }) {
   return (
-    <Link href={href} className="flex items-center gap-2.5" aria-label="입찰메이트LAB 홈">
+    <Link href={href} className="flex items-center gap-2.5" aria-label="입찰메이트LAB 홈" onClick={reset ? (e) => hardGo(e, href) : undefined}>
       <LogoMark className={`h-8 w-8 ${light ? "rounded-lg ring-1 ring-white/15" : ""}`} />
       <span className="flex flex-col leading-none">
         <span className={`text-[17px] font-extrabold tracking-[-0.04em] ${light ? "text-white" : "text-ink"}`}>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { agencyLogo, agencyLogoLabel } from "@/lib/agencyLogos";
+import { agencyKind } from "@/lib/agencyKind";
 
 /**
  * 발주기관 표기. 공식 CI가 확인된 기관(src/lib/agencyLogos.ts)은 CI와 기관명을,
@@ -70,10 +71,26 @@ function Card({ title, mark, top, main }: { title: string; mark: ReactNode; top:
   );
 }
 
+/** 상위 기관이 없는 칸의 윗줄. 발주처 분석과 같은 구분(src/lib/agencyKind.ts)을 쓰되 기관 하나에 맞는 말로 줄인다 */
+function kindLine(name: string): string {
+  switch (agencyKind(name)) {
+    case "gov": return "중앙행정기관";
+    case "local1": return "광역자치단체";
+    case "local2": return "기초자치단체";
+    case "edu": return "교육청";
+    case "school": return /대학/.test(name) ? "대학교" : "학교";
+    case "corp": return /공사$|공단$/.test(name) ? "공기업" : "공공기관";
+    case "mil": return "국방기관";
+    case "welfare": return "복지시설";
+    case "biz": return /조합|협회|법인/.test(name) ? "조합·단체" : "기업";
+    default: return "공공기관";
+  }
+}
+
 export function AgencyMark({ name }: { name: string }) {
   const [rawTop, rawMain] = split(name);
   const kind = kindOf(rawMain);
-  const top = rawTop || KIND[kind].label;
+  const top = rawTop || kindLine(rawMain);
   const main = rawTop ? trimRegion(rawTop, rawMain) : rawMain;
   const ch = rawMain.replace(/^(국립|한국)/, "").charAt(0);
   const logo = agencyLogo(name);

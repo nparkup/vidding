@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { looksLikeBizno, normCorpName, type CorpHit, type CorpSearchResult } from "@/lib/awards/corps";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
@@ -70,7 +70,7 @@ export function CorpSearch({ id, label, value, onChange, onBizno, busy, button =
           <p className="border-b border-ink-100 px-3 py-2 text-xs text-ink-500">
             &apos;{res.query}&apos;(으)로 시작하는 업체 {res.total.toLocaleString()}곳{res.total > res.hits.length ? ` 중 낙찰 많은 ${res.hits.length}곳` : ""}. 사업자번호를 보고 골라 주세요.
           </p>
-          <ul className="max-h-80 divide-y divide-ink-100 overflow-y-auto">
+          <ul className="max-h-80 divide-y divide-ink-100 overflow-y-auto overflow-x-hidden">
             {res.hits.map((h) => (
               <li key={h.bizno}>
                 <button type="button" className="block w-full px-3 py-2.5 text-left hover:bg-mint-50" onClick={() => pick(h)}>
@@ -85,7 +85,7 @@ export function CorpSearch({ id, label, value, onChange, onBizno, busy, button =
                       h.last ? `최근 ${h.last.slice(0, 7).replace("-", ".")}` : "",
                       h.biz,
                       h.region ? `주 지역 ${h.region}` : "",
-                    ].filter(Boolean).map((t, i) => <span key={t} className="whitespace-nowrap">{i ? " · " : ""}{t}</span>)}
+                    ].filter(Boolean).map((t, i) => <Fragment key={t}>{i ? " · " : ""}<span className="whitespace-nowrap">{t}</span></Fragment>)}
                   </span>
                   {h.formerNames.length > 0 && <span className="mt-0.5 block text-xs text-ink-400">예전 상호 {h.formerNames.slice(0, 2).join(", ")}</span>}
                 </button>

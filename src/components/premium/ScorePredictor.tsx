@@ -1118,7 +1118,7 @@ function CorpPanel({ corp }: { corp: CorpLookup }) {
         {fsc && (
           <Row title="재무 요약" source="금융위원회" error={errors.finance} empty="공시된 재무제표가 없습니다. 외부감사 대상이 아니면 재무제표 서류로 확인합니다.">
             {finance.length > 0 && (
-              <div className="-mx-1 overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full text-right text-[11px] tabular-nums sm:text-xs">
                   <thead className="text-ink-300">
                     <tr><th className="px-1 py-1 text-left font-medium">연도</th><th className="px-1 font-medium">매출</th><th className="px-1 font-medium">영업이익</th><th className="px-1 font-medium">순이익</th><th className="px-1 font-medium">부채비율</th></tr>

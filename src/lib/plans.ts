@@ -24,10 +24,10 @@ export const PLANS: Plan[] = [
 export const PLAN_IDS = PLANS.map((p) => p.id);
 export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && (PLAN_IDS as string[]).includes(v);
 
-/** 이용권에 들어 있는 기능 (공고 예측 건수 외에는 같음) */
+/** 이용권에 들어 있는 기능 (공고 예측 건수 외에는 같음). \n은 화면에서 줄바꿈 */
 export const FEATURES: string[] = [
   "영업일 매일 아침 맞춤 공고 요약 이메일",
-  "면허·지역·금액 기준 1차 선별, 참가조건·마감일 정리",
+  "면허·지역·금액 기준 1차 선별,\n참가조건·마감일 정리",
   "관심 공고 제출서류 체크리스트 무제한",
   "공고별 입찰 가능성 점수와 투찰 가이드",
   "사전규격·발주계획 단계부터 선제 알림",

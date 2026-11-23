@@ -33,6 +33,7 @@ import { syncTrialServer, type TrialEntry } from "@/lib/trial";
 import { useUsage } from "@/lib/usage";
 import { readMember } from "@/lib/member";
 import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
+import { PredictSummary, StepBar, type SummaryTile, type Tone } from "./PredictSummary";
 
 /** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
 const MAX_MATCHES = 100;
@@ -339,6 +340,18 @@ export function ScorePredictor() {
     return { matches: all.slice(0, MAX_MATCHES), matchTotal: all.length };
   }, [bids, query]);
 
+  // 처음 들어오면 바로 해 볼 수 있게: 공개 경쟁·기초금액 있는 공고를 업종이 겹치지 않게 마감 임박순으로 몇 건
+  const quick = useMemo(() => {
+    if (!bids) return [];
+    const soon = Date.now() + 86400000;
+    const seen = new Set<string>();
+    return bids
+      .filter((b) => new Date(b.closeAt).getTime() > soon && b.baseAmount > 0 && methodProfile(b).open)
+      .sort((a, b) => a.closeAt.localeCompare(b.closeAt))
+      .filter((b) => (seen.has(b.category) ? false : (seen.add(b.category), true)))
+      .slice(0, 5);
+  }, [bids]);
+
   const set = <K extends keyof CompanyInput>(k: K, v: CompanyInput[K]) => setCo((c) => ({ ...c, [k]: v }));
 
   async function onCreditFile(files: FileList | null) {
@@ -487,30 +500,118 @@ export function ScorePredictor() {
     );
   }
 
-  // 공고를 고르기 전: 검색만 보이고, 결과 자리에는 안내만 둔다
+  // 공고를 고르기 전: 검색과 바로 고를 수 있는 공고 몇 건, 결과 자리에는 무엇이 나오는지만 둔다
   if (!bid || !active || !result) {
     return (
+      <div className="space-y-6">
+      <StepBar steps={[
+        { label: "공고 선택", state: "now" },
+        { label: "우리 회사 조회", state: "todo" },
+        { label: "결과 확인", state: "todo" },
+      ]} />
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
           <Step n={1} title="공고 선택" />
           <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요. 고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다.</p>
+          {pickedBid && !bid && <p className="mt-2 text-sm text-ink-300">고른 공고를 불러오는 중…</p>}
           {searchBox}
           <TrialIntro />
+          {quick.length > 0 && (
+            <div className="mt-5 border-t border-ink-100 pt-4">
+              <p className="text-xs font-semibold text-ink-500">마감이 가까운 공고 (업종별 1건)</p>
+              <ul className="mt-2 space-y-1">
+                {quick.map((m) => (
+                  <li key={m.id}>
+                    <button type="button" className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm hover:bg-ink-100/60" onClick={() => setBidId(m.id)}>
+                      <span className="line-clamp-2 font-semibold sm:line-clamp-1"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
+                      <span className="text-xs text-ink-500">{m.category} · {m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
-        <aside className="card grid min-h-[12rem] min-w-0 place-items-center p-6 text-center">
-          <div>
-            <p className="font-bold">평가 기준</p>
-            <p className="mt-2 text-sm text-ink-500">공고를 고르면 평가항목과 배점이 나옵니다. 사업자번호를 조회하면 참가자격을 확인하고 예상 평가점수를 계산합니다.</p>
-          </div>
+        <aside className="card min-w-0 p-6">
+          <p className="font-bold">공고를 고르면 나오는 것</p>
+          <ol className="mt-4 space-y-3 text-sm">
+            {[
+              ["평가 기준", "공고 첨부에서 읽은 평가항목·배점과 통과 기준"],
+              ["참가자격", "사업자번호로 공고의 업종·지역 제한과 대조"],
+              ["예상 평가점수", "항목별 점수와 통과 여부, 점수를 올릴 수 있는 곳"],
+              ["투찰률", "통과 가능한 투찰률과 그 금액, 과거 낙찰자 투찰률"],
+              ["낙찰 결과 분석", "전년도·같은 사업·비슷한 공고의 낙찰 업체와 경쟁 강도"],
+            ].map(([t, d], n) => (
+              <li key={t} className="flex gap-3">
+                <span className="w-5 shrink-0 font-bold tabular-nums text-mint-600">{n + 1}</span>
+                <span className="min-w-0"><span className="block font-semibold">{t}</span><span className="block text-ink-500">{d}</span></span>
+              </li>
+            ))}
+          </ol>
         </aside>
+      </div>
       </div>
     );
   }
 
   const isNego = active.method === "협상에 의한 계약" || active.method === "종합심사";
 
+  // 맨 위 한눈에 보기: 참가자격 → 예상 점수 → 투찰 → 낙찰 가능성
+  const tiles: SummaryTile[] = [];
+  if (CORP_API) {
+    tiles.push(!corp
+      ? { label: "참가자격", value: "조회 전", tone: "muted", sub: "2번에서 사업자번호를 조회하면 공고의 업종·지역 제한과 대조합니다." }
+      : !eligibility
+        ? { label: "참가자격", value: "확인 중", tone: "muted" }
+        : { label: "참가자격", value: eligibility.verdict === "가능" ? "참가 가능" : eligibility.verdict === "불가" ? "참가 불가" : "확인 필요", tone: VERDICT_TILE[eligibility.verdict], sub: eligibility.verdict === "확인 필요" ? `${eligibility.checks.filter((c) => c.verdict === "확인 필요").map((c) => c.label).join("·")}을 공고서로 확인하세요.` : VERDICT_TITLE[eligibility.verdict] });
+  }
+  const scoreTone: Tone = result.passed === undefined ? "ink" : result.passed ? "mint" : "coral";
+  tiles.push(scoreStage === "score"
+    ? { label: "예상 평가점수", value: <>{result.total}<span className="text-sm font-semibold text-ink-500"> / {result.max}점</span></>, tone: scoreTone,
+        sub: [result.passed === undefined ? (result.pending > 0 ? `확인 필요 ${result.pending}점 제외` : "") : result.passed ? "통과 예상" : "미달 예상", result.passLabel ? `기준 ${result.passLabel}` : "", result.gap !== undefined ? (result.gap >= 0 ? `${result.gap}점 여유` : `${Math.abs(result.gap)}점 부족`) : ""].filter(Boolean).join(" · ") }
+    : scoreStage === "blocked"
+      ? { label: "예상 평가점수", value: "계산하지 않음", tone: "coral", sub: "현재 등록 정보로는 참가할 수 없는 공고입니다." }
+      : { label: "예상 평가점수", value: `평가항목 ${active.items.length}개`, tone: "muted", sub: `${result.passLabel ? `통과 기준 ${result.passLabel}. ` : ""}사업자번호를 조회하면 항목별 점수를 계산합니다.` });
+  const baseAmt = bid.baseAmount > 0 ? bid.baseAmount : 0;
+  const atRate = (r: number) => (baseAmt ? wonFull(Math.floor((baseAmt * r) / 100)) : "");
+  if (isNego) {
+    tiles.push(scoreStage === "score"
+      ? { label: "기술 점수", value: <>{result.techScore}<span className="text-sm font-semibold text-ink-500"> / {result.techMax}점</span></>, sub: `가격 ${Math.round((result.total - result.techScore) * 10) / 10}점 · 투찰률 ${co.bidRate.toFixed(2)}%`, tone: "ink" }
+      : { label: "예상 최저 경쟁 투찰률", value: `${co.rivalRate.toFixed(2)}%`, sub: atRate(co.rivalRate) ? `기초금액 기준 ${atRate(co.rivalRate)}` : undefined, tone: "ink" });
+  } else if (scoreStage === "score" && result.rateWindow) {
+    tiles.push({ label: "통과 가능한 투찰률", value: `${result.rateWindow.low}~${result.rateWindow.high}%`, tone: "ink", sub: atRate(result.rateWindow.low) ? `기초금액 기준 ${atRate(result.rateWindow.low)}부터` : undefined });
+  } else if (fc.suggestRate) {
+    tiles.push({ label: "과거 낙찰자 투찰률", value: `${fc.suggestRate.value}%`, tone: "ink", sub: `가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%` });
+  } else {
+    const lw = active.lowerLimit ?? bid.lowerLimitRate;
+    tiles.push({ label: "낙찰하한율", value: lw ? `${lw}%` : "공고에 없음", tone: lw ? "ink" : "muted", sub: lw && atRate(lw) ? `기초금액 기준 ${atRate(lw)}` : undefined });
+  }
+  tiles.push(chance && scoreStage === "score"
+    ? { label: "낙찰 가능성", value: `${chance.low}~${chance.high}%`, tone: chance.low > 0 ? "ink" : "coral", sub: `${fc.competition ? `경쟁 강도 ${fc.competition.level} · ` : ""}${chance.ifPassed ? `통과 기준을 채우면 ${chance.ifPassed.low}~${chance.ifPassed.high}%` : "같은 조건 과거 낙찰로 낸 범위"}` }
+    : fc.competition
+      ? { label: "경쟁 강도", value: fc.competition.level, tone: "ink", sub: fc.competition.text }
+      : analysisLoading
+        ? { label: "경쟁 강도", value: "분석 중", tone: "muted" }
+        : { label: "경쟁 강도", value: "자료 부족", tone: "muted", sub: "같은 사업·비슷한 공고의 낙찰 자료가 적습니다." });
+  const corpDone = !CORP_API || !!corp;
+
   return (
     <div className="space-y-6">
+    <StepBar steps={[
+      { label: "공고 선택", state: "done" },
+      { label: "우리 회사 조회", state: corpDone ? "done" : "now", href: "#corp" },
+      { label: "결과 확인", state: corpDone ? "now" : "todo", href: "#score" },
+    ]} />
+    <PredictSummary
+      title="한눈에 보기"
+      tiles={tiles}
+      links={[
+        { href: "#score", label: "항목별 점수" },
+        { href: "#rate", label: "투찰률 조정" },
+        { href: "#sheet", label: "평가표" },
+        { href: "#award", label: "낙찰 결과 분석" },
+      ]}
+    />
     {/* 입력과 결과: 결과 패널은 스크롤을 따라다니지 않고 제자리에 둔다 */}
     <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
       <div className="min-w-0 space-y-6">
@@ -548,7 +649,9 @@ export function ScorePredictor() {
                   </p>
                 )}
                 {docs.files.length > 0 && (
-                  <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                  <details className="group mt-3">
+                  <summary className="cursor-pointer select-none text-sm font-semibold text-ink-500 hover:text-ink">첨부파일 {docs.files.length}개 <span className="group-open:hidden">펼치기</span><span className="hidden group-open:inline">접기</span></summary>
+                  <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
                     {docs.files.map((f) => (
                       <li key={f.url} className="min-w-0">
                         <a href={f.url} target="_blank" rel="noreferrer" className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm hover:bg-ink-100/60 ${f.name === docs.sheetFile ? "bg-mint-50 font-semibold" : "bg-paper"}`}>
@@ -558,6 +661,7 @@ export function ScorePredictor() {
                       </li>
                     ))}
                   </ul>
+                  </details>
                 )}
               </>
             )}
@@ -565,11 +669,12 @@ export function ScorePredictor() {
           )}
         </section>
 
-        {/* 2. 기업 정보 */}
-        <section className="card p-6">
-          <Step n={2} title="기업 정보와 신용평가 서류" />
-          <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
-            <div className="min-w-0 sm:col-span-3">
+        {/* 2. 우리 회사 조회: 참가자격·기업 정보·유사 실적 */}
+        <section id="corp" className="card scroll-mt-24 p-6">
+          <Step n={2} title="우리 회사 조회" />
+          <p className="mt-2 text-sm text-ink-500">사업자번호 하나로 참가자격을 확인하고, 업력·종업원 수·유사 실적을 아래 3번에 채웁니다.</p>
+          <div className="mt-4">
+            <div className="min-w-0">
               <span className="label">사업자등록번호</span>
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); lookup(); }}>
                 <input className="input" inputMode="numeric" placeholder="000-00-00000" value={bizno} onChange={(e) => setBizno(e.target.value)} />
@@ -581,9 +686,24 @@ export function ScorePredictor() {
                   : "공개 미리보기에서는 직접 입력합니다.")}
               </p>}
               {corp && <EligibilityPanel result={eligibility} />}
-              {corp && <CorpPanel corp={corp} />}
+              {corp && (
+                <details className="group mt-3 rounded-2xl border border-ink-100">
+                  <summary className="flex cursor-pointer select-none flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 py-3 text-sm">
+                    <span className="font-bold">조회한 기업 정보 <span className="font-normal text-ink-500">{corp.corpName ?? ""}</span></span>
+                    <span className="text-xs font-semibold text-ink-500"><span className="group-open:hidden">국세청·나라장터·금융위원회 자료 펼치기</span><span className="hidden group-open:inline">접기</span></span>
+                  </summary>
+                  <div className="border-t border-ink-100 p-3"><CorpPanel corp={corp} /></div>
+                </details>
+              )}
               {perfBizno && <PerfLookup api={PERF_API} bid={bid} bizno={perfBizno} since={corp?.nara?.registeredAt} sheetPeriod={sheetPeriod} onChange={onPerf} />}
             </div>
+          </div>
+        </section>
+
+        {/* 3. 점수 계산에 쓰는 값 */}
+        <section className="card p-6">
+          <Step n={3} title="점수 계산에 쓰는 값" />
+          <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
             <p className="text-xs leading-relaxed text-ink-500 sm:col-span-3">
               값마다 출처를 표시합니다. <b className="text-mint-700">자동</b>은 공공데이터로 1차로 채운 값, <b className="text-ink">수정됨</b>은 고객이 증빙 서류 기준으로 고친 값, <b className="text-ink">직접 입력</b>은 공공데이터에 없어 고객이 넣는 값입니다. 심사에서는 증빙 서류 값이 기준입니다.
             </p>
@@ -649,7 +769,22 @@ export function ScorePredictor() {
               </div>
             </div>
             {jointOk && <div className="min-w-0 sm:col-span-3"><JointMembers members={members} onChange={setMembers} ourPerf={coEff.pastPerformance} showFinance={needs.finance} /></div>}
-            <TrustPicker rule={result?.trust?.rule ?? active?.trust} selected={co.trustItems ?? []} onChange={(ids) => set("trustItems", ids)} score={result?.trust} auto={trustAuto} checked={!!corp} />
+            <details className="group min-w-0 rounded-2xl border border-ink-100 sm:col-span-3">
+              <summary className="flex cursor-pointer select-none flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 py-3 text-sm">
+                <span className="font-bold">신뢰도 가감점(신인도) <span className="font-normal text-ink-500">현재 {result?.trust ? `${result.trust.total}점` : "0점"}{co.trustItems?.length ? ` · ${co.trustItems.length}개 선택` : ""}</span></span>
+                <span className="text-xs font-semibold text-ink-500"><span className="group-open:hidden">해당 항목 고르기</span><span className="hidden group-open:inline">접기</span></span>
+              </summary>
+              <div className="border-t border-ink-100 p-4">
+                <TrustPicker rule={result?.trust?.rule ?? active?.trust} selected={co.trustItems ?? []} onChange={(ids) => set("trustItems", ids)} score={result?.trust} auto={trustAuto} checked={!!corp} hideTitle />
+              </div>
+            </details>
+          </div>
+        </section>
+
+        {/* 4. 투찰률 */}
+        <section id="rate" className="card scroll-mt-24 p-6">
+          <Step n={4} title="투찰률" />
+          <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
             <Range
               label="투찰률 (예정가격 대비)"
               value={co.bidRate}
@@ -677,7 +812,7 @@ export function ScorePredictor() {
       </div>
 
       {/* 결과: 사업자번호 조회 전에는 평가 기준만, 조회 후 참가 가능하면 예상 점수, 불가면 사유 */}
-      <aside className="min-w-0 lg:self-start">
+      <aside id="score" className="min-w-0 scroll-mt-24 lg:self-start">
         {scoreStage === "criteria" && <CriteriaPanel sheet={active} passLabel={result.passLabel} />}
         {scoreStage === "checking" && (
           <section className="card p-6">
@@ -758,7 +893,7 @@ export function ScorePredictor() {
     </div>
 
     {/* 평가표 (전체 폭) */}
-    <section className="card min-w-0 p-6">
+    <section id="sheet" className="card min-w-0 scroll-mt-24 p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">{active.title}</h3>
           <div className="flex items-center gap-2">
@@ -795,7 +930,7 @@ export function ScorePredictor() {
       </section>
 
     {/* 평가 기준 아래: 전년도·과거 같은 사업·비슷한 공고의 낙찰 결과 */}
-    <AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} baseAmount={bid.baseAmount} />
+    <div id="award" className="scroll-mt-24"><AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} baseAmount={bid.baseAmount} /></div>
     </div>
   );
 }
@@ -816,6 +951,7 @@ const VERDICT_TONE: Record<Verdict, string> = {
   불가: "bg-coral-100 text-ink",
   "확인 필요": "bg-amber-100 text-ink",
 };
+const VERDICT_TILE: Record<Verdict, Tone> = { 가능: "mint", 불가: "coral", "확인 필요": "amber" };
 const VERDICT_SOLID: Record<Verdict, string> = { 가능: "bg-mint text-white", 불가: "bg-coral text-white", "확인 필요": "bg-amber text-ink" };
 const VERDICT_TITLE: Record<Verdict, string> = {
   가능: "업종·지역 기준 참가 가능",
@@ -933,16 +1069,13 @@ function BlockedPanel({ result, corpName }: { result: Eligibility; corpName?: st
 }
 
 /** 확인 필요: 점수는 보여 주되 무엇을 확인해야 하는지 위에 적는다 */
+/** 참가자격 일부를 확인하지 못했을 때 점수 카드 위 한 줄 (자세한 사유는 왼쪽 2번 참가자격 표) */
 function ReviewNotice({ result }: { result: Eligibility }) {
   const review = result.checks.filter((c) => c.verdict === "확인 필요");
   return (
-    <section className="mb-4 rounded-2xl bg-amber-100 p-4 text-sm text-ink">
-      <p className="font-bold">참가 가능 여부 확인 필요</p>
-      <ul className="mt-2 space-y-1.5 leading-relaxed">
-        {review.map((c) => <li key={c.label} className="break-keep"><b>{c.label}</b><DetailLines text={c.detail} className="mt-0.5" /></li>)}
-      </ul>
-      <p className="mt-2 text-xs text-ink-500">아래 점수는 참가할 수 있다고 보고 계산한 예상치입니다.</p>
-    </section>
+    <p className="mb-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm leading-relaxed text-ink">
+      <b>참가자격 확인 필요</b> · {review.map((c) => c.label).join("·")}. 아래 점수는 참가할 수 있다고 보고 계산한 예상치입니다.
+    </p>
   );
 }
 

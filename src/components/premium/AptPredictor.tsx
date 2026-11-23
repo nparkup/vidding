@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { aptDetailUrl, aptFileUrl, type AptBid, type AptBidsFile, type AptHistory } from "@/lib/apt";
 import { contractMonths, forecastAptPrice, type AptPriceCheck, type AptPriceForecast } from "@/lib/aptPrice";
@@ -13,6 +13,7 @@ import { syncTrialServer, type TrialEntry } from "@/lib/trial";
 import { useUsage } from "@/lib/usage";
 import { readMember } from "@/lib/member";
 import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
+import { PredictSummary, StepBar, type SummaryTile } from "./PredictSummary";
 
 const TRIAL_API = process.env.NEXT_PUBLIC_STATIC_SITE === "1" ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "";
 
@@ -94,12 +95,11 @@ export function AptPredictor() {
   // 처음 들어오면 직전 계약이 있는 마감 임박 공고 몇 건을 바로 고를 수 있게 둔다
   const quick = useMemo(() => open.filter((b) => b.prior).sort((a, b) => a.closeAt.localeCompare(b.closeAt)).slice(0, 6), [open]);
 
-  // 좁은 화면은 결과가 아래에 있어 공고를 고르면 결과로 내려간다
-  const resultRef = useRef<HTMLElement>(null);
   const choose = (no: string) => {
     setPicked(no);
     setQuery("");
-    if (typeof window !== "undefined" && window.innerWidth < 1024) setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    // 좁은 화면은 맨 위 한눈에 보기가 보이게 올린다 (검색 목록이 길어 아래로 내려가 있다)
+    if (typeof window !== "undefined" && window.innerWidth < 1024) setTimeout(() => document.getElementById("predict")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const model = data?.pricing;
@@ -170,6 +170,12 @@ export function AptPredictor() {
   // 공고를 고르기 전: 검색만 보이고, 결과 자리에는 안내만 둔다
   if (!bid) {
     return (
+      <div className="space-y-6">
+      <StepBar steps={[
+        { label: "공고 선택", state: "now" },
+        { label: "직전 계약·규모 확인", state: "todo" },
+        { label: "예상 낙찰금액 확인", state: "todo" },
+      ]} />
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
           <Step n={1} title="공고 선택" />
@@ -193,18 +199,61 @@ export function AptPredictor() {
             </div>
           )}
         </section>
-        <aside className="card grid min-h-[12rem] min-w-0 place-items-center p-6 text-center">
-          <div>
-            <p className="font-bold">예측 기준</p>
-            <p className="mt-2 text-sm text-ink-500">공고를 고르면 같은 단지·같은 업종의 직전 계약금액과 과거 낙찰 변화율로 이번 공고의 예상 낙찰금액과 구간이 나옵니다.</p>
-          </div>
+        <aside className="card min-w-0 p-6">
+          <p className="font-bold">공고를 고르면 나오는 것</p>
+          <ol className="mt-4 space-y-3 text-sm">
+            {[
+              ["직전 계약", "같은 단지·같은 업종의 직전 낙찰·수의계약 금액과 업체"],
+              ["예상 낙찰금액", "직전 계약과 과거 낙찰 변화율로 낸 가운데값과 구간"],
+              ["경쟁 강도", "같은 단지·비슷한 낙찰의 응찰 업체 수와 참가 예상 업체"],
+              ["예측 정확도", "같은 계산을 올해 실제 낙찰에 맞춰 본 결과"],
+            ].map(([t, d], n) => (
+              <li key={t} className="flex gap-3">
+                <span className="w-5 shrink-0 font-bold tabular-nums text-mint-600">{n + 1}</span>
+                <span className="min-w-0"><span className="block font-semibold">{t}</span><span className="block text-ink-500">{d}</span></span>
+              </li>
+            ))}
+          </ol>
         </aside>
+      </div>
       </div>
     );
   }
 
+  // 맨 위 한눈에 보기: 예상 낙찰금액 → 구간 → 직전 계약 → 경쟁 강도
+  const comp = bid.history?.competition;
+  const tiles: SummaryTile[] = [
+    f
+      ? { label: "예상 낙찰금액", value: wonFull(round(f.mid)), tone: "mint", sub: `직전 계약${f.scale !== 1 ? " 환산" : ""} 대비 ${signed(f.stat.median)}` }
+      : { label: "예상 낙찰금액", value: "예측하지 않음", tone: "muted", sub: PRICEABLE.has(bid.category) ? "직전 계약금액을 2번에 넣으면 계산합니다." : `${bid.category} 공고는 예측 대상이 아닙니다.` },
+    f
+      ? { label: "예상 구간 (과거 낙찰 10~90%)", value: <span className="text-base">{wonFull(round(f.low))} ~ {wonFull(round(f.high))}</span>, tone: "ink", sub: `${signed(f.stat.low)} ~ ${signed(f.stat.high)}` }
+      : { label: "예상 구간", value: "-", tone: "muted" },
+    prior
+      ? { label: manual ? "직접 넣은 직전 계약" : `직전 ${bid.prior?.via === "수의계약" ? "수의계약" : "낙찰"}`, value: wonFull(prior.amount), tone: "ink", sub: manual ? "2번에 넣은 금액" : [bid.prior?.closedAt, bid.prior?.company ?? (bid.prior?.via === "낙찰" ? bid.history?.same?.find((d) => d.amount === bid.prior?.amount)?.winner : undefined), priorMonths ? `${priorMonths}개월 계약` : ""].filter(Boolean).join(" · ") || undefined }
+      : { label: "직전 계약", value: "자료 없음", tone: "muted", sub: "같은 단지·같은 업종 계약을 찾지 못했습니다." },
+    comp
+      ? { label: "경쟁 강도", value: comp.level, tone: "ink", sub: `응찰 업체 수 가운데값 ${comp.median}곳 (${comp.n}건 기준)` }
+      : { label: "경쟁 강도", value: history ? "자료 부족" : "불러오는 중", tone: "muted" },
+  ];
+
   return (
     <div className="space-y-6">
+      <StepBar steps={[
+        { label: "공고 선택", state: "done" },
+        { label: "직전 계약·규모 확인", state: f ? "done" : "now", href: "#prior" },
+        { label: "예상 낙찰금액 확인", state: f ? "now" : "todo", href: "#price" },
+      ]} />
+      <PredictSummary
+        title="한눈에 보기"
+        tiles={tiles}
+        links={[
+          { href: "#price", label: "예상 금액" },
+          { href: "#forecast", label: "낙찰 결과로 본 예측" },
+          { href: "#notice", label: "입찰 조건" },
+          { href: "#history", label: "지난 계약" },
+        ]}
+      />
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <div className="min-w-0 space-y-6">
           {/* 1. 공고 */}
@@ -243,7 +292,7 @@ export function AptPredictor() {
 
           {/* 2. 직전 계약과 이번 계약 규모 */}
           {PRICEABLE.has(bid.category) && (
-            <section className="card p-6">
+            <section id="prior" className="card scroll-mt-24 p-6">
               <Step n={2} title="직전 계약과 이번 계약 규모" />
               {bid.prior && !manual && (
                 <div className="mt-4 rounded-2xl bg-paper p-4 text-sm">
@@ -281,7 +330,7 @@ export function AptPredictor() {
         </div>
 
         {/* 결과: 예상 낙찰금액 → 낙찰 결과로 본 예측 */}
-        <aside ref={resultRef} className="min-w-0 scroll-mt-20 space-y-4 lg:self-start">
+        <aside id="price" className="min-w-0 scroll-mt-24 space-y-4 lg:self-start">
           {f ? <PriceCard f={f} /> : (
             <section className="card p-6">
               <p className="font-bold">예상 낙찰금액</p>
@@ -290,7 +339,7 @@ export function AptPredictor() {
               </p>
             </section>
           )}
-          <AptForecastCard bid={bid} f={f} />
+          <div id="forecast" className="scroll-mt-24"><AptForecastCard bid={bid} f={f} /></div>
           {/* 좁은 화면: 예상 금액 다음에 계산 기준·정확도 */}
           {basis && <div className="space-y-4 lg:hidden">{basis}</div>}
           <p className="text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 나라장터처럼 투찰률로 계산하지 않고, 같은 단지·같은 업종 직전 계약(낙찰·수의계약) 대비 다음 낙찰의 변화율로 계산합니다. 예측값은 과거 자료로 낸 추정치입니다.</p>
@@ -298,10 +347,10 @@ export function AptPredictor() {
       </div>
 
       {/* 공고 내용 (전체 폭) */}
-      <NoticePanel bid={bid} />
+      <div id="notice" className="scroll-mt-24"><NoticePanel bid={bid} /></div>
 
       {/* 공고 내용 아래: 같은 단지 지난 계약·비슷한 낙찰 (나라장터 예측의 낙찰 결과 분석 자리) */}
-      <AptAwardSection bid={bid} />
+      <div id="history" className="scroll-mt-24"><AptAwardSection bid={bid} /></div>
     </div>
   );
 }

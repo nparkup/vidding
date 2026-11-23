@@ -26,7 +26,7 @@ export default function AptPredictPage() {
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">아파트 예측</p>
         <h2 className="h-section mt-3">아파트 공고 하나로 직접 계산해 보세요</h2>
-        <p className="lead mt-3 max-w-3xl">공고를 고르면 같은 단지의 직전 계약이 바로 적용됩니다. 이번 계약기간이나 규모가 직전과 다르면 바꿔 넣어 보세요. 오른쪽에 예상 낙찰금액과 구간이 계산됩니다. 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터 예측과 합산).</p>
+        <p className="lead mt-3 max-w-3xl">공고를 고르면 같은 단지의 직전 계약으로 예상 낙찰금액과 구간이 맨 위에 정리됩니다. 계약기간이나 규모가 직전과 다르면 2번에서 바꿔 보세요. 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터 예측과 합산).</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
             <AptPredictor />

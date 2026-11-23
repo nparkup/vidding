@@ -36,7 +36,7 @@ export function PricingCards() {
             <li key={f} className="flex gap-2.5"><Check className="mt-0.5 h-4 w-4 shrink-0 text-mint" strokeWidth={3} />{f}</li>
           ))}
         </ul>
-        <Link href="/apply" className="btn-mint mt-8">무료 체험</Link>
+        <Link href="/apply" className="btn-mint mt-8">무료 체험으로 시작</Link>
       </div>
       {PLANS.map((p) => {
         const c = cfg.find((x) => x.id === p.id)!;

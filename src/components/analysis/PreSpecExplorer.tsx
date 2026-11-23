@@ -136,7 +136,7 @@ export function PreSpecExplorer() {
       </ul>
       {shown.length > limit && <button type="button" onClick={() => setLimit((l) => l + 50)} className="btn-ghost mt-4 w-full">더 보기 ({(shown.length - limit).toLocaleString()}건 남음)</button>}
       <p className="mt-6 text-xs leading-relaxed text-ink-400">
-        사전규격은 본공고 전에 규격서를 미리 공개하고 업체 의견을 받는 단계입니다. 금액과 내용은 본공고에서 바뀔 수 있습니다. 저장한 조건은 이 브라우저에만 남고, 맞춤공고 메일을 받는 고객은 같은 분야의 사전규격을 메일로도 받습니다.
+        사전규격은 본공고 전에 규격서를 미리 공개하고 업체 의견을 받는 단계입니다.<br />금액과 내용은 본공고에서 바뀔 수 있습니다.<br />저장한 조건은 이 브라우저에만 남고, 맞춤공고 메일을 받는 고객은 같은 분야의 사전규격을 메일로도 받습니다.
       </p>
     </div>
   );

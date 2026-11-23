@@ -40,13 +40,13 @@ export function AccountView({ email }: { email: string }) {
         <button type="button" onClick={logout} className="btn-ghost btn-sm self-start sm:self-auto">로그아웃</button>
       </div>
       {m?.login?.temp && (
-        <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">임시 비밀번호로 로그인하셨습니다. 아래에서 비밀번호를 새로 정해 주세요.</p>
+        <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">임시 비밀번호로 로그인하셨습니다.<br />아래에서 비밀번호를 새로 정해 주세요.</p>
       )}
-      {m?.status === "suspended" && <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">이용이 정지된 계정입니다. 새 공고를 분석할 수 없습니다. {email}로 문의해 주세요.</p>}
+      {m?.status === "suspended" && <p className="rounded-xl bg-coral-100 p-3 text-sm text-coral">이용이 정지된 계정입니다.<br />새 공고를 분석할 수 없습니다. {email}로 문의해 주세요.</p>}
       <UsageCard usage={acc.usage} />
       {m ? <ProfileForm m={m} /> : <div className="h-40 animate-pulse rounded-2xl bg-ink-100/60" />}
       <PasswordForm />
-      <p className="text-xs text-ink-400">탈퇴를 원하시면 {email}로 요청해 주세요. 가입 정보와 서류함을 바로 지웁니다.</p>
+      <p className="text-xs text-ink-400">탈퇴를 원하시면 {email}로 요청해 주세요.<br />가입 정보와 서류함을 바로 지웁니다.</p>
     </div>
   );
 }
@@ -83,7 +83,7 @@ function UsageCard({ usage }: { usage?: Usage }) {
             <div className={`h-full rounded-full ${pct >= 100 ? "bg-coral" : "bg-mint"}`} style={{ width: `${pct}%` }} />
           </div>
         )}
-        <p className="mt-2 text-xs text-ink-400">공고 예측 1건은 공고 하나의 평가점수 예측·배점표 판독·낙찰 결과로 본 예측입니다. 나라장터·아파트 공고를 합쳐 세고, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
+        <p className="mt-2 text-xs text-ink-400">공고 예측 1건은 공고 하나의 평가점수 예측·배점표 판독·낙찰 결과로 본 예측입니다.<br />나라장터·아파트 공고를 합쳐 세고, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
       </div>
       {used.length > 0 ? (
         <div className="mt-4 border-t border-ink-100 pt-4">
@@ -130,7 +130,7 @@ function ProfileForm({ m }: { m: AccountMember }) {
   return (
     <form onSubmit={save} className="card p-5 sm:p-6">
       <p className="font-bold">가입 정보</p>
-      <p className="mt-1 text-xs text-ink-400">회사명과 사업자등록번호는 바꿀 수 없습니다. 이메일을 바꾸면 로그인 이메일도 같이 바뀝니다.</p>
+      <p className="mt-1 text-xs text-ink-400">회사명과 사업자등록번호는 바꿀 수 없습니다.<br />이메일을 바꾸면 로그인 이메일도 같이 바뀝니다.</p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div><label className="label" htmlFor="a-name">담당자 이름</label><input id="a-name" className="input" required maxLength={40} value={f.name} onChange={set("name")} /></div>
         <div><label className="label" htmlFor="a-phone">연락처</label><input id="a-phone" className="input" required maxLength={30} value={f.phone} onChange={set("phone")} /></div>

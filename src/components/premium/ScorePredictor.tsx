@@ -454,7 +454,7 @@ export function ScorePredictor() {
           </div>
   );
 
-  if (error) return <p className="card p-6 text-sm text-coral">공고 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
+  if (error) return <p className="card p-6 text-sm text-coral">공고 목록을 불러오지 못했습니다.<br />잠시 후 다시 시도해 주세요.</p>;
   if (!bids) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
 
   // 정해진 업체만 참가하는 공고: 평가표·점수 대신 까닭과 낙찰 방식을 보여 준다
@@ -472,7 +472,7 @@ export function ScorePredictor() {
         </section>
         <aside className="card min-w-0 p-6">
           <p className="font-bold text-coral">평가점수 예측 대상이 아닌 공고</p>
-          <p className="mt-2 text-sm text-ink-700">{profile.closedReason}입니다. 나라장터도 이런 공고는 정보공개 차원에서 올리는 것이며 계약대상자가 아닌 업체는 참가할 수 없다고 안내합니다.</p>
+          <p className="mt-2 text-sm text-ink-700">{profile.closedReason}입니다.<br />나라장터도 이런 공고는 정보공개 차원에서 올리는 것이며 계약대상자가 아닌 업체는 참가할 수 없다고 안내합니다.</p>
           <dl className="mt-4 space-y-2 text-sm">
             <div><dt className="text-xs text-ink-500">참가할 수 있는 업체</dt><dd>{profile.who}</dd></div>
             <div><dt className="text-xs text-ink-500">낙찰자 결정</dt><dd>{profile.decide}</dd></div>
@@ -513,7 +513,7 @@ export function ScorePredictor() {
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
           <Step n={1} title="공고 선택" />
-          <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요. 고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다.</p>
+          <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요.<br />고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다.</p>
           {pickedBid && !bid && <p className="mt-2 text-sm text-ink-300">고른 공고를 불러오는 중…</p>}
           {searchBox}
           <TrialIntro />
@@ -645,7 +645,7 @@ export function ScorePredictor() {
               <>
                 {aiRead === "reading" ? (
                   <div className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
-                    <p>공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 첨부를 모두 받아 읽느라 10초~1분 걸립니다. 그동안은 기준표로 계산합니다.</p>
+                    <p>공고 첨부의 배점표를 읽고 있습니다.<br />처음 읽는 공고는 첨부를 모두 받아 읽느라 10초~1분 걸립니다.<br />그동안은 기준표로 계산합니다.</p>
                     <LoadingBar label="배점표 판독 중" />
                   </div>
                 ) : (docs.sheet || docs.files.length > 0) && (
@@ -712,7 +712,7 @@ export function ScorePredictor() {
           <Step n={3} title="점수 계산에 쓰는 값" />
           <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
             <p className="text-xs leading-relaxed text-ink-500 sm:col-span-3">
-              값마다 출처를 표시합니다. <b className="text-mint-700">자동</b>은 공공데이터로 1차로 채운 값, <b className="text-ink">수정됨</b>은 고객이 증빙 서류 기준으로 고친 값, <b className="text-ink">직접 입력</b>은 공공데이터에 없어 고객이 넣는 값입니다. 심사에서는 증빙 서류 값이 기준입니다.
+              값마다 출처를 표시합니다. <b className="text-mint-700">자동</b>은 공공데이터로 1차로 채운 값, <b className="text-ink">수정됨</b>은 고객이 증빙 서류 기준으로 고친 값, <b className="text-ink">직접 입력</b>은 공공데이터에 없어 고객이 넣는 값입니다.<br />심사에서는 증빙 서류 값이 기준입니다.
             </p>
             <Num label="업력 (년)" value={co.years} onChange={(v) => set("years", v)} tag={<FactTag auto={auto.years} current={co.years} onReset={(v) => set("years", Number(v))} />} hint={EVIDENCE.years} />
             <Num label="종업원 수 (명)" value={co.employees} onChange={(v) => set("employees", v)} tag={<FactTag auto={auto.employees} current={co.employees} onReset={(v) => set("employees", Number(v))} />} hint={EVIDENCE.employees} />
@@ -764,7 +764,7 @@ export function ScorePredictor() {
               <div className="grid grid-cols-2 gap-3">
                 <Num label="기준 자기자본비율" value={co.equityBase} onChange={(v) => set("equityBase", v)} />
                 <Num label="기준 유동비율" value={co.currentBase} onChange={(v) => set("currentBase", v)} />
-                <p className="col-span-2 -mt-2 text-xs text-ink-500">공고서에 적힌 기준비율(한국은행 기업경영분석)을 넣으세요. 기본값은 추정입니다.</p>
+                <p className="col-span-2 -mt-2 text-xs text-ink-500">공고서에 적힌 기준비율(한국은행 기업경영분석)을 넣으세요.<br />기본값은 추정입니다.</p>
               </div>
             </>)}
             <div>
@@ -824,7 +824,7 @@ export function ScorePredictor() {
         {scoreStage === "checking" && (
           <section className="card p-6">
             <p className="font-bold">참가자격 확인 중</p>
-            <p className="mt-2 text-sm text-ink-500">공고의 업종·지역 제한과 조회한 기업 정보를 대조하고 있습니다. 끝나면 예상 평가점수가 나옵니다.</p>
+            <p className="mt-2 text-sm text-ink-500">공고의 업종·지역 제한과 조회한 기업 정보를 대조하고 있습니다.<br />끝나면 예상 평가점수가 나옵니다.</p>
           </section>
         )}
         {scoreStage === "blocked" && eligibility && <BlockedPanel result={eligibility} corpName={corp?.corpName} />}
@@ -987,7 +987,7 @@ function EligibilityPanel({ result }: { result: Eligibility | null }) {
         ))}
       </ul>
       <p className="border-t border-ink-100 bg-ink-50 px-4 py-2.5 text-xs leading-relaxed text-ink-500">
-        나라장터에 입력된 업종·지역 제한과 기업의 나라장터 등록 정보로 판정했습니다. 중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 포함하지 않으니, 투찰 전 공고서의 참가자격을 함께 확인하세요.
+        나라장터에 입력된 업종·지역 제한과 기업의 나라장터 등록 정보로 판정했습니다.<br />중소기업·직접생산·실적·등급 제한처럼 공고서 본문에만 있는 조건은 포함하지 않으니, 투찰 전 공고서의 참가자격을 함께 확인하세요.
       </p>
     </div>
   );
@@ -1007,7 +1007,7 @@ function DetailLines({ text, className = "" }: { text: string; className?: strin
 function AiReadNote() {
   return (
     <p className="mt-2 text-xs leading-relaxed text-ink-500">
-      공고 첨부의 배점표를 읽어 정리했습니다. 항목 이름이 원문에 있는지, 배점 합계가 100점이고 나라장터에 등록된 기술·가격 배점과 맞는지 확인을 통과한 경우에만 씁니다. 제출 전 공고 원문으로 한 번 더 확인하세요.
+      공고 첨부의 배점표를 읽어 정리했습니다.<br />항목 이름이 원문에 있는지, 배점 합계가 100점이고 나라장터에 등록된 기술·가격 배점과 맞는지 확인을 통과한 경우에만 씁니다.<br />제출 전 공고 원문으로 한 번 더 확인하세요.
     </p>
   );
 }
@@ -1370,7 +1370,7 @@ function SheetDetail({ sheet }: { sheet: EvalSheet }) {
           <p className="text-sm font-semibold">정성평가 방식</p>
           {sheet.scale && <p className="mt-1 tabular-nums text-ink-500">등급 {sheet.scale.map((l) => `${l.label} ${Math.round(l.ratio * 100)}%`).join(" · ")}</p>}
           {sheet.panelRule && <p className="mt-1 text-ink-500">{sheet.panelRule}</p>}
-          <p className="mt-1 text-ink-300">제안 준비 수준 상·중·하를 이 등급에 대응시켜 계산합니다. 위원별 실제 판단은 알 수 없어 예상치입니다.</p>
+          <p className="mt-1 text-ink-300">제안 준비 수준 상·중·하를 이 등급에 대응시켜 계산합니다.<br />위원별 실제 판단은 알 수 없어 예상치입니다.</p>
         </div>
       )}
       {sheet.recognition && (

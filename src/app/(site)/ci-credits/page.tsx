@@ -24,7 +24,7 @@ export default function CiCreditsPage() {
         lead="공고 목록과 상세 화면의 발주기관 CI는 위키미디어 공용에 공개된 파일을 받아 이 사이트에 함께 올린 것입니다. 기관을 알아보기 쉽게 하려는 표시이며 고객사나 제휴 관계를 뜻하지 않습니다. 중앙행정기관과 소속기관은 모두 대한민국 정부상징을 씁니다."
       />
       <section className="container-x py-12">
-        <p className="text-sm text-ink-500">CI {list.length}종. CI가 확인되지 않은 기관은 표시하지 않습니다. 잘못된 CI를 보시면 알려 주세요.</p>
+        <p className="text-sm text-ink-500">CI {list.length}종. CI가 확인되지 않은 기관은 표시하지 않습니다.<br />잘못된 CI를 보시면 알려 주세요.</p>
         <ul className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {list.map(([name, c]) => (
             <li key={name} className="flex min-w-0 items-center gap-3 rounded-2xl border border-ink-100 bg-white p-3">

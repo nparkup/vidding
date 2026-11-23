@@ -145,7 +145,7 @@ export function OrderPlanExplorer() {
       </ul>
       {shown.length > limit && <button type="button" onClick={() => setLimit((l) => l + 50)} className="btn-ghost mt-4 w-full">더 보기 ({(shown.length - limit).toLocaleString()}건 남음)</button>}
       <p className="mt-6 text-xs leading-relaxed text-ink-400">
-        발주계획은 기관이 앞으로 발주할 사업을 미리 올린 예정 목록입니다. 시기와 금액은 실제 공고에서 바뀌거나 취소될 수 있습니다. 이미 공고가 연결된 계획과 수의계약 계획은 뺐습니다. &quot;공고 나온 것으로 보임&quot;은 같은 기관의 비슷한 이름 공고를 찾아 붙인 것이라 직접 확인이 필요합니다. 저장한 조건은 이 브라우저에만 남습니다.
+        발주계획은 기관이 앞으로 발주할 사업을 미리 올린 예정 목록입니다.<br />시기와 금액은 실제 공고에서 바뀌거나 취소될 수 있습니다.<br />이미 공고가 연결된 계획과 수의계약 계획은 뺐습니다.<br />&quot;공고 나온 것으로 보임&quot;은 같은 기관의 비슷한 이름 공고를 찾아 붙인 것이라 직접 확인이 필요합니다.<br />저장한 조건은 이 브라우저에만 남습니다.
       </p>
     </div>
   );

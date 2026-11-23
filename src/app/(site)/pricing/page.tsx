@@ -56,7 +56,7 @@ export default function Pricing() {
     <div className="container-x">
       <div className="relative z-10 -mt-6">
         <PricingCards />
-        <p className="mt-3 text-center text-xs text-ink-400">세 이용권은 기능이 같고 한 달 공고 예측 건수만 다릅니다. 모두 매달 결제하는 월간 이용권입니다.</p>
+        <p className="mt-3 text-center text-xs text-ink-400">세 이용권은 기능이 같고 한 달 공고 예측 건수만 다릅니다.<br />모두 매달 결제하는 월간 이용권입니다.</p>
       </div>
 
       <h2 className="mt-20 text-2xl font-extrabold tracking-tight">기능 한눈에 비교</h2>
@@ -106,11 +106,11 @@ export default function Pricing() {
       <div className="mt-12 grid gap-4 md:grid-cols-2">
         <div className="card p-7">
           <p className="text-lg font-bold">낙찰 성공보수 없음</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink-500">이용료 외에 낙찰 금액에 비례한 수수료를 받지 않습니다. 많이 낙찰받을수록 이득입니다.</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-500">이용료 외에 낙찰 금액에 비례한 수수료를 받지 않습니다.<br />많이 낙찰받을수록 이득입니다.</p>
         </div>
         <div className="card p-7">
           <p className="text-lg font-bold">약정 없는 월간 이용권</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink-500">원하는 달까지만 쓰시면 됩니다. 해지하면 다음 달부터 결제되지 않고, 이미 결제한 달은 그달 끝까지 이용하실 수 있습니다.</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-500">원하는 달까지만 쓰시면 됩니다.<br />해지하면 다음 달부터 결제되지 않고, 이미 결제한 달은 그달 끝까지 이용하실 수 있습니다.</p>
         </div>
       </div>
 

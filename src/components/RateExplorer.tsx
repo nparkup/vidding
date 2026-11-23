@@ -80,7 +80,7 @@ export function RateExplorer({ table, tiers }: { table: RateTable | null; tiers:
           {table && rows.length === 0 && <li className="py-6 text-center text-sm text-ink-500">이 기준으로 집계된 공고가 없습니다.</li>}
         </ul>
         <p className="mt-4 text-xs leading-relaxed text-ink-300">
-          행정안전부(지방자치단체)·기관 자체 기준의 통과점수와 실적 평가 방법은 공고서마다 적힌 값을 씁니다. 공고 상세의 "하한율·실적 기준"에서 그 공고의 공고서 문장과 함께 확인할 수 있습니다.
+          행정안전부(지방자치단체)·기관 자체 기준의 통과점수와 실적 평가 방법은 공고서마다 적힌 값을 씁니다.<br />공고 상세의 "하한율·실적 기준"에서 그 공고의 공고서 문장과 함께 확인할 수 있습니다.
           같은 기준 이름인데 하한율이 다른 공고는 정정 전 기준이나 특례(중소기업자간 경쟁 등)가 섞인 경우입니다.
         </p>
       </section>

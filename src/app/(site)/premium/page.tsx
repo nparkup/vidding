@@ -41,7 +41,7 @@ export default function PremiumPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <div className="card p-7">
             <p className="text-lg font-bold">읽는 서류</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">나라장터에 올라온 입찰공고서, 과업지시서·규격서, 제안요청서, 적격심사 세부기준을 하루 세 번 수집해 PDF·HWPX에서 평가표를 읽습니다. 신용평가등급확인서는 고객이 올려 등급을 읽습니다.</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-500">나라장터에 올라온 입찰공고서, 과업지시서·규격서, 제안요청서, 적격심사 세부기준을 하루 세 번 수집해 PDF·HWPX에서 평가표를 읽습니다.<br />신용평가등급확인서는 고객이 올려 등급을 읽습니다.</p>
           </div>
           <div className="card p-7">
             <p className="text-lg font-bold">평가 구조</p>

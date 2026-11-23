@@ -228,7 +228,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
               <h2 className="text-lg font-bold">제출서류 체크리스트</h2>
               <span className="chip">{docs.length ? "공고 구비서류 기준" : "기본 확인 항목"}</span>
             </div>
-            <p className="mt-1 mb-5 text-sm text-ink-500">체크한 항목은 이 브라우저에 저장됩니다. 최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
+            <p className="mt-1 mb-5 text-sm text-ink-500">체크한 항목은 이 브라우저에 저장됩니다.<br />최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
             <Checklist bidId={`apt:${b.no}`} groups={groups} />
           </section>
         </div>
@@ -254,7 +254,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
                 {comparable ? "같은 단지 직전 계약 자료가 없어 예측하지 않습니다. 직전 계약금액을 알면 예측 화면에 직접 넣어 계산할 수 있습니다." : "공사·물품·기타 용역은 단지마다 과업이 달라 직전 계약과 비교하지 않습니다."}
               </p>
             )}
-            <p className="mt-3 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 투찰률 대신 직전 계약 대비 변화율로 계산합니다. 계약기간이 직전과 다르면 예측 화면에서 바꿔 보세요.</p>
+            <p className="mt-3 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 투찰률 대신 직전 계약 대비 변화율로 계산합니다.<br />계약기간이 직전과 다르면 예측 화면에서 바꿔 보세요.</p>
             {comparable && <Link href={`/premium/apt?apt=${encodeURIComponent(b.no)}`} className="btn-primary mt-4 w-full">계약기간 바꿔 계산하기</Link>}
           </section>
 

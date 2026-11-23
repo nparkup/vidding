@@ -93,7 +93,7 @@ export function ContractExplorer() {
         {list ? `최근 2주 경쟁 계약 ${list.length.toLocaleString()}건 중 ${shown.length.toLocaleString()}건${total ? ` · 합계 ${won(total)}` : ""}` : "불러오는 중…"}
       </p>
       {corpSummary && corpSummary.n > 0 && (
-        <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">이 업체는 최근 2주 {corpSummary.n}건을 계약했습니다. 주요 기관: {corpSummary.top.map(([a, n]) => `${a} ${n}건`).join(", ")}</p>
+        <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">이 업체는 최근 2주 {corpSummary.n}건을 계약했습니다.<br />주요 기관: {corpSummary.top.map(([a, n]) => `${a} ${n}건`).join(", ")}</p>
       )}
 
       <ul className="mt-3 space-y-3">
@@ -131,7 +131,7 @@ export function ContractExplorer() {
       </ul>
       {shown.length > limit && <button type="button" onClick={() => setLimit((l) => l + 50)} className="btn-ghost mt-4 w-full">더 보기 ({(shown.length - limit).toLocaleString()}건 남음)</button>}
       <p className="mt-6 text-xs leading-relaxed text-ink-400">
-        나라장터 계약정보에서 최근 2주 동안 등록된 일반·제한·지명경쟁 계약입니다. 수의계약은 뺐습니다. 장기계속계약은 이번 차수 금액을 계약금액으로 보여 줍니다. 업체 이름을 누르면 그 업체의 계약만 모아 봅니다.
+        나라장터 계약정보에서 최근 2주 동안 등록된 일반·제한·지명경쟁 계약입니다.<br />수의계약은 뺐습니다.<br />장기계속계약은 이번 차수 금액을 계약금액으로 보여 줍니다.<br />업체 이름을 누르면 그 업체의 계약만 모아 봅니다.
       </p>
     </div>
   );

@@ -163,7 +163,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
               <h2 className="text-lg font-bold">제출서류 체크리스트</h2>
               <span className="chip">{bid.contractMethod} 기준</span>
             </div>
-            <p className="mt-1 mb-5 text-sm text-ink-500">체크한 항목은 이 브라우저에 저장됩니다. 최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
+            <p className="mt-1 mb-5 text-sm text-ink-500">체크한 항목은 이 브라우저에 저장됩니다.<br />최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
             <Checklist bidId={bid.id} groups={docs} />
           </section>
         </div>
@@ -188,7 +188,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
               <p className="mt-2 text-xs text-ink-300">예상 범위 {won(guide.low)} ~ {won(guide.high)}</p>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-ink-300">
-              참고용 추정치입니다. 실제 예정가격은 복수예비가격 추첨으로 결정됩니다.
+              참고용 추정치입니다.<br />실제 예정가격은 복수예비가격 추첨으로 결정됩니다.
             </p>
           </section>}
 

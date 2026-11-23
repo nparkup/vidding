@@ -21,7 +21,7 @@ export function JointMembers({ members, onChange, ourPerf, showFinance }: { memb
         <span className="text-xs text-ink-500">공동도급 허용 공고 · 공동이행 방식 기준</span>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-ink-500">
-        구성원을 넣으면 실적은 모두 더하고, 신용평가·경영상태 점수는 지분율로 가중해 합칩니다. 분담이행이나 공고별 세부기준이 다르면 공고문을 따르세요.
+        구성원을 넣으면 실적은 모두 더하고, 신용평가·경영상태 점수는 지분율로 가중해 합칩니다.<br />분담이행이나 공고별 세부기준이 다르면 공고문을 따르세요.
       </p>
       {members.length > 0 && (
         <ul className="mt-3 space-y-3">

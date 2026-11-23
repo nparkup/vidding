@@ -25,7 +25,7 @@ export function ApplyLayout({ children }: { children: React.ReactNode }) {
           <div className="relative">
             <p className="text-sm font-semibold text-mint-400">무료 체험</p>
             <h1 className="mt-3 text-3xl font-extrabold leading-[1.2] tracking-[-0.04em] sm:text-4xl">가입하고<br />입찰공고 <TrialN />건을<br />무료로 분석해 보세요.</h1>
-            <p className="mt-4 leading-relaxed text-ink-300">요금제와 같은 분석을 공고 <TrialN />건까지 그대로 써 보실 수 있습니다. 나라장터와 아파트 공고를 합쳐 <TrialN />건이며, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
+            <p className="mt-4 leading-relaxed text-ink-300">요금제와 같은 분석을 공고 <TrialN />건까지 그대로 써 보실 수 있습니다.<br />나라장터와 아파트 공고를 합쳐 <TrialN />건이며, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
             <ul className="mt-6 space-y-3">
               {BENEFITS.map((b) => (
                 <li key={b.t} className="glass flex gap-3 rounded-2xl p-4">

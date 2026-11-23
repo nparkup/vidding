@@ -36,7 +36,7 @@ export default async function Done({ searchParams }: { searchParams: Promise<{ i
           <div className="mt-6 text-center"><Link href={`/bids?${qs}&ok=1`} className="btn-primary">전체 추천 공고 보기</Link></div>
         </>
       ) : (
-        <p className="mt-8 text-center text-ink-500">면허를 선택하지 않으셔서 추천 공고를 계산하지 못했습니다. 공고 검색에서 면허를 골라 바로 확인해 보세요.</p>
+        <p className="mt-8 text-center text-ink-500">면허를 선택하지 않으셔서 추천 공고를 계산하지 못했습니다.<br />공고 검색에서 면허를 골라 바로 확인해 보세요.</p>
       )}
     </div>
   );

@@ -87,7 +87,7 @@ function AwardNetwork({ rows }: { rows: RecentAwardRow[] }) {
         nodes={g.nodes} edges={g.edges} ariaLabel="수요기관과 낙찰업체 관계도" labelTop={18}
         groups={[{ key: "ag", label: "수요기관 (낙찰 많은 10곳)", color: CHART.cat[2] }, { key: "multi", label: "여러 기관에서 낙찰받은 업체", color: CHART.cat[0] }, { key: "win", label: "한 기관에서 낙찰받은 업체", color: CHART.cat[1] }]}
       />
-      <p className="mt-2 text-xs leading-relaxed text-ink-500">지금 조건(업무·기간·검색어 등)에 맞는 낙찰로 그립니다. 검색어로 업종을 좁히면(예: 청소, 급식) 그 시장에서 여러 기관을 함께 가져가는 업체가 잘 보입니다. 원을 누르면 이어진 곳만 진하게 보입니다.</p>
+      <p className="mt-2 text-xs leading-relaxed text-ink-500">지금 조건(업무·기간·검색어 등)에 맞는 낙찰로 그립니다.<br />검색어로 업종을 좁히면(예: 청소, 급식) 그 시장에서 여러 기관을 함께 가져가는 업체가 잘 보입니다.<br />원을 누르면 이어진 곳만 진하게 보입니다.</p>
     </div>
   );
 }

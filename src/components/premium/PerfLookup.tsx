@@ -224,11 +224,11 @@ export function PerfLookup({ api, bid, bizno, since, sheetPeriod, onChange }: {
       {phase === "done" && (
         <>
           {rows.length === 0 ? (
-            <p className="mt-2 text-xs text-ink-500">{dot(from)} 이후 나라장터 {biz} 낙찰 이력이 없습니다. 수의계약·민간 실적은 아래 직접 입력칸에 넣어 주세요.</p>
+            <p className="mt-2 text-xs text-ink-500">{dot(from)} 이후 나라장터 {biz} 낙찰 이력이 없습니다.<br />수의계약·민간 실적은 아래 직접 입력칸에 넣어 주세요.</p>
           ) : (
             <>
               <p className="mt-2 text-xs text-ink-500">
-                낙찰 {rows.length}건 중 유사 {similar.length}건을 찾았습니다. 세부품명이 같으면 동일, 중분류가 같으면 유사, 공고명 핵심 낱말이 겹치면 키워드로 표시합니다. 체크를 바꿔 인정 여부를 조정할 수 있습니다.
+                낙찰 {rows.length}건 중 유사 {similar.length}건을 찾았습니다.<br />세부품명이 같으면 동일, 중분류가 같으면 유사, 공고명 핵심 낱말이 겹치면 키워드로 표시합니다.<br />체크를 바꿔 인정 여부를 조정할 수 있습니다.
               </p>
               {similar.length > 0 && <WinList rows={similar} included={included} toggle={toggle} />}
               {others.length > 0 && (

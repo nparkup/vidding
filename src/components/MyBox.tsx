@@ -76,7 +76,7 @@ export function MyBox() {
         </>
       )}
       {items.length > 0 && view === "cal" && <Calendar rows={shown} />}
-      <p className="mt-6 text-xs text-ink-400">서류함은 이 브라우저에만 저장됩니다. 다른 기기에서는 따로 담아야 합니다.</p>
+      <p className="mt-6 text-xs text-ink-400">서류함은 이 브라우저에만 저장됩니다.<br />다른 기기에서는 따로 담아야 합니다.</p>
     </div>
   );
 }

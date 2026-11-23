@@ -46,7 +46,7 @@ export function TrialIntro() {
   if (u?.mode === "paid") {
     return (
       <p className="mt-3 text-xs text-ink-500">
-        {planName(u.plan)} 이용권으로 분석합니다. 이번 달 {u.used.length.toLocaleString()}건{u.quota !== null ? ` 사용, ${Math.max(0, u.quota - u.used.length).toLocaleString()}건 남았습니다` : " 분석했습니다"}. 나라장터·아파트 공고를 합쳐 세고, {md(u.period.to)}에 새로 시작합니다.
+        {planName(u.plan)} 이용권으로 분석합니다.<br />이번 달 {u.used.length.toLocaleString()}건{u.quota !== null ? ` 사용, ${Math.max(0, u.quota - u.used.length).toLocaleString()}건 남았습니다` : " 분석했습니다"}. 나라장터·아파트 공고를 합쳐 세고, {md(u.period.to)}에 새로 시작합니다.
       </p>
     );
   }
@@ -56,7 +56,7 @@ export function TrialIntro() {
   const left = Math.max(0, TRIAL_LIMIT - used.length);
   return (
     <p className="mt-3 text-xs text-ink-500">
-      무료 체험으로 입찰공고 {TRIAL_LIMIT}건까지 분석할 수 있습니다. 나라장터·아파트 공고를 합쳐 셉니다.{used.length ? ` 지금 ${used.length}건 사용, ${left}건 남았습니다.` : ""}
+      무료 체험으로 입찰공고 {TRIAL_LIMIT}건까지 분석할 수 있습니다.<br />나라장터·아파트 공고를 합쳐 셉니다.{used.length ? ` 지금 ${used.length}건 사용, ${left}건 남았습니다.` : ""}
     </p>
   );
 }
@@ -78,13 +78,13 @@ export function TrialLocked({ used, onPick, state }: { used: TrialEntry[]; onPic
       ) : state?.suspended ? (
         <>
           <p className="font-bold">이용이 정지된 계정입니다</p>
-          <p className="mt-2 text-sm text-ink-700">새 공고를 분석할 수 없습니다. 고객센터로 문의해 주세요.</p>
+          <p className="mt-2 text-sm text-ink-700">새 공고를 분석할 수 없습니다.<br />고객센터로 문의해 주세요.</p>
         </>
       ) : paid ? (
         <>
           <p className="font-bold">이번 달 공고 예측 {paid.quota?.toLocaleString()}건을 모두 사용했습니다</p>
           <p className="mt-2 text-sm text-ink-700">
-            {planName(paid.plan)} 이용권은 {md(paid.to)}에 다시 {paid.quota?.toLocaleString()}건으로 시작합니다. 그전에 더 분석하려면 건수가 많은 이용권으로 바꿔 주세요.
+            {planName(paid.plan)} 이용권은 {md(paid.to)}에 다시 {paid.quota?.toLocaleString()}건으로 시작합니다.<br />그전에 더 분석하려면 건수가 많은 이용권으로 바꿔 주세요.
           </p>
         </>
       ) : (
@@ -116,7 +116,7 @@ export function TrialLocked({ used, onPick, state }: { used: TrialEntry[]; onPic
       {!state?.error && !state?.suspended && <Link href="/pricing" className="btn-primary mt-5 inline-flex">요금제 보기</Link>}
       {acc.status !== "in" && (
         <p className="mt-3 text-xs text-ink-400">
-          이용권을 쓰고 계시면 <Link href="/login" className="font-semibold text-mint-600 underline">로그인</Link>해 주세요. 로그인하지 않으면 사용 건수는 가입·조회한 사업자등록번호와 이 브라우저를 기준으로 셉니다.
+          이용권을 쓰고 계시면 <Link href="/login" className="font-semibold text-mint-600 underline">로그인</Link>해 주세요.<br />로그인하지 않으면 사용 건수는 가입·조회한 사업자등록번호와 이 브라우저를 기준으로 셉니다.
         </p>
       )}
     </aside>

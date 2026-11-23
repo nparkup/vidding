@@ -229,7 +229,7 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
     <div className="space-y-6">
       <section className="card p-6">
         <h2 className="text-xl font-extrabold">{name ? `${name} · ` : ""}낙찰 {p.n.toLocaleString()}건</h2>
-        <p className="mt-1 text-sm text-ink-500">{from ? `${from} 이후 ` : ""}나라장터 낙찰 기준입니다. 떨어진 입찰은 공개 자료에 없어 넣지 않았습니다.{p.firstShare !== undefined ? ` 개찰 순위를 아는 낙찰 중 1위로 낙찰받은 비율 ${Math.round(p.firstShare * 100)}%.` : ""}</p>
+        <p className="mt-1 text-sm text-ink-500">{from ? `${from} 이후 ` : ""}나라장터 낙찰 기준입니다.<br />떨어진 입찰은 공개 자료에 없어 넣지 않았습니다.{p.firstShare !== undefined ? ` 개찰 순위를 아는 낙찰 중 1위로 낙찰받은 비율 ${Math.round(p.firstShare * 100)}%.` : ""}</p>
         <YearChart years={p.years.slice(-10).map(([y, n, a]) => [y, n, a])} title="연도별 낙찰" />
         <Link href={`/contracts?corp=${bizno}`} className="btn-ghost btn-sm mt-4 inline-flex">이 업체의 최근 2주 계약 보기</Link>
       </section>
@@ -396,7 +396,7 @@ function RivalNetwork({ p, name, onPick, mine }: { p: RivalProfile; name: string
         tipOf={tipOf} tipWidth={260} onFocusNode={focusNode}
         canOpen={(n) => !!infoOf(n)?.bizno} onOpen={(n) => onPick(infoOf(n)!.bizno)} openLabel="이 기업 기준으로 보기"
       />
-      <p className="mt-2 text-xs leading-relaxed text-ink-500">업체와 기관을 잇는 선은 그 기관 공고에서 이 업체가 낙찰받을 때 그 업체가 개찰 1~5위에 함께 든 경우입니다. 개찰 순위는 받아 둔 공고만 셉니다. 업체 원에 마우스를 올리면 그 업체의 낙찰 정보가 보이고, 누르면 그 업체를 기준으로 관계도를 다시 그립니다. 휴대폰에서는 한 번 눌러 정보를 보고 아래 버튼으로 넘어갑니다.</p>
+      <p className="mt-2 text-xs leading-relaxed text-ink-500">업체와 기관을 잇는 선은 그 기관 공고에서 이 업체가 낙찰받을 때 그 업체가 개찰 1~5위에 함께 든 경우입니다.<br />개찰 순위는 받아 둔 공고만 셉니다.<br />업체 원에 마우스를 올리면 그 업체의 낙찰 정보가 보이고, 누르면 그 업체를 기준으로 관계도를 다시 그립니다.<br />휴대폰에서는 한 번 눌러 정보를 보고 아래 버튼으로 넘어갑니다.</p>
     </section>
   );
 }

@@ -71,7 +71,7 @@ export function FinanceAvgView() {
       <aside className="min-w-0">
         <section className="card p-4 sm:p-5 lg:sticky lg:top-20">
           <h2 className="font-bold">우리 회사와 견주기</h2>
-          <p className="mt-1 text-sm text-ink-500">왼쪽 표에서 업종을 고르세요. 지금 <b className="text-ink">{avg.name}</b></p>
+          <p className="mt-1 text-sm text-ink-500">왼쪽 표에서 업종을 고르세요.<br />지금 <b className="text-ink">{avg.name}</b></p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <label className="min-w-0"><span className="label">부채비율 (%)</span><input className="input tabular-nums" inputMode="decimal" value={debt} onChange={(e) => setDebt(e.target.value)} /></label>
             <label className="min-w-0"><span className="label">유동비율 (%)</span><input className="input tabular-nums" inputMode="decimal" value={current} onChange={(e) => setCurrent(e.target.value)} /></label>
@@ -101,7 +101,7 @@ export function FinanceAvgView() {
             </li>
           </ul>
           <p className="mt-4 text-xs leading-relaxed text-ink-400">
-            조달청 시설공사 적격심사 세부기준의 재무비율 만점 조건입니다. 행정안전부(지자체)·공기업 기준과 신용평가 등급으로 평가받는 경우는 구간과 배점이 다르니 공고의 적격심사 기준을 확인하세요.
+            조달청 시설공사 적격심사 세부기준의 재무비율 만점 조건입니다.<br />행정안전부(지자체)·공기업 기준과 신용평가 등급으로 평가받는 경우는 구간과 배점이 다르니 공고의 적격심사 기준을 확인하세요.
             부채비율 = 부채 ÷ 자기자본, 유동비율 = 유동자산 ÷ 유동부채 (최근 결산 기준).
           </p>
         </section>

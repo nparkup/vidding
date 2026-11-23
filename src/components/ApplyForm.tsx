@@ -121,19 +121,19 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
             </p>
           )}
           {done.status === "local" && (
-            <p className="mt-2 text-xs text-coral">가입 정보를 서버에 저장하지 못했습니다. 체험은 이 브라우저로 바로 쓰실 수 있고, 가입 정보는 {email || "고객센터 메일"}로 회사명과 사업자번호를 보내 주시면 등록해 드립니다.</p>
+            <p className="mt-2 text-xs text-coral">가입 정보를 서버에 저장하지 못했습니다.<br />체험은 이 브라우저로 바로 쓰실 수 있고, 가입 정보는 {email || "고객센터 메일"}로 회사명과 사업자번호를 보내 주시면 등록해 드립니다.</p>
           )}
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
             <Link href="/premium#predict" className="btn-mint">나라장터 공고 분석하기</Link>
             <Link href="/premium/apt" className="btn-ghost">아파트 공고 분석하기</Link>
           </div>
-          <p className="mt-3 text-xs text-ink-400">공고 상세의 &lsquo;이 공고 점수 예측하기&rsquo;로 열어도 체험 건수로 셉니다. 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
+          <p className="mt-3 text-xs text-ink-400">공고 상세의 &lsquo;이 공고 점수 예측하기&rsquo;로 열어도 체험 건수로 셉니다.<br />이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
         </div>
         {done.match && (
           <>
             <div className="card p-5">
               <p className="text-sm font-bold">입력하신 조건으로 지금 참가 가능한 공고 <span className="text-mint-600">{done.match.ok.length.toLocaleString()}건</span></p>
-              <p className="mt-1 text-xs text-ink-500">이 중에서 체험할 공고를 고르셔도 됩니다. 맞춤 공고 메일은 요금제를 시작하면 다음 영업일 아침부터 보내 드립니다.</p>
+              <p className="mt-1 text-xs text-ink-500">이 중에서 체험할 공고를 고르셔도 됩니다.<br />맞춤 공고 메일은 요금제를 시작하면 다음 영업일 아침부터 보내 드립니다.</p>
             </div>
             {done.match.kw.length > 0 && (
               <div className="card p-5">
@@ -161,9 +161,9 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
         <form action={action} onSubmit={action ? undefined : onStatic} className="card space-y-5 p-6 sm:p-8">
           <div>
             <h2 className="text-xl font-extrabold">회원가입</h2>
-            <p className="mt-1 text-sm text-ink-500">가입하면 바로 무료 체험이 시작됩니다. 카드 등록은 없습니다.</p>
+            <p className="mt-1 text-sm text-ink-500">가입하면 바로 무료 체험이 시작됩니다.<br />카드 등록은 없습니다.</p>
             {acc.status === "in" ? (
-              <p className="mt-2 rounded-xl bg-mint-50 px-3 py-2 text-xs text-mint-700">{acc.company}(으)로 로그인되어 있습니다. 바로 <Link href="/premium#predict" className="font-semibold underline">공고 분석</Link>을 시작하셔도 됩니다.</p>
+              <p className="mt-2 rounded-xl bg-mint-50 px-3 py-2 text-xs text-mint-700">{acc.company}(으)로 로그인되어 있습니다.<br />바로 <Link href="/premium#predict" className="font-semibold underline">공고 분석</Link>을 시작하셔도 됩니다.</p>
             ) : joined ? (
               <p className="mt-2 rounded-xl bg-mint-50 px-3 py-2 text-xs text-mint-700">이 브라우저는 {joined}(으)로 가입되어 있습니다. <Link href="/login" className="font-semibold underline">로그인</Link>하면 다른 기기에서도 이어서 쓸 수 있습니다.</p>
             ) : (
@@ -227,7 +227,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
             <div>
               <label className="label" htmlFor="keywords">관심 키워드 <span className="font-normal text-ink-300">(쉼표로 구분)</span></label>
               <input id="keywords" name="keywords" maxLength={200} className="input" placeholder="CCTV, 급식, 학교 청소" />
-              <p className="mt-1 text-xs text-ink-300">요금제를 이용하시면 이 단어가 든 새 공고를 맞춤공고 메일에 따로 모아 드립니다. 빼고 싶은 단어는 앞에 -를 붙이세요 (예: -설계).</p>
+              <p className="mt-1 text-xs text-ink-300">요금제를 이용하시면 이 단어가 든 새 공고를 맞춤공고 메일에 따로 모아 드립니다.<br />빼고 싶은 단어는 앞에 -를 붙이세요 (예: -설계).</p>
             </div>
           </details>
 
@@ -253,7 +253,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
           </fieldset>
 
           <button className="btn-mint w-full text-base" disabled={busy}>{busy ? "가입하는 중…" : "가입하고 무료 체험 시작"}</button>
-          <p className="text-center text-xs text-ink-300">가입하면 바로 로그인됩니다. 다른 기기에서는 이메일과 비밀번호로 로그인하세요.</p>
+          <p className="text-center text-xs text-ink-300">가입하면 바로 로그인됩니다.<br />다른 기기에서는 이메일과 비밀번호로 로그인하세요.</p>
         </form>
   );
 }

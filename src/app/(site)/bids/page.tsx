@@ -22,7 +22,7 @@ export default async function BidsPage() {
         </div>
         <p className="inline-flex items-center gap-2 self-start rounded-full border border-ink-100 bg-white px-3 py-1.5 text-xs text-ink-500 sm:self-auto">
           <span className={`h-2 w-2 rounded-full ${sync.source === "g2b" ? "bg-mint" : "bg-amber"}`} />
-          {sync.source === "g2b" ? "나라장터 연동" : "데모 데이터"} · 갱신 {dateTime(sync.syncedAt)}
+          {sync.source === "g2b" ? "" : "데모 데이터 · "}갱신 {dateTime(sync.syncedAt)}
         </p>
       </div>
       <BidSourceTabs active="g2b" counts={{ g2b: open, apt: apt.items.length }} />

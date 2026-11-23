@@ -44,6 +44,7 @@ export const NAV: Entry[] = [
     ],
   },
   { label: "요금제", href: "/pricing" },
+  { label: "FAQ", href: "/faq" },
 ];
 
 const clean = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);

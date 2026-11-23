@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Price, TrialN } from "@/components/Cfg";
-import { Check, Plus, X } from "lucide-react";
+import { Check, X } from "lucide-react";
+import { FaqList } from "@/components/FaqList";
+import { SERVICE_FAQ } from "@/lib/faq";
 import { HeroCity } from "@/components/art/HeroCity";
 import { ConstructionArt, ITArt, SupplyArt } from "@/components/art/Sectors";
 import { DeskArt } from "@/components/art/Desk";
@@ -59,14 +61,6 @@ const PERSONAS = [
   { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", use: "사업장별 조건·평가점수 예측" },
 ];
 
-const FAQ = [
-  { q: "프로그램을 설치하거나 매일 접속해야 하나요?", a: "아닙니다. 조건만 한 번 등록하시면 영업일마다 이메일로 받아 보시면 됩니다. 필요할 때만 웹에서 공고 분석을 열어보시면 됩니다." },
-  { q: "공고 데이터는 어디서 오나요?", a: "조달청 나라장터가 공공데이터포털로 공개하는 입찰공고·낙찰·사전규격·발주계획·계약 정보와, 국토교통부 공동주택관리정보시스템(K-apt)의 아파트 입찰공고·입찰결과·수의계약 정보를 매일 수집해 분석합니다." },
-  { q: "아파트 관리 입찰도 볼 수 있나요?", a: "네. 아파트 청소·경비·소독·승강기 유지·위탁관리·공사 공고를 업종별로 모아 보여 드리고, 같은 단지의 직전 낙찰·수의계약 금액과 아파트 입찰가격 예측을 함께 제공합니다." },
-  { q: "입찰 가능성 점수는 어떻게 계산하나요?", a: "입찰 특화 알고리즘이 6개 항목을 가중 채점합니다. 면허 요건 30점, 참가 지역 20점, 사업 규모 15점은 필수 조건으로 먼저 판정하고, 하나라도 맞지 않으면 39점 이하로 제한해 제외합니다. 통과한 공고는 유사 공고 평균 참여업체 수로 본 경쟁 강도 15점, 기초금액 대비 실적 10점, 남은 준비 기간 10점을 더해 100점 만점으로 산출하고, 85점 이상 S, 72점 이상 A, 58점 이상 B, 그 아래는 C 등급을 붙입니다." },
-  { q: "무료 체험은 무엇을 해 볼 수 있나요?", a: <>입찰공고 <TrialN />건을 골라 평가점수 예측(나라장터·아파트), 배점표 판독, 낙찰 결과로 본 예측을 요금 없이 써 보실 수 있습니다. 이미 분석한 공고는 다시 열어도 차감되지 않으며, 카드 등록이 없어 자동으로 결제되지 않습니다.</> },
-  { q: "입찰 대리 투찰도 해주나요?", a: "투찰은 관련 법령상 귀사가 직접 하셔야 합니다. 입찰메이트LAB은 공고 발굴, 조건 검토, 서류 준비 가이드를 대신해 드립니다." },
-];
 
 /** 학교 이름을 "OOO 초등학교"처럼 가린다. "기초·최초·당초" 같은 낱말은 건드리지 않는다 */
 function maskSchool(text: string): string {
@@ -735,16 +729,9 @@ export default async function Home() {
           <h2 className="h-section mt-3">궁금한 점이<br />있으신가요?</h2>
           <p className="mt-4 text-ink-500">평일 09:00–18:00 · hello@ipchalmatelab.kr</p>
         </div>
-        <div className="space-y-3">
-          {FAQ.map((f, i) => (
-            <details key={f.q} className="group rounded-2xl bg-paper px-6 py-5 open:bg-white open:shadow-card open:ring-1 open:ring-ink-100" open={i === 0}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
-                {f.q}
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-ink-400 transition group-open:rotate-45 group-open:bg-mint group-open:text-white"><Plus className="h-4 w-4" /></span>
-              </summary>
-              <p className="mt-3 leading-relaxed text-ink-500">{f.a}</p>
-            </details>
-          ))}
+        <div>
+          <FaqList items={SERVICE_FAQ} large />
+          <p className="mt-6"><Link href="/faq" className="font-semibold text-mint-600">자주 묻는 질문 전체 보기</Link></p>
         </div>
       </section>
 

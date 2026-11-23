@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, Plus } from "lucide-react";
+import { Check } from "lucide-react";
 import { PageHero } from "@/components/PageHero";
 import { PricingCards } from "@/components/PricingCards";
 import { Price, TrialN } from "@/components/Cfg";
@@ -38,14 +38,6 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   },
 ];
 
-const FAQ = [
-  { q: "이용권은 무엇이 다른가요?", a: <>세 이용권 모두 기능은 같고, 한 달에 쓸 수 있는 공고 예측 건수만 다릅니다. 라이트는 월 <Price k="liteQuota" />건(월 <Price k="lite" />원), 스탠다드는 월 <Price k="standardQuota" />건(월 <Price k="standard" />원), 무제한은 건수 제한이 없습니다(월 <Price k="unlimited" />원).</> },
-  { q: "공고 예측 건수는 어떻게 세나요?", a: "공고 하나를 골라 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 보면 1건입니다. 나라장터와 아파트 공고를 합쳐 세고, 이미 분석한 공고는 다시 열어도 차감되지 않습니다. 건수는 결제일마다 새로 채워지며, 남은 건수는 다음 달로 넘어가지 않습니다." },
-  { q: "표시된 가격은 VAT 포함인가요?", a: "네. 모든 이용권 금액은 VAT 포함이며 사업자 1곳 기준입니다. 낙찰 금액에 비례한 성공보수 등 이용료 외 추가 수수료는 없습니다." },
-  { q: "약정이나 해지 조건이 있나요?", a: "약정이 없습니다. 해지하시면 다음 달부터 결제되지 않고, 이미 결제한 달은 그달 끝까지 이용하실 수 있습니다. 남은 날짜만큼 나누어 돌려드리는 일할 환불은 하지 않습니다." },
-  { q: "이용 중에 이용권을 바꿀 수 있나요?", a: "네. 바꾼 이용권은 다음 결제일부터 적용되고, 그때부터 바뀐 금액으로 결제됩니다. 이번 달 건수를 다 쓰셨다면 메일로 알려 주세요." },
-  { q: "무료 체험은 어떻게 진행되나요?", a: <>입찰공고 <TrialN />건을 골라 평가점수 예측(나라장터·아파트), 배점표 판독, 낙찰 결과로 본 예측을 요금 없이 써 보실 수 있습니다. 나라장터와 아파트 공고를 합쳐 <TrialN />건이며, 이미 분석한 공고는 다시 열어도 차감되지 않습니다. 회원가입 때 넣은 사업자등록번호 하나에 한 번 드리며, 로그인 기능이 생기기 전까지는 사업자등록번호와 이용하신 브라우저를 기준으로 셉니다. 카드를 등록하지 않으므로 체험 뒤 자동으로 결제되지 않으며, 계속 이용할지는 그때 정하시면 됩니다.</> },
-];
 
 const cell = (v: Cell) => (v === true ? <span className="mx-auto grid h-6 w-6 place-items-center rounded-full bg-mint-50 text-mint-600"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span> : v === false ? <span className="text-ink-100">—</span> : <span className="text-sm font-semibold">{v}</span>);
 
@@ -114,19 +106,7 @@ export default function Pricing() {
         </div>
       </div>
 
-      <section className="mx-auto mt-20 max-w-3xl">
-        <div className="space-y-3">
-          {FAQ.map((f, i) => (
-            <details key={f.q} className="group rounded-2xl bg-paper px-6 py-5 open:bg-white open:shadow-card open:ring-1 open:ring-ink-100" open={i === 0}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
-                {f.q}
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-ink-400 transition group-open:rotate-45 group-open:bg-mint group-open:text-white"><Plus className="h-4 w-4" /></span>
-              </summary>
-              <p className="mt-3 text-sm leading-relaxed text-ink-500">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+      <p className="mt-10 text-center text-sm text-ink-500">이용권·건수·해지·무료 체험에 관한 질문은 <Link href="/faq#pricing" className="font-semibold text-mint-600">자주 묻는 질문</Link>에 모아 두었습니다.</p>
     </div>
     </>
   );

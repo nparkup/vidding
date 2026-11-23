@@ -203,7 +203,7 @@ const BARE_FIELD: Record<string, string> = { 정량: "정량평가", 정량적: 
 const OPEN_RE = /[(（[［【「『{｛]/g;
 const CLOSE_RE = /[)）\]］】」』}｝]/g;
 /** 문장 앞 접속어·조사 ("…10점과 입찰가격평가 20점" 을 자르면 "과 입찰가격평가" 가 남는다) */
-const LEAD_RE = /^(?:[,，、;；/·ㆍ∙+＋&:：\])）\]］❑❍▣□■◦○●▪•※*∘‧・\-–—]+\s*|(?:및|와|과|는|은|을|를|이며|이고|으로|로|중|그리고|또는)\s+)/;
+const LEAD_RE = /^(?:[,，、;；/·ㆍ∙+＋&:：\])）\]］❑❍▣◦○●▪•※*∘‧・\-–—]+\s*|(?:및|와|과|는|은|을|를|이며|이고|으로|로|중|그리고|또는)\s+)/;
 
 /**
  * 항목 이름 앞뒤에 남은 문장 부호를 지운다.
@@ -275,19 +275,31 @@ function openParenParent(s: string): string | undefined {
   return name.replace(/[^가-힣A-Za-z]/g, "").length >= 2 && /(평가|능력|기술|가격)/.test(name) ? name.slice(0, 20) : undefined;
 }
 
-function cleanLabel(s: string, preferInner = false): string {
-  return tidyItemLabel(s
+function cleanLabel(s: string): string {
+  return s
     .replace(/^[\s\d.)(①-⑳ㄱ-ㅎ가-하]{0,3}[.)]\s*/, "")
     .replace(/[|│┃\t]+/g, " ")
     .replace(/[○●◦·\-–—:：]+\s*$/g, "")
     .replace(/\(\s*\)/g, "")
     .replace(/[(\[（]\s*$/g, "")
     .replace(/\s{2,}/g, " ")
-    .trim(), preferInner)
+    .trim()
     .slice(0, 40);
 }
-/** 40자로 자른 뒤 괄호가 열린 채 끝나면 괄호 앞까지 쓴다 */
-const cleanLabelCut = (s: string, preferInner = false) => tidyItemLabel(cleanLabel(s, preferInner), preferInner);
+
+/**
+ * 표에서 읽은 항목 이름을 화면용으로 다듬는다 (항목을 고르고 거르는 판단은 원래 이름으로 한다).
+ * 앞뒤 쉼표·가운뎃점·접속어, 40자에서 잘려 짝 없이 열린 괄호, 깨진 제어 문자를 지운다.
+ * "=", "□", "①" 처럼 산식·등급 줄을 알려 주는 글자는 남겨 둔다 (criteria.ts adoptable 이 본다).
+ */
+function displayLabel(label: string, group: string): { label: string; group: string } {
+  let t = tidyItemLabel(label);
+  let g = group;
+  // "정량적 평가 20점" 을 구분 열로 잘못 떼어 낸 경우 ("평가" + 묶음 "정량적")
+  if (/^평가$/.test(t) && /^(정량|정성|계량|비계량)적?$/.test(g)) { t = `${g} 평가`; g = /정성|비계량/.test(g) ? "기술(정성)" : "기술(정량)"; }
+  if (!t || t.replace(/[^가-힣A-Za-z]/g, "").length < 2) t = label;
+  return { label: t, group: g };
+}
 
 /** 공고문 텍스트에서 계약방법을 추정한다 */
 export function detectMethod(text: string): EvalSheet["method"] | undefined {
@@ -386,7 +398,7 @@ const tidy = (l: string) => l.replace(/^[\s\-·○◦•▪※*]+/, "").replace(
  * - 합계·소계·통과 기준 문장은 제외하고, 같은 이름은 한 번만 넣는다.
  * - 배점 합계가 100에 가까우면 신뢰도 높음.
  */
-interface Scan { found: EvalItem[]; lineOf: Map<EvalItem, number>; inline: Map<EvalItem, ScoreBand[]> }
+interface Scan { found: EvalItem[]; lineOf: Map<EvalItem, number>; inline: Map<EvalItem, ScoreBand[]>; display: Map<EvalItem, { label: string; group?: string }> }
 
 /** 배점표 머리글 ("평가항목 … 배점", "구분 … 배점한도") */
 const TABLE_HEAD_RE = /배\s*점/;
@@ -408,15 +420,15 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
   const lineOf = new Map<EvalItem, number>();
   const inline = new Map<EvalItem, ScoreBand[]>();
 
-  const push = (rawLabel: string, max: number, basis: string, parent?: string, inner = false) => {
-    // 배점표 안에서 "(", "+" 로 시작하는 줄은 앞 항목의 설명이 이어진 줄이다 (이름을 다듬기 전 원문으로 본다)
-    if (window && !inner && /^[(（+]/.test(rawLabel.replace(/^[\s\d.)(①-⑳ㄱ-ㅎ가-하]{0,3}[.)]\s*/, "").trim())) return;
-    let label = cleanLabelCut(rawLabel, inner).replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
+  /** 화면에 보일 이름·묶음 (문장 속 배점: "기술능력평가(정량 10점, 정성 80점)" → 정량평가·정성평가, 묶음 기술능력평가) */
+  const display = new Map<EvalItem, { label: string; group?: string }>();
+
+  const push = (rawLabel: string, max: number, basis: string, shown?: { label: string; group?: string }) => {
+    let label = cleanLabel(rawLabel).replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
     // 표의 첫 열(구분)이 같은 줄에 붙어 오면 그룹 이름으로 떼어 낸다
     let group: string | undefined;
     const g = label.match(/^((?:정량|정성|기술|가격|신인도)\s*(?:적\s*)?(?:평가)?(?:\s*\(\s*\d+\s*\))?|수행\s*능력|경영\s*상태)\s+(.{2,})$/);
-    if (g && !/^평가$/.test(g[2])) { group = g[1].replace(/\s|\(\d+\)/g, ""); label = g[2]; curGroup = group; }
-    else if (parent) group = parent;
+    if (g) { group = g[1].replace(/\s|\(\d+\)/g, ""); label = g[2]; curGroup = group; }
     else if (window) group = curGroup;
     label = label.replace(/^[○●◦·•▪\-]\s*/, "").trim();
     if (!label || label.length < 2 || /^\d/.test(label) || SKIP_RE.test(label)) return;
@@ -428,11 +440,10 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
     seen.add(key);
     // 정성평가 묶음 안의 항목은 이름에 '기술능력'·'인력'이 있어도 위원이 매기는 정성 항목이다
     const k = kindOf(label);
-    // "정량평가"처럼 세부 항목 없이 묶음으로만 배점이 적힌 경우는 '기타'가 아니라 기술(정량)이다
-    if (!group && k === "other" && /(정량|계량)/.test(label) && !/비계량/.test(label)) group = "기술(정량)";
     const it = item(label, max, group && /정성/.test(group) && k !== "price" ? "qualitative" : k, basis.slice(0, 80), group);
     lineOf.set(it, cur);
     found.push(it);
+    if (shown) display.set(it, shown);
   };
 
   for (let n = from; n < to; n++) {
@@ -478,7 +489,7 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
         parent = openParenParent(seg) ?? parent;
         prevSeg = seg;
         // 문장 속 항목은 점수 앞의 끝 명사구가 이름이다 (괄호가 열려 있으면 괄호 안)
-        if (seg) push(tailPhrase(tidyItemLabel(seg, true)), Number(m[1]), line, parent, true);
+        if (seg) push(seg, Number(m[1]), line, { label: tailPhrase(tidyItemLabel(seg, true)), group: parent });
         if (/[)）\]］}｝]/.test(line.slice((m.index ?? 0) + m[0].length).match(/^[^가-힣A-Za-z\d]*/)?.[0] ?? "")) parent = undefined;
         start = (m.index ?? 0) + m[0].length;
       }
@@ -516,7 +527,20 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
       i = j - 2;
     }
   }
-  return { found, lineOf, inline };
+  return { found, lineOf, inline, display };
+}
+
+/** 고른 표의 항목 이름·묶음을 화면용으로 다듬는다 (항목 고르기·합계 판단이 끝난 뒤) */
+function polish(s: Scan): EvalItem[] {
+  for (const it of s.found) {
+    const shown = s.display.get(it);
+    const d = displayLabel(shown?.label || it.label, shown?.group ?? it.group);
+    it.label = d.label;
+    it.group = d.group;
+    // "정량평가"처럼 세부 항목 없이 묶음으로만 배점이 적힌 경우는 '기타'가 아니라 기술(정량)이다
+    if (it.kind === "other" && it.group === GROUP_OF.other && /(정량|계량)/.test(it.label) && !/비계량/.test(it.label)) it.group = "기술(정량)";
+  }
+  return s.found;
 }
 
 /** "평 가 항 목", "배 점" 처럼 한 글자씩 띄운 표 머리글을 붙인다 */
@@ -537,13 +561,14 @@ export function extractQuantBlock(text: string): { items: EvalItem[]; total: num
     const ctx = lines.slice(Math.max(0, n - 3), n + 1).join(" ");
     const declared = ctx.match(/정량\s*(?:적)?\s*평가[^\d]{0,6}\(?\s*(\d{1,2})\s*점/);
     if (!/정량/.test(ctx)) continue;
-    const { found } = scanItems(lines, n, Math.min(lines.length, n + 30), true);
+    const scan = scanItems(lines, n, Math.min(lines.length, n + 30), true);
+    const { found } = scan;
     const items = found.filter((i) => QUANT_KINDS.includes(i.kind) || i.kind === "other");
     if (items.length < 2 || items.length !== found.length) continue;
     const total = items.reduce((a, i) => a + i.max, 0);
     if (total < 5 || total > 60 || (declared && Math.abs(total - Number(declared[1])) > 0.01)) continue;
     if (!items.some((i) => i.kind === "performance" || i.kind === "credit")) continue;
-    if (!best || items.length > best.items.length) best = { items, total, quote: ctx.slice(0, 100) };
+    if (!best || items.length > best.items.length) { polish(scan); best = { items, total, quote: ctx.slice(0, 100) }; }
   }
   return best;
 }
@@ -564,9 +589,11 @@ export function extractSheet(text: string, fallback?: EvalSheet): EvalSheet | un
     const off = Math.abs(sum - 100);
     return (off <= 0.5 ? 1000 : off <= 2 ? 500 : 0) - off + Math.min(s.found.length, 12) * 2 + (s.found.some((i) => i.kind === "price") ? 5 : 0);
   };
-  const { found, lineOf, inline } = cands.reduce((a, b) => (fit(b) > fit(a) ? b : a));
+  const chosen = cands.reduce((a, b) => (fit(b) > fit(a) ? b : a));
+  const { found, lineOf, inline } = chosen;
 
   if (found.length < 2) return undefined;
+  polish(chosen);
 
   // 항목 사이 줄(최대 14줄)을 그 항목의 세부기준으로 읽는다: 점수 구간, 서류 인정 범위, 평가 요소
   const used = new Set<number>();

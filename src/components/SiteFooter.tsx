@@ -6,7 +6,7 @@ export function SiteFooter() {
     <footer className="mt-24 border-t border-ink-100 bg-paper text-ink-500">
       <div className="container-x grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
-          <Logo />
+          <Logo reset />
           <p className="mt-4 max-w-xs text-sm leading-relaxed">
             입찰 특화 알고리즘이 귀사의 입찰 담당자가 되어 드립니다. 공고 채점부터 서류 체크리스트까지, 매일 아침 정리해서 전달합니다.
           </p>

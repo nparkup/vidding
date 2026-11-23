@@ -16,12 +16,20 @@ const AUTH_KEY = "bm-auth.v1";
  */
 const KEEP_PARAMS: Record<string, string[]> = { "/bids/view": ["id"], "/apt-bids/view": ["no"], "/contracts/view": ["no"] };
 
-function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: boolean, configKey: string, authKey: string) {
+/**
+ * mode
+ * - "reload": 새로고침일 때만 저장 값과 주소 값을 지운다 (<head> 인라인 스크립트)
+ * - "all": 언제든 저장 값과 주소 값을 지운다 (헤더 로고·같은 메뉴를 다시 눌렀을 때)
+ * - "storage": 저장 값만 지운다 (다른 화면으로 이동할 때, src/components/PageReset.tsx)
+ */
+function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: boolean, configKey: string, authKey: string, mode: "reload" | "all" | "storage") {
   try {
-    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    const legacy = (performance as unknown as { navigation?: { type: number } }).navigation;
-    const isReload = nav ? nav.type === "reload" : legacy?.type === 1;
-    if (!isReload) return;
+    if (mode === "reload") {
+      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      const legacy = (performance as unknown as { navigation?: { type: number } }).navigation;
+      const isReload = nav ? nav.type === "reload" : legacy?.type === 1;
+      if (!isReload) return;
+    }
     const path = location.pathname.replace(/\/+$/, "");
     if (/\/admin(\/|$)/.test(path)) return;
 
@@ -35,7 +43,7 @@ function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: 
       if (k.startsWith("bidmate.") || (clearChecklist && k.startsWith("checklist:"))) ls.removeItem(k);
     }
 
-    if (location.search || location.hash) {
+    if (mode !== "storage" && (location.search || location.hash)) {
       const page = Object.keys(keep).find((p) => path.endsWith(p));
       const src = new URLSearchParams(location.search);
       const out = new URLSearchParams();
@@ -51,4 +59,30 @@ function run(keep: Record<string, string[]>, keepMybox: string, clearChecklist: 
   }
 }
 
-export const resetOnReloadScript = `(${run.toString()})(${JSON.stringify(KEEP_PARAMS)},${JSON.stringify(MYBOX_KEY)},${JSON.stringify(!MYBOX_ENABLED)},${JSON.stringify(SITE_CONFIG_KEY)},${JSON.stringify(AUTH_KEY)});`;
+const args = [KEEP_PARAMS, MYBOX_KEY, !MYBOX_ENABLED, SITE_CONFIG_KEY, AUTH_KEY] as const;
+
+export const resetOnReloadScript = `(${run.toString()})(${args.map((a) => JSON.stringify(a)).join(",")},"reload");`;
+
+/** 화면마다 저장해 둔 마지막 조회 조건을 지운다 (서류함·로그인은 남김). 다른 화면으로 이동할 때 쓴다 */
+export function clearSavedState() {
+  run(...args, "storage");
+}
+
+/** 저장 값과 주소 값(공고 상세 번호만 남김)을 모두 지운다 */
+export function clearAllState() {
+  run(...args, "all");
+}
+
+/** 주소에서 지우지 않고 남길 값 (공고 상세 번호). 주소 문자열을 받아 정리한 주소를 돌려준다 */
+export function keptUrl(pathname: string, search: string): string {
+  const path = pathname.replace(/\/+$/, "");
+  const page = Object.keys(KEEP_PARAMS).find((p) => path.endsWith(p));
+  const src = new URLSearchParams(search);
+  const out = new URLSearchParams();
+  for (const name of page ? KEEP_PARAMS[page] : []) {
+    const v = src.get(name);
+    if (v !== null) out.set(name, v);
+  }
+  const qs = out.toString();
+  return pathname + (qs ? `?${qs}` : "");
+}

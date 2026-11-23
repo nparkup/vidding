@@ -7,13 +7,14 @@ import { useSiteConfig } from "@/lib/siteConfig";
 import { useAccount } from "@/lib/account";
 import { planName } from "@/lib/plans";
 import type { UsageState } from "@/lib/usage";
+import { TRIAL_LIMIT_ENABLED } from "@/lib/trialLimit";
 
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
 
 /** 고른 공고 아래: 무료 체험(또는 이용권) 사용 건수 */
 export function TrialNote({ state }: { state: UsageState | null }) {
   const TRIAL_LIMIT = useSiteConfig().trialLimit;
-  if (!state || state.status !== "ok") return null;
+  if (!state || state.status !== "ok" || state.off) return null;
   if (state.paid) {
     const n = state.used.length;
     const q = state.paid.quota;
@@ -49,6 +50,8 @@ export function TrialIntro() {
       </p>
     );
   }
+  // 무료 체험 제한을 꺼 둔 동안에는 건수 안내를 하지 않는다
+  if (!TRIAL_LIMIT_ENABLED) return null;
   const used = u ? u.used : local;
   const left = Math.max(0, TRIAL_LIMIT - used.length);
   return (

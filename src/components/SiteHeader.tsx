@@ -7,6 +7,7 @@ import { ChevronDown, Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
 import { useMyboxOn } from "@/lib/useMyboxOn";
 import { useAccount } from "@/lib/account";
+import { hardGo } from "@/lib/hardGo";
 
 type Item = { href: string; label: string; desc: string; /** 관리자 화면에서 서류함을 켰을 때만 */ mybox?: boolean };
 type Entry = { label: string; href: string } | { label: string; items: Item[] };
@@ -48,7 +49,6 @@ export const NAV: Entry[] = [
 const clean = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
 // 나라장터 예측(/premium)은 아래에 아파트 예측(/premium/apt)이 있어 같은 주소일 때만 켠다
 const isOn = (path: string, href: string) => (href === "/premium" ? path === href : href === "/bids" ? path === "/bids" || path.startsWith("/bids/") : path === href || path.startsWith(`${href}/`));
-const entryOn = (path: string, e: Entry) => ("href" in e ? isOn(path, e.href) : e.items.some((i) => isOn(path, i.href)));
 
 export function SiteHeader() {
   const myboxOn = useMyboxOn();
@@ -60,11 +60,26 @@ export function SiteHeader() {
   const [mobile, setMobile] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  /**
+   * 메뉴에서 마지막으로 누른 화면. 그 화면을 보고 있을 때만 메뉴를 선택된 것처럼 표시한다.
+   * 화면 메모리에만 두므로 새로고침하거나 로고를 누르면 선택 표시가 풀린다.
+   */
+  const [picked, setPicked] = useState<string | null>(null);
+  const lit = (href: string) => !!picked && isOn(path, href) && isOn(path, picked);
+  const litEntry = (e: Entry) => ("href" in e ? lit(e.href) : e.items.some((i) => lit(i.href)));
+  /** 메뉴 링크를 누를 때: 지금 보고 있는 화면이면 그 화면을 처음 상태로 새로 연다 */
+  const go = (href: string) => (ev: React.MouseEvent<HTMLAnchorElement>) => {
+    setPicked(href);
+    if (path === href) hardGo(ev, href);
+  };
 
-  // 화면이 바뀌면 펼친 메뉴를 닫는다
+  // 화면이 바뀌면 펼친 메뉴를 닫고, 메뉴에 남아 있는 포커스도 푼다
   useEffect(() => {
     setOpen(null);
     setMobile(false);
+    const a = document.activeElement as HTMLElement | null;
+    if (a && (headerRef.current?.contains(a) || document.getElementById("mobile-menu")?.contains(a))) a.blur();
   }, [path]);
 
   // 바깥 클릭·Esc로 닫기
@@ -96,17 +111,17 @@ export function SiteHeader() {
 
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-ink-100/70 bg-white/90 backdrop-blur-xl">
+    <header ref={headerRef} className="sticky top-0 z-40 border-b border-ink-100/70 bg-white/90 backdrop-blur-xl">
       <div className="container-x flex h-16 items-center justify-between gap-2 lg:gap-4">
-        <Logo />
+        <Logo reset />
 
         <nav ref={navRef} aria-label="주요 메뉴" className="hidden items-center gap-0.5 text-[15px] font-semibold text-ink-500 lg:flex">
           {nav.map((e) => {
-            const on = entryOn(path, e);
+            const on = litEntry(e);
             const base = `rounded-full px-3 py-2 transition hover:bg-paper hover:text-ink ${on ? "text-ink" : ""}`;
             if ("href" in e)
               return (
-                <Link key={e.label} href={e.href} aria-current={on ? "page" : undefined} className={`${base} whitespace-nowrap`}>
+                <Link key={e.label} href={e.href} onClick={go(e.href)} aria-current={on ? "page" : undefined} className={`${base} whitespace-nowrap`}>
                   {e.label}
                 </Link>
               );
@@ -127,11 +142,12 @@ export function SiteHeader() {
                   <div className="absolute left-1/2 top-full z-50 -translate-x-1/2 pt-2">
                     <ul className="w-[19rem] rounded-2xl border border-ink-100 bg-white p-2 shadow-lift">
                       {e.items.map((i) => {
-                        const cur = isOn(path, i.href);
+                        const cur = lit(i.href);
                         return (
                           <li key={i.href}>
                             <Link
                               href={i.href}
+                              onClick={go(i.href)}
                               aria-current={cur ? "page" : undefined}
                               className={`block rounded-xl px-3 py-2.5 transition hover:bg-paper ${cur ? "bg-mint-50" : ""}`}
                             >
@@ -188,9 +204,9 @@ export function SiteHeader() {
             </Link>
             <div className="grid grid-cols-2 gap-2">
               {nav.filter((e): e is { label: string; href: string } => "href" in e).map((e) => {
-                const on = isOn(path, e.href);
+                const on = lit(e.href);
                 return (
-                  <Link key={e.href} href={e.href} aria-current={on ? "page" : undefined} className={`rounded-xl border px-3 py-3 text-[15px] font-bold ${on ? "border-mint bg-mint-50 text-mint-600" : "border-ink-100 text-ink"}`}>
+                  <Link key={e.href} href={e.href} onClick={go(e.href)} aria-current={on ? "page" : undefined} className={`rounded-xl border px-3 py-3 text-[15px] font-bold ${on ? "border-mint bg-mint-50 text-mint-600" : "border-ink-100 text-ink"}`}>
                     {e.label}
                   </Link>
                 );
@@ -201,10 +217,10 @@ export function SiteHeader() {
                 <p className="px-1 text-xs font-bold tracking-wide text-ink-400">{g.label}</p>
                 <ul className="mt-2 divide-y divide-ink-100 rounded-2xl border border-ink-100">
                   {g.items.map((i) => {
-                    const on = isOn(path, i.href);
+                    const on = lit(i.href);
                     return (
                       <li key={i.href}>
-                        <Link href={i.href} aria-current={on ? "page" : undefined} className={`block px-4 py-3 ${on ? "bg-mint-50" : ""}`}>
+                        <Link href={i.href} onClick={go(i.href)} aria-current={on ? "page" : undefined} className={`block px-4 py-3 ${on ? "bg-mint-50" : ""}`}>
                           <span className={`block text-[15px] font-bold ${on ? "text-mint-600" : "text-ink"}`}>{i.label}</span>
                           <span className="block text-xs text-ink-400">{i.desc}</span>
                         </Link>

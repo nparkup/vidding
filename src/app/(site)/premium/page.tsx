@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { PageHero } from "@/components/PageHero";
 import { ScorePredictor } from "@/components/premium/ScorePredictor";
 import { AptPriceRedirect } from "@/components/premium/AptPriceRedirect";
+import { TRIAL_LIMIT_ENABLED } from "@/lib/trialLimit";
 
 export const metadata: Metadata = {
   title: "나라장터 예측",
@@ -28,7 +29,7 @@ export default function PremiumPage() {
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">나라장터 예측</p>
         <h2 className="h-section mt-3">공고 하나로 직접 계산해 보세요</h2>
-        <p className="lead mt-3 max-w-3xl">공고를 고르고 사업자번호나 기업명으로 우리 회사를 조회하면 참가자격, 예상 평가점수, 통과 가능한 투찰률이 맨 위에 정리됩니다. 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다.</p>
+        <p className="lead mt-3 max-w-3xl">공고를 고르고 사업자번호나 기업명으로 우리 회사를 조회하면 참가자격, 예상 평가점수, 통과 가능한 투찰률이 맨 위에 정리됩니다.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다."}</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
             <ScorePredictor />

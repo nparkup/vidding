@@ -195,7 +195,7 @@ export function ScorePredictor() {
   }, []);
   const corpNo = corp?.bizno ?? memberNo;
   useEffect(() => {
-    if (STATIC && CORP_API && corpNo && trialKey && trial?.status === "ok" && !trial.server) syncTrialServer(CORP_API, corpNo, trialKey);
+    if (STATIC && CORP_API && corpNo && trialKey && trial?.status === "ok" && !trial.server && !trial.off) syncTrialServer(CORP_API, corpNo, trialKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [corpNo, trialKey]);
 

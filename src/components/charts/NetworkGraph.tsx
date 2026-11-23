@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Tooltip } from "./Tooltip";
 import { CHART, useWidth } from "./useWidth";
 
@@ -77,9 +77,25 @@ function layout(nodes: NetNode[], edges: NetEdge[], radius: (n: NetNode) => numb
  * 관계도: 원 크기 = 건수, 색 = 구분, 선 굵기 = 함께 나온 횟수.
  * 원에 마우스를 올리거나 누르면 이어진 것만 진하게 남기고 말풍선을 띄운다.
  */
-export function NetworkGraph({ nodes, edges, groups, centerId, height = 420, ariaLabel, labelTop = 24 }: { nodes: NetNode[]; edges: NetEdge[]; groups: NetGroup[]; centerId?: string; height?: number; ariaLabel: string; labelTop?: number }) {
+export function NetworkGraph({ nodes, edges, groups, centerId, height = 420, ariaLabel, labelTop = 24, tipOf, tipWidth, onFocusNode, canOpen, onOpen, openLabel = "이 기준으로 보기" }: {
+  nodes: NetNode[]; edges: NetEdge[]; groups: NetGroup[]; centerId?: string; height?: number; ariaLabel: string; labelTop?: number;
+  /** 말풍선 내용을 바깥에서 그때그때 만든다 (불러온 자세한 정보 등). 없으면 node.tip */
+  tipOf?: (n: NetNode, touch: boolean) => string[];
+  tipWidth?: number;
+  /** 원에 마우스를 올리거나 눌러 말풍선이 뜰 때 */
+  onFocusNode?: (n: NetNode) => void;
+  /** 마우스로 누르면 바로 onOpen, 손가락으로 누르면 말풍선을 띄우고 아래 버튼으로 onOpen */
+  canOpen?: (n: NetNode) => boolean;
+  onOpen?: (n: NetNode) => void;
+  openLabel?: string;
+}) {
   const [ref, W] = useWidth<HTMLDivElement>();
-  const [focus, setFocus] = useState<string | null>(null);
+  const [focus, setFocusId] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+  const pointer = useRef<string>("mouse");
+  const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const setFocus = (id: string | null) => { setFocusId(id); const n = id ? byId.get(id) : undefined; if (n) onFocusNode?.(n); };
+  const openable = (n: NetNode) => !!onOpen && n.id !== centerId && (canOpen ? canOpen(n) : true);
   const maxN = Math.max(1, ...nodes.filter((n) => n.id !== centerId).map((n) => n.weight));
   const radius = (n: NetNode) => (n.id === centerId ? 20 : 6 + 14 * Math.sqrt(n.weight / maxN));
   const P = useMemo(() => layout(nodes, edges, radius, centerId), [nodes, edges, centerId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -120,7 +136,7 @@ export function NetworkGraph({ nodes, edges, groups, centerId, height = 420, ari
           <li key={g.key} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: g.color }} />{g.label}</li>
         ))}
       </ul>
-      <div ref={ref} className="relative mt-1 min-w-0 select-none overflow-hidden rounded-xl bg-paper" onMouseLeave={() => setFocus(null)}>
+      <div ref={ref} className="relative mt-1 min-w-0 select-none overflow-hidden rounded-xl bg-paper" onMouseLeave={() => { if (pointer.current === "mouse") setFocus(null); }}>
         <svg width={W} height={H} role="img" aria-label={ariaLabel} className="block" onClick={(e) => { if (e.target === e.currentTarget) setFocus(null); }}>
           {edges.map((e) => {
             const a = idx.get(e.a), b = idx.get(e.b);
@@ -132,7 +148,14 @@ export function NetworkGraph({ nodes, edges, groups, centerId, height = 420, ari
             const on = !focus || near.has(n.id);
             const r = radius(n);
             return (
-              <g key={n.id} opacity={on ? 1 : 0.2} className="cursor-pointer" onMouseEnter={() => setFocus(n.id)} onClick={() => setFocus(focus === n.id ? null : n.id)}>
+              <g key={n.id} opacity={on ? 1 : 0.2} className="cursor-pointer"
+                onPointerDown={(e) => { pointer.current = e.pointerType; }}
+                onPointerEnter={(e) => { pointer.current = e.pointerType; if (e.pointerType === "mouse") { setTouched(false); setFocus(n.id); } }}
+                onClick={() => {
+                  if (pointer.current === "mouse" && openable(n)) { onOpen!(n); return; }
+                  setTouched(pointer.current !== "mouse");
+                  setFocus(focus === n.id && pointer.current !== "mouse" ? null : n.id);
+                }}>
                 <circle cx={sx(P[i].x)} cy={sy(P[i].y)} r={r + 6} fill="transparent" />
                 <circle cx={sx(P[i].x)} cy={sy(P[i].y)} r={r} fill={n.id === centerId ? CHART.ink : color.get(n.group) ?? CHART.ref} stroke="#fff" strokeWidth="2" />
               </g>
@@ -151,8 +174,19 @@ export function NetworkGraph({ nodes, edges, groups, centerId, height = 420, ari
             })}
           </g>
         </svg>
-        {fi !== undefined && <Tooltip x={sx(P[fi].x)} y={Math.min(sy(P[fi].y) + radius(nodes[fi]) + 18, H - 80)} lines={nodes[fi].tip} width={W} />}
+        {fi !== undefined && (() => {
+          const n = nodes[fi], cy = sy(P[fi].y), r = radius(n);
+          // 아래쪽 반에 있는 원은 말풍선을 위로 띄워 잘리지 않게
+          const up = cy > H / 2;
+          return <Tooltip x={sx(P[fi].x)} y={up ? cy - r - 8 : cy + r + 18} above={up} lines={tipOf ? tipOf(n, touched) : n.tip} width={W} w={tipWidth} />;
+        })()}
       </div>
+      {touched && fi !== undefined && openable(nodes[fi]) && (
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-ink-100 bg-white px-3 py-2 text-sm">
+          <span className="min-w-0 truncate font-semibold">{nodes[fi].label}</span>
+          <button type="button" className="btn-primary btn-sm shrink-0" onClick={() => onOpen!(nodes[fi])}>{openLabel}</button>
+        </div>
+      )}
     </div>
   );
 }

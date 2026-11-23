@@ -75,7 +75,7 @@ export function AptPredictor() {
   // 가입한 사업자번호가 있으면 그 번호로 쓴 체험 건수도 중계 서버에서 맞춘다
   useEffect(() => {
     const m = readMember();
-    if (TRIAL_API && m && trialKey && trial?.status === "ok" && !trial.server) syncTrialServer(TRIAL_API, m.bizno, trialKey);
+    if (TRIAL_API && m && trialKey && trial?.status === "ok" && !trial.server && !trial.off) syncTrialServer(TRIAL_API, m.bizno, trialKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trialKey]);
   const pickTrial = (e: TrialEntry) => {

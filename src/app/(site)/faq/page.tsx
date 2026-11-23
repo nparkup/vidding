@@ -23,7 +23,7 @@ export default function FaqPage() {
             <h2 className="text-2xl font-extrabold tracking-tight">{s.title}</h2>
             <p className="mt-2 text-sm text-ink-500">{s.desc}</p>
           </div>
-          <FaqList items={s.items} openFirst={i === 0} />
+          <FaqList items={s.items} />
         </section>
       ))}
       <p className="mt-16 text-center text-sm text-ink-500">

@@ -28,23 +28,42 @@ const TILE_TONE: Record<Tone, string> = {
   muted: "border-dashed border-ink-100 bg-white",
 };
 
+const STEP_STATUS: Record<StepState, string> = { done: "완료", now: "지금 할 일", todo: "다음 단계" };
+
+/**
+ * 진행 단계 표시. 사이트 카드(.card) 한 장 안에 세 단계를 나란히 두고,
+ * 위쪽 막대가 진행 정도를 민트색으로 채운다. 지금 단계는 민트 원, 끝난 단계는 연한 민트 원.
+ */
 export function StepBar({ steps }: { steps: { label: string; state: StepState; href?: string }[] }) {
+  const nowAt = steps.findIndex((s) => s.state === "now");
   return (
-    <ol className="grid grid-cols-3 gap-2">
-      {steps.map((s, n) => {
-        const body = (
-          <>
-            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums ${s.state === "done" ? "bg-mint text-white" : s.state === "now" ? "bg-ink text-white" : "bg-ink-100 text-ink-500"}`}>{n + 1}</span>
-            <span className="min-w-0">
-              <span className={`block break-keep text-xs font-semibold leading-snug sm:text-sm ${s.state === "todo" ? "text-ink-500" : "text-ink"}`}>{s.label}</span>
-              <span className={`block text-xs ${s.state === "done" ? "text-mint-700" : s.state === "now" ? "text-ink" : "text-ink-300"}`}>{s.state === "done" ? "완료" : s.state === "now" ? "지금 할 일" : "다음 단계"}</span>
-            </span>
-          </>
-        );
-        const cls = `flex h-full min-w-0 flex-col items-start gap-1.5 rounded-2xl border px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 ${s.state === "now" ? "border-ink bg-white shadow-sm" : "border-ink-100 bg-white/60"}`;
-        return <li key={s.label} className="min-w-0">{s.href ? <a href={s.href} className={`${cls} hover:border-ink-300`}>{body}</a> : <div className={cls}>{body}</div>}</li>;
-      })}
-    </ol>
+    <nav className="card px-4 py-4 sm:px-6 sm:py-5" aria-label="진행 단계">
+      <ol className="grid grid-cols-3 gap-3 sm:gap-6">
+        {steps.map((s, n) => {
+          const body = (
+            <>
+              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold tabular-nums transition ${
+                s.state === "now" ? "bg-mint text-white ring-4 ring-mint-100"
+                  : s.state === "done" ? "bg-mint-50 text-mint-700 ring-1 ring-inset ring-mint/40"
+                  : "bg-white text-ink-300 ring-1 ring-inset ring-ink-100"}`}>{n + 1}</span>
+              <span className="min-w-0">
+                <span className={`block text-[11px] font-semibold leading-none sm:text-xs ${s.state === "todo" ? "text-ink-300" : "text-mint-600"}`}>{STEP_STATUS[s.state]}</span>
+                <span className={`mt-1 block break-keep text-[13px] font-bold leading-snug sm:text-[15px] ${s.state === "todo" ? "text-ink-400" : "text-ink"} ${s.href ? "underline-offset-4 group-hover:underline" : ""}`}>{s.label}</span>
+              </span>
+            </>
+          );
+          const row = "mt-3 flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3";
+          return (
+            <li key={s.label} className="min-w-0" aria-current={n === nowAt ? "step" : undefined}>
+              <span aria-hidden className={`block h-1 rounded-full ${s.state === "todo" ? "bg-ink-100" : "bg-mint"}`} />
+              {s.href
+                ? <a href={s.href} className={`${row} group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-mint`}>{body}</a>
+                : <div className={row}>{body}</div>}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 

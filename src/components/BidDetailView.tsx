@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { AgencyLogo } from "./AgencyLogo";
 import { Suspense, useEffect, useState } from "react";
-import { DdayBadge } from "@/components/Badges";
+import { CloseDdayBadge } from "@/components/Badges";
 import { ProfileScore } from "@/components/ProfileScore";
 import { DocList } from "@/components/DocList";
-import { bidPriceGuide, daysLeft, documentChecklist, keyPoints } from "@/lib/analysis";
+import { bidPriceGuide, documentChecklist, keyPoints } from "@/lib/analysis";
 import { loadBidExtra } from "@/lib/attachments";
 import { BidContact, BidSummary, kstIso } from "@/components/BidSummary";
 import { LicenseLaws } from "@/components/LicenseLaws";
@@ -70,10 +70,10 @@ export function BidDetailView({ bid }: { bid: Bid }) {
     <div className="container-x py-6 sm:py-8">
       <Link href="/bids" className="text-sm text-ink-500 hover:text-ink">공고 목록으로</Link>
 
-      <header className="mt-3">
-        <div className="min-w-0">
+      <header className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
+        <div className="min-w-0 lg:flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <DdayBadge days={daysLeft(bid.closeAt)} />
+            <CloseDdayBadge iso={bid.closeAt} />
             <span className="chip">{bid.bizType ?? "용역"} · {bid.category}</span>
             <span className="chip">{bid.contractMethod}</span>
             {!profile.open && <span className="chip border-coral/30 bg-coral-100/60 text-coral">참가 불가</span>}
@@ -86,7 +86,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>
           </p>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap lg:justify-end">
           <MyBoxButton bid={bid} />
           <a href={bid.detailUrl} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">나라장터 원문</a>
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>

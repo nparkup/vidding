@@ -1,16 +1,14 @@
 import Link from "next/link";
 import type { MatchResult } from "@/lib/analysis";
 import type { Bid } from "@/lib/types";
-import { daysLeft } from "@/lib/analysis";
 import { shortDate, won } from "@/lib/format";
 import { CloseDay } from "./CloseDay";
-import { DdayBadge, ScoreMeter } from "./Badges";
+import { CloseDdayBadge, ScoreMeter } from "./Badges";
 import { bidHref } from "@/lib/links";
 import { closedLabel } from "@/lib/bidMethod";
 import { AgencyLogo } from "./AgencyLogo";
 
 export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; href?: string }) {
-  const left = match?.daysLeft ?? daysLeft(bid.closeAt);
   const closed = closedLabel(bid);
   return (
     <Link
@@ -19,7 +17,7 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
-          <DdayBadge days={left} />
+          <CloseDdayBadge iso={bid.closeAt} />
           <span className="chip">{bid.bizType && bid.bizType !== "용역" ? `${bid.bizType} · ` : ""}{bid.category}</span>
           <span className="chip">{bid.region === "전국" ? "전국" : `${bid.region} 제한`}</span>
           <span className="chip">{bid.contractMethod}</span>

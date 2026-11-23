@@ -8,9 +8,9 @@ type Source = "g2b" | "apt" | "nuri";
  */
 export function BidSourceTabs({ active, counts }: { active: Source; counts: Record<Source, number> }) {
   const tabs = [
-    { key: "g2b", href: "/bids", label: "나라장터 공고", desc: "관공서·공공기관 용역·공사·물품", from: "조달청 나라장터" },
-    { key: "apt", href: "/apt-bids", label: "아파트 공고", desc: "아파트 청소·경비·소독·위탁관리", from: "공동주택관리정보시스템" },
-    { key: "nuri", href: "/nuri-bids", label: "민간 공고", desc: "민간 기업·조합·법인 입찰", from: "조달청 누리장터" },
+    { key: "g2b", href: "/bids", label: "나라장터 공고", desc: "관공서·공공기관 용역·공사·물품" },
+    { key: "apt", href: "/apt-bids", label: "아파트 공고", desc: "아파트 청소·경비·소독·위탁관리" },
+    { key: "nuri", href: "/nuri-bids", label: "민간 공고", desc: "민간 기업·조합·법인 입찰" },
   ] as const;
   return (
     <nav className="mt-6" aria-label="공고 출처 선택">
@@ -37,7 +37,6 @@ export function BidSourceTabs({ active, counts }: { active: Source; counts: Reco
                 <b className={`text-base tabular-nums sm:text-2xl ${on ? "text-mint-600" : "text-ink"}`}>{counts[t.key].toLocaleString()}건</b>
                 <span className="text-xs text-ink-400">진행 중</span>
               </span>
-              <span className="mt-1 hidden text-xs text-ink-400 sm:block">출처 {t.from}</span>
             </Link>
           );
         })}

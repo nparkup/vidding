@@ -27,14 +27,14 @@ export function DdayBadge({ days }: { days: number }) {
   );
 }
 
-/** 마감일 기준 D-day 배지 (한국 날짜 기준: 오늘 마감 D-0, 지난 공고 "마감") */
+/** 마감일 기준 D-day 배지 (한국 날짜 기준: 오늘 마감 "오늘마감", 지난 공고 "마감") */
 export function CloseDdayBadge({ iso, className = "" }: { iso?: string | null; className?: string }) {
   const days = calendarDaysLeft(iso);
   if (days === null) return null;
   const urgent = days <= 3;
   return (
     <span className={`inline-flex shrink-0 rounded-md px-2 py-0.5 text-xs font-bold tabular-nums ${urgent ? "bg-coral-100 text-coral" : "bg-ink-100 text-ink-500"} ${className}`}>
-      {days < 0 ? "마감" : `D-${days}`}
+      {days < 0 ? "마감" : days === 0 ? "오늘마감" : `D-${days}`}
     </span>
   );
 }

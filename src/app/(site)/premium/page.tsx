@@ -36,23 +36,6 @@ export default function PremiumPage() {
           </Suspense>
         </div>
       </section>
-
-      <section className="container-x pt-12">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="card p-7">
-            <p className="text-lg font-bold">읽는 서류</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">나라장터에 올라온 입찰공고서, 과업지시서·규격서, 제안요청서, 적격심사 세부기준을 하루 세 번 수집해 PDF·HWPX에서 평가표를 읽습니다.<br />신용평가등급확인서는 고객이 올려 등급을 읽습니다.</p>
-          </div>
-          <div className="card p-7">
-            <p className="text-lg font-bold">평가 구조</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">용역·물품 적격심사(85점 통과), 공사 적격심사(92점 통과), 협상에 의한 계약(기술점수 85% 협상적격) 구조를 기본으로 두고, 공고 원문 배점이 있으면 원문을 우선합니다.</p>
-          </div>
-          <div className="card p-7">
-            <p className="text-lg font-bold">요금제 이용 고객에게는</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">공고 수 제한 없이 첨부 전체에서 평가표를 판독하고, 예상 점수와 보완할 서류, 통과 가능한 투찰률 범위를 보여 드립니다.</p>
-          </div>
-        </div>
-      </section>
     </>
   );
 }

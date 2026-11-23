@@ -55,17 +55,17 @@ function trimRegion(top: string, main: string): string {
 }
 
 /**
- * 띠의 모든 칸을 같은 틀로 맞춘다: 칸 크기 고정, CI는 같은 크기 상자 안에 가운데 맞춤,
+ * 띠의 모든 칸을 같은 틀로 맞춘다: 칸 높이 고정(폭은 이름 길이만큼), CI는 같은 크기 상자 안에 가운데 맞춤,
  * 글자는 항상 두 줄(위: 상위 기관 또는 기관 유형, 아래: 기관 이름).
  */
 function Card({ title, mark, top, main }: { title: string; mark: ReactNode; top: string; main: string }) {
   return (
-    <span className="inline-flex h-[64px] w-[296px] items-center gap-3 rounded-2xl border border-ink-100 bg-white px-3" title={title}>
+    <span className="inline-flex h-[64px] items-center gap-3 whitespace-nowrap rounded-2xl border border-ink-100 bg-white pl-3 pr-5" title={title}>
       <span className="flex h-9 w-[80px] shrink-0 items-center justify-center">{mark}</span>
       <span className="h-8 w-px shrink-0 bg-ink-100" aria-hidden />
-      <span className="flex min-w-0 flex-col justify-center gap-0.5 leading-tight">
-        <span className="truncate text-[11px] font-medium text-ink-400">{top}</span>
-        <span className="line-clamp-2 break-keep text-[14px] font-bold tracking-[-0.02em] text-ink-700">{main}</span>
+      <span className="flex flex-col justify-center gap-0.5 leading-tight">
+        <span className="text-[11px] font-medium text-ink-400">{top}</span>
+        <span className="text-[14px] font-bold tracking-[-0.02em] text-ink-700">{main}</span>
       </span>
     </span>
   );

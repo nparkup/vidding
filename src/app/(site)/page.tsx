@@ -403,8 +403,8 @@ export default async function Home() {
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-[10%] bg-gradient-to-l from-white to-transparent" />
           {/* 같은 목록을 두 번 이어 붙이고 정확히 절반(-50%)만큼 옮겨 이음매 없이 돈다.
               간격은 gap 대신 항목마다 오른쪽 여백으로 줘야 절반 지점이 딱 맞는다(gap이면 한 바퀴마다 6px 튐) */}
-          {/* 속도는 칸 수에 맞춰 정한다: 한 칸(308px)에 6초, 초당 약 51px로 천천히 흐른다 */}
-          <div className="flex w-max animate-marquee [backface-visibility:hidden] [will-change:transform] motion-reduce:animate-none" style={{ animationDuration: `${agencies.length * 6}s` }}>
+          {/* 속도는 칸 수에 맞춰 정한다: 한 칸(약 260px)에 5초, 초당 약 52px로 천천히 흐른다 */}
+          <div className="flex w-max animate-marquee [backface-visibility:hidden] [will-change:transform] motion-reduce:animate-none" style={{ animationDuration: `${agencies.length * 5}s` }}>
             {[...agencies, ...agencies].map((a, i) => (
               <div key={i} className="shrink-0 pr-3" aria-hidden={i >= agencies.length || undefined}>
                 <AgencyMark name={a} />

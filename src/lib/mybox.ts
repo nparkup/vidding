@@ -54,7 +54,3 @@ export function updateMyBox(no: string, patch: Partial<Pick<MyBoxItem, "label" |
   saveMyBox(loadMyBox().map((x) => (x.no === no ? { ...x, ...patch } : x)));
 }
 
-/** 제출서류 체크리스트 진행 (Checklist 가 "checklist:{공고 id}" 에 둔다): [체크한 수] */
-export function checklistDone(id: string): number {
-  try { return Object.values(JSON.parse(localStorage.getItem(`checklist:${id}`) ?? "{}") as Record<string, boolean>).filter(Boolean).length; } catch { return 0; }
-}

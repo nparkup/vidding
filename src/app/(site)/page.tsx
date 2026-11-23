@@ -40,7 +40,7 @@ const COMPARE = [
   ["공고 범위", "나라장터와 아파트 공고를 사이트마다 따로 확인", "나라장터 전 업종과 아파트 관리 입찰을 한 곳에서"],
   ["업종 범위", "전 업종 공고를 한 목록에 나열", "전 업종 수집 후 귀사 면허에 맞는 공고만"],
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
-  ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 체크리스트 제공"],
+  ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 제출 서류 정리"],
   ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 채점과 S·A·B·C 등급"],
   ["정정·취소", "공고를 다시 열어 바뀐 곳을 직접 비교", "바뀐 항목만 골라 따로 알림"],
   ["낙찰 분석", "과거 결과를 건마다 직접 검색", "10년치 낙찰 기록으로 사정율·발주처·경쟁사 분석"],
@@ -57,7 +57,7 @@ const TRUST = [
 
 const PERSONAS = [
   { tags: ["아파트 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 아파트 공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", use: "아침 맞춤 공고 메일·아파트 예측" },
-  { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 제출서류 체크리스트로 마감 전 서류를 한 번 더 봅니다.", use: "입찰 가능성 점수·주간 보고서" },
+  { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 제출 서류 목록으로 마감 전 서류를 한 번 더 봅니다.", use: "입찰 가능성 점수·주간 보고서" },
   { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", use: "사업장별 조건·평가점수 예측" },
 ];
 
@@ -155,7 +155,7 @@ export default async function Home() {
       label: "매일 아침 맞춤 메일",
       title: "나라장터에 접속하지 않아도, 오늘 볼 공고가 먼저 도착합니다",
       points: [<><b>영업일 오전 7시</b>, 귀사 조건에 맞는 신규 공고만 골라 보냅니다</>, <>공고마다 <b>가능성 등급·규모·마감일</b>을 한 줄로 요약합니다</>, <><b>3일 내 마감</b> 공고는 따로 모아 경고합니다</>],
-      use: ["수도권 전기·통신공사 업체", "출근길에 메일만 확인하고, 관심 공고 두 건의 서류 체크리스트로 준비를 시작합니다."],
+      use: ["수도권 전기·통신공사 업체", "출근길에 메일만 확인하고, 관심 공고 두 건의 제출 서류 목록으로 준비를 시작합니다."],
       visual: (
         <div className="rounded-2xl bg-white p-4 shadow-lift sm:p-5">
           <div className="flex items-center justify-between text-xs text-ink-400">
@@ -233,26 +233,26 @@ export default async function Home() {
       ),
     },
     {
-      label: "제출서류 체크리스트",
+      label: "제출 서류",
       title: "계약방법에 맞는 제출서류를 빠짐없이 정리합니다",
-      points: [<>적격심사·협상계약 등 <b>계약방법별</b> 서류를 나눠 드립니다</>, <>서류마다 <b>발급처와 유효기간</b> 주의사항을 붙입니다</>, <>서류마다 <b>체크 표시</b>로 마감 전 누락 여부를 확인합니다</>],
-      use: ["처음 공공 입찰에 참가하는 업체", "체크리스트대로 서류를 모으고, 빠진 항목만 다시 확인합니다."],
+      points: [<>적격심사·협상계약 등 <b>계약방법별</b> 서류를 나눠 드립니다</>, <>서류마다 <b>발급처와 유효기간</b> 주의사항을 붙입니다</>, <>입찰 참가 전·제출·낙찰 후 <b>단계별</b>로 나눠 보여 드립니다</>],
+      use: ["처음 공공 입찰에 참가하는 업체", "정리된 목록대로 서류를 모으고, 공고문 원문과 한 번 더 맞춰 봅니다."],
       visual: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-bold">제출서류 체크리스트</p>
+            <p className="text-sm font-bold">제출 서류</p>
             <span className="chip">{featured.contractMethod} 기준</span>
           </div>
           <ul className="mt-4 space-y-2">
             {docs.flatMap((g) => g.items).slice(0, 6).map((d, i) => (
               <li key={d.name} className="flex items-center gap-3 rounded-xl border border-ink-100 px-3 py-2.5 text-sm">
-                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md ${i < 3 ? "bg-mint text-white" : "border border-ink-200"}`}>{i < 3 && <Check className="h-3.5 w-3.5" strokeWidth={3} />}</span>
-                <span className={`min-w-0 flex-1 ${i < 3 ? "text-ink-400 line-through" : "font-medium"}`}>{d.name}</span>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-300" />
+                <span className="min-w-0 flex-1 font-medium">{d.name}</span>
                 {d.note && <span className="hidden max-w-[45%] text-right text-xs text-ink-300 sm:block">{d.note}</span>}
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-right text-xs text-ink-400">총 {docCount}개 항목 중 3개 준비</p>
+          <p className="mt-3 text-right text-xs text-ink-400">총 {docCount}개 서류</p>
         </div>
       ),
     },

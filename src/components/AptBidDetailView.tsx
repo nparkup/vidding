@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CloseDdayBadge } from "@/components/Badges";
-import { Checklist } from "@/components/Checklist";
+import { DocList } from "@/components/DocList";
 import { aptDetailUrl, aptFileUrl, type AptBid } from "@/lib/apt";
 import { contractMonths, forecastAptPrice, type AptPriceModel } from "@/lib/aptPrice";
 import { dateTime, won, wonFull } from "@/lib/format";
@@ -113,10 +113,10 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
   ];
 
   return (
-    <div className="container-x py-10 sm:py-14">
+    <div className="container-x py-6 sm:py-8">
       <Link href="/apt-bids" className="text-sm text-ink-500 hover:text-ink">아파트 공고 목록으로</Link>
 
-      <header className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <header className="mt-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <CloseDdayBadge iso={b.closeAt} />
@@ -130,16 +130,16 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">{b.title}</h1>
           <p className="mt-2 text-ink-500 [overflow-wrap:anywhere]">{b.apt}{b.region ? ` · ${b.region}` : ""}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <a href={aptDetailUrl(b.no)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">K-apt 원문</a>
           {b.link && <a href={b.link} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">{b.system ?? "입찰 시스템"}에서 보기</a>}
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>
         </div>
       </header>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <div className="min-w-0 space-y-6">
-          <section className="card p-6">
+      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <div className="min-w-0 space-y-4">
+          <section className="card p-5">
             <h2 className="text-lg font-bold">핵심 요약</h2>
             <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
               {shown.map((c) => (
@@ -168,13 +168,13 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
           </section>
 
           {b.content && (
-            <section className="card p-6">
+            <section className="card p-5">
               <h2 className="text-lg font-bold">공고 내용</h2>
               <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{b.content}</p>
             </section>
           )}
 
-          <section className="card p-6">
+          <section className="card p-5">
             <h2 className="text-lg font-bold">일정</h2>
             <ol className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {timeline.map((t) => (
@@ -188,7 +188,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
           </section>
 
           {b.prior && (
-            <section className="card p-6">
+            <section className="card p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-bold">같은 단지 {priorLabel}</h2>
                 <span className="chip">{b.prior.via === "수의계약" ? "수의계약 공지" : "입찰결과 공지"}</span>
@@ -205,7 +205,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
           )}
 
           {(b.files?.length ?? 0) > 0 && (
-            <section className="card p-6">
+            <section className="card p-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold">첨부파일</h2>
                 <span className="chip">{b.files!.length}건 · K-apt</span>
@@ -223,18 +223,18 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
             </section>
           )}
 
-          <section className="card p-6">
+          <section className="card p-5">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-bold">제출서류 체크리스트</h2>
+              <h2 className="text-lg font-bold">제출 서류</h2>
               <span className="chip">{docs.length ? "공고 구비서류 기준" : "기본 확인 항목"}</span>
             </div>
-            <p className="mt-1 mb-5 text-sm text-ink-500">체크한 항목은 이 브라우저에 저장됩니다.<br />최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
-            <Checklist bidId={`apt:${b.no}`} groups={groups} />
+            <p className="mt-1 mb-3 text-sm text-ink-500">최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
+            <DocList groups={groups} />
           </section>
         </div>
 
-        <aside className="min-w-0 space-y-6">
-          <section className="card p-6">
+        <aside className="min-w-0 space-y-4">
+          <section className="card p-5">
             <h2 className="text-lg font-bold">입찰가격 예측</h2>
             <p className="mt-1 text-sm text-ink-500">같은 단지 직전 계약 × 과거 낙찰 변화율</p>
             {forecast ? (
@@ -258,7 +258,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
             {comparable && <Link href={`/premium/apt?apt=${encodeURIComponent(b.no)}`} className="btn-primary mt-4 w-full">계약기간 바꿔 계산하기</Link>}
           </section>
 
-          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-6 text-white shadow-glow">
+          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-5 text-white shadow-glow">
             <p className="font-bold">이 공고, 함께 준비할까요?</p>
             <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 이 공고 같은 조건의 새 공고를 매일 아침 메일로 받고, 평가점수 예측을 공고 수 제한 없이 쓰실 수 있습니다.</p>
             <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>

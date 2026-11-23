@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { bidHref } from "@/lib/links";
-import { checklistDone, loadMyBox, MYBOX_EVENT, removeFromMyBox, updateMyBox, type MyBoxItem } from "@/lib/mybox";
+import { loadMyBox, MYBOX_EVENT, removeFromMyBox, updateMyBox, type MyBoxItem } from "@/lib/mybox";
 import { useBids } from "@/lib/useBids";
 import { changesByNo, changeSummary } from "@/lib/noticeChanges";
 import { useNoticeChanges } from "@/lib/useSiteJson";
@@ -85,7 +85,6 @@ type RowT = MyBoxItem & { changed: boolean; savedId: string };
 
 function Row({ x, labels }: { x: RowT; labels: string[] }) {
   const [memo, setMemo] = useState(x.memo ?? "");
-  const done = Math.max(checklistDone(x.id), checklistDone(x.savedId));
   const d = dday(x.closeAt);
   return (
     <li className="card p-4 sm:p-5">
@@ -96,7 +95,7 @@ function Row({ x, labels }: { x: RowT; labels: string[] }) {
         <NoticeChangeBadge no={x.no} />
       </div>
       <Link href={bidHref(x.id)} className="mt-2 block font-bold leading-snug hover:underline">{x.title}</Link>
-      <p className="mt-1 text-sm text-ink-500">{x.agency} · 마감 {kday(x.closeAt)} {hm(x.closeAt)}{x.openAt ? ` · 개찰 ${kday(x.openAt)} ${hm(x.openAt)}` : ""} · 제출서류 체크 {done}개</p>
+      <p className="mt-1 text-sm text-ink-500">{x.agency} · 마감 {kday(x.closeAt)} {hm(x.closeAt)}{x.openAt ? ` · 개찰 ${kday(x.openAt)} ${hm(x.openAt)}` : ""}</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-[180px_1fr_auto]">
         <input list={`labels-${x.no}`} className="input py-1.5 text-sm" placeholder="라벨 (예: 준비 중)" defaultValue={x.label ?? ""} onBlur={(e) => updateMyBox(x.no, { label: e.target.value.trim() || undefined })} />
         <datalist id={`labels-${x.no}`}>{["검토 중", "준비 중", "투찰 완료", "보류", ...labels].filter((v, i, a) => a.indexOf(v) === i).map((l) => <option key={l} value={l} />)}</datalist>

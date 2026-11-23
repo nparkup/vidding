@@ -34,7 +34,7 @@ export function BidPriceAnalysis({ bid, info, analysis }: { bid: Bid; info?: Not
   const amountAt = (r: number) => (lwlt > 0 && base > 0 ? bidAmount(base, r, lwlt, aVal).amount : 0);
 
   return (
-    <section className="card p-6">
+    <section className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-bold">사정율 분석 · 투찰금액</h2>
         {st && <span className="chip">{bid.demandAgency} {analysis?.assess?.scope === "agency" ? "전체 업무" : bid.bizType ?? "용역"} {st.n}건</span>}

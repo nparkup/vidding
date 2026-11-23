@@ -21,19 +21,15 @@ jobs:
           const W = { inqryDiv: "1", inqryBgnDt: d(6) + "0000", inqryEndDt: d(0) + "2359" };
           const W30 = { inqryDiv: "1", inqryBgnDt: d(29) + "0000", inqryEndDt: d(0) + "2359" };
           const run = async (label, svc, op, p) => { const r = await q(svc, op, p); console.log(`\n=== ${label} ${op} total=${r.total} ${r.head ?? ""} ${r.raw ?? ""}`); for (const x of r.it.slice(0, 2)) console.log(JSON.stringify(show(x))); return r; };
-          await run("law", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", {});
-          await run("law-use", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", { indstrytyUseYn: "Y" });
-          await run("law-name", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", { indstrytyNm: "토목건축공사업" });
-          await run("law-name2", "IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", { indstrytyNm: "건물위생관리업" });
-          for (const k of ["Servc", "Cnstwk", "Thng", "Etc"]) { await run("bid7", "PrvtBidNtceService", `getPrvtBidPblancListInfo${k}`, W); await run("bid30", "PrvtBidNtceService", `getPrvtBidPblancListInfo${k}`, W30); }
-          for (const div of ["2"]) await run("bid-div2", "PrvtBidNtceService", "getPrvtBidPblancListInfoServc", { ...W, inqryDiv: div });
-          await run("lic", "PrvtBidNtceService", "getPrvtBidPblancListInfoLicenseLimit", W);
-          await run("rgn", "PrvtBidNtceService", "getPrvtBidPblancListInfoPrtcptPsblRgn", W);
-          await run("award", "PrvtScsbidInfoService", "getPrvtScsbidListSttus", W);
-          await run("award30", "PrvtScsbidInfoService", "getPrvtScsbidListSttus", W30);
-          await run("open", "PrvtScsbidInfoService", "getPrvtOpengResultListInfo", W);
-          await run("open-compt", "PrvtScsbidInfoService", "getPrvtOpengResultListInfoOpengCompt", W);
-          await run("cntrct", "PrvtCntrctInfoService", "getPrvtCntrctInfoList", W);
-          await run("cntrct30", "PrvtCntrctInfoService", "getPrvtCntrctInfoList", W30);
+          for (const div of ["1","2","3","4"]) for (const w of [[6,0],[13,7],[40,34],[100,94]]) await run(`award div${div} ${w}`, "PrvtScsbidInfoService", "getPrvtScsbidListSttus", { inqryDiv: div, inqryBgnDt: d(w[0]) + "0000", inqryEndDt: d(w[1]) + "2359" });
+          await run("award-no", "PrvtScsbidInfoService", "getPrvtScsbidListSttus", { inqryDiv: "4", bidNtceNo: "R26BK01802325" });
+          for (const op of ["getPrvtOpengResultListInfoOpengCompt", "getPrvtOpengResultListInfo"]) for (const div of ["1","2"]) { const r = await q("PrvtScsbidInfoService", op, { inqryDiv: div, inqryBgnDt: d(13) + "0000", inqryEndDt: d(7) + "2359", numOfRows: "100" }); console.log(`\n=== ${op} div${div} total=${r.total} ${r.raw ?? ""}`); const m = {}; for (const x of r.it) m[x.progrsDivCdNm] = (m[x.progrsDivCdNm] ?? 0) + 1; console.log(JSON.stringify(m)); const c = r.it.find((x) => x.opengCorpInfo); if (c) console.log("corp:", String(c.opengCorpInfo).replace(/\^[가-힣]{2,4}\^/g, "^(이름)^").slice(0, 400)); }
+          const t = await q("PrvtBidNtceService", "getPrvtBidPblancListInfoServc", { inqryDiv: "1", inqryBgnDt: d(6) + "0000", inqryEndDt: d(0) + "2359", numOfRows: "999" }); console.log("servc rows", t.it.length, "open", t.it.filter((x) => x.bidClseDt > new Date(Date.now()+9*3600e3).toISOString().replace("T"," ").slice(0,19)).length, "div", JSON.stringify(t.it.reduce((m,x)=>(m[x.ntceDivNm]=(m[x.ntceDivNm]??0)+1,m),{})), "methd", JSON.stringify(t.it.reduce((m,x)=>(m[x.bidMethdNm]=(m[x.bidMethdNm]??0)+1,m),{})), "minRgst", t.it.map(x=>x.rgstDt).sort()[0], "ord", JSON.stringify(t.it.slice(0,5).map(x=>[x.bidNtceNo,x.bidNtceOrd,x.aptHsmpNm])));
+          const c = await q("PrvtCntrctInfoService", "getPrvtCntrctInfoList", { inqryDiv: "1", inqryBgnDt: d(6) + "0000", inqryEndDt: d(0) + "2359", numOfRows: "999" }); console.log("cntrct rows", c.it.length, JSON.stringify(c.it.reduce((m,x)=>(m[x.cntrctCnclsMthdNm]=(m[x.cntrctCnclsMthdNm]??0)+1,m),{})), JSON.stringify(c.it.reduce((m,x)=>(m[x.bsnsDivNm]=(m[x.bsnsDivNm]??0)+1,m),{})), "withRef", c.it.filter(x=>/R\d\dBK/.test(x.cntrctRefNo+" "+(x.dcsnCntrctNo??""))).length);
+          for (const div of ["2","3"]) { const r = await q("PrvtCntrctInfoService", "getPrvtCntrctInfoList", { inqryDiv: div, inqryBgnDt: d(6) + "0000", inqryEndDt: d(0) + "2359" }); console.log("cntrct div", div, r.total, r.head, r.raw ?? ""); }
+          const law = []; for (let p = 1; p <= 3; p++) { const r = await q("IndstrytyBaseLawrgltInfoService", "getIndstrytyBaseLawrgltInfoList", { numOfRows: "999", pageNo: String(p) }); law.push(...r.it); } console.log("law rows", law.length, "with inclsn", law.filter(x=>x.inclsnLcns).length, "use N", law.filter(x=>x.indstrytyUseYn!=="Y").length, "url", law.filter(x=>x.baseLawordUrl).length, "rltn", law.filter(x=>x.rltnRgltCntnts).length, "bytes", JSON.stringify(law).length);
+          for (const x of law.filter(x=>x.inclsnLcns).slice(0,6)) console.log(x.indstrytyCd, x.indstrytyNm, "|", x.inclsnLcns.slice(0,200));
+          for (const x of law.filter(x=>x.baseLawordUrl||x.rltnRgltCntnts).slice(0,3)) console.log("U", x.indstrytyCd, x.baseLawordUrl, String(x.rltnRgltCntnts??"").slice(0,200));
+          const codes = ["1162","0037","4989","1399","3903","0001","0002"]; for (const k of codes) { const x = law.find(y=>y.indstrytyCd===k); console.log("C", k, x?.indstrytyNm, x?.baseLawordNm, x?.baseLawordArtclClauseNm, x?.inclsnLcns ?? ""); }
           JS
           node p.mjs

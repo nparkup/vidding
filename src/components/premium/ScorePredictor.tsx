@@ -1027,7 +1027,7 @@ function CriteriaPanel({ sheet, passLabel }: { sheet: EvalSheet; passLabel?: str
         ))}
       </ul>
       <p className="border-t border-ink-100 bg-ink-50 px-6 py-3 text-sm leading-relaxed text-ink-500">
-        사업자번호를 조회하면 참가자격을 먼저 확인하고, 참가할 수 있는 경우 항목별 예상 평가점수를 계산합니다.
+        사업자번호나 기업명으로 우리 회사를 조회하면 참가자격을 먼저 확인하고, 참가할 수 있는 경우 항목별 예상 평가점수를 계산합니다.
       </p>
     </section>
   );

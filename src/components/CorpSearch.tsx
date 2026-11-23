@@ -85,7 +85,7 @@ export function CorpSearch({ id, label, value, onChange, onBizno, busy, button =
                       h.last ? `최근 ${h.last.slice(0, 7).replace("-", ".")}` : "",
                       h.biz,
                       h.region ? `주 지역 ${h.region}` : "",
-                    ].filter(Boolean).join(" · ")}
+                    ].filter(Boolean).map((t, i) => <span key={t} className="whitespace-nowrap">{i ? " · " : ""}{t}</span>)}
                   </span>
                   {h.formerNames.length > 0 && <span className="mt-0.5 block text-xs text-ink-400">예전 상호 {h.formerNames.slice(0, 2).join(", ")}</span>}
                 </button>

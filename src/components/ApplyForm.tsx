@@ -162,7 +162,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
         <form action={action} onSubmit={action ? undefined : onStatic} className="card space-y-5 p-6 sm:p-8">
           <div>
             <h2 className="text-xl font-extrabold">회원가입</h2>
-            <p className="mt-1 text-sm text-ink-500">가입하면 바로 무료 체험이 시작됩니다.<br />카드 등록은 없습니다.</p>
+            <p className="mt-1 text-sm text-ink-500">가입하면 바로 무료 체험이 시작됩니다.</p>
             {acc.status === "in" ? (
               <p className="mt-2 rounded-xl bg-mint-50 px-3 py-2 text-xs text-mint-700">{acc.company}(으)로 로그인되어 있습니다.<br />바로 <Link href="/premium#predict" className="font-semibold underline">공고 분석</Link>을 시작하셔도 됩니다.</p>
             ) : joined ? (

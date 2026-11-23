@@ -70,8 +70,23 @@ function fileBids(): BidCache | null {
   if (fileMemo !== undefined) return fileMemo;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs") as typeof import("fs");
-  fileMemo = JSON.parse(fs.readFileSync(f, "utf8")) as BidCache;
+  fileMemo = JSON.parse(readUtf8(fs.readFileSync(f))) as BidCache;
   return fileMemo;
+}
+
+/**
+ * readFileSync(f, "utf8") 는 파일이 512MB(바이트)를 넘으면 ERR_STRING_TOO_LONG 으로 멈춘다.
+ * 한글은 UTF-8 3바이트가 글자 하나라 글자 수는 그보다 훨씬 적으므로, 나눠 풀어 이어 붙인다
+ * (2026-11-23 run 45163339406, bids.json 압축 88MB).
+ */
+function readUtf8(buf: Buffer): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { StringDecoder } = require("string_decoder") as typeof import("string_decoder");
+  const dec = new StringDecoder("utf8");
+  const step = 64 * 1024 * 1024;
+  let out = "";
+  for (let i = 0; i < buf.length; i += step) out += dec.write(buf.subarray(i, i + step));
+  return out + dec.end();
 }
 
 export async function getBids(): Promise<Bid[]> {

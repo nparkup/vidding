@@ -203,7 +203,7 @@ const BARE_FIELD: Record<string, string> = { 정량: "정량평가", 정량적: 
 const OPEN_RE = /[(（[［【「『{｛]/g;
 const CLOSE_RE = /[)）\]］】」』}｝]/g;
 /** 문장 앞 접속어·조사 ("…10점과 입찰가격평가 20점" 을 자르면 "과 입찰가격평가" 가 남는다) */
-const LEAD_RE = /^(?:[,，、;；/·ㆍ∙+＋&:：\])）\]］❑❍▣□■◦○●▪•※*\-–—]+\s*|(?:및|와|과|는|은|을|를|이며|이고|으로|로|중|그리고|또는)\s+)/;
+const LEAD_RE = /^(?:[,，、;；/·ㆍ∙+＋&:：\])）\]］❑❍▣□■◦○●▪•※*∘‧・\-–—]+\s*|(?:및|와|과|는|은|을|를|이며|이고|으로|로|중|그리고|또는)\s+)/;
 
 /**
  * 항목 이름 앞뒤에 남은 문장 부호를 지운다.
@@ -249,6 +249,14 @@ function tailPhrase(s: string): string {
   return out.join(" ") || s;
 }
 
+/** 묶음 이름: "기준 기술능력평가", "기술능력 평가" → "기술능력평가" */
+const groupName = (s: string) => {
+  const m = s.match(/기술\s*능력\s*평가|기술\s*평가|기술\s*능력/);
+  if (!m) return s.slice(0, 20);
+  const n = m[0].replace(/\s+/g, "");
+  return n === "기술능력" ? "기술능력평가" : n;
+};
+
 /** 문장 끝의 마지막 구 ("…진행하되, 기술능력평가" → "기술능력평가") */
 const lastPhrase = (s: string) => (s.split(/[,，、;；:：]/).map((p) => p.trim()).filter(Boolean).pop() ?? s).trim();
 
@@ -262,6 +270,7 @@ function openParenParent(s: string): string | undefined {
   for (const m of t.matchAll(OPEN_RE)) at = m.index ?? at;
   if (t.slice(at + 1).replace(/[^가-힣A-Za-z]/g, "").length < 2) return undefined;
   const head = tailPhrase(t.slice(0, at).replace(/\s*\d{1,3}(?:\.\d+)?\s*(?:점|%)?\s*$/, "").trim());
+  if (/기술\s*(?:능력|평가)/.test(head)) return groupName(head);
   const name = tidyItemLabel(head.replace(/\s*[(（]\s*\d+(?:\.\d+)?\s*(?:%|점)?\s*[)）]/g, ""));
   return name.replace(/[^가-힣A-Za-z]/g, "").length >= 2 && /(평가|능력|기술|가격)/.test(name) ? name.slice(0, 20) : undefined;
 }
@@ -400,6 +409,8 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
   const inline = new Map<EvalItem, ScoreBand[]>();
 
   const push = (rawLabel: string, max: number, basis: string, parent?: string, inner = false) => {
+    // 배점표 안에서 "(", "+" 로 시작하는 줄은 앞 항목의 설명이 이어진 줄이다 (이름을 다듬기 전 원문으로 본다)
+    if (window && !inner && /^[(（+]/.test(rawLabel.replace(/^[\s\d.)(①-⑳ㄱ-ㅎ가-하]{0,3}[.)]\s*/, "").trim())) return;
     let label = cleanLabelCut(rawLabel, inner).replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
     // 표의 첫 열(구분)이 같은 줄에 붙어 오면 그룹 이름으로 떼어 낸다
     let group: string | undefined;
@@ -463,7 +474,7 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
         const seg = line.slice(start, m.index).trim();
         if (/^[)）\]］}｝]/.test(seg)) parent = undefined;
         // "기술능력평가 90점(정량 10점, …": 괄호가 점수 뒤에서 열리면 바로 앞 항목이 묶음 이름이다
-        if (/^[(（[{]/.test(seg) && prevSeg) parent = tidyItemLabel(tailPhrase(prevSeg)).slice(0, 20);
+        if (/^[(（[{]/.test(seg) && prevSeg) parent = groupName(tidyItemLabel(tailPhrase(prevSeg)));
         parent = openParenParent(seg) ?? parent;
         prevSeg = seg;
         // 문장 속 항목은 점수 앞의 끝 명사구가 이름이다 (괄호가 열려 있으면 괄호 안)

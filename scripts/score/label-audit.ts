@@ -19,16 +19,22 @@ const show = (s?: EvalSheet) => s ? s.items.map((i: EvalItem) => `${i.label}[${i
 async function main() {
   const bids = (await (await fetch(`${SITE}/bids-data.json`)).json()) as { id: string }[];
   const docs = new Map<string, any>();
-  await pool(bids.map((b) => b.id), 32, async (id) => {
-    try { const r = await fetch(`${SITE}/attachments/${id}.json`); if (r.ok) { const j = await r.json(); if (j.sheet && adoptable(j.sheet, j.qual?.basis)) docs.set(id, j); } } catch { /* skip */ }
+  let miss = 0;
+  await pool(bids.map((b) => b.id), 8, async (id) => {
+    for (let t = 0; t < 4; t++) {
+      try { const r = await fetch(`${SITE}/attachments/${id}.json`); if (r.status === 404) return; if (r.ok) { const j = await r.json(); if (j.sheet && adoptable(j.sheet, j.qual?.basis)) docs.set(id, j); return; } } catch { /* retry */ }
+      await new Promise((r) => setTimeout(r, 1000 * (t + 1)));
+    }
+    miss++;
   });
+  console.log(`bids ${bids.length}, fetch failed ${miss}`);
   const all = [...docs.keys()];
   const bad = all.filter((id) => docs.get(id).sheet.items.some((i: EvalItem) => isBad(i.label)));
   const good = all.filter((id) => !bad.includes(id)).sort(() => Math.random() - 0.5).slice(0, Number(process.env.GOOD ?? 250));
   console.log(`adopted ${all.length}, bad-label ${bad.length}, good sample ${good.length}`);
   const rows: string[] = [];
   const stat = { same: 0, fixed: 0, stillBad: 0, changedGood: 0, lostAdopt: 0, gainedAdopt: 0, failed: 0 };
-  await pool([...bad, ...good], 8, async (id) => {
+  await pool([...bad, ...good], 10, async (id) => {
     const j = docs.get(id);
     const files = rankFiles(j.files as BidAttachment[]);
     const seen = new Set(files.map((f) => f.name.trim()));
@@ -53,7 +59,7 @@ async function main() {
     const keep = (s?: EvalSheet) => { const sum = s ? s.items.reduce((a, i) => a + i.max, 0) : 0; return s && sum >= 90 && sum <= 110 ? s : undefined; };
     const o = keep(bestOld), n = keep(bestNew);
     const ao = !!o && adoptable(o, j.qual?.basis), an = !!n && adoptable(n, j.qual?.basis);
-    if (ao && !an) stat.lostAdopt++;
+    if (ao && !an) { stat.lostAdopt++; rows.push(`LOST ${id} text:\n` + texts.join("\n").split(/\r?\n/).filter((l) => /(정량|정성|가격|기술능력)/.test(l) && /\d\s*점/.test(l)).slice(0, 12).map((l) => `    | ${l.trim().slice(0, 160)}`).join("\n")); }
     if (!ao && an) stat.gainedAdopt++;
     const wasBad = bad.includes(id);
     if (show(o) === show(n)) { stat.same++; if (wasBad) stat.stillBad++; return; }

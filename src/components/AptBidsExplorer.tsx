@@ -164,21 +164,21 @@ function AptRow({ bid: b }: { bid: AptBid }) {
           </p>
           <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">{b.apt}{b.system ? ` · ${b.system}` : ""}{b.way ? ` ${b.way}` : ""}</p>
         </div>
-        <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:block sm:text-right">
           {b.prior ? (
             <div>
               <p className="text-xs text-ink-500">{b.prior.via === "수의계약" ? "직전 수의계약" : "직전 낙찰"}</p>
               <p className="text-lg font-bold tabular-nums">{won(b.prior.amount)}</p>
             </div>
           ) : COMPARABLE.has(b.category) ? (
-            <p className="text-sm text-ink-300">직전 계약 자료 없음</p>
+            <p className="whitespace-nowrap text-sm text-ink-300">직전 계약 자료 없음</p>
           ) : <span />}
-          <p className="text-xs text-ink-300">마감 {shortDate(b.closeAt)}</p>
+          <p className="whitespace-nowrap text-xs text-ink-300">마감 {shortDate(b.closeAt)}</p>
           {COMPARABLE.has(b.category) && (
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/premium/apt?apt=${encodeURIComponent(b.no)}`); }}
-              className="btn-mint btn-sm mt-2 shrink-0"
+              className="btn-mint btn-sm ml-auto shrink-0 sm:ml-0 sm:mt-2"
             >
               입찰가격 예측
             </button>

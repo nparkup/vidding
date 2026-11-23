@@ -266,7 +266,23 @@ function SimilarCard({ similar, region, category }: { similar: AptPastDeal[]; re
       {!similar.length ? (
         <p className="text-sm text-ink-500">같은 지역·업종에서 금액이 비슷한 최근 낙찰을 찾지 못했습니다.</p>
       ) : (
-        <div className="min-w-0 overflow-x-auto">
+        <>
+        {/* 휴대폰: 표를 가로로 밀지 않고 한 건씩 카드로 */}
+        <ul className="divide-y divide-ink-100 sm:hidden">
+          {similar.map((d) => (
+            <li key={d.no} className="py-2.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">{d.apt}</span>
+                <span className="shrink-0 whitespace-nowrap text-sm font-bold tabular-nums">{won(d.amount)}</span>
+              </div>
+              <p className="mt-0.5 text-xs text-ink-500 [overflow-wrap:anywhere]">{d.title}</p>
+              <p className="mt-0.5 text-xs text-ink-500 [overflow-wrap:anywhere]">
+                <span className="tabular-nums">{d.date}</span> · 낙찰 {d.winner || "-"}{d.bidders ? ` · 응찰 ${d.bidders}곳` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden min-w-0 overflow-x-auto sm:block">
           <table className="w-full min-w-[36rem] text-sm">
             <thead>
               <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
@@ -290,6 +306,7 @@ function SimilarCard({ similar, region, category }: { similar: AptPastDeal[]; re
             </tbody>
           </table>
         </div>
+        </>
       )}
     </Box>
   );

@@ -73,8 +73,9 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
                 <li key={k.keyword} className="rounded-xl border border-ink-100 p-3">
                   <p className="text-xs"><b className="text-sm text-ink">{k.keyword}</b> <span className="text-ink-500">새 공고 {k.fresh}건 · 진행 중 {k.total}건</span></p>
                   {k.items.slice(0, 2).map((r) => (
-                    <p key={r.bid.id} className="mt-1.5 truncate text-xs text-ink-500">
-                      <span className="font-semibold text-ink">{r.bid.title}</span> · {won(r.bid.baseAmount)} · {r.eligible ? <span className="text-mint-600">참가 가능</span> : <span className="text-coral">조건 확인</span>}
+                    <p key={r.bid.id} className="mt-1.5 flex min-w-0 gap-1 text-xs text-ink-500">
+                      <span className="min-w-0 truncate font-semibold text-ink">{r.bid.title}</span>
+                      <span className="shrink-0 whitespace-nowrap">· {won(r.bid.baseAmount)} · {r.eligible ? <span className="text-mint-600">참가 가능</span> : <span className="text-coral">조건 확인</span>}</span>
                     </p>
                   ))}
                 </li>

@@ -34,7 +34,7 @@ import {
 } from "../../src/lib/awards/format";
 import { BANDS, bandOf, statKey, type RateStat } from "../../src/lib/rivalRate";
 import {
-  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, bandOfAmount, firstLic, forecast, likelyBidders, methodCode, METHOD_NAME, quantile, r3, regionalKeys, relatedRows, relatedAwards, similarKey,
+  AGENCY_BUCKETS, AGENCY_COLS, SIMILAR_MIN, SIMILAR_YEARS, agencyBucket, analyzeBid, provinceKey, bandOfAmount, firstLic, forecast, likelyBidders, methodCode, METHOD_NAME, quantile, r3, regionalKeys, relatedRows, relatedAwards, similarKey,
   type AnalyzeTarget,
   type AgencyIndexFile,
   KW_MIN_DF, KW_ROWS, keywords, kwBucket, type KwIndexFile, type KwLookup, type KwPosting, type KwRow,
@@ -42,6 +42,7 @@ import {
 } from "../../src/lib/awards/analysis";
 import { assessHit, assessSamples, assessStats } from "../../src/lib/awards/assess";
 import { agencySummary } from "../../src/lib/awards/agency";
+import { CORP_BUCKETS, corpBucket, corpNameKeys, type CorpEntry, type CorpIndexFile } from "../../src/lib/awards/corps";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 
 const NARA = "https://apis.data.go.kr/1230000";
@@ -770,7 +771,58 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
   }
   console.log(`분석 색인: 공고명 핵심어 ${kwCount.toLocaleString()}개 (공고 ${kwN.toLocaleString()}건, ${fmtGB(kwBytes)})`);
   const kw: KwLookup = { n: kwN, get: (k: string): KwPosting | undefined => kwFiles[Number(kwBucket(k))].kw[k] };
+  await buildCorpIndex(all, upload);
   return { rows, buckets, similar: out, kw };
+}
+
+/** 기업명으로 업체 찾기 색인 (src/lib/awards/corps.ts): 낙찰업체와 개찰 1~5위 업체 */
+async function buildCorpIndex(all: ShardRow[], upload: (key: string, body: Buffer) => Promise<boolean>) {
+  interface Acc { names: Map<string, string>; wins: Set<string>; tops: Set<string>; last: string; biz: Map<string, number>; region: Map<string, number> }
+  const corps = new Map<string, Acc>();
+  const add = (bizno: string, name: string, r: ShardRow, win: boolean) => {
+    if (!bizno || bizno.length !== 10) return;
+    const a = corps.get(bizno) ?? corps.set(bizno, { names: new Map(), wins: new Set(), tops: new Set(), last: "", biz: new Map(), region: new Map() }).get(bizno)!;
+    const nm = (name ?? "").trim();
+    if (nm && (a.names.get(nm) ?? "") < r[9]) a.names.set(nm, r[9]);
+    const seenBid = a.wins.has(r[2]) || a.tops.has(r[2]);
+    if (win) a.wins.add(r[2]);
+    a.tops.add(r[2]);
+    if (a.last < r[9]) a.last = r[9];
+    if (seenBid) return;
+    a.biz.set(r[4], (a.biz.get(r[4]) ?? 0) + 1);
+    // 참가 지역이 시·도 하나로 묶인 공고만 업체 소재지 단서로 본다
+    const pk = provinceKey(r[18]);
+    if (pk !== "전국" && !pk.includes("+")) a.region.set(pk, (a.region.get(pk) ?? 0) + 1);
+  };
+  for (const r of all) {
+    add(r[0], r[1], r, true);
+    for (const t of r[25]) if (t[1] !== r[0]) add(t[1], t[2], r, false);
+  }
+  const top1 = (m: Map<string, number>) => [...m.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? "";
+  const files: CorpIndexFile[] = Array.from({ length: CORP_BUCKETS }, () => ({ v: 1, rows: [] }));
+  let n = 0;
+  for (const [bizno, a] of corps) {
+    if (!a.names.size) continue;
+    const names = [...a.names.entries()].sort((x, y) => y[1].localeCompare(x[1])).map(([nm]) => nm);
+    // 지역은 그 지역 공고가 전체의 30% 이상이고 2건 이상일 때만 (드문 지역 공고로 잘못 짚지 않게)
+    const rg = top1(a.region);
+    const rgN = a.region.get(rg) ?? 0;
+    const row: CorpEntry = [bizno, names, a.wins.size, a.tops.size, a.last, top1(a.biz), rgN >= 2 && rgN >= a.tops.size * 0.3 ? rg : ""];
+    const bs = new Set(names.flatMap(corpNameKeys).filter((k) => k.length >= 2).map(corpBucket));
+    for (const b of bs) files[Number(b)].rows.push(row);
+    n++;
+  }
+  let up = 0;
+  let bytes = 0;
+  let maxRows = 0;
+  for (let i = 0; i < files.length; i++) {
+    files[i].rows.sort((x, y) => y[2] - x[2] || y[3] - x[3]);
+    maxRows = Math.max(maxRows, files[i].rows.length);
+    const b = gz(files[i]);
+    bytes += b.length;
+    if (await upload(`idx/corps/${String(i).padStart(3, "0")}.json.gz`, b)) up++;
+  }
+  console.log(`기업명 색인: 업체 ${n.toLocaleString()}곳, 파일 ${files.length}개 중 ${up}개 올림, 가장 큰 파일 ${maxRows.toLocaleString()}줄 (${fmtGB(bytes)})`);
 }
 
 /**

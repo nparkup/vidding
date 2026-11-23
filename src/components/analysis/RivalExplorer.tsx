@@ -13,6 +13,7 @@ import { assessStats, type AssessData, type AssessSample } from "@/lib/awards/as
 import type { AwardLookup, AwardWin } from "@/lib/awards/read";
 import { normalizeBizno, validBizno } from "@/lib/corpLookup";
 import { won } from "@/lib/format";
+import { CorpSearch } from "@/components/CorpSearch";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 const API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium/perf";
@@ -83,15 +84,10 @@ export function RivalExplorer({ mode = "rival" }: { mode?: Mode }) {
   return (
     <div className="container-x grid gap-6 py-8 lg:grid-cols-[320px_1fr]">
       <aside className="min-w-0">
-        <form onSubmit={(e) => { e.preventDefault(); look(input); }}>
-          <label className="label" htmlFor="rival-no">{mode === "mine" ? "우리 회사 사업자등록번호" : "경쟁사 사업자등록번호"}</label>
-          <div className="flex gap-2">
-            <input id="rival-no" className="input" inputMode="numeric" placeholder="000-00-00000" value={input} onChange={(e) => setInput(e.target.value)} />
-            <button className="btn-primary btn-sm shrink-0" disabled={loading}>{loading ? "조회 중" : "조회"}</button>
-          </div>
-        </form>
+        <CorpSearch id="rival-no" label={mode === "mine" ? "우리 회사 사업자등록번호 또는 기업명" : "경쟁사 사업자등록번호 또는 기업명"}
+          value={input} onChange={setInput} onBizno={(no) => look(no)} busy={loading} />
         {err && <p className="mt-2 text-sm text-coral">{err}</p>}
-        <p className="mt-2 text-xs leading-relaxed text-ink-500">{mode === "mine" ? "번호는 이 브라우저에만 남아 다음에 바로 진단합니다." : "조회한 업체는 관심 업체로 이 브라우저에 남습니다. 공고 상세의 참가 예상 기업이나 개찰 순위에 나온 업체를 넣어 보세요."}</p>
+        <p className="mt-2 text-xs leading-relaxed text-ink-500">{mode === "mine" ? "기업명으로 찾으면 같은 이름 업체를 사업자번호와 함께 보여 드립니다. 고른 번호는 이 브라우저에만 남아 다음에 바로 진단합니다." : "기업명으로 찾으면 같은 이름 업체를 사업자번호와 함께 보여 드립니다. 조회한 업체는 관심 업체로 이 브라우저에 남습니다. 공고 상세의 참가 예상 기업이나 개찰 순위에 나온 업체를 넣어 보세요."}</p>
         {saved.length > 0 && (
           <ul className="mt-3 divide-y divide-ink-100 rounded-2xl border border-ink-100 bg-white">
             {saved.map((s) => (
@@ -106,7 +102,7 @@ export function RivalExplorer({ mode = "rival" }: { mode?: Mode }) {
         )}
       </aside>
       <div className="min-w-0">
-        {!data && !loading && <p className="card p-6 text-sm text-ink-500">사업자등록번호를 넣으면 그 업체가 나라장터에서 낙찰받은 공고로 투찰 습관(사정율, 하한율 위 폭, 주요 발주처, 자주 맞붙는 업체)을 보여 드립니다.</p>}
+        {!data && !loading && <p className="card p-6 text-sm text-ink-500">사업자등록번호나 기업명을 넣으면 그 업체가 나라장터에서 낙찰받은 공고로 투찰 습관(사정율, 하한율 위 폭, 주요 발주처, 자주 맞붙는 업체)을 보여 드립니다.</p>}
         {loading && <p className="card p-6 text-sm text-ink-400">10년치 낙찰을 찾는 중…</p>}
         {back.length > 0 && !loading && (
           <button type="button" className="btn-ghost btn-sm mb-3" onClick={() => { const prev = back[back.length - 1]; setBack(back.slice(0, -1)); setInput(prev.bizno); look(prev.bizno); }}>

@@ -13,6 +13,7 @@
 import type { EvalBasis } from "./criteria";
 import type { CorpLookup } from "./corpLookup";
 import type { NoticeInfo } from "./noticeInfo";
+import type { NoticeCriteria } from "./noticeCriteria";
 
 /** 업종의 근거법령 (조달청 업종 및 근거법규서비스) */
 export interface IndustryLaw {
@@ -140,7 +141,7 @@ export interface GoodsInfo {
   smallBizOnly?: boolean;
 }
 
-export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizType?: string, now = new Date(), goods?: GoodsInfo): Eligibility {
+export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizType?: string, now = new Date(), goods?: GoodsInfo, notice?: Pick<NoticeCriteria, "holds" | "smeExempt">): Eligibility {
   const checks: Check[] = [];
   const { nts, nara, errors } = corp;
   const by = q?.registerBy ? ` 입찰참가자격 등록 마감(${q.registerBy})까지` : " 입찰참가자격 등록 마감 전까지";
@@ -250,6 +251,17 @@ export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizTy
       checks.push({ label: "직접생산확인", verdict: "확인 필요", detail: `${name}의 직접생산확인증명이 없습니다. 중소기업자간 경쟁제품이면 직접생산확인을 받아야 참가할 수 있으니 공고서의 참가자격을 확인하세요.` });
     }
   }
+
+  // 6. 공고서의 소지 요건 (검진기관 지정서·허가증·면허 등): 조회 자료로 확인할 수 없어 '가능'으로 두지 않는다
+  for (const h of notice?.holds ?? []) {
+    checks.unshift({
+      label: "필수 소지 서류",
+      verdict: "확인 필요",
+      detail: `공고서는 ${h.doc} 소지업체만 참가할 수 있다고 적었습니다${h.who ? `. 참가 대상은 ${h.who}입니다` : ""}. 이 서류가 없으면 다른 조건을 갖춰도 참가할 수 없습니다.`,
+    });
+  }
+  // 7. 중소기업 우선조달 예외 공고는 기업 규모로 제한하지 않는다
+  if (notice?.smeExempt) checks.push({ label: "기업 규모", verdict: "가능", detail: "중소기업 우선조달의 예외 공고라 중소기업이 아니어도 참가할 수 있습니다. 대형 병원·기관과 함께 경쟁합니다." });
 
   return { verdict: worst(checks.map((c) => c.verdict)), checks };
 }

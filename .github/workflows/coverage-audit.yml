@@ -1,0 +1,29 @@
+name: (임시) 평가 기준 추출 범위 점검
+on:
+  push:
+    branches: [claude/project-thread-13g8v4]
+    paths: ["audit/run.txt"]
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: 점검
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          npx tsx --conditions=react-server $(cat audit/run.txt) 2>&1 | tee audit/out-log.txt
+      - name: 결과 올리기
+        run: |
+          mkdir -p audit/out && mv audit/out-log.txt audit/out/log-$(date +%H%M).txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -f audit/out
+          git commit -m "점검 결과" && git pull --rebase -q origin claude/project-thread-13g8v4 && git push

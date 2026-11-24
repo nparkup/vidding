@@ -644,6 +644,8 @@ export function bidSheet(
     sheet.recognition = merged.slice(0, 6);
     facts.push({ label: "실적 인정 범위", value: notice.recognition[0], quote: notice.recognition[0] });
   }
+  for (const h of notice.holds ?? []) facts.push({ label: "필수 소지 서류", value: `${h.doc} 소지업체만 참가${h.who ? ` (대상: ${h.who})` : ""}`, quote: h.quote });
+  if (notice.smeExempt) facts.push({ label: "기업 규모", value: "중소기업 우선조달 예외: 중소기업이 아니어도 참가", quote: notice.smeExempt.quote });
   if (notice.qualify?.length) facts.push({ label: "참가자격", value: `공고서에 적힌 참가자격 ${notice.qualify.length}가지`, quote: "", list: notice.qualify });
   sheet.noticeFacts = facts;
   return sheet;

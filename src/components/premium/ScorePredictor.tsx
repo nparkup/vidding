@@ -318,7 +318,7 @@ export function ScorePredictor() {
     });
   }, [bid, analysis, result, fc, co.bidRate, co.proposal, active]);
   // 참가자격 판정: 사업자번호를 조회하고 공고 자료가 오면 판정한다. 불가면 예상 점수 대신 사유를 보여 준다
-  const eligibility = useMemo(() => (corp && docs && bid ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역", new Date(), { itemNo: bid.cls?.no, itemName: bid.cls?.nm, smallBizOnly: bid.smallBizOnly }) : null), [corp, docs, bid]);
+  const eligibility = useMemo(() => (corp && docs && bid ? judgeEligibility(docs.qual, corp, bid.bizType ?? "용역", new Date(), { itemNo: bid.cls?.no, itemName: bid.cls?.nm, smallBizOnly: bid.smallBizOnly }, docs.notice) : null), [corp, docs, bid]);
   /** 예상 점수를 보여 줄 단계: 조회 기능이 없는 미리보기는 직접 입력값으로 바로 계산한다 */
   const scoreStage: "criteria" | "checking" | "blocked" | "score" = !CORP_API
     ? "score"

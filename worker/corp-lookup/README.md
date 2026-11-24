@@ -46,3 +46,10 @@ Worker는 그 기간을 7일 단위로 다시 쪼개 조달청 낙찰정보서�
 - 이용 정지(`status: "suspended"`)한 사업자번호는 `?trial=` 이 새 공고를 더하지 않고 `suspended: true` 를 돌려준다
 - 운영 지표: Durable Object `Metrics`(`metrics.ts`, SQLite). 요청마다 경로·상태·처리 시간, 그 사이 공공데이터포털·Anthropic 호출(전역 fetch를 감싸 센다)을 날짜별로 더한다.
   사이트는 화면을 옮길 때 `?pv=1&p=경로` 를 보낸다(`src/components/PageBeacon.tsx`). 순 방문은 그날만 쓰는 무작위 값과 IP·브라우저 정보를 섞은 해시로 세고 이틀 뒤 지운다. IP는 앞 세 자리만 남긴다.
+
+## 기업 특허 (?patents=사업자번호)
+
+KIPRIS Plus Open API로 사업자번호 → 특허고객번호 → 지금 등록 상태인 특허·실용신안을 조회한다 (src/lib/patents.ts).
+비밀값 KIPRIS_API_KEY (KIPRIS Plus 마이페이지 > APIKEY관리의 인증키, "출원인 법인"과 "특허·실용 공개·등록공보" 두 상품을 신청한 키).
+저장소 Secrets에 KIPRIS_API_KEY 를 넣으면 배포 때 Worker 비밀값으로 들어가고, Cloudflare 화면에서 직접 넣어도 된다.
+결과는 R2 patents/{사업자번호}.json 에 30일, 월 호출 수는 patents/usage-YYYYMM.json (기본 상한 950회, KIPRIS_MONTHLY_LIMIT).

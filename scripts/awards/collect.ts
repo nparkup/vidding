@@ -42,6 +42,9 @@ import {
 } from "../../src/lib/awards/analysis";
 import { assessHit, assessSamples, assessStats } from "../../src/lib/awards/assess";
 import { agencySummary } from "../../src/lib/awards/agency";
+import { industrySummary, type IndustrySummary } from "../../src/lib/awards/industry";
+import { classify } from "../../src/lib/classify";
+import type { ServiceCategory } from "../../src/lib/types";
 import { CORP_BUCKETS, corpBucket, corpNameKeys, type CorpEntry, type CorpIndexFile } from "../../src/lib/awards/corps";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 
@@ -650,6 +653,23 @@ async function build(awardWeeks: string[], leadWeeks: string[], opts: { indexOnl
   return { rows, shards: keys.length, ...counts };
 }
 
+/**
+ * 업종별 분석 (src/lib/awards/industry.ts) → R2 stats/industry.json.gz (키: 업종).
+ * 업종은 낙찰 줄의 공고명·업종제한으로 공고 검색과 같은 규칙(src/lib/classify.ts)으로 나눈다
+ */
+async function buildIndustries(byCat: Map<ServiceCategory, { rows: AgencyRow[]; ags: string[] }>, upload: (key: string, body: Buffer) => Promise<boolean>) {
+  const t0 = Date.now();
+  const today = iso(ymd(kstNow()));
+  const out: Record<string, IndustrySummary> = {};
+  for (const [cat, { rows, ags }] of byCat) {
+    const s = industrySummary(cat, rows, ags, today);
+    if (s) out[cat] = s;
+  }
+  const body = gz({ v: 1, builtAt: new Date().toISOString(), industries: out });
+  await upload("stats/industry.json.gz", body);
+  console.log(`업종별 분석: ${Object.keys(out).length}개 업종 (${[...byCat].map(([c, x]) => `${c} ${x.rows.length.toLocaleString()}`).join(", ")}), ${Math.round(body.length / 1024)}KB, ${Math.round((Date.now() - t0) / 1000)}초`);
+}
+
 /* ---------- 낙찰 결과 분석 색인 (src/lib/awards/analysis.ts) ---------- */
 
 /** 비슷한 공고 묶음마다 저장하는 최근 낙찰 예 수 (화면은 지금 공고명과 겹치는 5건만 고른다) */
@@ -667,11 +687,16 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
 
   // 1. 수요기관별 과거 낙찰 (저장 기간 전체)
   const buckets: AgencyIndexFile[] = Array.from({ length: AGENCY_BUCKETS }, () => ({ v: 1, cols: AGENCY_COLS, agencies: {} }));
+  const byCat = new Map<ServiceCategory, { rows: AgencyRow[]; ags: string[] }>();
   for (const r of rows) {
     if (!r[6]) continue;
     const row: AgencyRow = [r[2], r[5], r[9], r[4], r[7], r[8], r[10], methodCode(r[11]), r[12], r[20], r[21], r[22], r[1], winnerRank(r),
       r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])];
     (buckets[Number(agencyBucket(r[6]))].agencies[r[6]] ??= []).push(row);
+    const cat = classify(r[5], r[19], r[4]);
+    const c = byCat.get(cat) ?? byCat.set(cat, { rows: [], ags: [] }).get(cat)!;
+    c.rows.push(row);
+    c.ags.push(r[6]);
   }
   let up = 0;
   let bytes = 0;
@@ -681,6 +706,10 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
     if (await upload(`idx/agency/${String(i).padStart(2, "0")}.json.gz`, body)) up++;
   }
   console.log(`분석 색인: 수요기관 ${buckets.reduce((s, b) => s + Object.keys(b.agencies).length, 0).toLocaleString()}곳, 공고 ${rows.length.toLocaleString()}건, 파일 ${buckets.length}개 중 ${up}개 올림 (${fmtGB(bytes)})`);
+
+  // 1-1. 업종별 분석 (공고 검색과 같은 업종 분류, 저장 기간 전체): 수요기관 색인 줄을 그대로 다시 쓴다
+  await buildIndustries(byCat, upload);
+  byCat.clear();
 
   // 2. 비슷한 공고 통계 (최근 SIMILAR_YEARS 년)
   const today = mondayOf(kstNow());

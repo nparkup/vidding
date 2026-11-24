@@ -1,5 +1,5 @@
 /**
- * (임시) 참가자격 표본: 최근 공고 중 업종 제한이 없는 무작위 300건의 공고서 본문을 받아 저장한다.
+ * (임시) 참가자격 표본: 최근 공고 중 업종 제한이 없는 무작위 1000건의 공고서 본문을 받아 저장한다.
  * 사용: DATA_GO_KR_SERVICE_KEY=... npx tsx --conditions=react-server scripts/score/qual-sample.ts 20261118,20261119 300
  */
 import { mkdirSync, writeFileSync } from "fs";

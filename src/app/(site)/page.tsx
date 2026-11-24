@@ -38,7 +38,7 @@ const COMPARE = [
   ["업종 범위", "전 업종 공고를 한 목록에 나열", "전 업종 수집 후 귀사 면허에 맞는 공고만"],
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 제출 서류 정리"],
-  ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 채점과 S·A·B·C 등급"],
+  ["입찰 판단", "투찰가 분석 위주", "6개 항목 가중 평가와 S·A·B·C 등급"],
   ["정정·취소", "공고를 다시 열어 바뀐 곳을 직접 비교", "바뀐 항목만 골라 따로 알림"],
   ["낙찰 분석", "과거 결과를 건마다 직접 검색", "10년치 낙찰 기록으로 사정율·발주처·경쟁사 분석"],
 ];
@@ -376,7 +376,7 @@ export default async function Home() {
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가.</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
-            입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 채점해 매일 아침 보내 드립니다.<br />아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.
+            입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 평가해 매일 아침 보내 드립니다.<br />아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.
           </p>
           <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -571,7 +571,7 @@ export default async function Home() {
             </div>
             <div className="px-8 pb-5">
               <p className="text-lg font-extrabold text-mint-300">입찰메이트LAB</p>
-              <p className="mt-1 text-xs text-ink-300">입찰 특화 알고리즘이 판정·채점</p>
+              <p className="mt-1 text-xs text-ink-300">입찰 특화 알고리즘이 판정·평가</p>
             </div>
             {COMPARE.map(([k, a, b]) => (
               <div key={k} className="contents">

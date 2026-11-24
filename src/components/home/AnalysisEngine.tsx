@@ -2,7 +2,7 @@ import type { Bid } from "@/lib/types";
 import { bidPriceGuide, type MatchResult } from "@/lib/analysis";
 import { won } from "@/lib/format";
 
-/** 입찰 분석 엔진: 실제 채점 로직(가중치·등급 기준)과 대표 공고의 채점 과정을 그대로 보여준다 */
+/** 입찰 분석 엔진: 실제 평가 로직(가중치·등급 기준)과 대표 공고의 평가 과정을 그대로 보여준다 */
 
 const WEIGHTS = [
   { k: "면허 요건", w: 30, hard: true, d: "투찰가능업종과 보유 면허 대조" },
@@ -25,7 +25,7 @@ const PIPELINE = [
   ["수집", "나라장터 공고 원문을 공공데이터포털에서 영업일 3회 받습니다."],
   ["구조화", "면허·지역·기초금액·계약방법·마감일을 항목별 데이터로 나눕니다."],
   ["필수 조건 판정", "면허·지역·규모 3개 조건 중 하나라도 맞지 않으면 즉시 제외합니다."],
-  ["가중 채점", "6개 항목을 가중치대로 더해 100점 만점 점수를 냅니다."],
+  ["가중 평가", "6개 항목을 가중치대로 더해 100점 만점 점수를 냅니다."],
   ["등급·가이드", "S·A·B·C 등급과 투찰 금액 범위를 붙여 전달합니다."],
 ];
 
@@ -51,7 +51,7 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
             {/* 가중치 + 등급 기준 */}
             <div className="glass rounded-3xl p-6 sm:p-7">
               <div className="flex items-baseline justify-between">
-                <p className="font-bold">채점 가중치</p>
+                <p className="font-bold">평가 가중치</p>
                 <p className="text-xs tabular-nums text-ink-300">합계 100점</p>
               </div>
               <ul className="mt-5 space-y-4">
@@ -88,11 +88,11 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
               <p className="mt-3 text-xs leading-relaxed text-ink-300">필수 조건을 하나라도 충족하지 못한 공고는 점수가 39점으로 제한되고 등급에서 제외됩니다.</p>
             </div>
 
-            {/* 대표 공고 채점 과정 */}
+            {/* 대표 공고 평가 과정 */}
             <div className="overflow-hidden rounded-3xl border border-white/10 bg-ink-900">
               <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3.5">
-                <p className="text-xs font-semibold text-ink-300">채점 과정 · 오늘 공고 {total.toLocaleString()}건 중 1건</p>
-                <span className="rounded-full bg-mint/15 px-2.5 py-0.5 text-[11px] font-bold text-mint-300">채점 완료</span>
+                <p className="text-xs font-semibold text-ink-300">평가 과정 · 오늘 공고 {total.toLocaleString()}건 중 1건</p>
+                <span className="rounded-full bg-mint/15 px-2.5 py-0.5 text-[11px] font-bold text-mint-300">평가 완료</span>
               </div>
               <div className="px-5 pt-5">
                 <p className="text-xs text-ink-300">{bid.demandAgency} · {bid.contractMethod}</p>
@@ -114,11 +114,8 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
                   </li>
                 ))}
               </ol>
-              <div className="flex items-end justify-between gap-4 border-t border-white/10 bg-white/[0.03] px-5 py-4">
-                <div>
-                  <p className="text-xs text-ink-300">가중 합계</p>
-                  <p className="mt-0.5 font-mono text-sm tabular-nums text-ink-200">{ev.factors.map((f) => f.score).join(" + ")}</p>
-                </div>
+              <div className="flex items-center justify-between gap-4 border-t border-white/10 bg-white/[0.03] px-5 py-4">
+                <p className="text-sm font-semibold text-ink-200">총 배점 합계</p>
                 <p className="text-right">
                   <span className="text-4xl font-extrabold tabular-nums text-mint">{ev.score}</span>
                   <span className="text-sm text-ink-400">/100</span>

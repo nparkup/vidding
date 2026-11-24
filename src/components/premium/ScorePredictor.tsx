@@ -8,7 +8,7 @@ import {
   CREDIT_GRADES, DEFAULT_COMPANY, findCreditGrade, kindOf, predict, templateSheet, yearsSince,
   type CompanyInput, type CreditGrade, type EvalItem, type EvalSheet, type ItemKind, type Level,
 } from "@/lib/evalscore";
-import { adoptable, bidSheet, TECH_GRADES } from "@/lib/criteria";
+import { adoptable, bidSheet, coarseSheet, TECH_GRADES } from "@/lib/criteria";
 import type { NoticeCriteria } from "@/lib/noticeCriteria";
 import { won, wonFull } from "@/lib/format";
 import { normalizeBizno, validBizno, type CorpLookup } from "@/lib/corpLookup";
@@ -63,14 +63,16 @@ type AiRead = "idle" | "reading" | "done" | "none" | "fail";
  * 규칙 파서가 배점표를 못 읽은 공고: 중계 서버에 AI 판독을 부탁한다 (서버가 빌드 때 만든 본문으로 Claude를 부르고 결과를 캐시한다).
  * 처음 읽는 공고는 10~30초 걸리고, 같은 공고는 캐시에서 바로 온다.
  */
-async function loadAiSheet(bid: Bid): Promise<EvalSheet | null> {
+async function loadAiSheet(bid: Bid): Promise<{ sheet: EvalSheet | null; notice?: NoticeCriteria; quant?: BidDocs["quant"] }> {
   const r = await fetch(`${CORP_API}?${new URLSearchParams({ aisheet: bid.id })}`);
   if (!r.ok) throw new Error(`배점표 판독 ${r.status}`);
-  const j = (await r.json()) as { status: string; sheet?: EvalSheet };
-  if (j.status !== "ok" || !j.sheet) return null;
+  // 빌드가 첨부를 다 읽지 못한 공고는 중계 서버가 공고서 문장 기준(통과점수·하한율 등)과 정량평가 표도 함께 읽어 준다
+  const j = (await r.json()) as { status: string; sheet?: EvalSheet; notice?: NoticeCriteria; quant?: BidDocs["quant"] };
+  const extra = { notice: j.notice, quant: j.quant };
+  if (j.status !== "ok" || !j.sheet) return { sheet: null, ...extra };
   // 예전에 저장된 판독 결과의 제목·메모에 남은 'AI 판독' 표기를 지운다
   const clean = (s: string) => s.replace(/\s*\(AI 판독\)/g, "").replace(/^AI 판독:\s*/, "배점표 원문: ");
-  return { ...j.sheet, title: clean(j.sheet.title), notes: j.sheet.notes.map(clean) };
+  return { sheet: { ...j.sheet, title: clean(j.sheet.title), notes: j.sheet.notes.map(clean) }, ...extra };
 }
 
 /**
@@ -243,13 +245,15 @@ export function ScorePredictor() {
         if (!alive) return;
         setDocs(d);
         // 원문 배점표를 쓸 수 없으면 그 자리에서 읽는다: 판독 입력이 있으면 그 본문으로, 빌드가 첨부를 다 읽지 못했으면 중계 서버가 첨부를 받아서
-        if (!STATIC || !CORP_API || (d.sheet && adoptable(d.sheet, d.qual?.basis))) return;
+        // 큰 묶음만 적힌 요약표(정량·정성·가격)는 상세 배점표를 한 번 더 찾는다. 못 찾으면 요약표를 그대로 쓴다
+        if (!STATIC || !CORP_API || (d.sheet && adoptable(d.sheet, d.qual?.basis) && !coarseSheet(d.sheet))) return;
         if (!d.ai && (d.read || !d.files.length)) return;
         setAiRead("reading");
         loadAiSheet(bid)
-          .then((s) => {
+          .then(({ sheet: s, notice, quant }) => {
             if (!alive) return;
-            if (s) { setDocs({ ...d, sheet: s, sheetFile: undefined }); setAiRead("done"); } else setAiRead("none");
+            const more = { notice: d.notice ?? notice, quant: d.quant ?? quant };
+            if (s) { setDocs({ ...d, ...more, sheet: s, sheetFile: undefined }); setAiRead("done"); } else { if (notice || quant) setDocs({ ...d, ...more }); setAiRead(d.sheet ? "done" : "none"); }
           })
           .catch(() => alive && setAiRead("fail"));
       })
@@ -1296,6 +1300,11 @@ function NoticeFacts({ sheet }: { sheet: EvalSheet }) {
               <span className="text-ink">{x.value}</span>
               {/* 같은 문장에서 읽은 값은 원문을 한 번만 보여 준다 */}
               {x.quote && x.quote !== x.value && f.findIndex((y) => y.quote === x.quote) === n && <span className="mt-0.5 block text-ink-300">원문: {x.quote}</span>}
+              {x.list && (
+                <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-ink-500">
+                  {x.list.map((t) => <li key={t}>{t}</li>)}
+                </ul>
+              )}
             </dd>
           </div>
         ))}

@@ -88,7 +88,8 @@ export interface Bid {
 export interface BidAttachment {
   name: string;
   url: string;
-  kind: "공고서" | "규격서·기타";
+  /** 사전규격: 본공고 전에 공개한 사전규격의 규격서 (제안요청서가 사전규격에만 올라온 공고가 있다). 이름은 받을 때 알 수 있어 자리 이름으로 둔다 */
+  kind: "공고서" | "규격서·기타" | "사전규격";
 }
 
 export interface ClientProfile {

@@ -20,13 +20,82 @@ export function rankFiles(files: BidAttachment[]): BidAttachment[] {
   const seen = new Set<string>();
   const readable = files.filter((f) => {
     const key = f.name.trim();
-    if (!READABLE.test(key) || seen.has(key)) return false;
+    // 사전규격 규격서는 이름(형식)을 받을 때 알 수 있어 일단 모두 읽는다
+    if ((f.kind !== "사전규격" && !READABLE.test(key)) || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
   const converted = new Set(readable.filter((f) => !/\.hwp$/i.test(f.name)).map((f) => stem(f.name)));
   const twin = (f: BidAttachment) => /\.hwp$/i.test(f.name) && converted.has(stem(f.name));
-  return readable.sort((a, b) => Number(twin(a)) - Number(twin(b)) || score(b) - score(a));
+  // 본공고 첨부를 먼저, 사전규격 규격서는 맨 뒤에 (같은 문서면 본공고에 올라온 최종본이 앞서도록)
+  const pre = (f: BidAttachment) => Number(f.kind === "사전규격");
+  return readable.sort((a, b) => pre(a) - pre(b) || Number(twin(a)) - Number(twin(b)) || score(b) - score(a));
+}
+
+/* ---------- 사전규격 규격서 ---------- */
+
+/** 사전규격 규격서 본문 머리글: 받을 때 알게 된 실제 파일 이름을 본문 캐시에 함께 둔다 */
+export const PRE_HEAD = "--- 사전규격 파일: ";
+
+/** 내려받기 응답의 파일 이름 (Content-Disposition) */
+function dispositionName(cd: string | null): string | undefined {
+  if (!cd) return undefined;
+  const star = /filename\*\s*=\s*(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+  if (star) try { return decodeURIComponent(star[1]).trim(); } catch { /* 아래 */ }
+  const m = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+  if (!m) return undefined;
+  try { return decodeURIComponent(m[1]).trim(); } catch { /* 아래 */ }
+  // 인코딩 없이 UTF-8 바이트를 그대로 보낸 이름
+  return Buffer.from(m[1], "latin1").toString("utf8").trim();
+}
+
+/** 확장자 없는 파일: 앞 바이트로 형식을 가린다 (ZIP 묶음은 HWPX·DOCX·XLSX·ZIP 중 안의 항목으로) */
+function sniffExt(buf: Buffer): string {
+  if (buf.subarray(0, 4).toString("latin1") === "%PDF") return "pdf";
+  if (buf[0] === 0xd0 && buf[1] === 0xcf) return "hwp";
+  if (buf[0] === 0x50 && buf[1] === 0x4b) {
+    const names = zipEntries(buf).map((e) => e.name);
+    if (names.some((n) => /^Contents\/section/.test(n))) return "hwpx";
+    if (names.includes("word/document.xml")) return "docx";
+    if (names.some((n) => /^xl\//.test(n))) return "xlsx";
+    return "zip";
+  }
+  return "";
+}
+
+/** 사전규격 규격서 하나를 받아 본문을 머리글(실제 파일 이름)과 함께 돌려준다. 없는 순번이면 null */
+export async function preSpecText(url: string, timeoutMs: number): Promise<string | null> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { "User-Agent": "Mozilla/5.0 (bid-analysis build)" } });
+  if (!res.ok) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length < 100 || buf.length >= 30_000_000) return null;
+  let name = dispositionName(res.headers.get("content-disposition")) ?? "";
+  if (!READABLE.test(name)) {
+    const ext = sniffExt(buf);
+    if (!ext) return `${PRE_HEAD}${name || "이름 없음"} ---\n`;
+    name = `${name || "사전규격 규격서"}.${ext}`;
+  }
+  return `${PRE_HEAD}${name} ---\n${await textOfName(name, buf)}`;
+}
+
+/** 같은 문서인지 볼 때 쓰는 이름: 앞 번호·[붙임]·(사전공개)·(수정)·최종·확장자·띄어쓰기를 뺀다 */
+export const docStem = (n: string) => n.replace(/\.[^.]+$/, "").replace(/^\s*(?:\[[^\]]*\]|[(（][^)）]*[)）]|\d{1,2}\s*[.)_-]|붙임\s*\d*\.?)\s*/g, "").replace(/[(（]\s*(?:사전\s*공개|사전\s*규격|수정|최종|공고용)\s*[)）]|_?최종/g, "").replace(/[\s_]+/g, "");
+
+/**
+ * 사전규격 본문 거르기: 본공고 첨부(또는 앞서 읽은 사전규격)에 같은 문서가 있으면 뺀다.
+ * 같은 파일명은 하나만 읽는 규칙을 따르되, 사전규격 쪽은 앞 번호·(사전공개) 같은 꼬리가 붙어 이름이 조금 달라 docStem 으로 맞춘다.
+ * stems 에는 본공고 첨부 이름의 docStem 을 넣어 두고, 남긴 사전규격 문서 이름이 더해진다.
+ */
+export function dropRepeatedPreSpec(text: string, stems: Set<string>): { name: string; text: string } {
+  if (!text.startsWith(PRE_HEAD)) return { name: "", text };
+  const nl = text.indexOf("\n");
+  const head = text.slice(0, nl < 0 ? undefined : nl);
+  const name = head.slice(PRE_HEAD.length, head.endsWith(" ---") ? -4 : undefined).trim();
+  const body = nl < 0 ? "" : text.slice(nl + 1);
+  const stem = docStem(name);
+  if (!body.trim() || stems.has(stem)) return { name, text: "" };
+  stems.add(stem);
+  return { name, text: body };
 }
 
 export async function download(url: string, timeoutMs: number): Promise<Buffer | null> {

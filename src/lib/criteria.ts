@@ -539,6 +539,17 @@ export function tableCheck(bid: Pick<Bid, "bizType" | "baseAmount" | "category">
 }
 
 /**
+ * 큰 묶음만 적힌 표인지: "기술능력 평가(정량 20점, 정성 70점), 입찰가격 10점"처럼 공고서 요약 문장에서 읽은 2~3개 묶음.
+ * 이런 표는 배점 합계가 맞아 쓸 수 있지만, 제안요청서에 항목별 상세 배점표가 따로 있는 일이 많아(2026-11-24 표본) 상세 표를 한 번 더 찾는다.
+ * 상세 표를 못 찾으면 이 표를 그대로 쓴다.
+ */
+export function coarseSheet(s: EvalSheet | undefined): boolean {
+  if (!s || s.items.length > 3) return false;
+  const tech = s.items.filter((i) => i.kind !== "price");
+  return tech.length > 0 && tech.every((i) => /^(?:기술\s*(?:능력)?\s*(?:평가)?|정량\s*(?:적)?\s*(?:평가)?|정성\s*(?:적)?\s*(?:평가)?|제안서\s*평가|수행\s*능력\s*(?:평가)?|사업\s*수행\s*능력\s*(?:평가)?)\s*(?:\(.*\))?$/.test(i.label.trim()));
+}
+
+/**
  * 공고 원문에서 읽은 배점표가 그대로 써도 될 만큼 온전한지.
  * 가격 배점을 실제로 읽었고 합계가 100이거나, 협상계약에서 기술 배점 합이 공고의 기술 배점과 같아야 한다.
  * (문서 전체에서 세부 기준·등급표 숫자를 함께 잡으면 합계가 100을 넘거나, 모자란 만큼 가격으로 채워져 100처럼 보인다)
@@ -633,6 +644,7 @@ export function bidSheet(
     sheet.recognition = merged.slice(0, 6);
     facts.push({ label: "실적 인정 범위", value: notice.recognition[0], quote: notice.recognition[0] });
   }
+  if (notice.qualify?.length) facts.push({ label: "참가자격", value: `공고서에 적힌 참가자격 ${notice.qualify.length}가지`, quote: "", list: notice.qualify });
   sheet.noticeFacts = facts;
   return sheet;
 }

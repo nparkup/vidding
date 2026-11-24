@@ -143,6 +143,8 @@ export interface NoticeFactView {
   label: string;
   value: string;
   quote: string;
+  /** 여러 줄로 보여 줄 원문 항목 (참가자격 등) */
+  list?: string[];
 }
 
 const KIND_RULES: [ItemKind, RegExp][] = [

@@ -16,3 +16,6 @@ worker/corp-lookup/.dev.vars
 # 발주기관 CI는 빌드 때 받는다 (scripts/agency-logos/fetch.mjs)
 public/agency-logos/*
 !public/agency-logos/README.md
+
+# 업종별 분석 기간별 자료는 빌드 때 받는다 (scripts/awards/industryFiles.ts)
+public/industry-period/

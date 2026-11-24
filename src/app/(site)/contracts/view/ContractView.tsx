@@ -28,7 +28,7 @@ export function ContractView() {
   const c = list?.find((x) => x.no === no);
 
   useEffect(() => {
-    if (c) document.title = `${c.title} 계약 상세 | 입찰메이트LAB`;
+    if (c) document.title = `${c.title} 계약 상세 | 비드매트릭스`;
   }, [c]);
 
   if (error) return <Message text="계약을 불러오지 못했습니다. 잠시 후 새로고침해 주세요." />;

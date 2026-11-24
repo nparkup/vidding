@@ -8,7 +8,7 @@ export default function AccountPage() {
     <div className="container-x max-w-3xl py-10 sm:py-14">
       <h1 className="text-2xl font-extrabold sm:text-3xl">내 정보</h1>
       <div className="mt-6">
-        <AccountView email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@ipchalmatelab.kr"} />
+        <AccountView email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@bidmatrix.kr"} />
       </div>
     </div>
   );

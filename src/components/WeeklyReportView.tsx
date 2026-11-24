@@ -98,7 +98,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
     <article className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-card">
       <header className="bg-ink p-6 text-white sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-300">
-          <p className="font-semibold text-mint">입찰메이트LAB 주간 분석보고서 · {weekLabel}</p>
+          <p className="font-semibold text-mint">비드매트릭스 주간 분석보고서 · {weekLabel}</p>
           <p className="tabular-nums">보고서 번호 {reportNo}</p>
         </div>
         <h2 className="mt-3 text-2xl font-extrabold sm:text-3xl">{client.company}</h2>
@@ -291,7 +291,7 @@ export function WeeklyReportView({ client, bids, weekLabel, note, now = new Date
             <li>데이터 출처: 조달청 나라장터 입찰공고 (공공데이터포털 Open API). 작성 기준 {dateTime(now.toISOString())}.</li>
             <li>투찰 참고 범위는 기초금액, 예정가격 범위(±2%), 낙찰하한율로 계산한 참고치이며 낙찰을 보장하지 않습니다. 최종 참가 여부와 제출서류는 공고문 원문을 기준으로 확인하시기 바랍니다.</li>
           </ul>
-          <p className="mt-4 flex justify-between border-t border-ink-100 pt-3 text-ink-300"><span>입찰메이트LAB</span><span className="tabular-nums">{reportNo}</span></p>
+          <p className="mt-4 flex justify-between border-t border-ink-100 pt-3 text-ink-300"><span>비드매트릭스</span><span className="tabular-nums">{reportNo}</span></p>
         </section>
       </div>
     </article>

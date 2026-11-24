@@ -28,7 +28,7 @@
  * 기업 특허 (src/lib/patents.ts, 평가점수 예측의 특허 항목):
  * - GET /?patents=사업자번호 : 특허청 등록원부 사업자 권리목록(공공데이터포털, 서비스키 DATA_GO_KR_SERVICE_KEY)으로 지금 살아 있는 특허권.
  *   실패하고 KIPRIS_API_KEY 가 있으면 KIPRIS Plus(출원인 법인 → 등록공보)로 한 번 더 찾는다 (월 호출 수를 patents/usage-YYYYMM.json 에 세어 상한 안에서).
- *   결과는 R2 patents/{사업자번호}.json 에 30일 둔다
+ *   결과는 R2 patents/v2/{사업자번호}.json 에 30일 둔다
  * - GET /?relate=공고번호-차수 : 사이트의 /award-analysis/{공고}.json 에 있는 '같은 사업인지 애매한 후보'와 '핵심어로 찾은 다른 기관 낙찰'을 Claude로 확인한다
  *   (src/lib/awards/relate.ts). 결과는 R2 ai-relate/v{버전}/{공고}-{후보 해시}.json
  */
@@ -416,7 +416,7 @@ const PATENT_TTL_MS = 30 * 86400e3;
 async function patents(env: Env, no: string, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<[PatentLookup, number, Record<string, string>?]> {
   const off = (status: PatentLookup["status"], reason: string): PatentLookup => ({ bizno: no, status, applicants: [], items: [], total: 0, checkedAt: new Date().toISOString(), reason });
   const bucket = env.AWARDS;
-  const key = `patents/${no}.json`;
+  const key = `patents/v2/${no}.json`;
   if (bucket) {
     const hit = await bucket.get(key);
     if (hit) {

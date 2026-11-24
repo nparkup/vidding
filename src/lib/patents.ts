@@ -101,26 +101,35 @@ export async function fetchPatents(key: string, bizno: string, f: typeof fetch =
 
 const RGST = "https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getBusinessRightList";
 
-/** 등록상태·존속기간으로 지금 살아 있는 권리인지 */
+/**
+ * 등록상태·존속기간으로 지금 살아 있는 권리인지. 실제 값(2026-11-24 확인): "등록유지", "존속기간만료(존속기간만료)",
+ * "등록료불납(등록료불납)" 등. 등록유지만 살아 있는 권리로 본다 (값이 비어 있으면 존속기간 만료일로 판단)
+ */
 function aliveRight(status: string, expires: string | undefined, today: string): boolean {
-  if (/소멸|포기|무효|취하|말소|거절|만료/.test(status)) return false;
   if (expires && expires < today) return false;
-  return true;
+  if (!status) return true;
+  return /등록\s*유지|존속\s*중/.test(status) && !/만료|불납|소멸|포기|무효|취하|말소|거절/.test(status);
 }
 
+/** 한 쪽 100건 (그보다 크면 007 TOO_MANY_REQUEST_DATA_ERROR). 큰 회사도 이 쪽 수 안에서 최근 등록부터 본다 */
+const RGST_ROWS = 100;
+const RGST_MAX_PAGES = 40;
+/** 한 번 조회에 쓰는 시간 한도 (권리가 아주 많은 회사는 등록원부 응답이 쪽마다 10초 넘게 걸린다) */
+const RGST_BUDGET_MS = 30_000;
+
 /**
- * 사업자번호(10자리) → 그 사업자가 가진 특허권 (특허청 등록원부, 공공데이터포털 15124946 사업자 권리목록 조회).
- * 공공데이터포털 서비스키를 그대로 쓴다 (개발계정 하루 10,000회). 100건씩 최대 3쪽(300건)까지 받는다.
+ * 사업자번호(10자리) → 그 사업자가 권리자로 가진 특허권·실용신안권 (특허청 등록원부, 공공데이터포털 15124946 사업자 권리목록 조회).
+ * 공공데이터포털 서비스키를 그대로 쓴다 (개발계정 하루 10,000회).
+ * 응답은 상표·디자인과 통상실시권(남의 권리를 쓰는 것)까지 등록일 오름차순으로 섞여 온다. 등록번호 앞 10(특허)·20(실용신안)이고
+ * 권리자란에 있는 것만 센다. 최근 등록이 뒤쪽 쪽에 있어 마지막 쪽부터 거꾸로 읽고, 쪽 전체가 존속기간(20년)을 넘긴 옛 등록이면 멈춘다.
  */
 export async function fetchPatentsRgst(serviceKey: string, bizno: string, f: typeof fetch = fetch): Promise<PatentLookup> {
   const now = new Date().toISOString();
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const dashed = `${bizno.slice(0, 3)}-${bizno.slice(3, 5)}-${bizno.slice(5)}`;
-  const items: PatentEntry[] = [];
-  const holders = new Map<string, string>();
-  let total = 0;
-  for (let page = 1; page <= 3; page++) {
-    const q = new URLSearchParams({ serviceKey, pageNo: String(page), numOfRows: "100", type: "json", searchType: "1", searchVal: dashed });
+  type Row = Record<string, unknown>;
+  const page = async (no: number, rows: number): Promise<{ total: number; list: Row[] }> => {
+    const q = new URLSearchParams({ serviceKey, pageNo: String(no), numOfRows: String(rows), type: "json", searchType: "1", searchVal: dashed });
     const r = await f(`${RGST}?${q}`);
     const t = await r.text();
     const auth = t.match(/<returnAuthMsg>([^<]*)<|"returnAuthMsg"\s*:\s*"([^"]*)"/);
@@ -128,39 +137,64 @@ export async function fetchPatentsRgst(serviceKey: string, bizno: string, f: typ
     if (!r.ok) throw new Error(`등록원부 ${r.status}`);
     let j: Record<string, unknown>;
     try { j = JSON.parse(t) as Record<string, unknown>; } catch { throw new Error("등록원부 응답을 읽지 못했습니다"); }
-    // 응답 감싸기(response.body 등)가 문서와 다를 수 있어 rightList·totalCount 를 찾아 내려간다
+    // 응답 감싸기가 바뀌어도 rightList·totalCount 를 찾아 내려간다
     const find = (o: unknown, k: string): unknown => {
       if (!o || typeof o !== "object") return undefined;
-      if (k in (o as Record<string, unknown>)) return (o as Record<string, unknown>)[k];
-      for (const v of Object.values(o as Record<string, unknown>)) { const x = find(v, k); if (x !== undefined) return x; }
+      if (k in (o as Row)) return (o as Row)[k];
+      for (const v of Object.values(o as Row)) { const x = find(v, k); if (x !== undefined) return x; }
       return undefined;
     };
     const code = String(find(j, "resultCode") ?? "");
     if (code && !/^0+$/.test(code)) {
       const msg = String(find(j, "resultMsg") ?? "");
-      if (/없|NODATA|NO_DATA/i.test(msg) || code === "03") break;
+      if (/없|NODATA|NO_DATA/i.test(msg) || code === "003" || code === "03") return { total: 0, list: [] };
       throw new Error(`등록원부 ${code} ${msg}`.trim().slice(0, 160));
     }
-    total = Number(find(j, "totalCount")) || total;
     const raw = find(j, "rightList");
-    const rows = (Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw] : []) as Record<string, unknown>[];
+    return { total: Number(find(j, "totalCount")) || 0, list: (Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw] : []) as Row[] };
+  };
+  const first = await page(1, RGST_ROWS);
+  const pages = Math.ceil(first.total / RGST_ROWS);
+  const items: PatentEntry[] = [];
+  const holders = new Map<string, string>();
+  const oldLimit = `${Number(today.slice(0, 4)) - 21}${today.slice(4)}`;
+  let partial = false;
+  const take = (rows: Row[]) => {
+    let anyRecent = false;
     for (const row of rows) {
       const str = (k: string) => (row[k] === undefined || row[k] === null ? "" : String(row[k]).trim());
       const no = str("rgstNo");
-      if (!no || items.some((i) => i.no === no)) continue;
-      const expires = ymd(str("cndrtExptnDate").replace(/\D/g, ""));
-      if (!aliveRight(str("rgstStatus"), expires, today)) continue;
+      const regDate = ymd(str("rgstDate").replace(/\D/g, ""));
+      if (regDate && regDate >= oldLimit) anyRecent = true;
+      if (!/^(10|20)/.test(no) || items.some((i) => i.no === no)) continue;
+      if (str("pertDiv") && !/권리자/.test(str("pertDiv"))) continue;
+      if (!aliveRight(str("rgstStatus"), ymd(str("cndrtExptnDate").replace(/\D/g, "")), today)) continue;
+      const holder = str("rightHolderInfo");
+      const code = str("applicantCd");
+      if (code && holder && !holders.has(code)) holders.set(code, holder.slice(0, 40));
       const appNo = str("applNo").replace(/\D/g, "");
-      const holder = str("rightHolderInfo") || str("applicantInfo");
-      const code2 = str("applicantCd");
-      if (code2 && !holders.has(code2)) holders.set(code2, holder.slice(0, 40));
-      items.push({ no, title: decode(str("title")).slice(0, 120), regDate: ymd(str("rgstDate").replace(/\D/g, "")), appNo: appNo || undefined, type: (appNo || no).startsWith("20") ? "실용신안" : "특허" });
+      items.push({ no, title: decode(str("title")).slice(0, 120), regDate, appNo: appNo || undefined, type: no.startsWith("20") ? "실용신안" : "특허" });
     }
-    if (rows.length < 100 || page * 100 >= total) break;
+    return anyRecent;
+  };
+  if (pages <= 1) take(first.list);
+  else {
+    // 마지막 쪽부터 거꾸로 (최근 등록 먼저). 쪽 전체가 21년보다 옛 등록이면 그 앞은 모두 만료라 멈춘다
+    const t0 = Date.now();
+    let n = pages;
+    let read = 1;
+    let stopped = false;
+    for (; n >= 1; n--, read++) {
+      if (read > RGST_MAX_PAGES || Date.now() - t0 > RGST_BUDGET_MS) { partial = true; break; }
+      const rows = n === 1 ? first.list : (await page(n, RGST_ROWS)).list;
+      if (!take(rows) && rows.length) { stopped = true; break; }
+    }
+    void stopped;
   }
   items.sort((x, y) => (y.regDate ?? "").localeCompare(x.regDate ?? ""));
-  if (!items.length && !total) return { bizno, status: "none", applicants: [], items: [], total: 0, checkedAt: now, reason: "특허청 등록원부에 이 사업자번호의 권리가 없습니다" };
-  return { bizno, status: "ok", applicants: [...holders].map(([code, name]) => ({ code, name })), items, total: items.length, checkedAt: now };
+  if (!items.length && partial) return { bizno, status: "error", applicants: [], items: [], total: 0, checkedAt: now, reason: "등록원부 권리가 많아 제시간에 확인하지 못했습니다" };
+  if (!items.length) return { bizno, status: "none", applicants: [], items: [], total: 0, checkedAt: now, reason: first.total ? "등록원부에 지금 유지 중인 특허권이 없습니다" : "특허청 등록원부에 이 사업자번호의 권리가 없습니다" };
+  return { bizno, status: "ok", applicants: [...holders].map(([code, name]) => ({ code, name })), items, total: items.length, checkedAt: now, ...(partial ? { reason: "권리가 많아 최근 등록분 일부만 확인했습니다" } : {}) };
 }
 
 /* ---------- 평가 항목 적용 ---------- */

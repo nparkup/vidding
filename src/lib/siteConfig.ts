@@ -63,15 +63,14 @@ export function useSiteConfig(): SiteConfig {
 /** 요금 값들 (VAT 포함) */
 export function priceOf(c: SiteConfig) {
   const p = c.pricing;
-  return { lite: p.lite, standard: p.standard, unlimited: p.unlimited, liteQuota: p.liteQuota, standardQuota: p.standardQuota };
+  return { lite: p.lite, standard: p.standard, liteQuota: p.liteQuota, standardQuota: p.standardQuota };
 }
 
-/** 이용권별 금액·한 달 공고 예측 건수 (null = 무제한) */
+/** 이용권별 금액·한 달 공고 예측 건수 */
 export function plansOf(c: SiteConfig): { id: PlanId; price: number; quota: number | null }[] {
   const p = c.pricing;
   return [
     { id: "lite", price: p.lite, quota: p.liteQuota },
     { id: "standard", price: p.standard, quota: p.standardQuota },
-    { id: "unlimited", price: p.unlimited, quota: null },
   ];
 }

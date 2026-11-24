@@ -6,8 +6,8 @@ import { TRIAL_LIMIT } from "./trialLimit";
 
 export interface SiteConfig {
   banner: { on: boolean; text: string; link: string; linkLabel: string; tone: "info" | "warn"; from: string; to: string };
-  /** 월간 이용권 금액(VAT 포함)과 한 달 공고 예측 건수 (무제한 이용권은 건수 없음) */
-  pricing: { lite: number; standard: number; unlimited: number; liteQuota: number; standardQuota: number };
+  /** 월간 이용권 금액(VAT 포함)과 한 달 공고 예측 건수 */
+  pricing: { lite: number; standard: number; liteQuota: number; standardQuota: number };
   trialLimit: number;
   features: { mybox: boolean };
   updatedAt?: string;
@@ -17,7 +17,7 @@ export interface SiteConfig {
 export const DEFAULT_CONFIG: SiteConfig = {
   banner: { on: false, text: "", link: "", linkLabel: "", tone: "info", from: "", to: "" },
   pricing: {
-    lite: PLANS[0].price, standard: PLANS[1].price, unlimited: PLANS[2].price,
+    lite: PLANS[0].price, standard: PLANS[1].price,
     liteQuota: PLANS[0].quota ?? 100, standardQuota: PLANS[1].quota ?? 200,
   },
   trialLimit: TRIAL_LIMIT,
@@ -39,11 +39,10 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       on: b.on === true, text: str(b.text, 200), link: /^(https:\/\/|\/)/.test(link) ? link : "", linkLabel: str(b.linkLabel, 30),
       tone: b.tone === "warn" ? "warn" : "info", from: date(b.from), to: date(b.to),
     },
-    // 예전 모양(monthly·annualMonthly)으로 저장된 값은 버리고 기본값을 쓴다
+    // 예전 모양(monthly·annualMonthly)으로 저장된 값은 버리고 기본값을 쓴다. 없앤 무제한 금액(unlimited)은 읽지 않는다
     pricing: {
       lite: num(r.pricing?.lite, d.pricing.lite, 1000, 10_000_000),
       standard: num(r.pricing?.standard, d.pricing.standard, 1000, 10_000_000),
-      unlimited: num(r.pricing?.unlimited, d.pricing.unlimited, 1000, 10_000_000),
       liteQuota: num(r.pricing?.liteQuota, d.pricing.liteQuota, 1, 100_000),
       standardQuota: num(r.pricing?.standardQuota, d.pricing.standardQuota, 1, 100_000),
     },

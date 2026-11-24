@@ -31,7 +31,7 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
     }
     return {
       active: members.filter((m) => m.billing?.status === "active").length,
-      unlimited: members.filter((m) => m.billing?.status === "active" && m.billing.plan === "unlimited").length,
+      standard: members.filter((m) => m.billing?.status === "active" && m.billing.plan === "standard").length,
       monthSum, total, refunds,
       expiring: members.filter((m) => m.billing?.status === "active" && m.billing.end && m.billing.end <= soon).length,
     };
@@ -67,7 +67,7 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
         결제 대행사(PG) 연동 전입니다. 계좌이체 등으로 받은 결제와 환불을 여기에 직접 적어 주세요. 연동하면 결제 내역이 자동으로 들어오고, 이 기록은 그대로 남습니다.
       </p>
 
-      <Stats items={[["이용 중", stats.active], ["그중 무제한", stats.unlimited], ["이번 달 순결제", won(stats.monthSum)], ["누적 결제", won(stats.total)], ["누적 환불", won(stats.refunds)], ["30일 안 만료", stats.expiring]]} />
+      <Stats items={[["이용 중", stats.active], ["그중 스탠다드", stats.standard], ["이번 달 순결제", won(stats.monthSum)], ["누적 결제", won(stats.total)], ["누적 환불", won(stats.refunds)], ["30일 안 만료", stats.expiring]]} />
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <input className="input sm:max-w-xs" placeholder="회사명·사업자번호" value={q} onChange={(e) => setQ(e.target.value)} aria-label="결제 회원 검색" />
@@ -148,7 +148,7 @@ function BillingEditor({ m, call, guard, onSaved }: { m: Member; call: TabProps[
           <select className="input" value={b.plan} onChange={(e) => set("plan", e.target.value as Billing["plan"])}>
             <option value="">없음</option>
             {PLANS.map((p) => <option key={p.id} value={p.id}>{p.name} ({won(priceFor(p.id))})</option>)}
-            {(b.plan === "monthly" || b.plan === "annual") && <option value={b.plan}>{planName(b.plan)}</option>}
+            {(b.plan === "unlimited" || b.plan === "monthly" || b.plan === "annual") && <option value={b.plan}>{planName(b.plan)}</option>}
           </select>
         </Field>
         <Field label="상태">

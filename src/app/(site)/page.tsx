@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { Price, TrialN } from "@/components/Cfg";
+import { TrialN } from "@/components/Cfg";
 import { Check, X } from "lucide-react";
-import { FaqList } from "@/components/FaqList";
-import { SERVICE_FAQ } from "@/lib/faq";
 import { HeroCity } from "@/components/art/HeroCity";
 import { ConstructionArt, ITArt, SupplyArt } from "@/components/art/Sectors";
 import { DeskArt } from "@/components/art/Desk";
@@ -18,7 +16,6 @@ import { MatchDemo } from "@/components/MatchDemo";
 import { bidPriceGuide, documentChecklist, evaluate, rank } from "@/lib/analysis";
 import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
-import { PricingCards } from "@/components/PricingCards";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getAptBids, getAwardCount, getBids, getContracts, getNoticeChanges, getOrderPlans, getPreSpecs, getRecentAwards } from "@/lib/store";
 import { APT_CATEGORIES } from "@/lib/apt";
@@ -707,32 +704,6 @@ export default async function Home() {
               <p className="mt-6 border-t border-ink-100 pt-4 text-sm text-ink-400">자주 쓰는 기능 <b className="text-ink">{p.use}</b></p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* 요금제 */}
-      <section className="container-x pt-28">
-        <div className="text-center">
-          <p className="eyebrow">요금제</p>
-          <h2 className="h-section mt-3">입찰 담당자 한 명 인건비의 일부로.</h2>
-          <p className="mt-4 text-ink-500">월간 이용권 월 <Price k="lite" />원부터 · VAT 포함 · 낙찰 성공보수 없음 · 무료 체험 입찰공고 <TrialN />건</p>
-        </div>
-        <div className="mt-12">
-          <PricingCards />
-        </div>
-        <p className="mt-6 text-center"><Link href="/pricing" className="font-semibold text-mint-600">요금·환불 기준 자세히 보기</Link></p>
-      </section>
-
-      {/* FAQ */}
-      <section className="container-x grid gap-10 pt-28 lg:grid-cols-[1fr_1.6fr]">
-        <div>
-          <p className="eyebrow">자주 묻는 질문</p>
-          <h2 className="h-section mt-3">궁금한 점이<br />있으신가요?</h2>
-          <p className="mt-4 text-ink-500">평일 09:00–18:00 · hello@ipchalmatelab.kr</p>
-        </div>
-        <div>
-          <FaqList items={SERVICE_FAQ} large />
-          <p className="mt-6"><Link href="/faq" className="font-semibold text-mint-600">자주 묻는 질문 전체 보기</Link></p>
         </div>
       </section>
 

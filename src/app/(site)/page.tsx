@@ -371,9 +371,9 @@ export default async function Home() {
             입찰공고 낙찰정보 빅데이터 분석 정보
           </p>
           <h1 className="mx-auto mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.15] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
-            공고마다 초 정밀하게 분석하고,
+            공고마다 데이터로 분석하고,
             <br />
-            <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가.</span>
+            <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가!</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
             입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 평가해 매일 아침 보내 드립니다.<br />아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.

@@ -157,7 +157,7 @@ export function patchFetch() {
     const host = u?.hostname ?? "";
     try {
       const res = await orig(input as RequestInfo, init);
-      if (u && (host === "apis.data.go.kr" || host.endsWith(".data.go.kr"))) {
+      if (u && (host === "apis.data.go.kr" || host.endsWith(".data.go.kr") || host === "plus.kipris.or.kr")) {
         const key = dataGoKrKey(u);
         pending.push({ kind: "api", key });
         if (!res.ok) pending.push({ kind: "apierr", key: `${key}:${res.status}` });

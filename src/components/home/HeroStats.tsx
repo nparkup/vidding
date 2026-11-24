@@ -45,23 +45,29 @@ export function HeroStats({ builtAt, notices, aptNotices = 0, awards, aptAwards 
       .catch(() => {});
   }, []);
 
-  const fmt = (n: number) => `${n.toLocaleString("ko-KR")}건`;
   const awardTotal = (awardRows ?? 0) + aptAwards;
-  const items: [string, string][] = [
-    ...(noticeRows ? [["누적입찰공고", fmt(noticeRows + aptNotices)] as [string, string]] : []),
-    ...(awardTotal ? [["누적낙찰정보", fmt(awardTotal)] as [string, string]] : []),
+  const items: [string, number][] = [
+    ...(noticeRows ? [["누적입찰공고", noticeRows + aptNotices] as [string, number]] : []),
+    ...(awardTotal ? [["누적낙찰정보", awardTotal] as [string, number]] : []),
   ];
+  // 칸 수에 맞춘 넓은 화면 열 (모르는 값은 칸째 뺀다)
+  const cols = ["sm:grid-cols-1", "sm:grid-cols-2", "sm:grid-cols-3"][items.length];
 
+  // 휴대폰: 날짜 한 줄 + 누적 두 칸, 넓은 화면: 세 칸 한 줄
   return (
-    <p className="mx-auto mt-7 flex max-w-2xl flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[13px] text-ink-500 sm:text-sm" aria-live="polite">
-      <span className="whitespace-nowrap">
-        금일기준 <b className="font-semibold text-ink-700 tabular-nums">{kstToday(now)}</b>,
-      </span>
+    <div className={`mx-auto mt-8 grid max-w-3xl grid-cols-2 overflow-hidden rounded-2xl border border-mint-100 bg-white shadow-card ${cols}`} aria-live="polite">
+      <div className={`flex flex-col justify-center px-4 py-3.5 sm:px-6 sm:py-5 ${items.length ? "col-span-2 border-b border-ink-100 sm:col-span-1 sm:border-b-0 sm:border-r" : "col-span-2 sm:col-span-1"}`}>
+        <p className="text-xs font-semibold text-ink-400">금일기준</p>
+        <p className="mt-1 text-base font-bold tabular-nums text-ink-800 sm:text-xl">{kstToday(now)}</p>
+      </div>
       {items.map(([k, v], i) => (
-        <span key={k} className="whitespace-nowrap">
-          {k} <b className="font-bold text-mint-700 tabular-nums">{v}</b>{i < items.length - 1 ? "," : ""}
-        </span>
+        <div key={k} className={`min-w-0 px-4 py-3.5 sm:px-6 sm:py-5 ${i < items.length - 1 ? "border-r border-ink-100" : ""}`}>
+          <p className="text-xs font-semibold text-mint-600">{k}</p>
+          <p className="mt-1 whitespace-nowrap text-[clamp(1.25rem,5.6vw,1.75rem)] font-extrabold tracking-tight tabular-nums text-mint-700 sm:text-[28px]">
+            {v.toLocaleString("ko-KR")}<span className="ml-0.5 text-sm font-bold text-ink-400">건</span>
+          </p>
+        </div>
       ))}
-    </p>
+    </div>
   );
 }

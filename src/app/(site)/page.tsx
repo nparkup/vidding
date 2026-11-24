@@ -418,27 +418,6 @@ export default async function Home() {
       </section>
       )}
 
-      {/* 숫자 */}
-      <section className="container-x pt-20">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-          {[
-            ["전 업종 수집", "오늘 확인한 공고", bids.length.toLocaleString(), "건"],
-            ["알고리즘 판정", "공고당 채점 항목", "6", "개"],
-            ["1차 선별", "검토할 공고", `${cut}%`, "감소"],
-            ["메일 발송", "영업일 아침", "07:00", ""],
-          ].map(([tag, k, v, u]) => (
-            <div key={tag} className="min-w-0 rounded-3xl bg-paper p-4 sm:p-7">
-              <p className="text-xs font-bold text-mint-600">{tag}</p>
-              <p className="mt-1 text-sm text-ink-500">{k}</p>
-              <p className="mt-4 whitespace-nowrap text-[clamp(1.5rem,7.2vw,2.25rem)] font-extrabold tracking-tight tabular-nums sm:text-5xl">
-                {v}<span className="ml-1 text-base font-bold text-ink-400">{u}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-right text-xs text-ink-300">예시 고객사 조건과 오늘 수집한 공고 기준</p>
-      </section>
-
       {/* 분석 엔진 */}
       <AnalysisEngine bid={featured} ev={featuredEval} total={bids.length} />
 

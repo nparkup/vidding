@@ -4,6 +4,7 @@ name: 기업 정보 중계 서버 배포
 # 필요한 저장소 Secrets: CLOUDFLARE_API_TOKEN (Workers 편집 권한), CLOUDFLARE_ACCOUNT_ID, DATA_GO_KR_SERVICE_KEY
 # 선택: ANTHROPIC_API_KEY (공고 배점표 AI 판독, ?aisheet=). 있으면 Worker 비밀값으로 넣는다
 # 선택: ADMIN_ID, ADMIN_PASSWORD (관리자 화면 /admin 로그인, 비밀번호 10자 이상). 있으면 Worker 비밀값으로 넣는다
+# 선택: KIPRIS_API_KEY (기업 특허 조회, ?patents=, KIPRIS Plus 마이페이지 > APIKEY관리의 인증키). 있으면 Worker 비밀값으로 넣는다
 # 선택: ADMIN_GITHUB_TOKEN (관리자 화면 GitHub Actions 실행 목록, Actions 읽기 권한만). 있으면 Worker 비밀값 GITHUB_TOKEN 으로 넣는다
 on:
   push:
@@ -25,6 +26,7 @@ on:
       - "src/lib/plans.ts"
       - "src/lib/trialLimit.ts"
       - "src/lib/usagePeriod.ts"
+      - "src/lib/patents.ts"
       - ".github/workflows/corp-worker.yml"
   # PR에서는 배포하지 않고 Cloudflare 토큰·계정 ID가 맞는지만 확인한다
   pull_request:
@@ -45,6 +47,7 @@ on:
       - "src/lib/plans.ts"
       - "src/lib/trialLimit.ts"
       - "src/lib/usagePeriod.ts"
+      - "src/lib/patents.ts"
       - ".github/workflows/corp-worker.yml"
   workflow_dispatch:
 
@@ -111,6 +114,14 @@ jobs:
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then echo "ANTHROPIC_API_KEY 없음: AI 판독은 꺼진 채로 둡니다"; exit 0; fi
           printf '%s' "$ANTHROPIC_API_KEY" | npx --yes wrangler@4.40.0 secret put ANTHROPIC_API_KEY
+      - name: KIPRIS Plus 인증키를 Worker 비밀값으로 저장
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
+        working-directory: worker/corp-lookup
+        env:
+          KIPRIS_API_KEY: ${{ secrets.KIPRIS_API_KEY }}
+        run: |
+          if [ -z "$KIPRIS_API_KEY" ]; then echo "KIPRIS_API_KEY 없음: 특허 조회는 꺼진 채로 둡니다 (Cloudflare에서 직접 넣은 값은 그대로 둡니다)"; exit 0; fi
+          printf '%s' "$KIPRIS_API_KEY" | npx --yes wrangler@4.40.0 secret put KIPRIS_API_KEY
       - name: 관리자 아이디·비밀번호를 Worker 비밀값으로 저장
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup

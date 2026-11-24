@@ -13,6 +13,7 @@ import type { Bid, ContractMethod } from "./types";
 import { estimatedRule, generalServiceRule, parseTrustRule, scoreTrust, type TrustRule, type TrustScore } from "./trustscore";
 import { criteriaSheet, type CriteriaRef, type EvalBasis } from "./criteria";
 import { won } from "./format";
+import { countPatents, isPatentItem, patentRule, scorePatentItem, type PatentEntry } from "./patents";
 
 /* ---------- 신용평가등급 ---------- */
 
@@ -471,7 +472,7 @@ function scanItems(lines: string[], from: number, to: number, window: boolean): 
       const m = pts[0];
       const before = line.slice(0, m.index).trim();
       const label = before || lastLabel;
-      if (label && (kindOf(label) !== "other" || /평가|심사|능력|실적|점수/.test(label))) push(label, Number(m[1]), line);
+      if (label && (kindOf(label) !== "other" || /평가|심사|능력|실적|점수|특\s*허|지식\s*재산/.test(label))) push(label, Number(m[1]), line);
       lastLabel = "";
       continue;
     }
@@ -712,6 +713,15 @@ export interface CompanyInput {
   perfSource?: string;
   /** 신뢰도 가감점(신인도) 해당 항목 id (trustscore.ts TRUST_ITEMS) */
   trustItems: string[];
+  /**
+   * 특허 항목에 쓰는 등록 특허·실용신안 (KIPRIS Plus 조회 결과 중 고객이 이 공고에 인정된다고 본 것).
+   * undefined 면 조회하지 않은 상태: 특허 항목은 건수를 모르는 채로 둔다
+   */
+  patents?: PatentEntry[];
+  /** 자동 조회에 없는 특허 건수 (고객 직접 입력: 출원 건, 조회 뒤 등록된 건 등) */
+  patentExtra?: number;
+  /** 특허 '최근 N년' 기준일 (공고일 YYYY-MM-DD). 없으면 오늘 */
+  patentAsOf?: string;
   /** 제안서·정성평가 준비 수준 */
   proposal: Level;
   /** 투찰률: 입찰가격 ÷ 예정가격 (%) */
@@ -745,6 +755,8 @@ export interface PredictedItem extends EvalItem {
   lost: number;
   /** 자료가 없어 점수를 정하지 못한 항목 (예: 기초금액이 없는 공고의 금액 비율 실적). score 는 0, 합계에서 빼고 따로 안내한다 */
   unknown?: boolean;
+  /** 특허 항목으로 계산했으면 그 건수 (신뢰도 가감점 합산에서 뺀다) */
+  patentCount?: number;
 }
 
 export interface Prediction {
@@ -867,6 +879,17 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   const items: PredictedItem[] = sheet.items.map((it) => {
     let ratio = 0;
     let reason = "";
+    // 특허 항목 (공고 배점표에 있을 때만): 공고 문구의 기준(실용신안 포함·최근 N년·건당·건수 구간)으로 등록 특허 건수를 센다
+    if (isPatentItem(it) && (c.patents !== undefined || (c.patentExtra ?? 0) > 0)) {
+      const rule = patentRule(it);
+      const asOf = c.patentAsOf ? new Date(`${c.patentAsOf.slice(0, 10)}T00:00:00+09:00`) : new Date();
+      const auto = countPatents(c.patents ?? [], rule, asOf).length;
+      const n = auto + Math.max(0, Math.round(c.patentExtra ?? 0));
+      const { points, how } = scorePatentItem(it.max, rule, n);
+      const what = `${rule.utility ? "등록 특허·실용신안" : "등록 특허"}${rule.withinYears ? ` (최근 ${rule.withinYears}년)` : ""} ${n}건${c.patents !== undefined ? ` (특허청 조회 ${auto}건${c.patentExtra ? ` + 직접 ${c.patentExtra}건` : ""})` : " (직접 입력)"}`;
+      const s0 = round2(points);
+      return { ...it, score: s0, ratio: it.max > 0 ? s0 / it.max : 0, reason: `${what} → ${how}`, lost: round2(it.max - s0), patentCount: n };
+    }
     // 기준표 등급표 (신용평가등급, 기술등급)
     if (it.lookup && it.max > 0) {
       const pts = it.lookup.points;
@@ -983,7 +1006,7 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
 
   // 신뢰도 가감점: 평가표에 항목이 여럿이면(가점·감점 따로) 첫 항목에 합산한다
   let trust: Prediction["trust"];
-  const bonusItems = items.filter((i) => i.kind === "bonus");
+  const bonusItems = items.filter((i) => i.kind === "bonus" && i.patentCount === undefined);
   if (bonusItems.length) {
     const first = bonusItems[0];
     const base = sheet.trust ?? (sheet.method === "적격심사" && first.max <= 0 ? generalServiceRule() : estimatedRule("평가표 배점 기준", first.max > 0 ? first.max : 2, first.max > 0 ? first.max : 3));
@@ -1041,7 +1064,8 @@ export function predict(sheet: EvalSheet, bid: Pick<Bid, "baseAmount" | "lowerLi
   const losers = [...items].filter((i) => i.kind !== "price" && i.lost > 0).sort((a, b) => b.lost - a.lost).slice(0, 3);
   for (const l of losers) {
     const up = l.bands && l.bands[0].unit === "%" ? [...l.bands].sort((a, b) => a.min - b.min).find((b) => b.points > l.score && b.min > 0) : undefined;
-    if (l.kind === "performance" && up) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. ${sheet.source === "extracted" ? "공고" : "기준표"} 구간상 유사 실적이 ${amtLabel}의 ${up.min}%(${won(Math.round((amt * up.min) / 100))}) 이상이면 ${up.points}점입니다. 공동수급 지분 합산도 검토하세요.`);
+    if (l.patentCount !== undefined) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공고가 인정하는 특허(등록 기준, 공고일 전 등록)를 확인하고, 특허청 조회에 없는 건은 직접 더하세요.`);
+    else if (l.kind === "performance" && up) tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. ${sheet.source === "extracted" ? "공고" : "기준표"} 구간상 유사 실적이 ${amtLabel}의 ${up.min}%(${won(Math.round((amt * up.min) / 100))}) 이상이면 ${up.points}점입니다. 공동수급 지분 합산도 검토하세요.`);
     else if (l.kind === "performance") tips.push(`${l.label}에서 ${l.lost}점이 빠집니다. 공동수급으로 실적을 합산하면 만점에 가까워질 수 있습니다.`);
     else if (l.kind === "credit") tips.push(c.creditGrade === "없음" ? `${l.label}에서 ${l.lost}점이 빠집니다. 유효한 신용평가등급확인서가 없으면 최저등급(공사는 0점)으로 평가하니 공고일 전 신용평가를 받으세요.` : `${l.label}에서 ${l.lost}점이 빠집니다. 공고일 전 신용평가 재평가 일정을 확인하세요.`);
     else if (l.kind === "capability") tips.push(`사업수행능력 평가점수가 ${c.pqScore}점이라 ${l.lost}점이 빠집니다. 참여기술인·유사 용역 실적 서류를 보강하세요.`);

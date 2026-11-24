@@ -35,6 +35,8 @@ import { useUsage } from "@/lib/usage";
 import { readMember } from "@/lib/member";
 import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
 import { PredictSummary, StepBar, type SummaryTile, type Tone } from "./PredictSummary";
+import { PatentBox } from "./PatentBox";
+import { isPatentItem, type PatentLookup } from "@/lib/patents";
 
 /** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
 const MAX_MATCHES = 100;
@@ -173,6 +175,11 @@ export function ScorePredictor() {
   const [auto, setAuto] = useState<Partial<Record<FactKey, AutoFact>>>({});
   /** 신뢰도 가감점 항목 중 API로 확인한 것 */
   const [trustAuto, setTrustAuto] = useState<Record<string, TrustAuto>>({});
+  /** 기업 특허 (KIPRIS Plus): 공고 배점표에 특허 항목이 있을 때만 조회한다 */
+  const [patentRes, setPatentRes] = useState<PatentLookup | null>(null);
+  const [patentLoading, setPatentLoading] = useState(false);
+  const [patentOff, setPatentOff] = useState<Set<string>>(new Set());
+  const [patentExtra, setPatentExtra] = useState(0);
   const onPerf = useCallback((s: PerfSummary) => setAutoPerf((p) => (p.amount === s.amount && p.count === s.count ? p : s)), []);
 
   const pickedBid: Bid | undefined = useMemo(() => {
@@ -299,11 +306,15 @@ export function ScorePredictor() {
   }, [suggestRate, floorRate]);
 
   // 실적 = 나라장터에서 찾은 유사 낙찰(추정) + 직접 입력(수의계약·민간·하도급 등)
+  // 특허 = 특허청 조회 결과에서 고객이 뺀 것을 제외 + 직접 입력
   const coEff = useMemo<CompanyInput>(() => ({
     ...co,
     pastPerformance: autoPerf.amount + manualPerf,
     perfSource: autoPerf.count ? `나라장터 낙찰 ${autoPerf.count}건 추정${manualPerf ? " + 직접 입력" : ""}` : undefined,
-  }), [co, autoPerf, manualPerf]);
+    patents: patentRes && (patentRes.status === "ok" || patentRes.status === "none") ? patentRes.items.filter((p) => !patentOff.has(p.no)) : undefined,
+    patentExtra,
+    patentAsOf: bid?.postedAt?.slice(0, 10),
+  }), [co, autoPerf, manualPerf, patentRes, patentOff, patentExtra, bid?.postedAt]);
   // 공동수급 구성원 (적격심사·공동도급 허용 공고): 실적 합산, 신용·경영상태 지분율 가중
   const [members, setMembers] = useState<JointMember[]>([]);
   useEffect(() => { setMembers([]); }, [bidId]);
@@ -332,8 +343,26 @@ export function ScorePredictor() {
       capability: it.some((i) => i.kind === "capability"),
       techGrade: it.some((i) => i.kind === "techGrade"),
       finance: it.some((i) => i.kind === "finance"),
+      patent: it.filter((i) => isPatentItem(i)),
     };
   }, [active]);
+  // 특허 항목이 있는 공고에서 회사를 조회했으면 특허를 한 번 불러온다 (같은 번호는 다시 부르지 않는다)
+  const needPatent = needs.patent.length > 0;
+  const patentNo = corp?.bizno;
+  useEffect(() => {
+    if (!needPatent || !patentNo || !STATIC || !CORP_API) return;
+    if (patentRes?.bizno === patentNo) return;
+    let alive = true;
+    setPatentLoading(true);
+    setPatentOff(new Set());
+    fetch(`${CORP_API}?${new URLSearchParams({ patents: patentNo })}`)
+      .then((r) => r.json() as Promise<PatentLookup>)
+      .then((j) => { if (alive) setPatentRes(j); })
+      .catch(() => { if (alive) setPatentRes({ bizno: patentNo, status: "error", applicants: [], items: [], total: 0, checkedAt: new Date().toISOString() }); })
+      .finally(() => { if (alive) setPatentLoading(false); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needPatent, patentNo]);
   const sheetPeriod = useMemo(() => active
     ? sheetPerfPeriod(active.items.filter((i) => i.kind === "performance").flatMap((i) => [i.label, i.basis ?? "", ...(i.recognition ?? [])]), active.recognition ?? [])
     : undefined, [active]);
@@ -383,6 +412,8 @@ export function ScorePredictor() {
     setCorpLoading(true);
     setCorp(null);
     setTrustAuto({});
+    setPatentRes(null);
+    setPatentExtra(0);
     setPerfBizno("");
     setAutoPerf({ amount: 0, count: 0 });
     setCorpMsg("국세청·나라장터·금융위원회 정보를 조회하는 중…");
@@ -773,6 +804,18 @@ export function ScorePredictor() {
                 <p className="col-span-2 -mt-2 text-xs text-ink-500">공고서에 적힌 기준비율(한국은행 기업경영분석)을 넣으세요.<br />기본값은 추정입니다.</p>
               </div>
             </>)}
+            {needPatent && (
+              <PatentBox
+                items={needs.patent}
+                res={patentRes?.bizno === patentNo ? patentRes : null}
+                loading={patentLoading}
+                excluded={patentOff}
+                onToggle={(no) => setPatentOff((s0) => { const n = new Set(s0); if (n.has(no)) n.delete(no); else n.add(no); return n; })}
+                extra={patentExtra}
+                onExtra={setPatentExtra}
+                asOf={bid?.postedAt}
+              />
+            )}
             <div>
               <span className="label">제안서 준비 수준</span>
               <div className="flex gap-2">

@@ -25,6 +25,9 @@
  *   결과는 R2 ai-sheets/v{버전}/{공고}-{본문 해시}.json 에 두어 같은 공고는 한 번만 부른다. 키는 Worker 비밀값 ANTHROPIC_API_KEY.
  *   빌드가 첨부를 다 읽지 못한 공고(/attachments/{공고}.json 에 read 가 없음)는 여기서 첨부를 모두 받아 읽는다
  *   (src/lib/nara/liveSheet.ts, 같은 파일명은 하나만, 나라장터 주소만). 결과는 R2 ai-sheets/v{버전}/{공고}-live-{첨부 해시}.json
+ * 기업 특허 (src/lib/patents.ts, 평가점수 예측의 특허 항목):
+ * - GET /?patents=사업자번호 : KIPRIS Plus 출원인 법인 → 등록 상태 특허·실용신안. 키는 Worker 비밀값 KIPRIS_API_KEY.
+ *   결과는 R2 patents/{사업자번호}.json 에 30일 두고, 월 호출 수를 patents/usage-YYYYMM.json 에 세어 상한을 넘지 않게 한다
  * - GET /?relate=공고번호-차수 : 사이트의 /award-analysis/{공고}.json 에 있는 '같은 사업인지 애매한 후보'와 '핵심어로 찾은 다른 기관 낙찰'을 Claude로 확인한다
  *   (src/lib/awards/relate.ts). 결과는 R2 ai-relate/v{버전}/{공고}-{후보 해시}.json
  */
@@ -37,6 +40,7 @@ import { RELATE_VERSION, relateAll, relateHash, type RelateResult } from "../../
 import type { AwardAnalysis } from "../../src/lib/awards/analysis";
 import { AI_SHEET_VERSION, readAiInput, type AiInput, type AiSheetResult } from "../../src/lib/nara/aiSheet";
 import { liveKey, readSheetLive, type LiveDocs } from "../../src/lib/nara/liveSheet";
+import { fetchPatents, type PatentLookup } from "../../src/lib/patents";
 import { handleAdmin, readSiteConfig } from "./admin";
 import { handleAccount } from "./account";
 import { metricsStub, patchFetch, takePending, truncIp, type MetricsNs, type RecBody } from "./metrics";
@@ -60,6 +64,10 @@ interface Env {
   SITE_URL?: string;
   /** 그 자리에서 첨부를 받을 때 허용하는 호스트 (쉼표 구분, 기본 www.g2b.go.kr) */
   ATTACH_HOSTS?: string;
+  /** 기업 특허 조회 (KIPRIS Plus Open API 인증키, ?patents=). 없으면 status off */
+  KIPRIS_API_KEY?: string;
+  /** 특허 조회 월 호출 상한 (기본 950, KIPRIS Plus 무료 월 1,000회 안) */
+  KIPRIS_MONTHLY_LIMIT?: string;
   /** 쉼표로 구분한 허용 Origin, 예: https://nparkup.github.io,http://localhost:3000 */
   ALLOWED_ORIGINS?: string;
   /** 관리자 화면(/admin) 아이디·비밀번호 (Worker 비밀값, 저장소 Secrets ADMIN_ID·ADMIN_PASSWORD 에서). 없으면 관리자 로그인은 503 */
@@ -255,6 +263,11 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
         return json({ status: "error", same: [], reason: (e as Error).message.slice(0, 200) }, 502);
       }
     }
+    if (sp.has("patents")) {
+      const no = normalizeBizno(sp.get("patents") ?? "");
+      if (!validBizno(no)) return json({ error: "올바른 사업자등록번호가 아닙니다." }, 400);
+      return json(...(await patents(env, no, ctx)));
+    }
     if (!env.DATA_GO_KR_SERVICE_KEY) return json({ error: "중계 서버에 공공데이터포털 인증키가 없습니다." }, 503);
 
     const cache0 = (caches as unknown as { default: Cache }).default;
@@ -320,7 +333,7 @@ function routeOf(req: Request): string {
   const sp = new URL(req.url).searchParams;
   if (sp.has("admin") || sp.has("adminlogin") || sp.has("members")) return `admin:${(sp.get("admin") ?? (sp.has("adminlogin") ? "login" : "members")).slice(0, 20)}`;
   if (sp.has("account")) return `account:${(sp.get("account") ?? "").slice(0, 20)}`;
-  for (const k of ["pv", "config", "signup", "trial", "awards", "awardmeta", "corps", "aisheet", "relate", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
+  for (const k of ["pv", "config", "signup", "trial", "awards", "awardmeta", "corps", "aisheet", "relate", "patents", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
   return "other";
 }
 
@@ -331,7 +344,7 @@ async function flushMetrics(req: Request, res: Response, ms: number, err: string
   const hits = await takePending();
   const cls = `${Math.floor(res.status / 100)}xx`;
   hits.push({ kind: "req", key: route }, { kind: "status", key: `${route}:${cls}` }, { kind: "ms", key: route, n: ms });
-  const bizno = ["bizno", "awards", "trial"].map((k) => sp.get(k) ?? "").map((v) => v.replace(/\D/g, "")).find((v) => v.length === 10);
+  const bizno = ["bizno", "awards", "trial", "patents"].map((k) => sp.get(k) ?? "").map((v) => v.replace(/\D/g, "")).find((v) => v.length === 10);
   const cf = (req as unknown as { cf?: { country?: string } }).cf;
   const body: RecBody = {
     hits,
@@ -391,4 +404,48 @@ async function signup(req: Request, bucket: NonNullable<Env["AWARDS"]>): Promise
   if (await bucket.get(key)) return [{ status: "exists" }, 200];
   await bucket.put(key, JSON.stringify({ ...m, joinedAt: new Date().toISOString() }), { httpMetadata: { contentType: "application/json" } });
   return [{ status: "ok" }, 200];
+}
+
+const PATENT_TTL_MS = 30 * 86400e3;
+
+/**
+ * 기업 특허 조회. 같은 사업자번호는 30일 동안 R2 결과를 쓴다 (특허 등록은 자주 바뀌지 않고, KIPRIS Plus 무료 호출은 월 1,000회).
+ * 이번 달 호출 수가 상한에 가까우면 부르지 않고 status limit 을 돌려준다 (화면은 직접 입력으로 계산).
+ */
+async function patents(env: Env, no: string, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<[PatentLookup, number, Record<string, string>?]> {
+  const off = (status: PatentLookup["status"], reason: string): PatentLookup => ({ bizno: no, status, applicants: [], items: [], total: 0, checkedAt: new Date().toISOString(), reason });
+  if (!env.KIPRIS_API_KEY) return [off("off", "특허 조회 인증키가 아직 없습니다"), 200];
+  const bucket = env.AWARDS;
+  const key = `patents/${no}.json`;
+  if (bucket) {
+    const hit = await bucket.get(key);
+    if (hit) {
+      try {
+        const v = JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())) as PatentLookup;
+        if (Date.now() - Date.parse(v.checkedAt) < PATENT_TTL_MS) return [v, 200, { "X-Cache": "HIT" }];
+      } catch { /* 새로 조회 */ }
+    }
+  }
+  const month = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7).replace("-", "");
+  const ukey = `patents/usage-${month}.json`;
+  let used = 0;
+  if (bucket) {
+    const u = await bucket.get(ukey);
+    if (u) { try { used = Number((JSON.parse(new TextDecoder().decode(await u.arrayBuffer())) as { calls?: number }).calls) || 0; } catch { used = 0; } }
+  }
+  const limit = Number(env.KIPRIS_MONTHLY_LIMIT) || 950;
+  if (used + 4 > limit) return [off("limit", "이번 달 특허 조회 한도에 다다랐습니다"), 200];
+  let calls = 0;
+  const counted: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => { calls++; return fetch(input as RequestInfo, init); }) as typeof fetch;
+  let result: PatentLookup;
+  try {
+    result = await fetchPatents(env.KIPRIS_API_KEY, no, counted);
+  } catch (e) {
+    result = off("error", (e as Error).message.slice(0, 160));
+  }
+  if (bucket) {
+    ctx.waitUntil(bucket.put(ukey, JSON.stringify({ calls: used + calls }), { httpMetadata: { contentType: "application/json" } }));
+    if (result.status === "ok" || result.status === "none") ctx.waitUntil(bucket.put(key, JSON.stringify(result), { httpMetadata: { contentType: "application/json" } }));
+  }
+  return [result, 200, { "Cache-Control": "no-store" }];
 }

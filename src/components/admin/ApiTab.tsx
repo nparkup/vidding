@@ -5,6 +5,7 @@ import type { TabProps } from "./AdminConsole";
 import { dt, won } from "./adminApi";
 import { Stats } from "./MembersTab";
 import { DailyBars, lastDays, RankBars } from "./Bars";
+import { dataGoKrName } from "./dataGoKrNames";
 
 interface ApiRow { day: string; source: string; key: string; n: number; err: number }
 interface AiHit { day: string; kind: string; key: string; n: number }
@@ -156,13 +157,16 @@ export function ApiTab({ call, guard }: TabProps) {
                     const pct = q ? Math.round((x.today / q) * 100) : null;
                     return (
                       <tr key={k}>
-                        <td className="font-semibold">{k}<span className="block text-xs font-normal text-ink-400">{[...x.ops.keys()].map((o) => o.split("/")[1]).slice(0, 3).join(", ")}{x.ops.size > 3 ? ` 외 ${x.ops.size - 3}개` : ""}</span></td>
+                        <td className="min-w-[13rem] max-w-[18rem]">
+                          {dataGoKrName(k) && <span className="block break-keep font-semibold">{dataGoKrName(k)}</span>}
+                          <span className={`block break-all ${dataGoKrName(k) ? "text-xs text-ink-500" : "font-semibold"}`}>{k}</span>
+                          <span className="block break-all text-xs font-normal text-ink-400">{[...x.ops.keys()].map((o) => o.split("/")[1]).slice(0, 3).join(", ")}{x.ops.size > 3 ? ` 외 ${x.ops.size - 3}개` : ""}</span></td>
                         <td className="text-right tabular-nums">{x.today.toLocaleString()}</td>
                         <td className="text-right tabular-nums text-ink-500">{x.worker.toLocaleString()}</td>
                         <td className="text-right tabular-nums text-ink-500">{x.build.toLocaleString()}</td>
                         <td>
                           {editQ ? (
-                            <input className="input py-1.5 text-right" inputMode="numeric" placeholder="예: 10000" value={editQ[k] ?? ""} onChange={(e) => setEditQ({ ...editQ, [k]: e.target.value.replace(/\D/g, "") })} aria-label={`${k} 일일 한도`} />
+                            <input className="input py-1.5 text-right" inputMode="numeric" placeholder="예: 10000" value={editQ[k] ?? ""} onChange={(e) => setEditQ({ ...editQ, [k]: e.target.value.replace(/\D/g, "") })} aria-label={`${dataGoKrName(k) ?? k} 일일 한도`} />
                           ) : pct === null ? <span className="text-xs text-ink-300">한도 미입력</span> : (
                             <div>
                               <div className="h-2 overflow-hidden rounded-full bg-ink-50"><div className={`h-full ${pct >= 90 ? "bg-coral" : pct >= 70 ? "bg-amber" : "bg-mint"}`} style={{ width: `${Math.min(100, pct)}%` }} /></div>

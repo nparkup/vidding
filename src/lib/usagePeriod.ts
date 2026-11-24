@@ -24,7 +24,7 @@ export function activePlan(b: BillingLike | null | undefined, today = kstToday()
   return b.plan as PaidPlanId;
 }
 
-/** 한 달 공고 예측 건수. null = 무제한 (예전 월간·연간 결제는 모든 기능이 들어 있던 요금제라 무제한으로 본다) */
+/** 한 달 공고 예측 건수. null = 무제한 (없앤 무제한 이용권과 예전 월간·연간 결제 기록은 건수 제한 없이 본다) */
 export function quotaOf(plan: PaidPlanId, pricing: PricingLike): number | null {
   if (plan === "lite") return pricing.liteQuota;
   if (plan === "standard") return pricing.standardQuota;

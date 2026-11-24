@@ -79,16 +79,15 @@ export function SettingsTab({ call, guard }: TabProps) {
 
       <section className="card mt-5 p-5 sm:p-6">
         <h2 className="text-lg font-bold">요금</h2>
-        <p className="mt-1 text-sm text-ink-500">월간 이용권 3종의 금액(VAT 포함, 월)과 한 달 공고 예측 건수입니다. 메인·요금제·회원가입 화면과 요금 FAQ에 반영됩니다.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          {([["lite", "라이트"], ["standard", "스탠다드"], ["unlimited", "무제한"]] as const).map(([k, label]) => (
+        <p className="mt-1 text-sm text-ink-500">월간 이용권 2종(라이트·스탠다드)의 금액(VAT 포함, 월)과 한 달 공고 예측 건수입니다. 메인·요금제·회원가입 화면과 요금 FAQ에 반영됩니다.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {([["lite", "라이트"], ["standard", "스탠다드"]] as const).map(([k, label]) => (
             <Field key={k} label={`${label} (월)`}><input className="input text-right tabular-nums" inputMode="numeric" value={cfg.pricing[k].toLocaleString()} onChange={(e) => setCfg({ ...cfg, pricing: { ...cfg.pricing, [k]: num(e.target.value) } })} /></Field>
           ))}
           <Field label="라이트 공고 예측 건수 (월)"><input className="input text-right tabular-nums" inputMode="numeric" value={cfg.pricing.liteQuota.toLocaleString()} onChange={(e) => setCfg({ ...cfg, pricing: { ...cfg.pricing, liteQuota: num(e.target.value) } })} /></Field>
           <Field label="스탠다드 공고 예측 건수 (월)"><input className="input text-right tabular-nums" inputMode="numeric" value={cfg.pricing.standardQuota.toLocaleString()} onChange={(e) => setCfg({ ...cfg, pricing: { ...cfg.pricing, standardQuota: num(e.target.value) } })} /></Field>
-          <Field label="무제한 공고 예측 건수"><input className="input text-right" value="무제한" disabled /></Field>
         </div>
-        {!(cfg.pricing.lite < cfg.pricing.standard && cfg.pricing.standard < cfg.pricing.unlimited) && <p className="mt-2 text-sm text-coral">윗 단계 이용권이 아래 단계보다 싸거나 같습니다. 금액을 다시 확인해 주세요.</p>}
+        {!(cfg.pricing.lite < cfg.pricing.standard && cfg.pricing.liteQuota < cfg.pricing.standardQuota) && <p className="mt-2 text-sm text-coral">스탠다드의 금액·건수가 라이트보다 적거나 같습니다. 값을 다시 확인해 주세요.</p>}
         <p className="mt-2 text-xs text-ink-400">이미 결제한 회원의 금액은 바뀌지 않습니다.</p>
       </section>
 

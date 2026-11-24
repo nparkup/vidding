@@ -11,7 +11,7 @@ export const SEED_CLIENTS: ClientProfile[] = [
   {
     id: "c-002", company: "누리소프트(주)", contactName: "이정희 실장", email: "sales@nurisoft.example", phone: "02-555-0144",
     licenses: ["소프트웨어사업자", "정보통신공사업"], regions: ["서울", "경기", "인천", "충남", "부산"], minAmount: 10_000_000, maxAmount: 800_000_000,
-    categories: ["IT·소프트웨어", "전기·통신공사"], plan: "unlimited", status: "활성", joinedAt: daysAgo(210), watchlist: [], keywords: ["홈페이지", "정보시스템 유지관리"], pastPerformance: 1_600_000_000, creditGrade: "A",
+    categories: ["IT·소프트웨어", "전기·통신공사"], plan: "standard", status: "활성", joinedAt: daysAgo(210), watchlist: [], keywords: ["홈페이지", "정보시스템 유지관리"], pastPerformance: 1_600_000_000, creditGrade: "A",
   },
   {
     id: "c-003", company: "새봄메디칼(주)", contactName: "박서윤 대표", email: "order@saebom-med.example", phone: "062-555-0177",

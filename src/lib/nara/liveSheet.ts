@@ -103,7 +103,7 @@ export async function readSheetLive(
   const template = templateSheet(like, basis);
   const rule0 = extractSheet(all, template);
   // 추정가격 구간마다 배점이 다른 표(지자체 세부기준 전문)는 공고의 구간 열을 쓴다
-  const rule = tierSheet(all, basis?.presmpt, rule0 ?? template) ?? rule0;
+  const rule = tierSheet(named, basis?.presmpt, rule0 ?? template) ?? rule0;
   const ruleOk = rule && adoptable(rule, basis) ? rule : undefined;
   // 큰 묶음(정량·정성·가격)만 적힌 요약표면 상세 배점표를 한 번 더 찾고, 못 찾으면 요약표를 쓴다
   const fallback = ruleOk ? { ...base, ...extra, status: "ok" as const, sheet: ruleOk, read, failed, by: "rule" as const } : undefined;

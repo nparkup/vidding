@@ -122,7 +122,7 @@ export async function extractSheetsForBids(
       const notice = all ? readNoticeCriteria(all) : undefined;
       const quant = all && bid.contractMethod === "협상에 의한 계약" ? extractQuantBlock(all) : undefined;
       // 추정가격 구간마다 배점이 다른 표(지자체 세부기준 전문)는 공고의 구간 열을 쓴다
-      const tier = all ? tierSheet(all, opts.estimatedOf?.(bid), best?.sheet ?? templateSheet(bid)) : undefined;
+      const tier = all ? tierSheet(named.join("\n"), opts.estimatedOf?.(bid), best?.sheet ?? templateSheet(bid)) : undefined;
       if (tier) best = { sheet: tier, file: "금액 구간 배점표" };
       // 배점표는 합계가 100에서 크게 벗어나면 버린다 (쓸지 최종 판단은 화면에서 공고 기준 값과 함께 한다)
       const sum = best?.sheet ? best.sheet.items.reduce((a, i) => a + i.max, 0) : 0;

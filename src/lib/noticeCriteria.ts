@@ -115,7 +115,11 @@ function readStandard(all: string[]): NoticeCriteria["standard"] {
 /** 적용 구간: "[별표 3] 추정가격이 고시금액 미만인 물품의 평가기준" 같은 문구 */
 function readTier(all: string[]): NoticeCriteria["tier"] {
   for (const s of all) {
-    const m = s.match(/((?:[\[<〈［(]\s*별표\s*[\d#]+(?:-\d+)?\s*[\]>〉］)]\s*)?(?:추정\s*가격|공사\s*예정\s*금액)[^.。「」]{2,50}?(?:평가\s*기준|용역|입찰\s*공사|공사|물품))/);
+    // 세부기준 전문의 "추정가격 10억원 이상인 용역은 90점, 10억원 미만인 용역은 95점"처럼 구간을 나열한 문장은 이 공고의 구간이 아니다
+    if ((s.match(/추정\s*가격|공사\s*예정\s*금액/g) ?? []).length >= 2) continue;
+    const m = s.match(/((?:[\[<〈［(]\s*별표\s*[\d#]+(?:-\d+)?\s*[\]>〉］)]\s*)?(?:추정\s*가격|공사\s*예정\s*금액)[^.。「」]{2,50}?(?:평가\s*기준|용역|입찰\s*공사|공사|물품))/)
+      // "세부기준(추정가격 5억원 미만 2억원 이상)에 따라"처럼 괄호 안에 구간만 적은 문장
+      ?? s.match(/[(（]\s*((?:추정\s*가격|공사\s*예정\s*금액)\s*\d[^.。()（）]{2,40}?(?:이상|미만|이하|초과))\s*[)）]/);
     if (m && /(이상|미만)/.test(m[1]) && /(적용|의하여|따라|의거|심사|평가)/.test(s)) return { value: clip(m[1].replace(/\s+/g, " "), 80), quote: clip(s) };
   }
   return undefined;
@@ -136,7 +140,9 @@ function readPass(all: string[]): NoticeCriteria["pass"] {
     const v = Number(m[2]);
     if (!(v >= 60 && v <= 100)) continue;
     if (/등급|S\s*등급|A\s*등급|정성|위원/.test(s.slice(0, (m.index ?? 0) + m[0].length)) && !/종합\s*평점|합산/.test(s)) continue;
-    hits.push({ s, v, w: (/낙찰자|적격자|협상\s*(?:대상|적격)자|선정/.test(s) ? 2 : 0) + (/종합\s*평점|합산\s*점수/.test(m[1]) ? 1 : 0) });
+    // 구간·용역 종류마다 통과 점수를 나열한 세부기준 문장("10억원 이상은 90점 이상, 10억원 미만은 95점 이상")은 뒤로 미룬다
+    const listed = new Set([...s.matchAll(new RegExp(String.raw`${NUM}점\s*이상`, "g"))].map((x) => x[1])).size > 1;
+    hits.push({ s, v, w: (/낙찰자|적격자|협상\s*(?:대상|적격)자|선정/.test(s) ? 2 : 0) + (/종합\s*평점|합산\s*점수/.test(m[1]) ? 1 : 0) - (listed ? 3 : 0) });
   }
   if (!hits.length) return undefined;
   const best = hits.sort((a, b) => b.w - a.w)[0];

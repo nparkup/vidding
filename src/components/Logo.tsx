@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { hardGo } from "@/lib/hardGo";
 
-/** 비드매트릭스 심볼: M(Matrix) 자형 분석 라인 + 판정 노드 */
+/** 비드매트릭스 심볼: 3x3 공고 격자 중 가운데 맞는 한 칸(민트)을 골라냄 */
 export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
@@ -14,8 +14,15 @@ export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
         </linearGradient>
       </defs>
       <rect width="32" height="32" rx="8" fill="url(#lm-bg)" />
-      <path d="M8.5 23V9.5L16 17.5L23.5 9.5V23" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="16" cy="17.5" r="3.2" fill="#12B886" stroke="#0B1426" strokeWidth="1.6" />
+      <rect x="7.0" y="7.0" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.62} />
+      <rect x="13.6" y="7.0" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.38} />
+      <rect x="20.2" y="7.0" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.62} />
+      <rect x="7.0" y="13.6" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.38} />
+      <rect x="13.6" y="13.6" width="4.8" height="4.8" rx="1.3" fill="#12B886" />
+      <rect x="20.2" y="13.6" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.38} />
+      <rect x="7.0" y="20.2" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.62} />
+      <rect x="13.6" y="20.2" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.38} />
+      <rect x="20.2" y="20.2" width="4.8" height="4.8" rx="1.3" fill="#FFFFFF" opacity={0.62} />
     </svg>
   );
 }

@@ -11,6 +11,7 @@ import { buildMockBids } from "../src/lib/mock/bids";
 import { fetchAllBidsWithChanges, hasServiceKey } from "../src/lib/nara/client";
 import { fetchAttachmentsBulk } from "../src/lib/nara/corp";
 import { extractSheetsForBids, textCacheKey } from "../src/lib/nara/docExtract";
+import { fetchPreSpecFileIndex, preSpecAttachments } from "../src/lib/nara/preSpecFiles";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { applyIndustryLaws, fetchIndustryLaws, type IndustryLawTable } from "../src/lib/nara/industryLaw";
 import { fetchNuriBids } from "../src/lib/nara/nuri";
@@ -70,6 +71,26 @@ async function main() {
     console.log(`첨부파일 목록 ${Object.keys(attachments).length}건`);
   } catch (e) {
     console.warn("첨부파일 목록 수집 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  // 사전규격 규격서: 제안요청서·평가기준을 사전규격에만 올린 공고가 있어, 평가 구조가 있는 공고(적격심사·협상)는 사전규격 규격서도 첨부 뒤에 붙여 읽는다. 실패해도 배포는 계속
+  try {
+    const methods = new Map(items.map((b) => [b.id, b.contractMethod]));
+    const want = [...listItems.entries()].filter(([id, v]) => v.item.bfSpecRgstNo && /^(적격심사|협상에 의한 계약)$/.test(methods.get(id) ?? ""));
+    if (want.length) {
+      const r = await fetchPreSpecFileIndex({ cacheDir: process.env.AWARD_CACHE_DIR ? `${process.env.AWARD_CACHE_DIR}/prespec-files` : ".cache/award/prespec-files" });
+      let n = 0, files = 0;
+      const att = attachments as Record<string, BidAttachment[]>;
+      for (const [id, v] of want) {
+        const pre = preSpecAttachments(v.item.bfSpecRgstNo, r.index);
+        if (!pre.length) continue;
+        att[id] = [...(att[id] ?? []), ...pre];
+        n++;
+        files += pre.length;
+      }
+      console.log(`사전규격 규격서: 사전규격 번호가 있는 적격·협상 공고 ${want.length}건 중 ${n}건에 규격서 ${files}개를 붙임 (사전규격 목록 ${r.index.size.toLocaleString()}건, 이번 호출 ${r.fetched}회, 실패 ${r.failed}회)`);
+    }
+  } catch (e) {
+    console.warn("사전규격 규격서 붙이기 건너뜀:", e instanceof Error ? e.message : e);
   }
   // 입찰 참가자격(업종 제한·참가지역): 사업자번호 조회 때 공고별로 가능/불가/확인 필요를 판정하는 데 쓴다. 실패해도 배포는 계속
   let quals: Awaited<ReturnType<typeof fetchQualBulk>>["quals"] = {};

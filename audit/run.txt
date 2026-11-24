@@ -1,1 +1,1 @@
-scripts/score/prespec-audit.ts
+scripts/score/coverage-recheck.ts ai

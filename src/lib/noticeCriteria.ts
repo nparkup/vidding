@@ -33,6 +33,8 @@ export interface NoticeCriteria {
   refAmount?: NoticeFact<number>;
   /** 실적 인정 대상·기간 등 공고 문장 */
   recognition?: string[];
+  /** 공고서의 입찰 참가자격 항목 (업종 등록·소재지·실적·인력·시설 등, 원문 그대로) */
+  qualify?: string[];
 }
 
 const NUM = String.raw`(\d{1,3}(?:\.\d{1,4})?)`;
@@ -82,6 +84,8 @@ function readStandard(all: string[]): NoticeCriteria["standard"] {
     const add = (raw: string, at: number) => {
       let name = raw.replace(/\s+/g, " ").replace(/\s*별지\s*제?\s*\d+\s*호\s*서식.*$/, "").trim();
       if (/협상|제안서|사업수행능력\s*세부평가|발주\s*세부기준|등록\s*기준|기술\s*자격|인정\s*방법|자동차/.test(name)) return;
+      // 따옴표가 문장 중간에서 열려 조사로 시작하는 조각("는 의료기관 인증평가 기준에 부합하도록")은 기준 이름이 아니다
+      if (/^[은는이가을를의에로와과도]\s/.test(name) || /(?:하도록|하여야|해야|합니다)$/.test(name)) return;
       const org = s.slice(Math.max(0, at - 20), at).match(ORG_BEFORE_RE)?.[1];
       if (org && !name.includes(org)) name = `${org} ${name}`;
       const c = cands.get(name) ?? { n: 0, quote: s, used: 0 };
@@ -124,7 +128,7 @@ function readPass(all: string[]): NoticeCriteria["pass"] {
     if (m && Number(m[1]) >= 50 && Number(m[1]) <= 95) return { value: { kind: "techRatio", ratio: Number(m[1]) / 100 }, quote: clip(s) };
   }
   // 적격심사 종합평점 / 협상 합산점수 N점 이상 (낙찰자·적격자·협상대상자 문장 우선)
-  const re = new RegExp(String.raw`(종합\s*평점|종합\s*점수|합산\s*점수|평가\s*점수의\s*합산|총점|적격\s*심사)[^.]{0,30}?${NUM}점\s*이상`);
+  const re = new RegExp(String.raw`(종합\s*평점|종합\s*점수|합산\s*점수|평가\s*점수의\s*합산|총점|적격\s*심사|적격\s*통과\s*점수|통과\s*점수)[^.]{0,30}?${NUM}점\s*이상`);
   const hits: { s: string; v: number; w: number }[] = [];
   for (const s of all) {
     const m = s.match(re);
@@ -142,6 +146,12 @@ function readPass(all: string[]): NoticeCriteria["pass"] {
 function readLowerLimit(all: string[]): NoticeCriteria["lowerLimit"] {
   for (const s of all) {
     const m = s.match(new RegExp(String.raw`낙찰\s*하한율\s*[(（:：은는이]?\s*(?:[^0-9.%]{0,10})?${NUM}\s*%`));
+    if (m && Number(m[1]) >= 70 && Number(m[1]) <= 95) return { value: Number(m[1]), quote: clip(s) };
+  }
+  // "낙찰하한율은 물품구매 10억원 미만 고시금액 이상으로 80.495%", "낙찰 하한율(입찰가격-A를 예정가격-A로 나눈 결과 89.745%)":
+  // 사이에 금액 구간·산식 낱말이 끼어 있으면 소수 셋째 자리까지 적힌 비율만 하한율로 본다
+  for (const s of all) {
+    const m = s.match(/낙찰\s*하\s*한\s*율[^%。]{0,60}?(\d{2}\.\d{3})\s*%/);
     if (m && Number(m[1]) >= 70 && Number(m[1]) <= 95) return { value: Number(m[1]), quote: clip(s) };
   }
   return undefined;
@@ -171,9 +181,17 @@ function readFinanceBase(text: string): NoticeCriteria["financeBase"] {
 }
 
 function readRefAmount(all: string[]): NoticeCriteria["refAmount"] {
+  // "평가 기준금액: 금…원", "기준금액(추정가격)은 금229,750,000원", "※ 기준금액 : 금1,549,800,000원(금일십오억…)"
+  // 금액 앞에 업무 이름이 붙어 여러 금액으로 나뉘어 있으면(예: 처리 …원, 운반 …원) 어느 것을 쓸지 몰라 읽지 않는다
+  // (합계 뒤에 업무별 내역이 이어지는 "기준금액: 금482,390,909원 -건물시설관리: 금…원"은 앞의 합계를 쓴다)
+  const re = /(?:평가\s*)?기준\s*금액\s*(?:[(（]\s*[가-힣\s]{2,10}\s*[)）])?\s*[:：은는]?\s*([가-힣]{1,8}\s*)?금?\s*([\d,]{7,})\s*원/;
   for (const s of all) {
-    const m = s.match(/평가\s*기준\s*금액\s*[:：]?\s*(?:[가-힣]{0,8}\s*)?금?\s*([\d,]{7,})\s*원/);
-    if (m) return { value: Number(m[1].replace(/,/g, "")), quote: clip(s) };
+    const m = s.match(re);
+    if (!m) continue;
+    const amounts = s.slice(m.index ?? 0).match(/[\d,]{7,}\s*원/g) ?? [];
+    if (m[1] && !/^금$/.test(m[1].trim()) && amounts.length > 1) continue;
+    const v = Number(m[2].replace(/,/g, ""));
+    if (v >= 1_000_000) return { value: v, quote: clip(s) };
   }
   return undefined;
 }
@@ -193,6 +211,39 @@ function readRecognition(all: string[]): string[] | undefined {
   return out.length ? out : undefined;
 }
 
+/** "4. 입찰참가자격", "□ 입찰 참가자격", "Ⅲ. 참가자격 및 제한" 같은 머리 줄 */
+const QUAL_HEAD = /^\s*(?:\d{1,2}\s*[.)]|[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\s*\.?|[□■◎●▣]|제\s*\d+\s*조)?\s*(?:입찰\s*)?참\s*가\s*자\s*격(?:\s*(?:및|등)\s*[가-힣\s]{1,12})?\s*[:：]?\s*$/;
+/** 같은 수준의 다음 머리 줄 (참가자격 절이 끝나는 곳) */
+const NEXT_HEAD = /^\s*(?:\d{1,2}\s*[.)]\s*\S|[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\s*\.|[□■◎●▣]\s*\S|제\s*\d+\s*조)/;
+/** 참가자격 안의 항목 머리 (가. / 1) / (1) / ○ / - / ①) */
+const ITEM_HEAD = /^\s*(?:[가-하]\s*[.)]|\(?\d{1,2}\)|[○◦·•▪\-※]|[①-⑳])\s*/;
+/** 모든 공고에 같은 절차 문구 (지문인식·인증서·조세포탈 서약 등)는 빼고 그 공고만의 자격만 남긴다 */
+const QUAL_BOILER = /(지문|개인\s*인증서|조세\s*포탈|서약서|전자\s*입찰\s*이용자\s*등록|입찰\s*대리인)|^아래의?\s.*(?:모두|갖춘)/;
+
+/** 같은 공고서가 PDF·HWP로 함께 오면 참가자격 절도 여러 번 나온다: 항목을 가장 많이(같으면 길게) 읽은 쪽을 쓴다 (PDF는 줄이 끊겨 짧게 읽히기도 한다) */
+function readQualify(text: string): string[] | undefined {
+  const lines = normalize(text).split(/\r?\n/);
+  let best: string[] | undefined;
+  const size = (l: string[]) => l.length * 1000 + l.join("").length;
+  for (let n = 0; n < lines.length; n++) {
+    if (!QUAL_HEAD.test(lines[n]) || lines[n].trim().length > 40) continue;
+    const items: string[] = [];
+    let cur = "";
+    const push = () => { const t = cur.replace(/\s+/g, " ").trim(); if (t.length >= 10 && !QUAL_BOILER.test(t)) items.push(clip(t, 180)); cur = ""; };
+    for (let k = n + 1; k < Math.min(lines.length, n + 40); k++) {
+      const l = lines[k].trim();
+      if (!l || /^[-─━=]{5,}$/.test(l)) continue;
+      if (NEXT_HEAD.test(l) && !ITEM_HEAD.test(l)) break;
+      if (ITEM_HEAD.test(l)) { push(); cur = l.replace(ITEM_HEAD, ""); }
+      else cur += ` ${l}`;
+    }
+    push();
+    const got = items.slice(0, 8);
+    if (got.length && (!best || size(got) > size(best))) best = got;
+  }
+  return best;
+}
+
 export function readNoticeCriteria(text: string): NoticeCriteria | undefined {
   if (!text || text.length < 200) return undefined;
   const all = sentences(text);
@@ -205,6 +256,7 @@ export function readNoticeCriteria(text: string): NoticeCriteria | undefined {
     financeBase: readFinanceBase(text),
     refAmount: readRefAmount(all),
     recognition: readRecognition(all),
+    qualify: readQualify(text),
   };
   (Object.keys(out) as (keyof NoticeCriteria)[]).forEach((k) => out[k] === undefined && delete out[k]);
   return Object.keys(out).length ? out : undefined;

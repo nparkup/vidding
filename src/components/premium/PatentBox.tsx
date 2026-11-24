@@ -26,7 +26,7 @@ export function PatentBox({ items, res, loading, excluded, onToggle, extra, onEx
   const status = loading
     ? "특허청 특허 정보를 조회하는 중…"
     : !res ? "우리 회사를 조회하면 특허청에 등록된 특허를 불러옵니다."
-    : res.status === "ok" ? `특허청 등록원부 조회: 존속 중인 권리 ${res.total.toLocaleString("ko-KR")}건${res.total > list.length ? ` (최근 등록 ${list.length}건 표시)` : ""}`
+    : res.status === "ok" ? `특허청 등록원부 조회: 권리자로 유지 중인 특허·실용신안 ${res.total.toLocaleString("ko-KR")}건${res.reason ? ` (${res.reason})` : ""}`
     : res.status === "none" ? "특허청 등록원부에 이 사업자번호의 특허권이 없습니다. 보유 특허가 있으면 직접 넣어 주세요."
     : res.status === "limit" ? "이번 달 특허 자동 조회 한도에 다다라 직접 입력으로 계산합니다."
     : res.status === "off" ? "특허 자동 조회를 준비 중입니다. 보유 특허 건수를 직접 넣어 주세요."

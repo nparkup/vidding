@@ -1,1 +1,1 @@
-20261120,20261123 5
+scripts/score/prespec-audit.ts

@@ -368,7 +368,7 @@ export default async function Home() {
         {/* 아래 여백: 섹션이 overflow-hidden이라 여백이 없으면 목업 그림자·뒤 민트 번짐이 목업 아래 선에서 잘린다 */}
         <div className="container-x relative pb-24 pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
-            입찰 특화 분석 알고리즘 기반 공공입찰 대행
+            입찰공고 낙찰정보 빅데이터 분석 정보
           </p>
           <h1 className="mx-auto mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.15] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
             공고마다 초 정밀하게 분석하고,

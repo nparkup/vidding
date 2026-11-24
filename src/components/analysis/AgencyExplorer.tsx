@@ -14,12 +14,15 @@ import { HBarList } from "@/components/charts/HBarList";
 import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
 import { CHART } from "@/components/charts/useWidth";
 import { METHOD_NAME } from "@/lib/awards/analysis";
-import type { AgencySummary } from "@/lib/awards/agency";
+import { agencyId, type AgencySummary } from "@/lib/awards/agency";
+import { cutCats, cutStats, type AgencyCutFile } from "@/lib/awards/agencyCut";
+import { periodLabel } from "@/lib/awards/industry";
+import { ScrollRow } from "@/components/ScrollRow";
 import { assessStats } from "@/lib/awards/assess";
 import { won } from "@/lib/format";
 import { bidHref } from "@/lib/links";
 import { useBids } from "@/lib/useBids";
-import type { Bid } from "@/lib/types";
+import { CATEGORIES, type Bid } from "@/lib/types";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 const BASE = STATIC ? process.env.NEXT_PUBLIC_BASE_PATH ?? "" : "";
@@ -205,6 +208,23 @@ export function AgencyExplorer() {
 
 function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
   const recent4 = s.groups.reduce((a, g) => a + g.n, 0);
+  // 업종·기간 선택 (/agency-cut/{id}.json). 기본(전체 업종·최근 4년)은 발주처 요약 그대로
+  const [cut, setCut] = useState<AgencyCutFile | null | undefined>();
+  const [cat, setCat] = useState(-1);
+  const [period, setPeriod] = useState("4y");
+  useEffect(() => {
+    let alive = true;
+    setCut(undefined); setCat(-1); setPeriod("4y");
+    loadJson<AgencyCutFile>(`/agency-cut/${agencyId(s.name)}.json`).then((f) => alive && setCut(f)).catch(() => alive && setCut(null));
+    return () => { alive = false; };
+  }, [s]);
+  const cats = useMemo(() => (cut ? cutCats(cut) : []), [cut]);
+  const filtered = !!cut && (cat >= 0 || period !== "4y");
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const cs = useMemo(() => (cut && filtered ? cutStats(cut, cat, period, today) : null), [cut, filtered, cat, period, today]);
+  const cutYears = useMemo(() => (cut ? [...new Set(cut.rows.map((r) => Math.floor(r[0] / 10000)))].sort((a, b) => b - a).slice(0, 11).map(String) : []), [cut]);
+  const label = [cat >= 0 ? CATEGORIES[cat] : "", periodLabel(period)].filter(Boolean).join(" · ");
+  const view = cs ? { groups: cs.groups, winners: cs.winners.map(([n, c, a]) => [n, c, a] as [string, number, number]), ranked: [] as [string, number][] } : s;
   return (
     <div className="space-y-6">
       <section className="card p-6">
@@ -218,15 +238,49 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
         </dl>
       </section>
 
+      {cut && cut.rows.length > 0 && (
+        <section className="card p-4 sm:p-5" aria-label="업종·기간 선택">
+          <div className="grid gap-3 sm:grid-cols-[16rem_1fr] sm:items-end">
+            {cats.length > 0 && (
+              <div className="min-w-0">
+                <label className="label" htmlFor="ag-cut-cat">업종</label>
+                <select id="ag-cut-cat" className="input" value={cat} onChange={(e) => setCat(Number(e.target.value))}>
+                  <option value={-1}>전체 업종</option>
+                  {cats.map(([c, n]) => <option key={c} value={c}>{CATEGORIES[c]} ({n.toLocaleString()}건)</option>)}
+                </select>
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="label">조회 기간</p>
+              <ScrollRow className="flex gap-1" active={period}>
+                {["4y", "all", ...cutYears].map((p) => (
+                  <button key={p} type="button" aria-pressed={p === period} onClick={() => setPeriod(p)} className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold ${p === period ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
+                    {periodLabel(p)}
+                  </button>
+                ))}
+              </ScrollRow>
+            </div>
+          </div>
+          {cs && (
+            <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Tile k="낙찰" v={`${cs.n.toLocaleString()}건`} sub={label} />
+              <Tile wide k="낙찰금액" v={won(cs.amount)} />
+              <Tile k="낙찰받은 업체" v={`${cs.firms.toLocaleString()}곳`} sub={`단독 참가 ${Math.round(cs.single * 100)}%`} />
+            </dl>
+          )}
+          <p className="mt-2 text-xs text-ink-500">연도별 낙찰, 계약방법별 낙찰, 자주 낙찰받은 업체가 고른 업종·기간으로 바뀝니다. 사정율 분포와 관계도, 최근 낙찰은 전체 기준입니다.</p>
+        </section>
+      )}
+
       <section className="card p-6">
-        <h3 className="font-bold">연도별 낙찰</h3>
-        <YearChart years={s.years.slice(-10)} title="최근 10년" />
-        <GroupShare s={s} />
+        <h3 className="font-bold">연도별 낙찰{cs && cat >= 0 && <span className="text-sm font-normal text-ink-400"> {CATEGORIES[cat]}</span>}</h3>
+        <YearChart years={(cs && cat >= 0 ? cs.years : s.years).slice(-10)} title="최근 10년" />
+        <GroupShare s={view} period={cs ? label : undefined} />
       </section>
 
-      <MethodTable s={s} />
+      <MethodTable s={view} period={cs ? label : undefined} />
 
-      <WinnersCard s={s} />
+      <WinnersCard s={view} period={cs ? label : undefined} />
 
       <AssessCard s={s} />
 
@@ -268,7 +322,7 @@ export function Tile({ k, v, sub, wide }: { k: string; v: string; sub?: string; 
 }
 
 /** 최근 4년 업무·계약방법별 낙찰 건수 비중 (한 줄 막대) */
-export function GroupShare({ s }: { s: Pick<AgencySummary, "groups"> }) {
+export function GroupShare({ s, period }: { s: Pick<AgencySummary, "groups">; period?: string }) {
   const gs = s.groups.slice(0, 4);
   const rest = s.groups.slice(4).reduce((a, g) => a + g.n, 0);
   const total = gs.reduce((a, g) => a + g.n, 0) + rest;
@@ -276,7 +330,7 @@ export function GroupShare({ s }: { s: Pick<AgencySummary, "groups"> }) {
   const parts = [...gs.map((g, i) => ({ label: `${g.biz} ${METHOD_NAME[g.method]}`, n: g.n, color: CHART.cat[i] })), ...(rest ? [{ label: "그 밖", n: rest, color: CHART.ref }] : [])];
   return (
     <div className="mt-5">
-      <p className="text-sm font-semibold">업무·계약방법 비중 <span className="font-normal text-ink-400">최근 4년 {total.toLocaleString()}건</span></p>
+      <p className="text-sm font-semibold">업무·계약방법 비중 <span className="font-normal text-ink-400">{period ?? "최근 4년"} {total.toLocaleString()}건</span></p>
       <div className="mt-2 flex h-3 gap-0.5 overflow-hidden rounded-full">
         {parts.map((p) => <span key={p.label} title={`${p.label} ${p.n.toLocaleString()}건`} style={{ width: `${(p.n / total) * 100}%`, background: p.color }} />)}
       </div>
@@ -322,10 +376,10 @@ function AgencyNetwork({ s }: { s: AgencySummary }) {
 }
 
 /** 업무·계약방법별 낙찰률·참가업체 (최근 4년). 업종별 분석도 같이 쓴다 */
-export function MethodTable({ s }: { s: Pick<AgencySummary, "groups"> }) {
+export function MethodTable({ s, period }: { s: Pick<AgencySummary, "groups">; period?: string }) {
   return (
     <section className="card p-6">
-      <h3 className="font-bold">계약방법별 낙찰 <span className="text-sm font-normal text-ink-400">최근 4년</span></h3>
+      <h3 className="font-bold">계약방법별 낙찰 <span className="text-sm font-normal text-ink-400">{period ?? "최근 4년"}</span></h3>
       <div className="mt-3 overflow-x-auto">
         <table className="table-x min-w-[520px]">
           <thead className="text-xs text-ink-500">
@@ -350,10 +404,10 @@ export function MethodTable({ s }: { s: Pick<AgencySummary, "groups"> }) {
 }
 
 /** 자주 낙찰받은 업체·개찰 상위 업체 (최근 4년) */
-export function WinnersCard({ s }: { s: Pick<AgencySummary, "winners" | "ranked"> }) {
+export function WinnersCard({ s, period }: { s: Pick<AgencySummary, "winners" | "ranked">; period?: string }) {
   return (
     <section className="card p-6">
-      <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">최근 4년</span></h3>
+      <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">{period ?? "최근 4년"}</span></h3>
       <HBarList rows={s.winners.map(([n, c, a], i) => ({ label: `${i + 1}. ${n}`, value: c, text: `${c}건 · ${won(a)}` }))} />
       {s.ranked.length > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>

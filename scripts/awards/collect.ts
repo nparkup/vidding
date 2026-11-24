@@ -44,7 +44,7 @@ import { assessHit, assessSamples, assessStats } from "../../src/lib/awards/asse
 import { agencySummary } from "../../src/lib/awards/agency";
 import { industryId, industryPeriods, industrySummary, type IndustrySummary } from "../../src/lib/awards/industry";
 import { classify } from "../../src/lib/classify";
-import type { ServiceCategory } from "../../src/lib/types";
+import { CATEGORIES, type ServiceCategory } from "../../src/lib/types";
 import { CORP_BUCKETS, corpBucket, corpNameKeys, type CorpEntry, type CorpIndexFile } from "../../src/lib/awards/corps";
 import { r2BucketBytes, r2Delete, r2Get, r2Put } from "./r2";
 
@@ -699,6 +699,7 @@ async function buildIndexes(all: ShardRow[], upload: (key: string, body: Buffer)
       r[25].map((x) => [x[2], x[4], x[3]] as [string, number, number])];
     (buckets[Number(agencyBucket(r[6]))].agencies[r[6]] ??= []).push(row);
     const cat = classify(r[5], r[19], r[4]);
+    row.push(CATEGORIES.indexOf(cat));
     const c = byCat.get(cat) ?? byCat.set(cat, { rows: [], ags: [] }).get(cat)!;
     c.rows.push(row);
     c.ags.push(r[6]);

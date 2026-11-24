@@ -221,6 +221,14 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
           NEXT_BUILD_CPUS: "2"
         run: node scripts/build-static.mjs
+      # 발주처 분석 업종·기간 선택용 자료 (정적 빌드가 만든 발주처 목록 기준, 실패해도 계속)
+      - name: 발주처 업종·기간 자료 받기
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: npx tsx scripts/awards/agencyCuts.ts out
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

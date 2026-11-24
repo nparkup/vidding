@@ -7,7 +7,7 @@ import { PageBeacon } from "@/components/PageBeacon";
 export const viewport = { themeColor: "#0B1426" };
 
 export const metadata: Metadata = {
-  title: { default: "비드매트릭스 | 전 업종 공공입찰 분석 대행", template: "%s | 비드매트릭스" },
+  title: { default: "비드매트릭스 | 입찰공고 낙찰정보 빅데이터 분석 정보", template: "%s | 비드매트릭스" },
   description:
     "입찰공고 낙찰정보 빅데이터 분석 정보. 용역·공사·물품 전 업종 나라장터 공고를 면허·지역·규모·경쟁 강도·실적·준비 기간 6개 항목으로 정밀 평가해 참가조건, 제출서류, 입찰 가능성까지 정리해 드립니다.",
 };

@@ -203,7 +203,7 @@ export default async function Home() {
     },
     {
       label: "공고 분석 · 가능성 점수",
-      title: "들어갈지 말지, 알고리즘이 항목별로 채점해 드립니다",
+      title: "들어갈지 말지, 알고리즘이 항목별로 분석합니다.",
       points: [<><b>면허 30·지역 20·규모 15점</b>, 3개 필수 조건을 먼저 판정합니다</>, <>유사 공고 평균 참여업체 수로 <b>경쟁 강도 15점</b>을 계산합니다</>, <><b>실적 10점·준비 기간 10점</b>까지 더해 100점 만점과 등급을 매깁니다</>],
       use: ["입찰 담당자가 없는 소프트웨어 업체", "점수와 근거를 보고 대표가 바로 참가 여부를 정합니다. 따로 회의할 필요가 없습니다."],
       visual: (
@@ -368,7 +368,8 @@ export default async function Home() {
         <div className="pointer-events-none absolute left-1/2 top-[-200px] h-[560px] w-[960px] -translate-x-1/2 rounded-full bg-gradient-to-r from-mint-100 via-white to-sky-100 opacity-90 blur-3xl" />
         <ConstructionArt className="pointer-events-none absolute left-[2%] top-20 hidden w-56 -rotate-6 animate-float-slow opacity-90 xl:block 2xl:left-[8%]" />
         <SupplyArt className="pointer-events-none absolute right-[2%] top-32 hidden w-52 rotate-6 animate-float opacity-90 xl:block 2xl:right-[8%]" />
-        <div className="container-x relative pt-14 text-center sm:pt-20">
+        {/* 아래 여백: 섹션이 overflow-hidden이라 여백이 없으면 목업 그림자·뒤 민트 번짐이 목업 아래 선에서 잘린다 */}
+        <div className="container-x relative pb-24 pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
             입찰 특화 분석 알고리즘 기반 공공입찰 대행
           </p>
@@ -392,7 +393,7 @@ export default async function Home() {
           </ul>
 
           <div className="relative mx-auto mt-14 max-w-5xl sm:mt-16">
-            <div className="pointer-events-none absolute -inset-x-10 -bottom-10 top-10 rounded-[48px] bg-gradient-to-b from-mint/20 to-sky/10 blur-3xl" />
+            <div className="pointer-events-none absolute -inset-x-10 bottom-8 top-10 rounded-[48px] bg-gradient-to-b from-mint/20 to-sky/10 blur-3xl" />
             <div className="relative"><ProductMockup cases={cases} /></div>
           </div>
         </div>
@@ -400,7 +401,7 @@ export default async function Home() {
 
       {/* 발주기관 마키 (공식 CI가 확인된 기관만) */}
       {agencies.length > 0 && (
-      <section className="pt-16">
+      <section className="pt-0">
         <p className="container-x text-center text-sm font-semibold text-ink-400">오늘 수집한 공고의 발주기관</p>
         <div className="relative mt-5 overflow-hidden">
           {/* 양 끝 흐림은 mask-image 대신 흰 그라데이션을 덮는다. 움직이는 층에 mask를 걸면 매 프레임 다시 그려 끊긴다 */}

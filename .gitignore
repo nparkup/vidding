@@ -19,3 +19,4 @@ public/agency-logos/*
 
 # 업종별 분석 기간별 자료는 빌드 때 받는다 (scripts/awards/industryFiles.ts)
 public/industry-period/
+public/agency-cut/

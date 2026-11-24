@@ -36,8 +36,9 @@ export type AgencyRow = [
   /** 낙찰금액(원) */ amount: number, /** 낙찰률(%), 없으면 0 */ rate: number, bidders: number, method: MethodCode,
   /** 추정가격(원) */ price: number, /** 기초금액(원) */ base: number, /** 예정가격(원) */ plnprc: number, /** 낙찰하한율(%) */ lwlt: number,
   winner: string, /** 낙찰자의 개찰 순위 (모르면 0) */ wr: number, /** 개찰 1~5위 */ top: RankCell[],
+  /** 업종 (CATEGORIES 순번, src/lib/classify.ts). 2026-11-24 이전 색인에는 없다 */ cat?: number,
 ];
-export const AGENCY_COLS = ["no", "title", "date", "biz", "amount", "rate", "bidders", "method", "price", "base", "plnprc", "lwlt", "winner", "wr", "top"] as const;
+export const AGENCY_COLS = ["no", "title", "date", "biz", "amount", "rate", "bidders", "method", "price", "base", "plnprc", "lwlt", "winner", "wr", "top", "cat"] as const;
 export interface AgencyIndexFile { v: 1; cols: readonly string[]; agencies: Record<string, AgencyRow[]> }
 
 export const AGENCY_BUCKETS = 64;

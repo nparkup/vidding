@@ -368,12 +368,12 @@ export default async function Home() {
         {/* 아래 여백: 섹션이 overflow-hidden이라 여백이 없으면 목업 그림자·뒤 민트 번짐이 목업 아래 선에서 잘린다 */}
         <div className="container-x relative pb-24 pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
-            입찰 특화 분석 알고리즘 기반 공공입찰 대행
+            입찰공고 낙찰정보 빅데이터 분석 정보
           </p>
           <h1 className="mx-auto mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.15] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
-            공고마다 초 정밀하게 분석하고,
+            공고마다 데이터로 분석하고,
             <br />
-            <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가.</span>
+            <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가!</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
             입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 평가해 매일 아침 보내 드립니다.<br />아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.
@@ -693,7 +693,7 @@ export default async function Home() {
           <div className="pointer-events-none absolute -left-32 bottom-0 h-96 w-96 rounded-full bg-mint/25 blur-[120px]" />
           <div className="container-x relative grid items-center gap-6 py-16 sm:py-20 lg:grid-cols-[1.1fr_1fr]">
             <div>
-              <h2 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl sm:leading-[1.15]">입찰 업무,<br />오늘부터 맡겨 보세요.</h2>
+              <h2 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl sm:leading-[1.15]">입찰 분석,<br />오늘부터 시작해 보세요.</h2>
               <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 그중 입찰공고 <TrialN />건은 평가점수 예측으로 무료 분석해 보실 수 있습니다.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/apply" className="btn-mint px-7 text-base">무료 체험 시작하기</Link>

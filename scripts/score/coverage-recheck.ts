@@ -28,7 +28,9 @@ async function main() {
   const rows: string[] = [];
   const out: Record<string, unknown> = {};
   const tally = { bids: 0, beforeTable: 0, afterTable: 0, beforeFacts: 0, afterFacts: 0, preRead: 0, aiCalls: 0, aiIn: 0, aiOut: 0 };
+  const only = (process.argv[3] ?? "").split(",").filter(Boolean);
   for (const [id, v] of Object.entries(dump)) {
+    if (only.length && !only.includes(id)) continue;
     tally.bids++;
     const it = v.it;
     const files: BidAttachment[] = [];
@@ -58,7 +60,7 @@ async function main() {
     if ((!sheet || coarseSheet(sheet)) && named && hasTableSignal(named) && client) {
       tally.aiCalls++;
       try {
-        const res = await readSheetWithAI(client, { id, title: it.bidNtceNm, contractMethod: bid.contractMethod, agency: it.ntceInsttNm, baseAmount: amt || undefined, estimated: basis?.presmpt || undefined }, excerpt(named), { techRatio: basis?.techRatio, priceRatio: basis?.priceRatio });
+        const res = await readSheetWithAI(client, { id, title: it.bidNtceNm, contractMethod: bid.contractMethod, agency: it.ntceInsttNm, baseAmount: amt || undefined, estimated: basis?.presmpt || undefined }, excerpt(named), { techRatio: basis?.techRatio, priceRatio: basis?.priceRatio, onRaw: only.length ? (o) => console.log(JSON.stringify(o).slice(0, 3000)) : undefined });
         ai = res as AiSheetResult;
         tally.aiIn += res.usage?.input ?? 0; tally.aiOut += res.usage?.output ?? 0;
         if (res.status === "ok" && res.sheet) sheet = res.sheet;

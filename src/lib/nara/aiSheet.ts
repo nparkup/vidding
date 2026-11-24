@@ -359,11 +359,15 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   let scaledTo: number | undefined;
   const sc = out.tech_scale;
   const scQuote = squash(sc?.quote ?? "");
-  if (sc?.to && sc.to >= 50 && sc.to < 100 && !raw.some((i) => i.kind === "price") && Math.abs(total(raw) - 100) <= 0.5
+  // 가격 항목은 표 밖(공고 문장)에서 읽어 함께 넣었을 수 있다: 기술 항목만 100점이고 가격 항목이 100−N 이면 같은 경우로 본다
+  const techRaw = raw.filter((i) => i.kind !== "price");
+  const priceRaw = raw.filter((i) => i.kind === "price");
+  if (sc?.to && sc.to >= 50 && sc.to < 100 && Math.abs(total(techRaw) - 100) <= 0.5
+    && (priceRaw.length === 0 || (priceRaw.length === 1 && Math.abs(priceRaw[0].max - (100 - sc.to)) <= 0.5))
     && scQuote.length >= 8 && flat.includes(scQuote) && /환산|만점|%/.test(sc.quote) && new RegExp(String.raw`(?<![\d.])${sc.to}(?![\d.])`).test(sc.quote)
     && (priceTotal === null || Math.abs(priceTotal - (100 - sc.to)) <= 0.5)) {
     const f = sc.to / 100;
-    for (const i of raw) {
+    for (const i of techRaw) {
       i.quote = `${i.quote} (원 배점 ${i.max}점)`;
       i.max = Math.round(i.max * f * 100) / 100;
       i.bands = i.bands.map((b) => ({ ...b, points: Math.round(b.points * f * 1000) / 1000 }));
@@ -406,7 +410,9 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
     const stated = out.stated_total !== null ? `표 합계 ${out.stated_total}점과 ` : "";
     return { reason: `항목 배점을 더하면 ${sum}점이라 ${stated || "100점과 "}맞지 않음` };
   }
-  if (scaledTo === undefined && out.tech_total !== null && Math.abs(out.tech_total + price - 100) > 0.5) return { reason: `기술 ${out.tech_total}점 + 가격 ${price}점이 100점이 아님` };
+  // 기술 배점 합계 줄은 항목이 빠졌는지 볼 때만 쓴다. "해당용역 수행능력 소계 27"처럼 일부 항목(지역참여 제외)의 소계가
+  // 기술 합계로 읽혀 항목 합보다 작으면, 항목 배점이 표 합계 100점과 맞는 한 그대로 받는다
+  if (scaledTo === undefined && out.tech_total !== null && Math.abs(out.tech_total + price - 100) > 0.5 && out.tech_total > sum - price + 0.5) return { reason: `기술 ${out.tech_total}점 + 가격 ${price}점이 100점이 아님` };
   const pass: EvalSheet["pass"] =
     out.pass.kind === "total" && out.pass.value && out.pass.value > 0 && out.pass.value <= 100 ? { kind: "total", score: out.pass.value }
       : out.pass.kind === "techRatio" && out.pass.value && out.pass.value > 0 && out.pass.value < 1 ? { kind: "techRatio", ratio: out.pass.value }

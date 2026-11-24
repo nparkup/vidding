@@ -4,7 +4,7 @@ import { LineChart } from "@/components/charts/LineChart";
 import { CHART } from "@/components/charts/useWidth";
 import { AmountRate } from "@/components/AmountRate";
 import { won, wonRate } from "@/lib/format";
-import { METHOD_NAME, type AwardAnalysis, type Forecast, type LikelyBidder, type PartGroup, type PastAward, type Related, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
+import { METHOD_NAME, priorOf, type AwardAnalysis, type Forecast, type LikelyBidder, type PartGroup, type PastAward, type Related, type SimilarStat, type WinChance } from "@/lib/awards/analysis";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 
@@ -36,8 +36,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
   // 비율은 금액을 기준으로 쓴다: 금액 = 공고 기초금액 × 비율 (예정가격은 개찰 때 정해짐), 비율은 그 금액 옆 보조값
   const amountOf = (rate: number) => (baseAmount > 0 ? Math.floor((baseAmount * rate) / 100) : 0);
   // 최근 낙찰 결과: 같은 사업 이력이 있으면 그것, 없으면 비슷한 공고의 최근 낙찰
-  const prior = analysis?.prior;
-  const years = analysis?.cycleYears ?? 1;
+  const prior = priorOf(analysis);
   const recent: { key: string; date: string; winner: string; wr: number; amount: number; rate: number; bidders: number; title?: string }[] = analysis?.history.length
     ? analysis.history.filter((h) => h.no !== prior?.no).slice(0, 3).map((h) => ({ key: h.no, date: h.date, winner: h.winner, wr: h.wr, amount: h.amount, rate: h.rate, bidders: h.bidders }))
     : (analysis?.related?.ex ?? analysis?.similar?.stat.ex ?? []).slice(0, 3).map(exRow);
@@ -60,7 +59,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
         )}
         {analysis && (
           <div>
-            <dt className="text-ink-500">{years > 1 ? `직전 계약 낙찰 (${years}년 계약)` : "전년도 낙찰"}</dt>
+            <dt className="text-ink-500">이 공고의 직전 낙찰</dt>
             {prior ? (
               <dd className="mt-1 rounded-xl border border-ink-100 bg-ink-50 px-3 py-2">
                 <div className="flex min-w-0 items-baseline justify-between gap-2">
@@ -165,12 +164,11 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
           </div>
         )}
         {prePrice > 0 && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="shrink-0 text-ink-500">예상 예정가격</dt>
-            <dd className="text-right">
-              <b className="tabular-nums">{won(prePrice)}</b>
-              <span className="block text-xs text-ink-300">(기초금액의 {pct(fc.pre!.value)}) · 투찰금액 {won(Math.round((prePrice * bidRate) / 100))} (투찰률 {bidRate}%)</span>
-            </dd>
+          <div className="rounded-xl border border-mint/40 bg-mint-50/60 px-3 py-3">
+            <dt className="text-xs font-semibold text-mint-700">예상 예정가격</dt>
+            <dd className="mt-1 text-xl font-extrabold leading-tight tabular-nums text-mint-700 [overflow-wrap:anywhere]">{won(prePrice)}</dd>
+            <dd className="mt-1 text-xs text-ink-500">기초금액의 {pct(fc.pre!.value)} · {fc.pre!.basis}</dd>
+            <dd className="mt-0.5 text-xs text-ink-500 [overflow-wrap:anywhere]">투찰률 {bidRate}%로 넣으면 투찰금액 <b className="tabular-nums text-ink">{won(Math.round((prePrice * bidRate) / 100))}</b></dd>
           </div>
         )}
       </dl>
@@ -178,7 +176,7 @@ export function ForecastCard({ fc, chance, isNego, bidRate, baseAmount, analysis
   );
 }
 
-/** 평가 기준 아래: 전년도 같은 사업, 과거 같은 사업 추이, 비슷한 공고의 낙찰 결과 */
+/** 평가 기준 아래: 이 공고의 직전 낙찰, 과거 같은 사업 추이, 비슷한 공고의 낙찰 결과 */
 export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, isNego, baseAmount }: { analysis: AwardAnalysis | null; loading: boolean; fc: Forecast; bidRate: number; floor?: number; isNego: boolean; baseAmount?: number }) {
   return (
     <section className="card min-w-0 p-6">
@@ -192,7 +190,7 @@ export function AwardAnalysisSection({ analysis, loading, fc, bidRate, floor, is
         <p className="mt-4 rounded-xl bg-paper px-4 py-3 text-sm text-ink-500">이 공고는 아직 낙찰 결과 분석이 없습니다.<br />사이트가 다시 만들어질 때(영업일 하루 세 번) 채워집니다.</p>
       ) : (
         <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-          <PriorCard prior={analysis.prior} years={analysis.cycleYears ?? 1} />
+          <PriorCard prior={priorOf(analysis)} />
           <HistoryCard history={analysis.history} fc={fc} />
           {analysis.parts ? (
             <div className="min-w-0 space-y-4 lg:col-span-2">
@@ -263,12 +261,12 @@ function RankList({ top, winner, plnprc }: { top: PastAward["top"]; winner?: str
   );
 }
 
-function PriorCard({ prior, years }: { prior?: PastAward; years: number }) {
-  const title = years > 1 ? `직전 계약 낙찰 결과 (${years}년 계약)` : "전년도 낙찰 결과";
+function PriorCard({ prior }: { prior?: PastAward }) {
+  const title = "이 공고의 직전 낙찰";
   if (!prior) {
     return (
-      <Box title={title} sub={years > 1 ? `지금 공고 약 ${years}년 전, 같은 수요기관의 같은 사업` : "지금 공고 8~20개월 전, 같은 수요기관의 같은 사업"}>
-        <p className="text-sm text-ink-500">이 기간에 같은 수요기관이 낸 비슷한 이름의 공고를 찾지 못했습니다.<br />올해 처음 발주했거나 이름이 크게 바뀐 사업일 수 있습니다.</p>
+      <Box title={title} sub="같은 수요기관의 같은 사업 중 가장 최근 낙찰">
+        <p className="text-sm text-ink-500">같은 수요기관이 낸 같은 사업의 낙찰 기록을 찾지 못했습니다.<br />처음 발주했거나 이름이 크게 바뀐 사업일 수 있습니다.</p>
       </Box>
     );
   }
@@ -293,7 +291,7 @@ function HistoryCard({ history, fc }: { history: PastAward[]; fc: Forecast }) {
   if (history.length < 2) {
     return (
       <Box title="과거 같은 사업 낙찰 추이" sub="같은 수요기관이 해마다 낸 같은 사업">
-        <p className="text-sm text-ink-500">{history.length ? "같은 사업 낙찰이 1건뿐이라 추이 대신 전년도 결과와 비슷한 공고 통계를 씁니다." : "같은 수요기관의 같은 사업 낙찰을 찾지 못해 비슷한 공고 통계를 씁니다."}</p>
+        <p className="text-sm text-ink-500">{history.length ? "같은 사업 낙찰이 1건뿐이라 추이 대신 직전 낙찰과 비슷한 공고 통계를 씁니다." : "같은 수요기관의 같은 사업 낙찰을 찾지 못해 비슷한 공고 통계를 씁니다."}</p>
       </Box>
     );
   }

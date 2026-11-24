@@ -161,7 +161,7 @@ async function main() {
     analyses = await awardAnalysesFromR2(items) ?? undefined;
     if (analyses) {
       const v = Object.values(analyses);
-      console.log(`낙찰 결과 분석: 공고 ${v.length}건, 전년도 같은 사업 ${v.filter((a) => a.prior).length}건, 과거 같은 사업 2건 이상 ${v.filter((a) => a.history.length >= 2).length}건, 비슷한 공고 ${v.filter((a) => a.similar).length}건`);
+      console.log(`낙찰 결과 분석: 공고 ${v.length}건, 직전 낙찰 ${v.filter((a) => a.prior).length}건, 과거 같은 사업 2건 이상 ${v.filter((a) => a.history.length >= 2).length}건, 비슷한 공고 ${v.filter((a) => a.similar).length}건`);
     } else console.log("낙찰 결과 분석: 낙찰 저장소 색인이 아직 없어 건너뜀");
   } catch (e) {
     console.warn("낙찰 결과 분석 건너뜀:", e instanceof Error ? e.message : e);

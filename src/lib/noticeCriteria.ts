@@ -8,6 +8,8 @@
  * 여기서 읽은 값은 기준표보다 우선한다. 값마다 원문 문장을 함께 둬 화면에 근거로 보여 준다.
  */
 
+import { readNoticeReqs, readSmeExempt, type NoticeReq } from "./noticeReqs";
+
 export interface NoticeFact<T> {
   value: T;
   /** 공고서 원문 문장 (화면 표시용으로 줄임) */
@@ -35,19 +37,12 @@ export interface NoticeCriteria {
   recognition?: string[];
   /** 공고서의 입찰 참가자격 항목 (업종 등록·소재지·실적·인력·시설 등, 원문 그대로) */
   qualify?: string[];
-  /** 참가자격의 소지 요건: 이 서류(지정서·허가증·면허 등)를 가진 업체만 참가할 수 있다 */
-  holds?: HoldReq[];
+  /** 참가자격 본문의 요건 (허가·지정, 중소기업 확인서, 직접생산확인, 실적, 장비 등; noticeReqs.ts) */
+  reqs?: NoticeReq[];
   /** 중소기업 우선조달의 예외 공고 (판로지원법 시행령 제2조의3): 기업 규모 제한 없음 */
   smeExempt?: NoticeFact<true>;
 }
 
-export interface HoldReq {
-  /** 공고서가 적은 서류·자격 이름 (예: 검진기관지정서) */
-  doc: string;
-  /** 이 서류를 가질 수 있는 곳 (예: 병원·검진기관). 모르면 없음 */
-  who?: string;
-  quote: string;
-}
 
 const NUM = String.raw`(\d{1,3}(?:\.\d{1,4})?)`;
 
@@ -245,46 +240,6 @@ const ITEM_HEAD = /^\s*(?:[가-하]\s*[.)]|\(?\d{1,2}\)|[○◦·•▪\-※]|[�
 /** 모든 공고에 같은 절차 문구 (지문인식·인증서·조세포탈 서약 등)는 빼고 그 공고만의 자격만 남긴다 */
 const QUAL_BOILER = /(지문|개인\s*인증서|조세\s*포탈|서약서|전자\s*입찰\s*이용자\s*등록|입찰\s*대리인|입찰\s*보증금|보증금\s*납|지급\s*(?:확약|각서)|국고\s*귀속)|^아래의?\s.*(?:모두|갖춘)/;
 
-/**
- * 참가자격의 소지 요건: "“검진기관지정서” 소지업체", "폐기물처리업 허가를 받은 자", "○○ 면허를 보유한 업체".
- * 나라장터 업종 등록·사업자등록·직접생산확인·중소기업 확인서처럼 따로 판정하거나 모든 공고에 같은 서류는 뺀다.
- */
-const HOLD_RE = /[“"「『‘']?\s*([가-힣A-Za-z0-9·ㆍ()\s]{2,30}?(?:지정서|허가증|면허증|등록증|신고증|인증서|인가서|자격증|지정|허가|면허|인가|인증))\s*[”"」』’']?\s*(?:을|를)?\s*(?:소지|보유|취득|갖춘|받은|득한)\s*(?:한\s*|하고\s*있는\s*)?(?:업체|자|기관|사업자|법인|업자)/;
-const HOLD_SKIP = /경쟁\s*입찰\s*참가\s*자격|사업자\s*등록|직접\s*생산|중소\s*기업|소상공인|공인\s*인증서|전자\s*인증|입찰\s*참가\s*자격\s*등록|업종\s*등록/;
-/** 서류를 가질 수 있는 곳 */
-const HOLD_WHO: [RegExp, string][] = [
-  [/검진\s*기관|건강\s*검진/, "병원·검진기관 (건강검진기본법에 따라 지정받은 곳)"],
-  [/의료\s*기관|병원/, "병원·의료기관"],
-  [/약국|약사/, "약국"],
-  [/폐기물/, "폐기물처리업 허가를 받은 업체"],
-  [/경비\s*업/, "경비업 허가를 받은 업체"],
-  [/소독\s*업|방역/, "소독업 신고 업체"],
-  [/여행\s*업/, "여행업 등록 업체"],
-  [/보험/, "보험회사"],
-];
-
-function readHolds(qualify: string[] | undefined): HoldReq[] | undefined {
-  const out: HoldReq[] = [];
-  for (const q of qualify ?? []) {
-    const m = q.match(HOLD_RE);
-    if (!m) continue;
-    let doc = m[1].replace(/\s+/g, " ").trim();
-    // "건강검진기본법 제14조 및 동법 시행규칙 제5조에 따른 검진기관지정서" → 근거 법령 뒤의 서류 이름만
-    doc = doc.replace(/^.*(?:따른|의한|의거한|규정한|정한)\s*/, "").replace(/^[)\s]+/, "").trim();
-    if (doc.length < 2 || HOLD_SKIP.test(doc) || HOLD_SKIP.test(q.slice(0, (m.index ?? 0) + m[0].length))) continue;
-    if (out.some((o) => o.doc === doc)) continue;
-    const who = HOLD_WHO.find(([re]) => re.test(doc))?.[1];
-    out.push({ doc, ...(who ? { who } : {}), quote: q });
-  }
-  return out.length ? out.slice(0, 4) : undefined;
-}
-
-function readSmeExempt(all: string[]): NoticeCriteria["smeExempt"] {
-  for (const s of all) {
-    if (/우선\s*조달\s*계약의?\s*예외|제\s*2\s*조의\s*3/.test(s) && /중소\s*기업|판로/.test(s)) return { value: true, quote: clip(s) };
-  }
-  return undefined;
-}
 
 /** 같은 공고서가 PDF·HWP로 함께 오면 참가자격 절도 여러 번 나온다: 항목을 가장 많이(같으면 길게) 읽은 쪽을 쓴다 (PDF는 줄이 끊겨 짧게 읽히기도 한다) */
 function readQualify(text: string): string[] | undefined {
@@ -325,7 +280,8 @@ export function readNoticeCriteria(text: string): NoticeCriteria | undefined {
     qualify: readQualify(text),
     smeExempt: readSmeExempt(all),
   };
-  out.holds = readHolds(out.qualify);
+  out.reqs = readNoticeReqs(out.qualify);
+  if (!out.reqs) delete out.reqs;
   (Object.keys(out) as (keyof NoticeCriteria)[]).forEach((k) => out[k] === undefined && delete out[k]);
   return Object.keys(out).length ? out : undefined;
 }

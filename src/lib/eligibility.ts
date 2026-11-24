@@ -14,6 +14,7 @@ import type { EvalBasis } from "./criteria";
 import type { CorpLookup } from "./corpLookup";
 import type { NoticeInfo } from "./noticeInfo";
 import type { NoticeCriteria } from "./noticeCriteria";
+import { REQ_TITLE } from "./noticeReqs";
 
 /** 업종의 근거법령 (조달청 업종 및 근거법규서비스) */
 export interface IndustryLaw {
@@ -141,7 +142,7 @@ export interface GoodsInfo {
   smallBizOnly?: boolean;
 }
 
-export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizType?: string, now = new Date(), goods?: GoodsInfo, notice?: Pick<NoticeCriteria, "holds" | "smeExempt">): Eligibility {
+export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizType?: string, now = new Date(), goods?: GoodsInfo, notice?: Pick<NoticeCriteria, "reqs" | "smeExempt">): Eligibility {
   const checks: Check[] = [];
   const { nts, nara, errors } = corp;
   const by = q?.registerBy ? ` 입찰참가자격 등록 마감(${q.registerBy})까지` : " 입찰참가자격 등록 마감 전까지";
@@ -183,7 +184,7 @@ export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizTy
   if (!q || q.licenseLimited === null) {
     checks.push({ label: "업종 제한", verdict: "확인 필요", detail: "이 공고의 업종 제한 자료를 받지 못했습니다. 공고서의 참가자격을 확인하세요." });
   } else if (!q.licenseLimited) {
-    checks.push({ label: "업종 제한", verdict: "가능", detail: "업종 제한이 없는 공고입니다." });
+    checks.push({ label: "업종 제한", verdict: "가능", detail: notice?.reqs?.some((r) => r.kind === "permit") ? "나라장터 업종 제한은 없습니다. 공고서가 적은 허가·지정 요건은 위 항목을 보세요." : "업종 제한이 없는 공고입니다." });
   } else if (!q.licenseGroups.length) {
     checks.push({ label: "업종 제한", verdict: "확인 필요", detail: "업종 제한이 있는 공고인데 제한 업종 목록이 비어 있습니다. 공고서에서 업종을 확인하세요." });
   } else if (!nara) {
@@ -252,16 +253,51 @@ export function judgeEligibility(q: BidQual | undefined, corp: CorpLookup, bizTy
     }
   }
 
-  // 6. 공고서의 소지 요건 (검진기관 지정서·허가증·면허 등): 조회 자료로 확인할 수 없어 '가능'으로 두지 않는다
-  for (const h of notice?.holds ?? []) {
-    checks.unshift({
-      label: "필수 소지 서류",
-      verdict: "확인 필요",
-      detail: `공고서는 ${h.doc} 소지업체만 참가할 수 있다고 적었습니다${h.who ? `. 참가 대상은 ${h.who}입니다` : ""}. 이 서류가 없으면 다른 조건을 갖춰도 참가할 수 없습니다.`,
-    });
+  // 6. 공고서 참가자격 본문의 요건 (업종 제한이 없는 공고도 허가·지정·확인서·실적 등을 적는다, noticeReqs.ts)
+  const today = now.toISOString().slice(0, 10);
+  const held = new Set((nara?.industries ?? []).filter((i) => i.code && (!i.expiresAt || i.expiresAt >= today)).map((i) => i.code));
+  const front: Check[] = [];
+  for (const r of notice?.reqs ?? []) {
+    const label = `공고서 요건: ${REQ_TITLE[r.kind]}`;
+    const who = r.who ? ` 참가 대상은 ${r.who}입니다.` : "";
+    if (r.kind === "permit") {
+      if (r.codes?.length && nara?.industries.length) {
+        const have = r.codes.filter((c) => held.has(c));
+        if (have.length === r.codes.length || (r.anyCode && have.length)) front.push({ label, verdict: "가능", detail: `공고서가 요구한 ${r.label}(업종코드 ${r.codes.join(", ")})${r.anyCode ? " 중 하나" : ""}이 나라장터 등록 업종에 있습니다.` });
+        else if (!have.length) front.push({ label, verdict: "불가", detail: `공고서는 ${r.label}(업종코드 ${r.codes.join(", ")})을 갖춘 업체만 참가할 수 있다고 적었는데, 나라장터 등록 업종에 없습니다.${who}` });
+        else front.push({ label, verdict: "확인 필요", detail: `공고서가 요구한 업종코드 ${r.codes.join(", ")} 중 ${have.join(", ")}만 등록되어 있습니다.${who}` });
+      } else {
+        front.push({ label, verdict: "확인 필요", detail: `공고서는 ${r.label} 업체만 참가할 수 있다고 적었습니다.${who} 조회 자료로는 확인할 수 없어, 이 요건이 없으면 다른 조건을 갖춰도 참가할 수 없습니다.` });
+      }
+    } else if (r.kind === "direct") {
+      const recs = corp.directProduction;
+      const items = r.items ?? [];
+      const ok = recs && items.length ? recs.find((d) => items.includes(d.itemNo) && d.valid) : undefined;
+      if (ok) front.push({ label, verdict: "가능", detail: `공고서가 요구한 ${r.label} 직접생산확인증명이 유효합니다${ok.validTo ? ` (~${ok.validTo})` : ""}.` });
+      else if (recs && items.length) front.push({ label, verdict: "불가", detail: `공고서는 ${r.label}(세부품명번호 ${items.join(", ")}) 직접생산확인증명을 가진 업체만 참가할 수 있다고 적었는데, 공공구매종합정보망에 유효한 증명이 없습니다.` });
+      else front.push({ label, verdict: "확인 필요", detail: `공고서는 ${r.label}을 가진 업체만 참가할 수 있다고 적었습니다. 공공구매종합정보망에서 확인하세요.` });
+    } else if (r.kind === "social" && r.cert) {
+      const c = corp.certs?.[r.cert];
+      if (c?.valid) front.push({ label, verdict: "가능", detail: `${r.label}이 유효합니다.` });
+      else if (c === null) front.push({ label, verdict: "불가", detail: `공고서는 ${r.label}을 가진 업체만 참가할 수 있다고 적었는데, 조회된 확인서가 없습니다.` });
+      else front.push({ label, verdict: "확인 필요", detail: `공고서는 ${r.label}을 가진 업체만 참가할 수 있다고 적었습니다.` });
+    } else {
+      const what: Record<string, string> = {
+        sme: `공고서는 ${r.label}를 가진 업체만 참가할 수 있다고 적었습니다. 공공구매종합정보망에서 확인서 발급과 유효기간을 확인하세요.`,
+        social: `공고서는 ${r.label}만 참가할 수 있다고 적었습니다.`,
+        record: "공고서가 참가자격으로 실적을 요구합니다. 실적증명서로 조건을 갖췄는지 확인하세요.",
+        staff: "공고서가 참가자격으로 인력·장비·시설 보유를 요구합니다.",
+        product: "공고서가 납품 제품의 인증이나 제조사 공급 확약을 요구합니다.",
+        bizscope: "공고서가 사업자등록 종목이나 법인 목적에 해당 사업이 있어야 한다고 적었습니다.",
+        insurance: "공고서가 배상책임보험 가입을 요구합니다.",
+      };
+      front.push({ label, verdict: "확인 필요", detail: `${what[r.kind] ?? "공고서의 참가자격을 확인하세요."} 원문: ${r.quote.length > 140 ? `${r.quote.slice(0, 139)}…` : r.quote}` });
+    }
   }
+  // 허가·지정처럼 참가 대상을 가르는 요건은 맨 앞에 보인다
+  checks.unshift(...front);
   // 7. 중소기업 우선조달 예외 공고는 기업 규모로 제한하지 않는다
-  if (notice?.smeExempt) checks.push({ label: "기업 규모", verdict: "가능", detail: "중소기업 우선조달의 예외 공고라 중소기업이 아니어도 참가할 수 있습니다. 대형 병원·기관과 함께 경쟁합니다." });
+  if (notice?.smeExempt && !notice.reqs?.some((r) => r.kind === "sme")) checks.push({ label: "기업 규모", verdict: "가능", detail: "중소기업 우선조달의 예외 공고라 중소기업이 아니어도 참가할 수 있습니다. 대형 기관과 함께 경쟁합니다." });
 
   return { verdict: worst(checks.map((c) => c.verdict)), checks };
 }

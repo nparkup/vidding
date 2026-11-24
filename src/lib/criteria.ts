@@ -21,6 +21,7 @@
  * - 행정안전부(지방자치단체) 기준, 공기업·기관 자체 기준("관리규정외 수기심사"): 기준표 원문을 대조하지 못했다.
  *   같은 업무·금액대의 조달청 기준표 구조를 쓰고, 가격 산식은 공고 낙찰하한율에 맞춰 역산한다.
  */
+import { REQ_TITLE } from "./noticeReqs";
 import type { Bid, BizType } from "./types";
 import type { CreditGrade, EvalItem, EvalSheet, ItemKind, PriceRule, ScoreBand } from "./evalscore";
 import { estimatedRule, generalServiceRule, techServiceRule, type TrustRule } from "./trustscore";
@@ -644,7 +645,7 @@ export function bidSheet(
     sheet.recognition = merged.slice(0, 6);
     facts.push({ label: "실적 인정 범위", value: notice.recognition[0], quote: notice.recognition[0] });
   }
-  for (const h of notice.holds ?? []) facts.push({ label: "필수 소지 서류", value: `${h.doc} 소지업체만 참가${h.who ? ` (대상: ${h.who})` : ""}`, quote: h.quote });
+  if (notice.reqs?.length) facts.push({ label: "참가 요건", value: `공고서 참가자격에서 읽은 요건 ${notice.reqs.length}가지`, quote: "", list: notice.reqs.map((r) => `${REQ_TITLE[r.kind]}: ${r.label}${r.codes ? ` (업종코드 ${r.codes.join(", ")})` : ""}${r.who ? ` · 대상 ${r.who}` : ""}`) });
   if (notice.smeExempt) facts.push({ label: "기업 규모", value: "중소기업 우선조달 예외: 중소기업이 아니어도 참가", quote: notice.smeExempt.quote });
   if (notice.qualify?.length) facts.push({ label: "참가자격", value: `공고서에 적힌 참가자격 ${notice.qualify.length}가지`, quote: "", list: notice.qualify });
   sheet.noticeFacts = facts;

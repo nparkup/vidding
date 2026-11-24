@@ -1,1 +1,1 @@
-scripts/score/coverage-recheck.ts ai
+scripts/score/coverage-recheck.ts ai 

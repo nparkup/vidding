@@ -14,6 +14,7 @@ import { extractSheetsForBids, textCacheKey } from "../src/lib/nara/docExtract";
 import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { applyIndustryLaws, fetchIndustryLaws, type IndustryLawTable } from "../src/lib/nara/industryLaw";
 import { fetchNuriBids } from "../src/lib/nara/nuri";
+import { extractNuriSheets } from "../src/lib/nara/nuriSheets";
 import type { NuriBidsFile } from "../src/lib/nuri";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
@@ -113,13 +114,14 @@ async function main() {
   let sheets: Awaited<ReturnType<typeof extractSheetsForBids>>["sheets"] = {};
   // 규칙 파서가 쓸 수 있는 배점표를 못 읽은 공고는 평가 관련 본문을 AI 판독 입력으로 남긴다 (공고를 고를 때 중계 서버가 읽는다)
   const ai = makeAiInputs(quals);
+  // 첨부는 모두 읽는다(같은 파일명은 하나만). 읽은 본문은 캐시에 남겨 다음 빌드는 새 첨부만 받는다 (누리장터 첨부도 같은 캐시, 정리는 누리장터 뒤에)
+  const textCache = makeTextCache();
+  let textPruneReady = false;
   try {
-    // 첨부는 모두 읽는다(같은 파일명은 하나만). 읽은 본문은 캐시에 남겨 다음 빌드는 새 첨부만 받는다
-    const textCache = makeTextCache();
     const r = await extractSheetsForBids(items, attachments, { collect: ai.collect, textCache, budgetMs: 10 * 60_000 });
     sheets = r.sheets;
-    const pruned = textCache.prune((Object.values(attachments) as BidAttachment[][]).flat().map(textCacheKey));
-    console.log(`평가표 추출: 대상 ${r.stats.bids}건 중 ${r.stats.done}건 읽음, 파일 ${r.stats.files}개(캐시 ${r.stats.cached}, 새로 받음 ${textCache.stats().added}, 실패 ${r.stats.downloadFailed}), 배점표 ${r.stats.found}건, 공고 기준 문장 ${r.stats.notice}건${r.stats.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서 (화면에서 고르면 그 자리에서 읽음)" : ""}, 캐시 정리 ${pruned}개`);
+    textPruneReady = true;
+    console.log(`평가표 추출: 대상 ${r.stats.bids}건 중 ${r.stats.done}건 읽음, 파일 ${r.stats.files}개(캐시 ${r.stats.cached}, 새로 받음 ${textCache.stats().added}, 실패 ${r.stats.downloadFailed}), 배점표 ${r.stats.found}건, 공고 기준 문장 ${r.stats.notice}건${r.stats.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서 (화면에서 고르면 그 자리에서 읽음)" : ""}`);
   } catch (e) {
     console.warn("평가표 추출 건너뜀:", e instanceof Error ? e.message : e);
   }
@@ -226,8 +228,15 @@ async function main() {
     const r = await fetchNuriBids(laws);
     nuriBids = r.file;
     console.log(r.log);
+    const sh = await extractNuriSheets(nuriBids.items, textCache);
+    console.log(`누리장터 배점표: 대상(적격심사·제안서평가, 진행 중) ${sh.targets}건 중 첨부 읽음 ${sh.read}건, 배점표 ${sh.found}건, 받기 실패 ${sh.failed}개${sh.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서" : ""}`);
   } catch (e) {
     console.warn("누리장터 건너뜀:", e instanceof Error ? e.message : e);
+  }
+  // 첨부 본문 캐시 정리: 이번 빌드의 나라장터·누리장터 공고에 없는 첨부를 지운다 (나라장터 추출이 실패한 빌드는 정리하지 않는다)
+  if (textPruneReady) {
+    const keep = [...(Object.values(attachments) as BidAttachment[][]).flat(), ...(nuriBids?.items ?? []).flatMap((b) => b.files.map((f) => ({ name: f.name, url: f.url, kind: "규격서·기타" as const })))].map(textCacheKey);
+    console.log(`첨부 본문 캐시 정리 ${textCache.prune(keep)}개`);
   }
   // 발주계획 모아보기 (/plans): 이번 달부터 넉 달 발주 예정. 실패해도 배포는 계속
   let orderPlans;

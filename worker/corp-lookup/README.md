@@ -49,7 +49,7 @@ Worker는 그 기간을 7일 단위로 다시 쪼개 조달청 낙찰정보서�
 
 ## 기업 특허 (?patents=사업자번호)
 
-KIPRIS Plus Open API로 사업자번호 → 특허고객번호 → 지금 등록 상태인 특허·실용신안을 조회한다 (src/lib/patents.ts).
-비밀값 KIPRIS_API_KEY (KIPRIS Plus 마이페이지 > APIKEY관리의 인증키, "출원인 법인"과 "특허·실용 공개·등록공보" 두 상품을 신청한 키).
-저장소 Secrets에 KIPRIS_API_KEY 를 넣으면 배포 때 Worker 비밀값으로 들어가고, Cloudflare 화면에서 직접 넣어도 된다.
-결과는 R2 patents/{사업자번호}.json 에 30일, 월 호출 수는 patents/usage-YYYYMM.json (기본 상한 950회, KIPRIS_MONTHLY_LIMIT).
+기본: 특허청 등록원부 사업자 권리목록 (공공데이터포털 15124946 `PttRgstRtInfoInqSvc/getBusinessRightList`, searchType=1 사업자등록번호).
+공공데이터포털 서비스키(DATA_GO_KR_SERVICE_KEY)를 그대로 쓰므로 포털에서 활용신청(자동승인)만 하면 된다. 개발계정 하루 10,000회.
+예비: KIPRIS_API_KEY 가 있으면 등록원부가 실패할 때 KIPRIS Plus(출원인 법인 → 특허·실용 등록공보)로 찾는다 (월 상한 950회, KIPRIS_MONTHLY_LIMIT).
+결과는 R2 patents/{사업자번호}.json 에 30일 둔다 (src/lib/patents.ts).

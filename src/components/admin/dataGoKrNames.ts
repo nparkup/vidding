@@ -26,6 +26,7 @@ export const DATA_GO_KR_NAMES: Record<string, string> = {
   GetCorpBasicInfoService_V2: "금융위원회_기업기본정보", // 15043184
   GetFinaStatInfoService_V2: "금융위원회_기업 재무정보", // 15043459
   smppCertInfo: "주식회사한국중소벤처기업유통원_공공구매종합정보망 인증서 정보 제공 서비스", // 15062581
+  PttRgstRtInfoInqSvc: "지식재산처_등록원부 실시간 정보 조회 서비스", // 15124946
   // KIPRIS Plus (plus.kipris.or.kr, 키는 KIPRIS Plus에서 발급). 이름은 KIPRIS Plus 데이터 상세 화면 제목
   CorpBsApplicantService: "KIPRIS Plus 출원인 법인",
   patUtiModInfoSearchSevice: "KIPRIS Plus 특허·실용 공개·등록공보",

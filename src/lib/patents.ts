@@ -1,7 +1,9 @@
 /**
  * 기업 특허 조회와 평가 항목 적용 (평가점수 예측).
  *
- * 조회 (KIPRIS Plus Open API, 키는 Worker 비밀값 KIPRIS_API_KEY, worker/corp-lookup ?patents=사업자번호)
+ * 조회 (worker/corp-lookup ?patents=사업자번호)
+ * 기본: 특허청 등록원부 사업자 권리목록 (공공데이터포털 15124946, 공공데이터포털 서비스키 그대로). 한 번에 사업자번호 → 특허권 목록.
+ * 예비: KIPRIS Plus Open API (키는 Worker 비밀값 KIPRIS_API_KEY가 있을 때만, 등록원부가 실패하면)
  * 1. 출원인 법인: CorpBsApplicantService/corpBsApplicantInfoV3 (BusinessRegistrationNumber=000-00-00000)
  *    → 특허고객번호(ApplicantNumber). 한 사업자번호에 번호가 여럿일 수 있다
  * 2. 특허·실용 공개·등록공보: patUtiModInfoSearchSevice/getAdvancedSearch (applicant=특허고객번호, lastvalue=R)
@@ -93,6 +95,72 @@ export async function fetchPatents(key: string, bizno: string, f: typeof fetch =
   }
   items.sort((x, y) => (y.regDate ?? "").localeCompare(x.regDate ?? ""));
   return { bizno, status: "ok", applicants, items: items.slice(0, 200), total: Math.max(total, items.length), checkedAt: now };
+}
+
+/* ---------- 공공데이터포털 등록원부 (기본 경로) ---------- */
+
+const RGST = "https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getBusinessRightList";
+
+/** 등록상태·존속기간으로 지금 살아 있는 권리인지 */
+function aliveRight(status: string, expires: string | undefined, today: string): boolean {
+  if (/소멸|포기|무효|취하|말소|거절|만료/.test(status)) return false;
+  if (expires && expires < today) return false;
+  return true;
+}
+
+/**
+ * 사업자번호(10자리) → 그 사업자가 가진 특허권 (특허청 등록원부, 공공데이터포털 15124946 사업자 권리목록 조회).
+ * 공공데이터포털 서비스키를 그대로 쓴다 (개발계정 하루 10,000회). 100건씩 최대 3쪽(300건)까지 받는다.
+ */
+export async function fetchPatentsRgst(serviceKey: string, bizno: string, f: typeof fetch = fetch): Promise<PatentLookup> {
+  const now = new Date().toISOString();
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const dashed = `${bizno.slice(0, 3)}-${bizno.slice(3, 5)}-${bizno.slice(5)}`;
+  const items: PatentEntry[] = [];
+  const holders = new Map<string, string>();
+  let total = 0;
+  for (let page = 1; page <= 3; page++) {
+    const q = new URLSearchParams({ serviceKey, pageNo: String(page), numOfRows: "100", type: "json", searchType: "1", searchVal: dashed });
+    const r = await f(`${RGST}?${q}`);
+    const t = await r.text();
+    const auth = t.match(/<returnAuthMsg>([^<]*)<|"returnAuthMsg"\s*:\s*"([^"]*)"/);
+    if (auth) throw new Error(`등록원부 ${auth[1] ?? auth[2]}`);
+    if (!r.ok) throw new Error(`등록원부 ${r.status}`);
+    let j: Record<string, unknown>;
+    try { j = JSON.parse(t) as Record<string, unknown>; } catch { throw new Error("등록원부 응답을 읽지 못했습니다"); }
+    // 응답 감싸기(response.body 등)가 문서와 다를 수 있어 rightList·totalCount 를 찾아 내려간다
+    const find = (o: unknown, k: string): unknown => {
+      if (!o || typeof o !== "object") return undefined;
+      if (k in (o as Record<string, unknown>)) return (o as Record<string, unknown>)[k];
+      for (const v of Object.values(o as Record<string, unknown>)) { const x = find(v, k); if (x !== undefined) return x; }
+      return undefined;
+    };
+    const code = String(find(j, "resultCode") ?? "");
+    if (code && !/^0+$/.test(code)) {
+      const msg = String(find(j, "resultMsg") ?? "");
+      if (/없|NODATA|NO_DATA/i.test(msg) || code === "03") break;
+      throw new Error(`등록원부 ${code} ${msg}`.trim().slice(0, 160));
+    }
+    total = Number(find(j, "totalCount")) || total;
+    const raw = find(j, "rightList");
+    const rows = (Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw] : []) as Record<string, unknown>[];
+    for (const row of rows) {
+      const str = (k: string) => (row[k] === undefined || row[k] === null ? "" : String(row[k]).trim());
+      const no = str("rgstNo");
+      if (!no || items.some((i) => i.no === no)) continue;
+      const expires = ymd(str("cndrtExptnDate").replace(/\D/g, ""));
+      if (!aliveRight(str("rgstStatus"), expires, today)) continue;
+      const appNo = str("applNo").replace(/\D/g, "");
+      const holder = str("rightHolderInfo") || str("applicantInfo");
+      const code2 = str("applicantCd");
+      if (code2 && !holders.has(code2)) holders.set(code2, holder.slice(0, 40));
+      items.push({ no, title: decode(str("title")).slice(0, 120), regDate: ymd(str("rgstDate").replace(/\D/g, "")), appNo: appNo || undefined, type: (appNo || no).startsWith("20") ? "실용신안" : "특허" });
+    }
+    if (rows.length < 100 || page * 100 >= total) break;
+  }
+  items.sort((x, y) => (y.regDate ?? "").localeCompare(x.regDate ?? ""));
+  if (!items.length && !total) return { bizno, status: "none", applicants: [], items: [], total: 0, checkedAt: now, reason: "특허청 등록원부에 이 사업자번호의 권리가 없습니다" };
+  return { bizno, status: "ok", applicants: [...holders].map(([code, name]) => ({ code, name })), items, total: items.length, checkedAt: now };
 }
 
 /* ---------- 평가 항목 적용 ---------- */

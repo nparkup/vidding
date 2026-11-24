@@ -8,6 +8,8 @@
  * 여기서 읽은 값은 기준표보다 우선한다. 값마다 원문 문장을 함께 둬 화면에 근거로 보여 준다.
  */
 
+import { readNoticeReqs, readSmeExempt, type NoticeReq } from "./noticeReqs";
+
 export interface NoticeFact<T> {
   value: T;
   /** 공고서 원문 문장 (화면 표시용으로 줄임) */
@@ -35,7 +37,12 @@ export interface NoticeCriteria {
   recognition?: string[];
   /** 공고서의 입찰 참가자격 항목 (업종 등록·소재지·실적·인력·시설 등, 원문 그대로) */
   qualify?: string[];
+  /** 참가자격 본문의 요건 (허가·지정, 중소기업 확인서, 직접생산확인, 실적, 장비 등; noticeReqs.ts) */
+  reqs?: NoticeReq[];
+  /** 중소기업 우선조달의 예외 공고 (판로지원법 시행령 제2조의3): 기업 규모 제한 없음 */
+  smeExempt?: NoticeFact<true>;
 }
+
 
 const NUM = String.raw`(\d{1,3}(?:\.\d{1,4})?)`;
 
@@ -231,7 +238,8 @@ const NEXT_HEAD = /^\s*(?:\d{1,2}\s*[.)]\s*\S|[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\
 /** 참가자격 안의 항목 머리 (가. / 1) / (1) / ○ / - / ①) */
 const ITEM_HEAD = /^\s*(?:[가-하]\s*[.)]|\(?\d{1,2}\)|[○◦·•▪\-※]|[①-⑳])\s*/;
 /** 모든 공고에 같은 절차 문구 (지문인식·인증서·조세포탈 서약 등)는 빼고 그 공고만의 자격만 남긴다 */
-const QUAL_BOILER = /(지문|개인\s*인증서|조세\s*포탈|서약서|전자\s*입찰\s*이용자\s*등록|입찰\s*대리인)|^아래의?\s.*(?:모두|갖춘)/;
+const QUAL_BOILER = /(지문|개인\s*인증서|조세\s*포탈|서약서|전자\s*입찰\s*이용자\s*등록|입찰\s*대리인|입찰\s*보증금|보증금\s*납|지급\s*(?:확약|각서)|국고\s*귀속)|^아래의?\s.*(?:모두|갖춘)/;
+
 
 /** 같은 공고서가 PDF·HWP로 함께 오면 참가자격 절도 여러 번 나온다: 항목을 가장 많이(같으면 길게) 읽은 쪽을 쓴다 (PDF는 줄이 끊겨 짧게 읽히기도 한다) */
 function readQualify(text: string): string[] | undefined {
@@ -270,7 +278,10 @@ export function readNoticeCriteria(text: string): NoticeCriteria | undefined {
     refAmount: readRefAmount(all),
     recognition: readRecognition(all),
     qualify: readQualify(text),
+    smeExempt: readSmeExempt(all),
   };
+  out.reqs = readNoticeReqs(out.qualify);
+  if (!out.reqs) delete out.reqs;
   (Object.keys(out) as (keyof NoticeCriteria)[]).forEach((k) => out[k] === undefined && delete out[k]);
   return Object.keys(out).length ? out : undefined;
 }

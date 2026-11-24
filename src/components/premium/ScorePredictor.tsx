@@ -266,7 +266,7 @@ export function ScorePredictor() {
   }, []);
   const rivalEst = useMemo(() => (bid ? estimateRival(awardStats, bid) : undefined), [awardStats, bid]);
 
-  // 낙찰 결과 분석 (전년도 같은 사업, 과거 같은 사업 추이, 비슷한 공고): 가격점수 기본값·경쟁 강도·낙찰 가능성에 반영한다
+  // 낙찰 결과 분석 (직전 낙찰, 과거 같은 사업 추이, 비슷한 공고): 가격점수 기본값·경쟁 강도·낙찰 가능성에 반영한다
   const [analysis, setAnalysis] = useState<AwardAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   useEffect(() => {
@@ -541,7 +541,7 @@ export function ScorePredictor() {
               ["참가자격", "사업자번호로 공고의 업종·지역 제한과 대조"],
               ["예상 평가점수", "항목별 점수와 통과 여부, 점수를 올릴 수 있는 곳"],
               ["투찰률", "통과 가능한 투찰률과 그 금액, 과거 낙찰자 투찰률"],
-              ["낙찰 결과 분석", "전년도·같은 사업·비슷한 공고의 낙찰 업체와 경쟁 강도"],
+              ["낙찰 결과 분석", "이 공고의 직전 낙찰·같은 사업·비슷한 공고의 낙찰 업체와 경쟁 강도"],
             ].map(([t, d], n) => (
               <li key={t} className="flex gap-3">
                 <span className="w-5 shrink-0 font-bold tabular-nums text-mint-600">{n + 1}</span>
@@ -597,6 +597,8 @@ export function ScorePredictor() {
       ? { label: "낙찰하한 금액", value: amtVal(lw), tone: "ink", sub: `낙찰하한율 ${lw}% · 기초금액 기준` }
       : { label: "낙찰하한율", value: lw ? `${lw}%` : "공고에 없음", tone: lw ? "ink" : "muted" });
   }
+  // 예상 예정가격: 기초금액 × 과거 예정가격 비율 (낙찰 결과 분석과 같은 값)
+  if (fc.pre && baseAmt) tiles.push({ label: "예상 예정가격", value: <span className="text-base sm:text-lg">{wonFull(Math.round((baseAmt * fc.pre.value) / 100))}</span>, tone: "mint", sub: `기초금액의 ${fc.pre.value.toFixed(3)}% · ${fc.pre.basis}` });
   tiles.push(chance && scoreStage === "score"
     ? { label: "낙찰 가능성", value: `${chance.low}~${chance.high}%`, tone: chance.low > 0 ? "ink" : "coral", sub: `${fc.competition ? `경쟁 강도 ${fc.competition.level} · ` : ""}${chance.ifPassed ? `통과 기준을 채우면 ${chance.ifPassed.low}~${chance.ifPassed.high}%` : "같은 조건 과거 낙찰로 낸 범위"}` }
     : fc.competition
@@ -936,7 +938,7 @@ export function ScorePredictor() {
         </ul>
       </section>
 
-    {/* 평가 기준 아래: 전년도·과거 같은 사업·비슷한 공고의 낙찰 결과 */}
+    {/* 평가 기준 아래: 직전 낙찰·과거 같은 사업·비슷한 공고의 낙찰 결과 */}
     <div id="award" className="scroll-mt-24"><AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} baseAmount={bid.baseAmount} /></div>
     </div>
   );

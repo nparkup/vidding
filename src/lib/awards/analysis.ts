@@ -1,6 +1,6 @@
 /**
  * 평가점수 예측의 '낙찰 결과 분석': 낙찰 저장소(R2)의 과거 낙찰로 지금 공고의
- * (1) 전년도 같은 사업 낙찰 결과, (2) 과거 같은 사업(매년 반복 발주)의 낙찰 추이, (3) 비슷한 공고들의 낙찰 결과를 만든다.
+ * (1) 이 공고의 직전 낙찰(같은 사업 가장 최근 낙찰), (2) 과거 같은 사업(매년 반복 발주)의 낙찰 추이, (3) 비슷한 공고들의 낙찰 결과를 만든다.
  * 그리고 그 결과로 가격점수(협상 최저 경쟁 투찰률, 적격 투찰률)·경쟁 강도·낙찰 가능성을 예측한다.
  *
  * 만드는 곳
@@ -212,13 +212,13 @@ export interface AwardAnalysis {
   builtAt: string;
   /** 자료 범위 (낙찰일 기준) */
   range: { from: string; to: string };
-  /** 전년도 같은 사업: 지금 공고보다 약 1년 전(8~20개월) 같은 수요기관의 가장 비슷한 공고 */
+  /** 이 공고의 직전 낙찰: 같은 수요기관의 같은 사업 낙찰 중 가장 최근 것 */
   prior?: PastAward;
   /** 과거 같은 사업: 같은 수요기관·같은 업무, 공고명이 비슷한 낙찰 (최근 순, 최대 10건) */
   history: PastAward[];
   /** 비슷한 공고: 가장 좁은 묶음부터 표본이 충분한 것 */
   similar?: { label: string; key: string; stat: SimilarStat };
-  /** 공고명에 적힌 계약 기간이 2년 이상이면 그 햇수 (전년도 대신 그만큼 전의 직전 계약을 찾는다) */
+  /** 공고명에 적힌 계약 기간이 2년 이상이면 그 햇수 */
   cycleYears?: number;
   /** 같은 사업인지 애매한 후보 (최대 10건). 화면에서 확인을 거쳐 이력에 넣는다 */
   maybe?: PastAward[];
@@ -417,13 +417,18 @@ export function contractYears(title: string): number {
   return d >= 2 && d <= 5 ? d : 1;
 }
 
-/** 전년도(직전 계약): 지금 공고일 기준 계약 기간만큼 전(1년이면 8~20개월 전) 중 가장 비슷한 것 */
-export function pickPrior(history: PastAward[], posted: string, years = 1): PastAward | undefined {
-  const days = (d: string) => (Date.parse(posted) - Date.parse(d)) / 86400e3;
-  const lo = 365 * years - 125, hi = 365 * years + 235;
-  return history
-    .filter((h) => days(h.date) >= lo && days(h.date) <= hi)
-    .sort((a, b) => b.similarity - a.similarity || Math.abs(days(a.date) - 365 * years) - Math.abs(days(b.date) - 365 * years))[0];
+/**
+ * 이 공고의 직전 낙찰: 같은 사업으로 확인된 과거 낙찰 중 가장 최근 것 (지난해가 아니어도 된다).
+ * history 는 최근 순이라 맨 앞이 직전 낙찰이다.
+ */
+export function pickPrior(history: PastAward[], posted: string, _years = 1): PastAward | undefined {
+  return [...history].filter((h) => h.date < posted).sort((a, b) => b.date.localeCompare(a.date) || b.similarity - a.similarity)[0];
+}
+
+/** 화면·예측에서 쓰는 직전 낙찰 (예전 형식 자료는 history 맨 앞으로 바로잡는다) */
+export function priorOf(a: Pick<AwardAnalysis, "history" | "prior"> | null | undefined): PastAward | undefined {
+  if (!a) return undefined;
+  return a.history.length ? [...a.history].sort((x, y) => y.date.localeCompare(x.date))[0] : a.prior;
 }
 
 /** 형제 공고 묶음: 날짜가 가까운 것끼리 묶어 가장 비슷한 1건만 남긴다 */
@@ -622,7 +627,7 @@ function pickSimilar(t: AnalyzeTarget, groups: Record<string, SimilarStat>, key:
 /** 비슷한 공고의 최근 낙찰 예로 보여 줄 최소 공고명 유사도 */
 export const EX_SIMILAR = 0.2;
 
-/** 애매한 후보 중 같은 사업으로 확인된 공고를 이력에 넣고 전년도를 다시 고른다 */
+/** 애매한 후보 중 같은 사업으로 확인된 공고를 이력에 넣고 직전 낙찰을 다시 고른다 */
 export function withConfirmed(a: AwardAnalysis, nos: string[], posted: string): AwardAnalysis {
   if (!a.maybe?.length || !nos.length) return a;
   const ok = a.maybe.filter((m) => nos.includes(m.no));
@@ -706,8 +711,9 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const st = a.similar?.stat;
   // 공고명이 비슷한 다른 기관 낙찰은 참가 예상 기업과 예시에만 쓴다 (되짚어 보기에서 낙찰률·참가업체 수 예측은 업무·금액대 묶음이 더 맞았다)
   const rel = a.related;
+  const prior = priorOf(a);
 
-  // 참가업체 수: 같은 사업 이력이 2건 이상이면 그 분포, 아니면 비슷한 공고 분포. 전년도 값이 있으면 근거에 같이 적는다
+  // 참가업체 수: 같은 사업 이력이 2건 이상이면 그 분포, 아니면 비슷한 공고 분포. 직전 낙찰 값이 있으면 근거에 같이 적는다
   // 되짚어 보기(8주): 공사 적격심사를 빼면 가운데 값은 최근 3건 중앙값이 전체 중앙값보다 맞았다 (물품 적격 40→33%, 용역 적격 38→33%)
   const biz = a.similar?.key.split("|")[0];
   const m = methodCode(bid.contractMethod);
@@ -733,11 +739,11 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
     out.bidders = { q, basis: st ? `과거 같은 사업 1건과 비슷한 공고 ${st.n.toLocaleString()}건` : "과거 같은 사업 1건" };
   } else if (st) {
     const q = st.bidders.q.map((n) => Math.round(n)) as [number, number, number];
-    if (a.prior?.bidders) q[1] = Math.round((q[1] + a.prior.bidders) / 2);
-    out.bidders = { q, basis: a.prior?.bidders ? `비슷한 공고 ${st.n.toLocaleString()}건과 전년도 ${a.prior.bidders}곳` : `비슷한 공고 ${st.n.toLocaleString()}건` };
-  } else if (a.prior?.bidders) {
-    const b = a.prior.bidders;
-    out.bidders = { q: [b, b, b], basis: "전년도 같은 사업" };
+    if (prior?.bidders) q[1] = Math.round((q[1] + prior.bidders) / 2);
+    out.bidders = { q, basis: prior?.bidders ? `비슷한 공고 ${st.n.toLocaleString()}건과 직전 낙찰 ${prior.bidders}곳` : `비슷한 공고 ${st.n.toLocaleString()}건` };
+  } else if (prior?.bidders) {
+    const b = prior.bidders;
+    out.bidders = { q: [b, b, b], basis: "이 공고의 직전 낙찰" };
   }
   if (out.bidders) {
     const n = out.bidders.q[1];
@@ -757,14 +763,14 @@ export function forecast(a: AwardAnalysis | null | undefined, bid: { contractMet
   const sure = h.filter((x) => !conf.has(x.no)).map((x) => x.rate).filter((r) => r > 50 && r <= 110);
   if (latest && sure.length >= 1) out.winRate = { value: r3(sure[0]), basis: hr.length >= 2 ? `가장 최근 같은 사업 낙찰률 (과거 ${hr.length}건 중앙값 ${fmt(median(hr))}%)` : "가장 최근 같은 사업 낙찰률" };
   else if (hr.length >= 2) out.winRate = { value: r3(median(hr)), basis: `과거 같은 사업 ${hr.length}건 중앙값` };
-  else if (a.prior?.rate) out.winRate = { value: a.prior.rate, basis: "전년도 같은 사업" };
+  else if (prior?.rate) out.winRate = { value: prior.rate, basis: "이 공고의 직전 낙찰" };
   else if (st?.rate) out.winRate = { value: r3(st.rate.q[2]), basis: `비슷한 공고 ${st.rate.n.toLocaleString()}건 중앙값` };
 
-  // 협상: 개찰 1위(가장 낮은) 투찰률. 같은 사업 이력 > 전년도 > 비슷한 공고 > 낙찰률
+  // 협상: 개찰 1위(가장 낮은) 투찰률. 같은 사업 이력 > 직전 낙찰 > 비슷한 공고 > 낙찰률
   if (m === "N") {
     const firsts = h.map((x) => x.top[0]?.[1] ?? 0).filter((r) => r > 50 && r <= 110);
     if (firsts.length >= 2) out.rival = { value: r3(median(firsts)), basis: `과거 같은 사업 ${firsts.length}건의 개찰 1위 투찰률 중앙값` };
-    else if (firsts.length === 1) out.rival = { value: r3(firsts[0]), basis: "전년도 같은 사업의 개찰 1위 투찰률" };
+    else if (firsts.length === 1) out.rival = { value: r3(firsts[0]), basis: "같은 사업 직전 낙찰의 개찰 1위 투찰률" };
     else if (st?.ranks && st.ranks.n >= SIMILAR_USE && st.ranks.mean[0] > 50) out.rival = { value: r3(st.ranks.mean[0]), basis: `비슷한 공고 ${st.ranks.n.toLocaleString()}건의 개찰 1위 평균 투찰률` };
     else if (out.winRate) out.rival = { value: out.winRate.value, basis: `${out.winRate.basis} 낙찰률` };
   }

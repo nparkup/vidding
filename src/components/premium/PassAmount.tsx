@@ -38,6 +38,10 @@ export function PassAmount({ bid, window, info, analysis }: { bid: Bid; window: 
           <p className="mt-0.5 text-2xl font-extrabold tabular-nums text-mint-300 [overflow-wrap:anywhere]">{wonFull(amt(window.low))} <span className="whitespace-nowrap text-sm font-semibold text-ink-300">(투찰률 {window.low}%)</span></p>
           <p className="mt-3 text-xs text-ink-300">통과 가능한 투찰금액</p>
           <p className="mt-0.5 text-sm font-bold tabular-nums [overflow-wrap:anywhere]">{wonFull(amt(window.low))} ~ {wonFull(amt(window.high))} <span className="whitespace-nowrap font-semibold text-ink-300">(투찰률 {window.low}% ~ {window.high}%)</span></p>
+          <div className="mt-3 rounded-lg border border-mint/40 bg-mint/10 px-3 py-2">
+            <p className="text-xs font-semibold text-mint-300">예상 예정가격</p>
+            <p className="mt-0.5 text-xl font-extrabold tabular-nums text-white [overflow-wrap:anywhere]">{wonFull(Math.round(plan))} <span className="whitespace-nowrap text-sm font-semibold text-ink-300">(사정율 {pick.ratio.toFixed(3)}%)</span></p>
+          </div>
           <label className="mt-3 block text-xs text-ink-300">
             예상 사정율 (예정가격 ÷ 기초금액)
             <select value={pick.key} onChange={(e) => setKey(e.target.value)} className="mt-1 w-full rounded-lg border border-white/15 bg-ink-900 px-2 py-1.5 text-sm text-white">

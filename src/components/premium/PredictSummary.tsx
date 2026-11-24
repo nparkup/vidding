@@ -78,7 +78,7 @@ export function PredictSummary({ title, tiles, links, note }: { title: string; t
           </nav>
         )}
       </div>
-      <dl className={`mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 ${tiles.length >= 4 ? "xl:grid-cols-4" : "lg:grid-cols-3"}`}>
+      <dl className={`mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 ${tiles.length >= 5 ? "lg:grid-cols-3 xl:grid-cols-5" : tiles.length === 4 ? "xl:grid-cols-4" : "lg:grid-cols-3"}`}>
         {tiles.map((t) => (
           <div key={t.label} className={`min-w-0 rounded-2xl border px-4 py-3 ${TILE_TONE[t.tone ?? "ink"]}`}>
             <dt className="text-xs font-semibold text-ink-500">{t.label}</dt>

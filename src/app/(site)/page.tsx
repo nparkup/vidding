@@ -368,7 +368,8 @@ export default async function Home() {
         <div className="pointer-events-none absolute left-1/2 top-[-200px] h-[560px] w-[960px] -translate-x-1/2 rounded-full bg-gradient-to-r from-mint-100 via-white to-sky-100 opacity-90 blur-3xl" />
         <ConstructionArt className="pointer-events-none absolute left-[2%] top-20 hidden w-56 -rotate-6 animate-float-slow opacity-90 xl:block 2xl:left-[8%]" />
         <SupplyArt className="pointer-events-none absolute right-[2%] top-32 hidden w-52 rotate-6 animate-float opacity-90 xl:block 2xl:right-[8%]" />
-        <div className="container-x relative pt-14 text-center sm:pt-20">
+        {/* 아래 여백: 섹션이 overflow-hidden이라 여백이 없으면 목업 그림자·뒤 민트 번짐이 목업 아래 선에서 잘린다 */}
+        <div className="container-x relative pb-24 pt-14 text-center sm:pt-20">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-mint-100 bg-white px-3.5 py-1.5 text-[13px] font-semibold text-mint-700 shadow-card">
             입찰 특화 분석 알고리즘 기반 공공입찰 대행
           </p>
@@ -392,7 +393,7 @@ export default async function Home() {
           </ul>
 
           <div className="relative mx-auto mt-14 max-w-5xl sm:mt-16">
-            <div className="pointer-events-none absolute -inset-x-10 -bottom-10 top-10 rounded-[48px] bg-gradient-to-b from-mint/20 to-sky/10 blur-3xl" />
+            <div className="pointer-events-none absolute -inset-x-10 bottom-8 top-10 rounded-[48px] bg-gradient-to-b from-mint/20 to-sky/10 blur-3xl" />
             <div className="relative"><ProductMockup cases={cases} /></div>
           </div>
         </div>
@@ -400,7 +401,7 @@ export default async function Home() {
 
       {/* 발주기관 마키 (공식 CI가 확인된 기관만) */}
       {agencies.length > 0 && (
-      <section className="pt-16">
+      <section className="pt-0">
         <p className="container-x text-center text-sm font-semibold text-ink-400">오늘 수집한 공고의 발주기관</p>
         <div className="relative mt-5 overflow-hidden">
           {/* 양 끝 흐림은 mask-image 대신 흰 그라데이션을 덮는다. 움직이는 층에 mask를 걸면 매 프레임 다시 그려 끊긴다 */}

@@ -203,6 +203,13 @@ jobs:
         with:
           path: public/agency-logos
           key: agency-logos-${{ hashFiles('scripts/agency-logos/sources.json') }}
+      # 업종별 분석의 기간(최근 4년·전체·연도별) 낙찰 업체·발주기관 자료. 자료 재사용 배포에서도 받는다 (실패해도 계속)
+      - name: 업종 기간 자료 받기
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx tsx scripts/awards/industryFiles.ts public/industry-period
       - name: 정적 사이트 빌드
         env:
           BIDS_FILE: data/bids.json

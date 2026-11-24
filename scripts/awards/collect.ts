@@ -42,7 +42,7 @@ import {
 } from "../../src/lib/awards/analysis";
 import { assessHit, assessSamples, assessStats } from "../../src/lib/awards/assess";
 import { agencySummary } from "../../src/lib/awards/agency";
-import { industrySummary, type IndustrySummary } from "../../src/lib/awards/industry";
+import { industryId, industryPeriods, industrySummary, type IndustrySummary } from "../../src/lib/awards/industry";
 import { classify } from "../../src/lib/classify";
 import type { ServiceCategory } from "../../src/lib/types";
 import { CORP_BUCKETS, corpBucket, corpNameKeys, type CorpEntry, type CorpIndexFile } from "../../src/lib/awards/corps";
@@ -661,13 +661,18 @@ async function buildIndustries(byCat: Map<ServiceCategory, { rows: AgencyRow[]; 
   const t0 = Date.now();
   const today = iso(ymd(kstNow()));
   const out: Record<string, IndustrySummary> = {};
+  let agBytes = 0;
   for (const [cat, { rows, ags }] of byCat) {
     const s = industrySummary(cat, rows, ags, today);
     if (s) out[cat] = s;
+    // 기간(최근 4년·전체·연도별)마다 낙찰 업체·발주기관 (업종마다 파일 하나, 빌드가 화면용 파일로 나눈다: scripts/awards/industryFiles.ts)
+    const pb = gz(industryPeriods(cat, rows, ags, today));
+    agBytes += pb.length;
+    await upload(`stats/industry-period/${industryId(cat)}.json.gz`, pb);
   }
   const body = gz({ v: 1, builtAt: new Date().toISOString(), industries: out });
   await upload("stats/industry.json.gz", body);
-  console.log(`업종별 분석: ${Object.keys(out).length}개 업종 (${[...byCat].map(([c, x]) => `${c} ${x.rows.length.toLocaleString()}`).join(", ")}), ${Math.round(body.length / 1024)}KB, ${Math.round((Date.now() - t0) / 1000)}초`);
+  console.log(`업종별 분석: ${Object.keys(out).length}개 업종 (${[...byCat].map(([c, x]) => `${c} ${x.rows.length.toLocaleString()}`).join(", ")}), ${Math.round(body.length / 1024)}KB, 기간별 업체·발주기관 ${Math.round(agBytes / 1024)}KB, ${Math.round((Date.now() - t0) / 1000)}초`);
 }
 
 /* ---------- 낙찰 결과 분석 색인 (src/lib/awards/analysis.ts) ---------- */

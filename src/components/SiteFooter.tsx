@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <Logo reset />
           <p className="mt-4 max-w-xs text-sm leading-relaxed">
-            입찰 특화 알고리즘이 귀사의 입찰 담당자가 되어 드립니다.<br />공고 채점부터 제출 서류 정리까지, 매일 아침 정리해서 전달합니다.
+            입찰 특화 알고리즘이 귀사의 입찰 담당자가 되어 드립니다.<br />공고 평가부터 제출 서류 정리까지, 매일 아침 정리해서 전달합니다.
           </p>
         </div>
         <div>

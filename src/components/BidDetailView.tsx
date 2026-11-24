@@ -175,7 +175,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           {/* 가능성 */}
           <section className="card p-5">
             <h2 className="text-lg font-bold">입찰 가능성</h2>
-            <p className="mt-1 text-xs text-ink-400">알고리즘 분석 · 6개 항목 가중 채점</p>
+            <p className="mt-1 text-xs text-ink-400">알고리즘 분석 · 6개 항목 가중 평가</p>
             <Suspense fallback={<p className="mt-4 text-sm text-ink-300">계산 중…</p>}>
               <ProfileScore bid={bid} />
             </Suspense>

@@ -117,6 +117,8 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
             )}
           </section>
 
+          {b.sheet ? <SheetCard sheet={b.sheet} /> : null}
+
           <LicenseLaws groups={b.licenseGroups} />
 
           <section className="card p-5">
@@ -185,6 +187,46 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
         </aside>
       </div>
     </div>
+  );
+}
+
+const pts = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(/0+$/, "")}점`;
+
+/** 첨부에서 읽은 평가 배점표: 묶음별 항목과 배점 */
+function SheetCard({ sheet: s }: { sheet: NonNullable<NuriBid["sheet"]> }) {
+  const groups: { name: string; items: typeof s.items }[] = [];
+  for (const i of s.items) {
+    const g = groups.find((x) => x.name === i.group);
+    if (g) g.items.push(i); else groups.push({ name: i.group, items: [i] });
+  }
+  return (
+    <section className="card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold">평가 배점표</h2>
+        <span className="chip">총 배점 합계 {pts(s.total)}</span>
+      </div>
+      <p className="mt-1 text-sm text-ink-500 [overflow-wrap:anywhere]">첨부 {s.file}에서 읽은 항목과 배점입니다.</p>
+      <div className="mt-4 space-y-3">
+        {groups.map((g) => (
+          <div key={g.name} className="rounded-xl bg-paper p-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm font-bold">{g.name}</p>
+              <p className="shrink-0 text-sm font-bold tabular-nums">{pts(g.items.reduce((a, i) => a + i.max, 0))}</p>
+            </div>
+            <ul className="mt-2 space-y-1.5">
+              {g.items.map((i, n) => (
+                <li key={`${i.label}-${n}`} className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 text-ink-700 [overflow-wrap:anywhere]">{i.label}</span>
+                  <span className="shrink-0 tabular-nums text-ink-500">{pts(i.max)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {s.pass ? <p className="mt-3 text-sm text-ink-700">통과 기준: 총점 {pts(s.pass)} 이상</p> : null}
+      <p className="mt-3 text-xs leading-relaxed text-ink-400">세부 평가 기준과 서류 인정 범위는 공고서 원문에서 확인하세요. 항목 이름은 원문 표를 줄여 보여 줄 수 있습니다.</p>
+    </section>
   );
 }
 

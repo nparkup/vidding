@@ -62,6 +62,17 @@ export interface NuriBid {
   /** 아파트 단지 공고면 단지 정보 (주소·전화는 저장하지 않는다) */
   apt?: { name: string; households?: number; buildings?: number; area?: number; heating?: string };
   files: NuriFile[];
+  /** 첨부에서 읽은 평가 배점표 (빌드가 읽어 합계가 90~110점인 표만. 없으면 못 읽었거나 배점표가 없는 공고) */
+  sheet?: NuriSheet;
+}
+
+/** 공고 첨부의 평가 배점표 (항목 이름·배점만 화면에 보인다) */
+export interface NuriSheet {
+  file: string;
+  total: number;
+  items: { group: string; label: string; max: number }[];
+  /** 통과 기준 총점 (공고서에 있으면) */
+  pass?: number;
 }
 
 /** 개찰 결과 한 건 (상위 순위만, 업체는 이름만) */

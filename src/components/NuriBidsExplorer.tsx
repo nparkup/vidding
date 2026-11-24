@@ -30,6 +30,7 @@ export function NuriBidsExplorer() {
   const [biz, setBiz] = useState<string[]>([]);
   const [region, setRegion] = useState("");
   const [urgent, setUrgent] = useState(false);
+  const [sheetOnly, setSheetOnly] = useState(false);
   const [sort, setSort] = useState<Sort>("close");
   const [limit, setLimit] = useState(PAGE);
 
@@ -61,6 +62,7 @@ export function NuriBidsExplorer() {
     const not = all.filter((w) => w.startsWith("-") && w.length > 1).map((w) => norm(w.slice(1)));
     const xs = live.filter((b) => {
       if (urgent && hoursLeft(b.closeAt) > 72) return false;
+      if (sheetOnly && !b.sheet) return false;
       if (biz.length && !biz.includes(b.biz)) return false;
       if (!inRegion(b)) return false;
       const hay = norm(`${b.title} ${b.agency} ${b.category} ${b.no} ${b.licenseGroups.flat().map((r) => r.name).join(" ")}`);
@@ -72,7 +74,7 @@ export function NuriBidsExplorer() {
       budget: (a, b) => (b.refAmount ?? b.budget ?? -1) - (a.refAmount ?? a.budget ?? -1),
     };
     return xs.sort(by[sort]);
-  }, [live, q, biz, region, urgent, sort]);
+  }, [live, q, biz, region, urgent, sheetOnly, sort]);
 
   if (error) return <div className="card mt-6 p-10 text-center text-ink-500">민간 공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
   if (!data) return <div className="card mt-6 p-10 text-center text-ink-500">민간 공고를 불러오는 중…</div>;
@@ -94,9 +96,14 @@ export function NuriBidsExplorer() {
           <option value="">전국</option>
           {regions.map((r) => <option key={r}>{r}</option>)}
         </select>
-        <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
-          <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
-        </label>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+          <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+            <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
+          </label>
+          <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+            <input type="checkbox" checked={sheetOnly} onChange={(e) => setSheetOnly(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 배점표 있음
+          </label>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
@@ -143,6 +150,7 @@ function NuriRow({ bid: b }: { bid: NuriBid }) {
             {b.award && <span className="chip">{b.award.replace("에의한낙찰자결정", "")}</span>}
             {b.regions.length > 0 && <span className="chip">{b.regions.map(sidoOf).filter((x, i, a) => a.indexOf(x) === i).join("·")} 제한</span>}
             {b.method === "직찰" && <span className="chip">직접 제출</span>}
+            {b.sheet && <span className="chip border-mint/40 bg-mint-100 text-mint-600">배점표 있음</span>}
             {b.state !== "등록공고" && <span className="chip border-amber/40 bg-amber-100/60 text-ink">{b.state}</span>}
           </div>
           <p className="mt-2 text-[16px] font-semibold leading-snug group-hover:text-mint-600 [overflow-wrap:anywhere]">

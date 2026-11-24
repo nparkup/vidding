@@ -13,7 +13,7 @@ export default function RecentAwardsPage() {
     <>
       <PageHero
         eyebrow="입찰 분석 · 최근 낙찰"
-        title={<>지난주에는<br />누가, 얼마에 가져갔을까.</>}
+        title={<>최근 낙찰 업체와<br />낙찰금액을 확인하세요.</>}
         lead="최근 한 달 동안 나라장터에서 낙찰이 확정된 공고를 매일 모았습니다. 기초금액, 낙찰금액과 낙찰률, 사정율, 참가업체 수, 개찰 순위를 한 줄에 정리했습니다."
       />
       <AnalysisTabs active="awards" />

@@ -14,7 +14,7 @@ export default function AgencyPage() {
     <>
       <PageHero
         eyebrow="입찰 분석 · 발주처"
-        title={<>이 기관은<br />어떻게 발주하고, 누가 따 갔을까.</>}
+        title={<>이 기관의 발주 방식과<br />낙찰 업체를 확인하세요.</>}
         lead="지금 공고를 낸 수요기관마다 나라장터 10년치 낙찰을 모아 연도별 발주 규모, 계약방법별 낙찰률과 참가업체 수, 자주 낙찰받는 업체, 사정율 분포를 정리했습니다."
       />
       <AnalysisTabs active="agency" />

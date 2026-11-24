@@ -84,6 +84,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <AgencyLogo name={bid.demandAgency} size={24} maxW={140} className="mr-2 -mt-1" />
             {bid.agency}{bid.demandAgency !== bid.agency && ` · 수요기관 ${bid.demandAgency}`}
             <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>
+            <Link href={`/analysis/industry?cat=${encodeURIComponent(bid.category)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">업종별 분석</Link>
           </p>
         </div>
         <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap lg:justify-end">

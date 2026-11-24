@@ -18,7 +18,7 @@ import type { NuriBidsFile } from "../src/lib/nuri";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
-import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, aptMeta, rateTableFromR2, agencySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
+import { awardAnalysesFromR2, awardStatsFromR2, recentNoticeClasses, awardMeta, aptMeta, rateTableFromR2, agencySummariesFromR2, industrySummariesFromR2, recentAwardsFromR2 } from "./awards/forBuild";
 import type { AwardCount } from "../src/lib/awards/format";
 import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
@@ -174,6 +174,14 @@ async function main() {
   } catch (e) {
     console.warn("발주처 분석 건너뜀:", e instanceof Error ? e.message : e);
   }
+  // 업종별 분석 (/analysis/industry): 낙찰 수집이 업종마다 만들어 둔 요약을 받는다
+  let industries;
+  try {
+    industries = await industrySummariesFromR2() ?? undefined;
+    console.log(industries ? `업종별 분석: ${Object.keys(industries).length}개 업종` : "업종별 분석: 낙찰 저장소에 아직 없어 건너뜀");
+  } catch (e) {
+    console.warn("업종별 분석 건너뜀:", e instanceof Error ? e.message : e);
+  }
   // 사전규격 미리보기 (/prespecs): 최근 2주 등록분. 실패해도 배포는 계속
   let preSpecs;
   try {
@@ -282,7 +290,7 @@ async function main() {
   } catch (e) {
     console.warn("최근 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, preSpecs, orderPlans, contracts, aptBids, nuriBids, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, industries, preSpecs, orderPlans, contracts, aptBids, nuriBids, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

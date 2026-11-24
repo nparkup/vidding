@@ -6,6 +6,7 @@ import type { ExtractedSheet } from "./nara/docExtract";
 import type { AwardStats } from "./rivalRate";
 import type { AwardAnalysis } from "./awards/analysis";
 import type { AgencySummary } from "./awards/agency";
+import type { IndustrySummary } from "./awards/industry";
 import type { PreSpec } from "./preSpecs";
 import type { AptBidsFile, AptHistory } from "./apt";
 import type { NuriBidsFile } from "./nuri";
@@ -51,7 +52,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; nuriBids?: NuriBidsFile; awardCount?: AwardCount; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; industries?: Record<string, IndustrySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; nuriBids?: NuriBidsFile; awardCount?: AwardCount; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -138,6 +139,14 @@ export async function getAgencySummaries(): Promise<Record<string, AgencySummary
   if (!process.env.BIDS_FILE) return {};
   agencyMemo ??= fileBids()?.agencies ?? {};
   return agencyMemo;
+}
+
+let industryMemo: Record<string, IndustrySummary> | null = null;
+/** 빌드 때 받은 업종별 분석 (키: 업종) */
+export async function getIndustrySummaries(): Promise<Record<string, IndustrySummary>> {
+  if (!process.env.BIDS_FILE) return {};
+  industryMemo ??= fileBids()?.industries ?? {};
+  return industryMemo;
 }
 
 /** 빌드 때 받은 최근 2주 사전규격 */

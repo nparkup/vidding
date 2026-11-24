@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CHART } from "./useWidth";
 
 export interface HBar {
@@ -7,6 +8,8 @@ export interface HBar {
   text: string;
   /** 말풍선 (마우스 올리면) */
   title?: string;
+  /** 이름을 누르면 갈 화면 */
+  href?: string;
 }
 
 /** 가로 막대 목록: 이름과 값은 글자로, 막대는 크기 비교용. 좁은 화면에서도 한 줄 이름 + 막대 */
@@ -17,7 +20,7 @@ export function HBarList({ rows, color = CHART.bar }: { rows: HBar[]; color?: st
       {rows.map((r) => (
         <li key={r.label} className="min-w-0 text-sm" title={r.title}>
           <div className="flex min-w-0 items-baseline justify-between gap-2">
-            <span className="min-w-0 font-semibold">{r.label}</span>
+            {r.href ? <Link href={r.href} className="min-w-0 font-semibold text-mint-700 underline-offset-2 hover:underline">{r.label}</Link> : <span className="min-w-0 font-semibold">{r.label}</span>}
             <span className="shrink-0 text-xs tabular-nums text-ink-500">{r.text}</span>
           </div>
           <span className="mt-1 block h-2 rounded-full bg-paper">

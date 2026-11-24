@@ -13,6 +13,7 @@ import type { Bid } from "../../src/lib/types";
 import { r2Get } from "./r2";
 import { buildRateRows, type RateInput, type RateTable } from "../../src/lib/rateTable";
 import { agencySummary, type AgencySummary } from "../../src/lib/awards/agency";
+import type { IndustrySummary } from "../../src/lib/awards/industry";
 import { agencyBucket, analyzeBid, keywords, kwBucket, type AgencyIndexFile, type AwardAnalysis, type KwIndexFile, type KwLookup, type SimilarIndexFile } from "../../src/lib/awards/analysis";
 
 const canUse = () => !!process.env.R2_LOCAL_DIR || (!!process.env.CLOUDFLARE_API_TOKEN && !!process.env.CLOUDFLARE_ACCOUNT_ID);
@@ -180,6 +181,13 @@ export async function agencySummariesFromR2(items: Bid[]): Promise<Record<string
     if (s) out[name] = s;
   }
   return out;
+}
+
+/** 업종별 분석 (낙찰 수집이 만든 stats/industry.json.gz, src/lib/awards/industry.ts). 키는 업종. 없으면 null */
+export async function industrySummariesFromR2(): Promise<Record<string, IndustrySummary> | null> {
+  const gz = await r2Get("stats/industry.json.gz").catch(() => null);
+  if (!gz) return null;
+  return (JSON.parse(gunzipSync(gz).toString("utf8")) as { industries: Record<string, IndustrySummary> }).industries ?? null;
 }
 
 /** R2 원자료 한 파일 (빌드 한 번에 같은 파일을 두 번 받지 않게 기억한다). 없으면 [] */

@@ -1,0 +1,95 @@
+전체 10920건, 업종 제한 없는 후보 4244건
+Warning: Required "glyf" table is not found -- trying to recover.
+25건
+Warning: Required "glyf" table is not found -- trying to recover.
+50건
+Warning: Required "glyf" table is not found -- trying to recover.
+75건
+100건
+Warning: Required "glyf" table is not found -- trying to recover.
+125건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+150건
+Warning: loadFont - translateFont failed: "UnknownErrorException: Ensure that the `cMapUrl` and `cMapPacked` API parameters are provided.".
+Warning: loadFont - translateFont failed: "UnknownErrorException: Ensure that the `cMapUrl` and `cMapPacked` API parameters are provided.".
+175건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+200건
+Warning: TT: undefined function: 21
+Warning: Required "glyf" table is not found -- trying to recover.
+225건
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+250건
+Warning: Required "glyf" table is not found -- trying to recover.
+275건
+300건
+325건
+Warning: Required "glyf" table is not found -- trying to recover.
+350건
+375건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+400건
+Warning: Required "glyf" table is not found -- trying to recover.
+425건
+Warning: TT: undefined function: 21
+450건
+475건
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: Required "glyf" table is not found -- trying to recover.
+500건
+525건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Indexing all PDF objects
+Warning: Indexing all PDF objects
+550건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+575건
+600건
+625건
+Warning: Required "glyf" table is not found -- trying to recover.
+650건
+675건
+700건
+725건
+Warning: Required "glyf" table is not found -- trying to recover.
+750건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+775건
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+800건
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+825건
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+850건
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+875건
+Warning: Required "glyf" table is not found -- trying to recover.
+900건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+925건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+950건
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+975건
+Warning: Required "glyf" table is not found -- trying to recover.
+1000건
+저장 1000건

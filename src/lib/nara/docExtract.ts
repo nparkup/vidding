@@ -1,6 +1,7 @@
 import "server-only";
 import type { Bid, BidAttachment } from "../types";
 import { extractQuantBlock, extractSheet, templateSheet, type EvalItem, type EvalSheet } from "../evalscore";
+import { tierSheet } from "../tierSheet";
 import { readNoticeCriteria, type NoticeCriteria } from "../noticeCriteria";
 import type { AiInput } from "./aiSheet";
 import { docStem, download, dropRepeatedEntries, dropRepeatedPreSpec, preSpecText, rankFiles, textOf } from "./attachText";
@@ -48,6 +49,8 @@ export async function extractSheetsForBids(
     textCache?: TextCache;
     /** 공고마다 읽은 본문(파일 이름 머리글 포함)과 규칙 파서 결과를 넘긴다 (AI 판독 대상 고르기, aiSheet.ts) */
     collect?: (bid: Bid, text: string, ruleSheet: EvalSheet | undefined) => void;
+    /** 공고의 추정가격 (금액 구간마다 배점이 다른 표의 열 고르기, tierSheet.ts) */
+    estimatedOf?: (bid: Bid) => number | undefined;
   } = {},
 ): Promise<{ sheets: Record<string, ExtractedSheet>; stats: { bids: number; done: number; files: number; cached: number; downloadFailed: number; found: number; notice: number; timedOut: boolean } }> {
   const budget = Date.now() + (opts.budgetMs ?? 8 * 60_000);
@@ -118,6 +121,9 @@ export async function extractSheetsForBids(
       const all = texts.join("\n");
       const notice = all ? readNoticeCriteria(all) : undefined;
       const quant = all && bid.contractMethod === "협상에 의한 계약" ? extractQuantBlock(all) : undefined;
+      // 추정가격 구간마다 배점이 다른 표(지자체 세부기준 전문)는 공고의 구간 열을 쓴다
+      const tier = all ? tierSheet(all, opts.estimatedOf?.(bid), best?.sheet ?? templateSheet(bid)) : undefined;
+      if (tier) best = { sheet: tier, file: "금액 구간 배점표" };
       // 배점표는 합계가 100에서 크게 벗어나면 버린다 (쓸지 최종 판단은 화면에서 공고 기준 값과 함께 한다)
       const sum = best?.sheet ? best.sheet.items.reduce((a, i) => a + i.max, 0) : 0;
       const keep = best?.sheet && sum >= 90 && sum <= 110 ? best : undefined;

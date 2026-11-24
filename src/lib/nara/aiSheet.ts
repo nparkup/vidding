@@ -358,13 +358,17 @@ export function toSheet(out: AiOut, text: string, bid: Pick<Bid, "contractMethod
   let priceTotal = out.price_total;
   let scaledTo: number | undefined;
   const sc = out.tech_scale;
-  const scQuote = squash(sc?.quote ?? "");
+  // 판독이 긴 문장을 "…"로 줄여 적으면 줄임표 앞뒤 조각이 모두 원문에 있어야 한다
+  const scPieces = (sc?.quote ?? "").split(/\.{3,}|…/).map(squash).filter((p) => p.length >= 6);
+  const scQuoteOk = scPieces.length > 0 && scPieces.reduce((a, p) => a + p.length, 0) >= 8 && scPieces.every((p) => flat.includes(p));
+  // 배점 없이 머리글만 잡힌 가격 줄("가격평가 0점")은 항목이 아니다 (입찰가격 배점은 price_total 로 넣는다)
+  raw.splice(0, raw.length, ...raw.filter((i) => !(i.max === 0 && /가격/.test(i.label))));
   // 가격 항목은 표 밖(공고 문장)에서 읽어 함께 넣었을 수 있다: 기술 항목만 100점이고 가격 항목이 100−N 이면 같은 경우로 본다
   const techRaw = raw.filter((i) => i.kind !== "price");
   const priceRaw = raw.filter((i) => i.kind === "price");
   if (sc?.to && sc.to >= 50 && sc.to < 100 && Math.abs(total(techRaw) - 100) <= 0.5
     && (priceRaw.length === 0 || (priceRaw.length === 1 && Math.abs(priceRaw[0].max - (100 - sc.to)) <= 0.5))
-    && scQuote.length >= 8 && flat.includes(scQuote) && /환산|만점|%/.test(sc.quote) && new RegExp(String.raw`(?<![\d.])${sc.to}(?![\d.])`).test(sc.quote)
+    && scQuoteOk && /환산|만점|%/.test(sc.quote) && new RegExp(String.raw`(?<![\d.])${sc.to}(?![\d.])`).test(sc.quote)
     && (priceTotal === null || Math.abs(priceTotal - (100 - sc.to)) <= 0.5)) {
     const f = sc.to / 100;
     for (const i of techRaw) {

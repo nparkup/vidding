@@ -137,7 +137,7 @@ async function main() {
   try {
     // 첨부는 모두 읽는다(같은 파일명은 하나만). 읽은 본문은 캐시에 남겨 다음 빌드는 새 첨부만 받는다
     const textCache = makeTextCache();
-    const r = await extractSheetsForBids(items, attachments, { collect: ai.collect, textCache, budgetMs: 10 * 60_000 });
+    const r = await extractSheetsForBids(items, attachments, { collect: ai.collect, textCache, budgetMs: 10 * 60_000, estimatedOf: (b) => quals[b.id]?.basis?.presmpt });
     sheets = r.sheets;
     const pruned = textCache.prune((Object.values(attachments) as BidAttachment[][]).flat().map(textCacheKey));
     console.log(`평가표 추출: 대상 ${r.stats.bids}건 중 ${r.stats.done}건 읽음, 파일 ${r.stats.files}개(캐시 ${r.stats.cached}, 새로 받음 ${textCache.stats().added}, 실패 ${r.stats.downloadFailed}), 배점표 ${r.stats.found}건, 공고 기준 문장 ${r.stats.notice}건${r.stats.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서 (화면에서 고르면 그 자리에서 읽음)" : ""}, 캐시 정리 ${pruned}개`);

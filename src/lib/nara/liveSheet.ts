@@ -1,3 +1,4 @@
+import { tierSheet } from "../tierSheet";
 import { createHash } from "crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Bid, BidAttachment } from "../types";
@@ -36,7 +37,7 @@ export interface LiveResult extends AiSheetResult {
 }
 
 /** 즉석 판독 결과 모양을 바꾸면 올린다 (2: 공고서 문장 기준·정량평가 표를 함께 돌려줌) */
-export const LIVE_VERSION = 2;
+export const LIVE_VERSION = 3;
 
 /** 첨부 주소만 보고 만든 캐시 키 (첨부가 바뀌면 새로 읽는다) */
 export const liveKey = (docs: LiveDocs) => createHash("sha1").update(`${AI_SHEET_VERSION}\nlive${LIVE_VERSION}\n${rankFiles(docs.files).map((f) => `${f.name}\t${f.url}`).join("\n")}`).digest("hex").slice(0, 16);
@@ -99,7 +100,10 @@ export async function readSheetLive(
   const quant = bid.contractMethod === "협상에 의한 계약" ? extractQuantBlock(all) : undefined;
   const extra = { ...(notice ? { notice } : {}), ...(quant ? { quant } : {}) };
   const like = { contractMethod: bid.contractMethod, bizType: bid.bizType, baseAmount: bid.baseAmount ?? 0, category: bid.category, lowerLimitRate: bid.lowerLimitRate } as Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category" | "lowerLimitRate">;
-  const rule = extractSheet(all, templateSheet(like, basis));
+  const template = templateSheet(like, basis);
+  const rule0 = extractSheet(all, template);
+  // 추정가격 구간마다 배점이 다른 표(지자체 세부기준 전문)는 공고의 구간 열을 쓴다
+  const rule = tierSheet(all, basis?.presmpt, rule0 ?? template) ?? rule0;
   const ruleOk = rule && adoptable(rule, basis) ? rule : undefined;
   // 큰 묶음(정량·정성·가격)만 적힌 요약표면 상세 배점표를 한 번 더 찾고, 못 찾으면 요약표를 쓴다
   const fallback = ruleOk ? { ...base, ...extra, status: "ok" as const, sheet: ruleOk, read, failed, by: "rule" as const } : undefined;

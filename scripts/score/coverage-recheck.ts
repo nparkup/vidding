@@ -51,7 +51,7 @@ async function main() {
     const bid = { id, title: it.bidNtceNm, agency: it.ntceInsttNm, postedAt: it.bidNtceDt ?? "", contractMethod: nego ? "협상에 의한 계약" : "적격심사", bizType: v.biz, baseAmount: amt, category: "기타 용역", lowerLimitRate: Number(it.sucsfbidLwltRate) || undefined } as unknown as Bid;
     const basis = evalBasisOf(it);
     let named = "";
-    const r = await extractSheetsForBids([bid], { [id]: files }, { concurrency: 1, textCache: { get: (u) => cache.get(u), set: () => undefined }, collect: (_b, t) => { named = t; } });
+    const r = await extractSheetsForBids([bid], { [id]: files }, { concurrency: 1, textCache: { get: (u) => cache.get(u), set: () => undefined }, collect: (_b, t) => { named = t; }, estimatedOf: () => basis?.presmpt });
     const ex = r.sheets[id];
     const preUsed = (ex?.read ?? []).filter((n) => n.startsWith("사전규격")).length;
     if (/사전규격 규격서/.test(named)) tally.preRead++;

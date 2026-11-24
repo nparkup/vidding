@@ -40,7 +40,7 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
         <div className="container-x relative">
           <div className="max-w-3xl">
             <p className="text-sm font-bold tracking-wide text-mint-400">입찰 특화 분석 엔진</p>
-            <h2 className="h-section mt-3">공고 한 건마다 6개 항목,<br />100점 만점으로 정밀 채점합니다.</h2>
+            <h2 className="h-section mt-3">모든 입찰 공고를<br />정밀 분석합니다.</h2>
             <p className="mt-5 text-base leading-relaxed text-ink-300 sm:text-lg">
               면허·지역·규모 3개 필수 조건을 먼저 판정하고, 통과한 공고만 경쟁 강도·실적·준비 기간을 가중해 점수와 등급을 매깁니다.
               모든 점수는 항목별 근거와 함께 공개됩니다.

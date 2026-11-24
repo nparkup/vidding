@@ -5,7 +5,7 @@ import { countPatents, patentRule, type PatentLookup } from "@/lib/patents";
 
 /**
  * 평가점수 예측 3단계: 공고 배점표에 특허 항목이 있을 때만 보인다.
- * 특허청(KIPRIS Plus) 조회 결과 중 지금 등록 상태인 특허·실용신안을 보여 주고, 공고에 인정되지 않는 건은 고객이 뺄 수 있다.
+ * 특허청 등록원부(공공데이터포털) 조회 결과 중 지금 살아 있는 특허권을 보여 주고, 공고에 인정되지 않는 건은 고객이 뺄 수 있다.
  * 조회에 없는 건(출원 건, 조회 뒤 등록된 건)은 직접 더한다.
  */
 export function PatentBox({ items, res, loading, excluded, onToggle, extra, onExtra, asOf }: {
@@ -26,8 +26,8 @@ export function PatentBox({ items, res, loading, excluded, onToggle, extra, onEx
   const status = loading
     ? "특허청 특허 정보를 조회하는 중…"
     : !res ? "우리 회사를 조회하면 특허청에 등록된 특허를 불러옵니다."
-    : res.status === "ok" ? `특허청 조회: 등록 상태 ${res.total.toLocaleString("ko-KR")}건${res.total > list.length ? ` (최근 등록 ${list.length}건 표시)` : ""} · 출원인 ${res.applicants.map((a) => a.name).filter(Boolean).join(", ") || "-"}`
-    : res.status === "none" ? "특허청에 이 사업자번호로 출원한 기록이 없습니다. 보유 특허가 있으면 직접 넣어 주세요."
+    : res.status === "ok" ? `특허청 등록원부 조회: 존속 중인 권리 ${res.total.toLocaleString("ko-KR")}건${res.total > list.length ? ` (최근 등록 ${list.length}건 표시)` : ""}`
+    : res.status === "none" ? "특허청 등록원부에 이 사업자번호의 특허권이 없습니다. 보유 특허가 있으면 직접 넣어 주세요."
     : res.status === "limit" ? "이번 달 특허 자동 조회 한도에 다다라 직접 입력으로 계산합니다."
     : res.status === "off" ? "특허 자동 조회를 준비 중입니다. 보유 특허 건수를 직접 넣어 주세요."
     : "특허 조회에 실패했습니다. 보유 특허 건수를 직접 넣어 주세요.";
@@ -36,7 +36,7 @@ export function PatentBox({ items, res, loading, excluded, onToggle, extra, onEx
       <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold">
         특허 보유
         {res?.status === "ok" || res?.status === "none"
-          ? <span className="rounded-md bg-mint-50 px-1.5 py-0.5 text-[11px] font-semibold text-mint-700">자동 · 특허청 KIPRIS</span>
+          ? <span className="rounded-md bg-mint-50 px-1.5 py-0.5 text-[11px] font-semibold text-mint-700">자동 · 특허청 등록원부</span>
           : <span className="rounded-md bg-ink-50 px-1.5 py-0.5 text-[11px] font-semibold text-ink-500">직접 입력</span>}
       </p>
       <ul className="mt-2 space-y-1 text-xs text-ink-500">

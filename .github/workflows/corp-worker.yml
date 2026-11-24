@@ -4,7 +4,7 @@ name: 기업 정보 중계 서버 배포
 # 필요한 저장소 Secrets: CLOUDFLARE_API_TOKEN (Workers 편집 권한), CLOUDFLARE_ACCOUNT_ID, DATA_GO_KR_SERVICE_KEY
 # 선택: ANTHROPIC_API_KEY (공고 배점표 AI 판독, ?aisheet=). 있으면 Worker 비밀값으로 넣는다
 # 선택: ADMIN_ID, ADMIN_PASSWORD (관리자 화면 /admin 로그인, 비밀번호 10자 이상). 있으면 Worker 비밀값으로 넣는다
-# 선택: KIPRIS_API_KEY (기업 특허 조회, ?patents=, KIPRIS Plus 마이페이지 > APIKEY관리의 인증키). 있으면 Worker 비밀값으로 넣는다
+# 선택: KIPRIS_API_KEY (기업 특허 조회 예비 경로, KIPRIS Plus 인증키). 기본 경로는 공공데이터포털 등록원부라 없어도 된다
 # 선택: ADMIN_GITHUB_TOKEN (관리자 화면 GitHub Actions 실행 목록, Actions 읽기 권한만). 있으면 Worker 비밀값 GITHUB_TOKEN 으로 넣는다
 on:
   push:

@@ -1,7 +1,0 @@
-{"found":true,"decides_award":true,"reason":"계약방법 적격심사이며 공고서가 낙찰자 결정을 계약이행능력심사 세부기준 별표 4(추정가격이 고시금액 미만인 중소기업자간 경쟁물품)로 적용하고 있다. 본문에 평가 배점표 표 자체가 없고 평가기준 문장(통과점수 88점, 낙찰하한율 89.995%)만 있어 배점 항목을 구조화할 수 없다. 따라서 found=false로 둔다.","table_quote":"조달청 중소기업자간 경쟁물품에 대한 계약이행능력심사 세부기준 제 4 조 제 1 항 제 2 호 [ 별표 4] ( 추정가격이 고시금액 미만인 중소기업자간 경쟁물품 )","stated_total":null,"tech_total":null,"price_total":null,"tech_scale":{"to":null,"quote":""},"pass":{"kind":"total","value":88,"quote":"낙찰자 결정을 위한 통과점수 : 88 점"},"panel_rule":null,"items":[]}
-R26BK01846206-000	물품	적격	배점표 추정→추정	공고서 기준 1→1	사전규격 3	AI rejected (평가항목이 2개 미만)
-    전: -
-    후: -
-    기준: 낙찰하한율=89.995%
-
-요약 {"bids":1,"beforeTable":0,"afterTable":0,"beforeFacts":1,"afterFacts":1,"preRead":1,"aiCalls":1,"aiIn":13516,"aiOut":398}

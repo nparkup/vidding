@@ -1,1 +1,0 @@
-scripts/score/coverage-recheck.ts ai R26BK01846206-000

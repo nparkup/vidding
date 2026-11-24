@@ -144,7 +144,14 @@ function readPass(all: string[]): NoticeCriteria["pass"] {
     const listed = new Set([...s.matchAll(new RegExp(String.raw`${NUM}점\s*이상`, "g"))].map((x) => x[1])).size > 1;
     hits.push({ s, v, w: (/낙찰자|적격자|협상\s*(?:대상|적격)자|선정/.test(s) ? 2 : 0) + (/종합\s*평점|합산\s*점수/.test(m[1]) ? 1 : 0) - (listed ? 3 : 0) });
   }
-  if (!hits.length) return undefined;
+  if (!hits.length) {
+    // "낙찰자 결정을 위한 통과점수 : 88 점"처럼 '이상' 없이 적은 문장
+    for (const s of all) {
+      const m = s.match(new RegExp(String.raw`(?:적격\s*)?통과\s*점수\s*[:：은는]?\s*${NUM}\s*점`));
+      if (m && Number(m[1]) >= 60 && Number(m[1]) <= 100) return { value: { kind: "total", score: Number(m[1]) }, quote: clip(s) };
+    }
+    return undefined;
+  }
   const best = hits.sort((a, b) => b.w - a.w)[0];
   return { value: { kind: "total", score: best.v }, quote: clip(best.s) };
 }

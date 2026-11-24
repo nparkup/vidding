@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "무료 체험 · 회원가입" };
 export default function Apply() {
   return (
     <ApplyLayout>
-      <ApplyForm email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@ipchalmatelab.kr"} />
+      <ApplyForm email={process.env.NEXT_PUBLIC_APPLY_EMAIL || "hello@bidmatrix.kr"} />
     </ApplyLayout>
   );
 }

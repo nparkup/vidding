@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { PageHero } from "@/components/PageHero";
 
-export const metadata = { title: "발주기관 CI 출처 | 입찰메이트LAB" };
+export const metadata = { title: "발주기관 CI 출처 | 비드매트릭스" };
 
 type Credit = { file: string; source: string; page: string; license: string; artist: string };
 

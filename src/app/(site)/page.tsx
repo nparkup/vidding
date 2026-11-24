@@ -159,7 +159,7 @@ export default async function Home() {
             <span>받은편지함 · 오전 7:00</span>
             <span className="rounded-full bg-mint-50 px-2 py-0.5 font-bold text-mint-600">새 메일</span>
           </div>
-          <p className="mt-2 text-sm font-bold">[입찰메이트LAB] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
+          <p className="mt-2 text-sm font-bold">[비드매트릭스] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
           <ul className="mt-3 divide-y divide-ink-100">
             {digest.recommended.slice(0, 4).map((r) => (
               <li key={r.bid.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -555,10 +555,10 @@ export default async function Home() {
       {/* 비교 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">왜 입찰메이트LAB인가요</p>
+          <p className="eyebrow">왜 비드매트릭스인가요</p>
           <h2 className="h-section mt-3">입찰정보 사이트는 많은데,<br />왜 여전히 힘들까요?</h2>
         </div>
-        {/* 데스크톱: 항목별 한 줄 비교 표, 입찰메이트LAB 열을 강조 */}
+        {/* 데스크톱: 항목별 한 줄 비교 표, 비드매트릭스 열을 강조 */}
         <div className="relative mt-14 hidden lg:block">
           <div className="pointer-events-none absolute -bottom-6 -top-6 right-0 w-[44%] rounded-[32px] bg-ink shadow-glow ring-2 ring-mint">
             <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-mint/25 blur-3xl" />
@@ -570,7 +570,7 @@ export default async function Home() {
               <p className="mt-1 text-xs text-ink-300">사람이 직접 찾고 판단</p>
             </div>
             <div className="px-8 pb-5">
-              <p className="text-lg font-extrabold text-mint-300">입찰메이트LAB</p>
+              <p className="text-lg font-extrabold text-mint-300">비드매트릭스</p>
               <p className="mt-1 text-xs text-ink-300">입찰 특화 알고리즘이 판정·평가</p>
             </div>
             {COMPARE.map(([k, a, b]) => (
@@ -609,7 +609,7 @@ export default async function Home() {
               </p>
               <p className="flex items-center gap-2.5 bg-ink px-4 py-3.5 font-bold text-white">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-mint"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span>
-                <span><span className="mr-1.5 text-[11px] font-semibold text-mint-300">입찰메이트LAB</span>{b}</span>
+                <span><span className="mr-1.5 text-[11px] font-semibold text-mint-300">비드매트릭스</span>{b}</span>
               </p>
             </div>
           ))}
@@ -619,7 +619,7 @@ export default async function Home() {
               <p className="mt-1 text-3xl font-extrabold tabular-nums text-ink-300">{bids.length.toLocaleString()}<span className="text-sm">건</span></p>
             </div>
             <div className="bg-ink p-4">
-              <p className="text-[11px] font-semibold text-mint-300">입찰메이트LAB</p>
+              <p className="text-[11px] font-semibold text-mint-300">비드매트릭스</p>
               <p className="mt-1 text-3xl font-extrabold tabular-nums text-mint">{eligible.length.toLocaleString()}<span className="text-sm text-mint-300">건</span></p>
               <p className="text-xs font-bold text-white">{cut}% 감소</p>
             </div>

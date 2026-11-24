@@ -32,7 +32,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
         <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
         <span className="h-3 w-3 rounded-full bg-[#28C840]" />
         <span className="mx-auto hidden w-1/2 truncate rounded-lg bg-white px-3 py-1 text-center text-xs text-ink-400 ring-1 ring-ink-100 sm:block">
-          입찰메이트LAB · {digest.client.company} 전용 공고함
+          비드매트릭스 · {digest.client.company} 전용 공고함
         </span>
       </div>
 

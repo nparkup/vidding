@@ -13,7 +13,7 @@ export function BidView() {
   const bid = bids?.find((b) => b.id === id) ?? bids?.find((b) => b.bidNtceNo === id.split("-")[0]);
 
   useEffect(() => {
-    if (bid) document.title = `${bid.title} 공고 분석 | 입찰메이트LAB`;
+    if (bid) document.title = `${bid.title} 공고 분석 | 비드매트릭스`;
   }, [bid]);
 
   if (error) return <Message text="공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요." />;

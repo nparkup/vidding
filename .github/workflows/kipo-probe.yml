@@ -1,0 +1,21 @@
+name: kipo-probe (임시)
+on:
+  push:
+    branches: [claude/project-thread-x5jz9i]
+    paths: [".github/workflows/kipo-probe.yml"]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 등록원부 사업자 권리목록 조회 확인
+        env:
+          K: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: |
+          base="https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getBusinessRightList"
+          for v in "301-81-08302" "3018108302" "124-81-00998" "1248100998"; do
+            echo "=== searchVal=$v"
+            curl -sS -G "$base" --data-urlencode "serviceKey=$K" -d pageNo=1 -d numOfRows=3 -d type=json -d searchType=1 --data-urlencode "searchVal=$v" -w "\nHTTP %{http_code}\n" | sed "s/$K/KEY/g" | head -c 2500
+            echo
+          done

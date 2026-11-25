@@ -14,6 +14,7 @@ import { HBarList } from "@/components/charts/HBarList";
 import { ScrollRow } from "@/components/ScrollRow";
 import { daysLeft } from "@/lib/analysis";
 import { METHOD_NAME } from "@/lib/awards/analysis";
+import { isVagueAgency } from "@/lib/awards/agency";
 import { industryId, periodLabel, type FirmStat, type IndustryAgencyRow, type IndustryIndexRow, type IndustryPeriodData, type IndustrySummary } from "@/lib/awards/industry";
 import { won } from "@/lib/format";
 import { useBids } from "@/lib/useBids";
@@ -50,7 +51,7 @@ export function IndustryExplorer() {
     if (!cat) { setSum(undefined); return; }
     let alive = true;
     setSum(undefined);
-    loadJson<IndustrySummary>(`/industry-data/${industryId(cat)}.json`).then((s) => alive && setSum(s)).catch(() => alive && setSum(null));
+    loadJson<IndustrySummary>(`/industry-data/${industryId(cat)}.json`).then((s) => alive && setSum(s && { ...s, agencies: s.agencies.filter(([a]) => !isVagueAgency(a)) })).catch(() => alive && setSum(null));
     return () => { alive = false; };
   }, [cat]);
 
@@ -225,7 +226,7 @@ function PeriodSection({ s, agencyIds }: { s: IndustrySummary; agencyIds: Map<st
   useEffect(() => {
     let alive = true;
     setD(undefined);
-    loadJson<IndustryPeriodData>(`/industry-period/${id}-${period}.json`).then((x) => alive && setD(x)).catch(() => alive && setD(null));
+    loadJson<IndustryPeriodData>(`/industry-period/${id}-${period}.json`).then((x) => alive && setD(x && { ...x, agencies: x.agencies.filter(([a]) => !isVagueAgency(a)) })).catch(() => alive && setD(null));
     return () => { alive = false; };
   }, [id, period]);
   // 기간 자료가 아직 없으면 최근 4년은 업종 요약에 든 값으로 보여 준다
@@ -284,7 +285,7 @@ function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; list
   const load = () => {
     if (all !== undefined || !listPath) return;
     setAll(null);
-    loadJson<IndustryAgencyRow[]>(listPath).then((l) => setAll(l ?? [])).catch(() => setAll([]));
+    loadJson<IndustryAgencyRow[]>(listPath).then((l) => setAll((l ?? []).filter((r) => !isVagueAgency(r[0])))).catch(() => setAll([]));
   };
   const t = q.replace(/\s+/g, "");
   const matches = useMemo(() => (t && all ? all.filter((r) => r[0].replace(/\s+/g, "").includes(t)) : []), [all, t]);

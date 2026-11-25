@@ -12,7 +12,7 @@ import type { AwardStats, PriorMatch, RateStat } from "../../src/lib/rivalRate";
 import type { Bid } from "../../src/lib/types";
 import { r2Get } from "./r2";
 import { buildRateRows, type RateInput, type RateTable } from "../../src/lib/rateTable";
-import { agencySummary, type AgencySummary } from "../../src/lib/awards/agency";
+import { agencySummary, isVagueAgency, type AgencySummary } from "../../src/lib/awards/agency";
 import type { IndustrySummary } from "../../src/lib/awards/industry";
 import { agencyBucket, analyzeBid, keywords, kwBucket, type AgencyIndexFile, type AwardAnalysis, type KwIndexFile, type KwLookup, type SimilarIndexFile } from "../../src/lib/awards/analysis";
 
@@ -172,7 +172,7 @@ function agencyFile(k: string): Promise<AgencyIndexFile | null> {
 export async function agencySummariesFromR2(items: Bid[]): Promise<Record<string, AgencySummary> | null> {
   if (!(await awardMeta())) return null;
   const today = kstNow().toISOString().slice(0, 10);
-  const names = [...new Set(items.map((b) => b.demandAgency).filter(Boolean))];
+  const names = [...new Set(items.map((b) => b.demandAgency).filter((n) => n && !isVagueAgency(n)))];
   const out: Record<string, AgencySummary> = {};
   for (const name of names) {
     const file = await agencyFile(agencyBucket(name));

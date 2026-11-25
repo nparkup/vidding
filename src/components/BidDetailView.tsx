@@ -20,7 +20,7 @@ import { BidPriceAnalysis } from "@/components/BidPriceAnalysis";
 import { loadAwardAnalysis } from "@/components/premium/AwardAnalysis";
 import type { AwardAnalysis } from "@/lib/awards/analysis";
 import { usesAssess } from "@/lib/awards/assess";
-import { agencyId } from "@/lib/awards/agency";
+import { agencyId, isVagueAgency } from "@/lib/awards/agency";
 import { MyBoxButton } from "@/components/MyBoxButton";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
@@ -83,7 +83,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
           <p className="mt-2 text-ink-500">
             <AgencyLogo name={bid.demandAgency} size={24} maxW={140} className="mr-2 -mt-1" />
             {bid.agency}{bid.demandAgency !== bid.agency && ` · 수요기관 ${bid.demandAgency}`}
-            <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>
+            {!isVagueAgency(bid.demandAgency) && <Link href={`/analysis/agency?id=${agencyId(bid.demandAgency)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">발주처 분석</Link>}
             <Link href={`/analysis/industry?cat=${encodeURIComponent(bid.category)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">업종별 분석</Link>
           </p>
         </div>

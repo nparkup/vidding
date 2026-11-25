@@ -54,8 +54,10 @@ function squarify(values: number[], box: Rect): Rect[] {
 }
 
 /**
- * 면적형 차트(트리맵): 칸 넓이 = 값. 앞 top개는 따로, 나머지는 '기타 N곳' 한 칸으로 묶고
- * 기타를 누르면 그 안을 다시 같은 방식으로 펼친다(처음으로 버튼으로 돌아간다).
+ * 면적형 차트(트리맵): 칸 넓이 = 값. 앞 top개만 칸으로 그리고, 나머지는 그림 밖 아래
+ * '기타 N곳' 한 줄로 묶는다(기타가 화면 절반을 차지해 보이지 않게). 칸의 %는 전체 대비 값을
+ * 그대로 쓰고, 기타 줄에 실제 비중을 숫자와 얇은 막대로 적는다. 기타 줄을 누르면 그 안을
+ * 다시 같은 방식으로 펼친다(처음으로 버튼으로 돌아간다).
  */
 export function Treemap({ items, top = 30, height = 320, ariaLabel, unit = "곳" }: { items: TreeItem[]; top?: number; height?: number; ariaLabel: string; unit?: string }) {
   const [ref, W] = useWidth<HTMLDivElement>();
@@ -67,14 +69,12 @@ export function Treemap({ items, top = 30, height = 320, ariaLabel, unit = "곳"
   const otherSum = others.reduce((a, t) => a + t.value, 0);
   const H = W < 480 ? Math.round(height * 1.15) : height;
   const cells = useMemo(() => {
-    const vals = [...shown.map((t) => t.value), ...(others.length ? [otherSum] : [])];
-    return squarify(vals, { x: 0, y: 0, w: W, h: H });
-  }, [shown, others.length, otherSum, W, H]);
+    return squarify(shown.map((t) => t.value), { x: 0, y: 0, w: W, h: H });
+  }, [shown, W, H]);
   const all = rest.reduce((a, t) => a + t.value, 0) || 1;
   const pctOf = (v: number) => { const p = (v / all) * 100; return p >= 10 ? `${Math.round(p)}%` : p >= 0.1 ? `${p.toFixed(1)}%` : "0.1% 미만"; };
-  const tipFor = (i: number): string[] => (i < shown.length
-    ? [...shown[i].tip, `이 그림 안 비중 ${pctOf(shown[i].value)}`]
-    : [`기타 ${others.length.toLocaleString()}${unit}`, `비중 ${pctOf(otherSum)}`, "누르면 이 안을 펼쳐 봅니다"]);
+  const otherShare = otherSum / all;
+  const tipFor = (i: number): string[] => [...shown[i].tip, `${skip > 0 ? "펼친 범위 안 비중" : "전체 비중"} ${pctOf(shown[i].value)}`];
   const hc = hover !== null ? cells[hover] : null;
   if (!items.length) return null;
   return (
@@ -89,20 +89,17 @@ export function Treemap({ items, top = 30, height = 320, ariaLabel, unit = "곳"
       <div ref={ref} className="relative min-w-0 select-none" onMouseLeave={() => setHover(null)}>
         <svg width={W} height={H} role="img" aria-label={ariaLabel} className="block">
           {cells.map((c, i) => {
-            const isOther = i >= shown.length;
-            const t = isOther ? null : shown[i];
-            const label = isOther ? `기타 ${others.length.toLocaleString()}${unit}` : t!.label;
-            const fill = isOther ? CHART.axis : i === 0 ? CHART.barHot : CHART.bar;
-            const op = isOther ? 1 : Math.max(0.45, 1 - i * 0.025);
-            const ink = isOther || (i > 0 && op < 0.75) ? CHART.ink : "#fff";
+            const t = shown[i];
+            const fill = i === 0 ? CHART.barHot : CHART.bar;
+            const op = Math.max(0.45, 1 - i * 0.025);
+            const ink = i > 0 && op < 0.75 ? CHART.ink : "#fff";
             const fit = Math.floor((c.w - 8) / 11);
-            const name = fit >= 2 ? (label.length > fit ? `${label.slice(0, fit - 1)}…` : label) : "";
+            const name = fit >= 2 ? (t.label.length > fit ? `${t.label.slice(0, fit - 1)}…` : t.label) : "";
             // 둘째 줄은 숫자가 잘리지 않게, 칸에 다 들어가는 것만 쓴다 (값·비중 → 값 → 비중)
             const fitsSub = (s: string) => textW(s) * 0.92 <= c.w - 10;
-            const subOpts = isOther ? [pctOf(otherSum)] : [`${t!.sub} · ${pctOf(t!.value)}`, t!.sub, pctOf(t!.value)];
-            const subText = c.h >= 34 ? subOpts.find(fitsSub) : undefined;
+            const subText = c.h >= 34 ? [`${t.sub} · ${pctOf(t.value)}`, t.sub, pctOf(t.value)].find(fitsSub) : undefined;
             return (
-              <g key={isOther ? "__other" : t!.key} onMouseEnter={() => setHover(i)} onClick={() => { setHover(i); if (isOther) { setSkip(skip + shown.length); setHover(null); } }} className={isOther ? "cursor-pointer" : undefined}>
+              <g key={t.key} onMouseEnter={() => setHover(i)} onClick={() => setHover(i)}>
                 <rect x={c.x + 1} y={c.y + 1} width={Math.max(0, c.w - 2)} height={Math.max(0, c.h - 2)} rx={4} fill={fill} fillOpacity={op} stroke={hover === i ? CHART.ink : "none"} strokeWidth={1.5} />
                 {c.h >= 18 && name && <text x={c.x + 6} y={c.y + 15} fontSize="11" fontWeight="600" fill={ink}>{name}</text>}
                 {subText && <text x={c.x + 6} y={c.y + 29} fontSize="10" fill={ink} fillOpacity={0.85}>{subText}</text>}
@@ -112,6 +109,31 @@ export function Treemap({ items, top = 30, height = 320, ariaLabel, unit = "곳"
         </svg>
         {hc && hover !== null && <Tooltip x={hc.x + hc.w / 2} y={Math.min(hc.y + hc.h / 2, H - 80)} lines={tipFor(hover)} width={W} />}
       </div>
+      {others.length > 0 && (
+        <button
+          type="button"
+          onClick={() => { setSkip(skip + shown.length); setHover(null); }}
+          className="mt-2 block w-full rounded-lg border border-ink-100 bg-ink-50 px-3 py-2 text-left transition hover:border-ink-300"
+          aria-label={`기타 ${others.length.toLocaleString()}${unit}, 비중 ${pctOf(otherSum)}, 펼쳐 보기`}
+        >
+          <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+            <span className="min-w-0 text-ink-700">
+              <span className="font-semibold">기타 {others.length.toLocaleString()}{unit}</span>
+              <span className="text-ink-500"> · {skip > 0 ? "펼친 범위 안 비중" : "전체 비중"} </span>
+              <span className="font-semibold">{pctOf(otherSum)}</span>
+            </span>
+            <span className="shrink-0 font-semibold text-mint-700">펼쳐 보기</span>
+          </span>
+          <span className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-white" aria-hidden>
+            <span className="h-full" style={{ width: `${(1 - otherShare) * 100}%`, background: CHART.bar }} />
+            <span className="h-full" style={{ width: `${otherShare * 100}%`, background: CHART.axis }} />
+          </span>
+          <span className="mt-1 flex justify-between text-[11px] text-ink-400">
+            <span>상위 {shown.length}{unit} {pctOf(all - otherSum)}</span>
+            <span>기타 {pctOf(otherSum)}</span>
+          </span>
+        </button>
+      )}
     </div>
   );
 }

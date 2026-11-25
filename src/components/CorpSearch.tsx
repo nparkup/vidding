@@ -66,7 +66,7 @@ export function CorpSearch({ id, label, value, onChange, onBizno, busy, button =
       </form>
       {msg && <p className="mt-2 text-sm text-coral">{msg}</p>}
       {res && (
-        <div className="mt-2 rounded-2xl border border-ink-100 bg-white">
+        <div className="mt-2 overflow-hidden rounded-2xl border border-ink-100 bg-white">
           <p className="border-b border-ink-100 px-3 py-2 text-xs text-ink-500">
             &apos;{res.query}&apos;(으)로 시작하는 업체 {res.total.toLocaleString()}곳{res.total > res.hits.length ? ` 중 낙찰 많은 ${res.hits.length}곳` : ""}. 사업자번호를 보고 골라 주세요.
           </p>

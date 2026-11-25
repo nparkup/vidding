@@ -50,7 +50,7 @@ export function RivalExplorer({ mode = "rival" }: { mode?: Mode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  async function look(no: string) {
+  async function look(no: string, hint?: string) {
     const n = normalizeBizno(no);
     if (!validBizno(n)) { setErr("사업자등록번호 10자리를 확인해 주세요."); return; }
     if (!API) { setErr("이 미리보기에서는 낙찰 조회를 쓸 수 없습니다."); return; }
@@ -61,7 +61,8 @@ export function RivalExplorer({ mode = "rival" }: { mode?: Mode }) {
       if (!r.ok || j.error) throw new Error(j.error ?? "조회 실패");
       if (!j.ready) throw new Error("낙찰 저장소를 다시 만드는 중입니다. 잠시 뒤 다시 시도해 주세요.");
       setData(j);
-      const name = j.wins[0] ? winnerName(j.wins) : "";
+      // 낙찰 기록이 없으면 고른 이름이나 전에 저장한 이름을 그대로 둔다
+      const name = (j.wins[0] ? winnerName(j.wins) : "") || hint || loadSaved(mode).find((s) => s.bizno === n)?.name || "";
       const next = [{ bizno: n, name }, ...loadSaved(mode).filter((s) => s.bizno !== n)];
       save(mode, next); setSaved(next);
     } catch (e) {
@@ -85,11 +86,11 @@ export function RivalExplorer({ mode = "rival" }: { mode?: Mode }) {
     <div className="container-x grid gap-6 py-8 lg:grid-cols-[320px_1fr]">
       <aside className="min-w-0">
         <CorpSearch id="rival-no" label={mode === "mine" ? "우리 회사 사업자등록번호 또는 기업명" : "경쟁사 사업자등록번호 또는 기업명"}
-          value={input} onChange={setInput} onBizno={(no) => look(no)} busy={loading} />
+          value={input} onChange={setInput} onBizno={(no, name) => look(no, name)} busy={loading} />
         {err && <p className="mt-2 text-sm text-coral">{err}</p>}
         <p className="mt-2 text-xs leading-relaxed text-ink-500">{mode === "mine" ? "기업명으로 찾으면 같은 이름 업체를 사업자번호와 함께 보여 드립니다. 고른 번호는 이 브라우저에만 남아 다음에 바로 진단합니다." : "기업명으로 찾으면 같은 이름 업체를 사업자번호와 함께 보여 드립니다. 조회한 업체는 관심 업체로 이 브라우저에 남습니다. 공고 상세의 참가 예상 기업이나 개찰 순위에 나온 업체를 넣어 보세요."}</p>
         {saved.length > 0 && (
-          <ul className="mt-3 divide-y divide-ink-100 rounded-2xl border border-ink-100 bg-white">
+          <ul className="mt-3 divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white">
             {saved.map((s) => (
               <li key={s.bizno} className={`flex items-center justify-between gap-2 px-3 py-2 text-sm ${s.bizno === bizno ? "bg-mint-50" : ""}`}>
                 <button type="button" className="min-w-0 text-left font-semibold" onClick={() => { setInput(s.bizno); look(s.bizno); }}>

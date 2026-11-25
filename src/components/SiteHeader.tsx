@@ -218,7 +218,7 @@ export function SiteHeader() {
             {nav.filter((e): e is { label: string; items: Item[] } => "items" in e).map((g) => (
               <section key={g.label}>
                 <p className="px-1 text-xs font-bold tracking-wide text-ink-400">{g.label}</p>
-                <ul className="mt-2 divide-y divide-ink-100 rounded-2xl border border-ink-100">
+                <ul className="mt-2 divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100">
                   {g.items.map((i) => {
                     const on = lit(i.href);
                     return (

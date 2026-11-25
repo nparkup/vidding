@@ -92,7 +92,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
               </div>
             ))}
           </div>
-          <ul className="mt-4 divide-y divide-ink-100 rounded-2xl border border-ink-100">
+          <ul className="mt-4 divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100">
             {digest.recommended.slice(0, 4).map((r, i) => (
               <li key={r.bid.id} className={`flex items-center gap-3 px-3 py-3 sm:px-4 ${i === 0 ? "bg-mint-50/50" : ""}`}>
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">{i + 1}</span>

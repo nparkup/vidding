@@ -33,6 +33,7 @@
  *   (src/lib/awards/relate.ts). 결과는 R2 ai-relate/v{버전}/{공고}-{후보 해시}.json
  */
 import { lookupCompany, normalizeBizno, validBizno } from "../../src/lib/corpLookup";
+import { MAX_QUOTA, readOverride } from "../../src/lib/usagePeriod";
 import { fetchNtceClasses, fetchWins, perfBizOf } from "../../src/lib/perfLookup";
 import { readAwards, type R2BucketLike } from "../../src/lib/awards/read";
 import { searchCorps } from "../../src/lib/awards/corps";
@@ -169,7 +170,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
     if (sp.has("trial")) {
       // 무료 체험 사용 공고 (src/lib/trial.ts): 사업자번호마다 처음 분석한 공고 3건까지만 남긴다. 저장 값은 공고 키와 시각뿐
       const bizno = sp.get("trial") ?? "";
-      const TRIAL_LIMIT = (await readSiteConfig(env.AWARDS)).trialLimit;
+      let TRIAL_LIMIT = (await readSiteConfig(env.AWARDS)).trialLimit;
       const keys = (sp.get("bids") ?? "").split(",").filter((k) => /^(nara|apt|nuri):[A-Za-z0-9._-]{1,60}$/.test(k)).slice(0, 6);
       if (!/^\d{10}$/.test(bizno)) return json({ error: "잘못된 사업자번호" }, 400);
       if (!env.AWARDS) return json({ error: "off" }, 503);
@@ -177,7 +178,15 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       // 관리자가 이용 정지한 사업자번호는 새 공고를 더하지 않는다
       const mem = await env.AWARDS.get(`members/${bizno}.json`);
       let suspended = false;
-      if (mem) { try { suspended = (JSON.parse(new TextDecoder().decode(await mem.arrayBuffer())) as { status?: string }).status === "suspended"; } catch { /* 무시 */ } }
+      if (mem) {
+        try {
+          const m = JSON.parse(new TextDecoder().decode(await mem.arrayBuffer())) as { status?: string; limit?: unknown };
+          suspended = m.status === "suspended";
+          // 관리자가 정한 회원별 개별 한도 (null = 무제한)
+          const o = readOverride(m.limit);
+          if (o) TRIAL_LIMIT = o.quota === null ? MAX_QUOTA : o.quota;
+        } catch { /* 무시 */ }
+      }
       const hit = await env.AWARDS.get(key);
       let used: { k: string; t: number }[] = [];
       if (hit) {

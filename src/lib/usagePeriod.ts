@@ -50,3 +50,47 @@ export function periodOf(start: string | undefined, today = kstToday()): { from:
   if (from > today) { fm = m - 1; from = ymd(y, fm, anchor); }
   return { from, to: ymd(y, fm + 1, anchor) };
 }
+
+/**
+ * 회원별 개별 한도 (관리자 회원정보 '이용 한도'에서 정한다, members/{사업자번호}.json 의 limit).
+ * 없으면 요금제 기본 한도(라이트·스탠다드 월 건수, 무료 체험 건수)를 쓴다. quota null = 무제한.
+ * 지금 요금제(유료 이용권 또는 무료 체험)에 그대로 적용된다.
+ */
+export interface LimitOverride { quota: number | null; memo?: string; at?: string }
+
+export const MAX_QUOTA = 100_000;
+
+export function readOverride(v: unknown): LimitOverride | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const q = o.quota === null ? null : Math.round(Number(o.quota));
+  if (q !== null && !(Number.isFinite(q) && q >= 0 && q <= MAX_QUOTA)) return null;
+  return { quota: q, memo: typeof o.memo === "string" ? o.memo.slice(0, 200) : undefined, at: typeof o.at === "string" ? o.at : undefined };
+}
+
+export interface LimitInfo {
+  /** 지금 요금제: 유료 이용권 id 또는 무료 체험 */
+  tier: PaidPlanId | "trial";
+  /** 요금제 기본 한도 (null = 무제한) */
+  base: number | null;
+  /** 실제 적용 한도 (개별 한도가 있으면 그 값) */
+  quota: number | null;
+  /** 개별 한도를 쓰는지 */
+  custom: boolean;
+  /** 유료 이용권은 한 달 기간, 무료 체험은 기간 없이 누적 */
+  period: { from: string; to: string } | null;
+}
+
+/** 회원 한 명의 지금 요금제·한도. 중계 서버의 차감(account.ts)과 관리자 목록이 같은 계산을 쓴다 */
+export function limitOf(billing: BillingLike | null | undefined, pricing: PricingLike, trialLimit: number, override: unknown, today = kstToday()): LimitInfo {
+  const plan = activePlan(billing, today);
+  const o = readOverride(override);
+  const base = plan ? quotaOf(plan, pricing) : trialLimit;
+  return {
+    tier: plan ?? "trial",
+    base,
+    quota: o ? o.quota : base,
+    custom: !!o,
+    period: plan ? periodOf(billing?.start || undefined, today) : null,
+  };
+}

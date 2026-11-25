@@ -6,6 +6,8 @@
  * - POST member&bizno=        : 가입 정보 고치기 (회사명·담당자·연락처·이메일·업종·지역·규모·키워드·메일 수신·상태·메모)
  * - POST member-delete&bizno= : 탈퇴 처리 (가입 정보·결제 기록 삭제, 무료 체험 사용 기록은 남긴다)
  * - POST trial-reset&bizno=   : 무료 체험 사용 기록 초기화
+ * - POST member-limit&bizno=  : 회원별 개별 이용 한도 { quota: 숫자 | null(무제한), memo } 또는 { reset: true } (요금제 기본 한도로)
+ * - POST usage-reset&bizno=   : 유료 이용권 이번 기간 공고 예측 사용 기록 초기화
  * - POST password-temp&bizno= : 임시 비밀번호 발급 (회원 로그인, account.ts). 화면에 한 번만 보여 주고 저장하지 않는다
  * - GET  billing&bizno=       : 결제 기록 / POST billing&bizno= : 결제 기록 저장 (결제 대행사 연동 전이라 손으로 적는다)
  * - GET  hits&days=&kinds=    : 날짜별 집계 (요청·API·페이지 조회 등, metrics.ts)
@@ -21,7 +23,8 @@
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
 import { actions, apiUsage, storage } from "./ops";
-import { adminMember, deleteAccountData, issueTempPassword, moveEmail, normEmail, paidUsageCount, type MemberAuth } from "./account";
+import { adminMember, deleteAccountData, issueTempPassword, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
+import { limitOf, MAX_QUOTA } from "../../src/lib/usagePeriod";
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../../src/lib/siteConfigCore";
 
 /** 사이트 설정 (R2 config/site.json). 한 인스턴스 안에서 1분 동안 다시 읽지 않는다 */
@@ -108,7 +111,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
   switch (action) {
     case "members": {
       if (post) break;
-      return json(await listMembers(bucket, env, (await readSiteConfig(bucket)).trialLimit), 200, noStore);
+      return json(await listMembers(bucket, env, await readSiteConfig(bucket)), 200, noStore);
     }
     case "member": {
       if (!post || !needBizno()) break;
@@ -148,6 +151,39 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       if (!post || !needBizno()) break;
       await bucket.delete(`trial/${bizno}.json`);
       audit("trial-reset", bizno);
+      return json({ status: "ok" }, 200, noStore);
+    }
+    case "member-limit": {
+      // 회원별 개별 이용 한도. { quota: 숫자 | null(무제한) , memo } 저장, { reset: true } 면 요금제 기본 한도로 되돌린다
+      if (!post || !needBizno()) break;
+      const cur = await readJson(bucket, `members/${bizno}.json`);
+      if (!cur) return json({ error: "가입 정보가 없습니다." }, 404);
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
+      const next: Record<string, unknown> = { ...cur };
+      if (b.reset === true) delete next.limit;
+      else {
+        const q = b.quota === null ? null : Math.round(Number(b.quota));
+        if (q !== null && !(Number.isFinite(q) && q >= 0 && q <= MAX_QUOTA)) return json({ error: `한도는 0 ~ ${MAX_QUOTA.toLocaleString()}건 사이로 정해 주세요.` }, 400);
+        next.limit = { quota: q, memo: s(b.memo, 200) || undefined, at: new Date().toISOString() };
+      }
+      await putJson(bucket, `members/${bizno}.json`, next);
+      const cfg = await readSiteConfig(bucket);
+      const bill = await readJson(bucket, `billing/${bizno}.json`);
+      const t = await readJson(bucket, `trial/${bizno}.json`);
+      const quota = await memberLimit(bucket, next, bill, cfg, ((t?.used as unknown[]) ?? []).length);
+      audit("member-limit", `${bizno} ${b.reset === true ? "기본 한도" : next.limit && (next.limit as { quota: number | null }).quota === null ? "무제한" : `${(next.limit as { quota: number }).quota}건`}`);
+      return json({ status: "ok", member: adminMember(next), quota }, 200, noStore);
+    }
+    case "usage-reset": {
+      // 유료 이용권 이번 기간 공고 예측 사용 기록을 지운다 (무료 체험은 trial-reset)
+      if (!post || !needBizno()) break;
+      const cfg = await readSiteConfig(bucket);
+      const bill = await readJson(bucket, `billing/${bizno}.json`);
+      const lim = limitOf(bill as Parameters<typeof limitOf>[0], cfg.pricing, cfg.trialLimit, null);
+      if (lim.tier === "trial" || !lim.period) return json({ error: "이용 중인 이용권이 없습니다." }, 400);
+      await bucket.delete(`usage/${bizno}/${lim.period.from}.json`);
+      audit("usage-reset", `${bizno} ${lim.period.from}`);
       return json({ status: "ok" }, 200, noStore);
     }
     case "billing": {
@@ -261,7 +297,7 @@ function cleanBilling(b: Record<string, unknown>): Billing | { error: string } {
 }
 
 /** 가입자 목록: members/ 전부와 사업자번호별 무료 체험 사용 공고(trial/), 결제 기록(billing/), 마지막 조회(Metrics seen) */
-async function listMembers(bucket: AdminBucket, env: AdminEnv, trialLimit: number) {
+async function listMembers(bucket: AdminBucket, env: AdminEnv, cfg: SiteConfig) {
   const keys: string[] = [];
   let cursor: string | undefined;
   do {
@@ -291,12 +327,13 @@ async function listMembers(bucket: AdminBucket, env: AdminEnv, trialLimit: numbe
       if (!m) return null;
       const no = String(m.bizno);
       const [t, bill] = await Promise.all([readJson(bucket, `trial/${no}.json`), billed.has(no) ? readJson(bucket, `billing/${no}.json`) : null]);
-      const paidUse = bill ? await paidUsageCount(bucket, no, bill) : null;
-      return { ...adminMember(m), trial: (t?.used as unknown[]) ?? [], billing: bill, paidUse, seen: seen[no] ?? null };
+      const trial = (t?.used as unknown[]) ?? [];
+      const quota = await memberLimit(bucket, m, bill, cfg, trial.length);
+      return { ...adminMember(m), trial, billing: bill, quota, seen: seen[no] ?? null };
     }));
     out.push(...part.filter(Boolean));
   }
-  return { members: out, limit: trialLimit, at: new Date().toISOString() };
+  return { members: out, limit: cfg.trialLimit, pricing: cfg.pricing, at: new Date().toISOString() };
 }
 
 /** 관리자 비밀번호 비교: 해시끼리 끝까지 비교해 응답 시간으로 맞힌 글자 수를 알 수 없게 한다 */

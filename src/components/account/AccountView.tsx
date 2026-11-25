@@ -56,7 +56,8 @@ function UsageCard({ usage }: { usage?: Usage }) {
   const [all, setAll] = useState(false);
   if (!usage) return <div className="h-40 animate-pulse rounded-2xl bg-ink-100/60" />;
   const used = [...usage.used].sort((a, b) => b.t - a.t);
-  const quota = usage.mode === "paid" ? usage.quota : trialLimit;
+  // 서버가 회원별 개별 한도까지 반영한 값을 보낸다 (예전 응답이면 사이트 설정 값)
+  const quota = usage.quota === undefined ? trialLimit : usage.quota;
   const pct = quota ? Math.min(100, Math.round((used.length / quota) * 100)) : 0;
   const shown = all ? used : used.slice(0, 8);
   return (

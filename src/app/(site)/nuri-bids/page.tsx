@@ -5,7 +5,7 @@ import { dateTime } from "@/lib/format";
 import { getAptBids, getBids, getNuriBids } from "@/lib/store";
 
 export const metadata: Metadata = {
-  title: "민간 공고",
+  title: "누리장터 공고",
   description: "조달청 누리장터에 올라온 민간 기업·재건축조합·법인의 용역·공사·물품 입찰공고를 업무·지역·마감일로 찾고, 같은 기관의 지난 개찰 결과와 계약을 함께 봅니다.",
 };
 export const revalidate = 600;

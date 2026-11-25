@@ -25,12 +25,12 @@ const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 const BASE = STATIC ? process.env.NEXT_PUBLIC_BASE_PATH ?? "" : "";
 const pct = (n: number, d = 3) => `${(Math.round(n * 10 ** d) / 10 ** d).toFixed(d)}%`;
 
-async function loadJson<T>(path: string): Promise<T | null> {
+export async function loadJson<T>(path: string): Promise<T | null> {
   const r = await fetch(`${BASE}${path}`);
   return r.ok ? ((await r.json()) as T) : null;
 }
 
-const GROUP_OF = Object.fromEntries(Object.entries(CATEGORY_GROUPS).flatMap(([g, cs]) => cs.map((c) => [c, g]))) as Record<ServiceCategory, string>;
+export const GROUP_OF = Object.fromEntries(Object.entries(CATEGORY_GROUPS).flatMap(([g, cs]) => cs.map((c) => [c, g]))) as Record<ServiceCategory, string>;
 
 /** 업종별 분석: 업종 고르기(공고 검색과 같은 타일) → 그 업종의 10년치 낙찰 요약 */
 export function IndustryExplorer() {
@@ -122,11 +122,12 @@ export function IndustryExplorer() {
   );
 }
 
-function IndustryDetail({ s, bids, agencyIds }: { s: IndustrySummary; bids: Bid[]; agencyIds: Map<string, string> }) {
+/** 업종 하나의 낙찰 분석. embedded: 다른 화면(우리 회사 진단) 안에 넣을 때 지금 공고·최근 낙찰은 빼고 제목 카드를 생략한다 */
+export function IndustryDetail({ s, bids, agencyIds, embedded }: { s: IndustrySummary; bids: Bid[]; agencyIds: Map<string, string>; embedded?: boolean }) {
   const recent4 = s.groups.reduce((a, g) => a + g.n, 0);
   return (
     <div className="space-y-6">
-      <section className="card p-6">
+      {!embedded && <section className="card p-6">
         <p className="text-xs font-semibold text-ink-400">{GROUP_OF[s.name]}</p>
         <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight">{s.name}</h2>
         <p className="mt-1 text-sm text-ink-500">나라장터 낙찰 {s.n.toLocaleString()}건 · {s.from} ~ {s.to}</p>
@@ -137,7 +138,7 @@ function IndustryDetail({ s, bids, agencyIds }: { s: IndustrySummary; bids: Bid[
           <Tile k="단독 참가 비율" v={`${Math.round(s.single * 100)}%`} sub="참가 1곳 낙찰" />
           <Tile k="지금 공고" v={`${bids.length.toLocaleString()}건`} sub="마감 전" />
         </dl>
-      </section>
+      </section>}
 
       <section className="card p-6">
         <h3 className="font-bold">연도별 낙찰</h3>
@@ -153,7 +154,7 @@ function IndustryDetail({ s, bids, agencyIds }: { s: IndustrySummary; bids: Bid[
 
       <AssessCard s={s} />
 
-      {bids.length > 0 && (
+      {!embedded && bids.length > 0 && (
         <section className="card p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-bold">이 업종의 지금 공고 <span className="text-sm font-normal text-ink-400">마감 임박 순</span></h3>
@@ -165,7 +166,7 @@ function IndustryDetail({ s, bids, agencyIds }: { s: IndustrySummary; bids: Bid[
         </section>
       )}
 
-      <section className="card p-6">
+      {!embedded && <section className="card p-6">
         <h3 className="font-bold">최근 낙찰</h3>
         <ul className="mt-3 divide-y divide-ink-100">
           {s.recent.map(([no, title, date, biz, m, amount, rate, bidders, winner], i) => (
@@ -175,7 +176,7 @@ function IndustryDetail({ s, bids, agencyIds }: { s: IndustrySummary; bids: Bid[
             </li>
           ))}
         </ul>
-      </section>
+      </section>}
     </div>
   );
 }

@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { EngineName } from "@/components/EngineName";
+import type { EngineId } from "@/lib/engines";
 
 export interface FeatureTab {
+  /** 이 화면을 맡는 엔진 (비드파인더·비드아틀라스·비드인사이트) */
+  engine?: EngineId;
   label: string;
   title: string;
   desc: string;
@@ -33,7 +37,7 @@ export function FeatureTabs({ tabs }: { tabs: FeatureTab[] }) {
       </div>
       <div role="tabpanel" className="mt-10 grid items-center gap-10 lg:grid-cols-[1fr_1.4fr]">
         <div key={t.label} className="animate-fade-up">
-          <p className="text-sm font-bold tracking-wide text-mint-600">Feature 0{i + 1}</p>
+          <p className="text-sm font-bold tracking-wide text-mint-600">Feature 0{i + 1}{t.engine && <><span aria-hidden className="mx-1.5 text-mint-300">·</span><EngineName id={t.engine} className="text-ink" /></>}</p>
           <h3 className="mt-3 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">{t.title}</h3>
           <p className="lead mt-4">{t.desc}</p>
           <Link href={t.href} className="mt-7 inline-block font-semibold text-mint-600 underline-offset-4 hover:underline">

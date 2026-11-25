@@ -7,6 +7,9 @@ import { DeskArt } from "@/components/art/Desk";
 import { BidRow } from "@/components/BidRow";
 import { GradeBadge, ScoreBar } from "@/components/Badges";
 import { FeatureTabs } from "@/components/home/FeatureTabs";
+import { EngineTrio } from "@/components/home/EngineTrio";
+import { EngineName } from "@/components/EngineName";
+import type { EngineId } from "@/lib/engines";
 import { ProductMockup } from "@/components/home/ProductMockup";
 import { HeroStats } from "@/components/home/HeroStats";
 import { AnalysisEngine } from "@/components/home/AnalysisEngine";
@@ -17,7 +20,7 @@ import { bidPriceGuide, documentChecklist, evaluate, rank } from "@/lib/analysis
 import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
-import { getAptBids, getAwardCount, getBids, getContracts, getNoticeChanges, getOrderPlans, getPreSpecs, getRecentAwards } from "@/lib/store";
+import { getAptBids, getAwardCount, getBids, getContracts, getPreSpecs, getRecentAwards } from "@/lib/store";
 import { APT_CATEGORIES } from "@/lib/apt";
 import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
 import { aptBidHref, bidHref } from "@/lib/links";
@@ -75,7 +78,7 @@ export default async function Home() {
   const apt = await getAptBids();
   const awardCount = getAwardCount();
   // 입찰 분석 메뉴 카드에 붙일 건수 (빌드 때 받은 자료, 없으면 숫자 없이 보여 준다)
-  const [plans, preSpecs, contracts, changes, recent] = await Promise.all([getOrderPlans(), getPreSpecs(), getContracts(), getNoticeChanges(), getRecentAwards()]);
+  const [preSpecs, contracts, recent] = await Promise.all([getPreSpecs(), getContracts(), getRecentAwards()]);
   // 아파트 공고: 마감 전 공고만, 업종별 건수와 직전 낙찰금액이 붙은 예시
   const aptOpen = apt.items.filter((b) => new Date(b.closeAt).getTime() > builtAt);
   const aptCats = APT_CATEGORIES.map((c) => ({ c, n: aptOpen.filter((b) => b.category === c).length })).filter((x) => x.n > 0);
@@ -149,6 +152,7 @@ export default async function Home() {
 
   const FEATURES = [
     {
+      engine: "finder" as EngineId,
       label: "매일 아침 맞춤 메일",
       title: "나라장터에 접속하지 않아도, 오늘 볼 공고가 먼저 도착합니다",
       points: [<><b>영업일 오전 7시</b>, 귀사 조건에 맞는 신규 공고만 골라 보냅니다</>, <>공고마다 <b>가능성 등급·규모·마감일</b>을 한 줄로 요약합니다</>, <><b>3일 내 마감</b> 공고는 따로 모아 경고합니다</>],
@@ -175,6 +179,7 @@ export default async function Home() {
       ),
     },
     {
+      engine: "finder" as EngineId,
       label: "면허·지역·규모 1차 선별",
       title: "참가할 수 없는 공고는 처음부터 보여드리지 않습니다",
       points: [<>보유 <b>면허</b>가 맞지 않는 공고를 먼저 제외합니다</>, <>공고문의 <b>지역제한</b>을 읽어 참가 가능 지역만 남깁니다</>, <>수행 가능한 <b>용역 규모</b>를 벗어난 공고를 거릅니다</>],
@@ -199,6 +204,7 @@ export default async function Home() {
       ),
     },
     {
+      engine: "atlas" as EngineId,
       label: "공고 분석 · 가능성 점수",
       title: "들어갈지 말지, 알고리즘이 항목별로 분석합니다.",
       points: [<><b>면허 30·지역 20·규모 15점</b>, 3개 필수 조건을 먼저 판정합니다</>, <>유사 공고 평균 참여업체 수로 <b>경쟁 강도 15점</b>을 계산합니다</>, <><b>실적 10점·준비 기간 10점</b>까지 더해 100점 만점과 등급을 매깁니다</>],
@@ -230,6 +236,7 @@ export default async function Home() {
       ),
     },
     {
+      engine: "atlas" as EngineId,
       label: "제출 서류",
       title: "계약방법에 맞는 제출서류를 빠짐없이 정리합니다",
       points: [<>적격심사·협상계약 등 <b>계약방법별</b> 서류를 나눠 드립니다</>, <>서류마다 <b>발급처와 유효기간</b> 주의사항을 붙입니다</>, <>입찰 참가 전·제출·낙찰 후 <b>단계별</b>로 나눠 보여 드립니다</>],
@@ -257,6 +264,7 @@ export default async function Home() {
 
   const TABS = [
     {
+      engine: "finder" as EngineId,
       label: "공고 검색",
       title: "용역·공사·물품 전 업종 공고를 업종별로 나눠 검색합니다",
       desc: "업무 구분·업종·지역·마감 임박으로 거르고, 내 조건을 넣으면 공고마다 참가 가능 여부와 점수가 바로 붙습니다.",
@@ -265,6 +273,7 @@ export default async function Home() {
       preview: <div className="space-y-2">{clientEligible.slice(0, 1).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} />)}</div>,
     },
     {
+      engine: "atlas" as EngineId,
       label: "공고 분석",
       title: "공고 하나를 한 장으로 정리합니다",
       desc: "기초금액, 참가 지역, 필요 면허, 낙찰하한율, 공동도급, 일정, 투찰 금액 가이드까지 공고문을 열지 않고 확인합니다.",
@@ -292,11 +301,12 @@ export default async function Home() {
       ),
     },
     {
+      engine: "insight" as EngineId,
       label: "평가점수 예측",
       title: "적격심사·협상 공고의 예상 점수와 투찰률을 미리 계산합니다",
       desc: "공고 첨부의 배점표와 공고서 기준을 읽고 귀사 실적·경영상태·신뢰도 가감점을 넣어 항목별 예상 점수를 냅니다. 같은 사업의 과거 낙찰률과 참가 예상 기업까지 함께 봅니다.",
       href: "/premium",
-      cta: "나라장터 예측 열기",
+      cta: "비드인사이트 나라장터 예측 열기",
       preview: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
           <p className="text-xs text-ink-400">{featured.demandAgency}</p>
@@ -322,6 +332,7 @@ export default async function Home() {
       ),
     },
     {
+      engine: "finder" as EngineId,
       label: "아파트 공고",
       title: "아파트 청소·경비·위탁관리 입찰도 함께 봅니다",
       desc: "공동주택관리정보시스템(K-apt)의 아파트 입찰공고를 업종별로 모으고, 같은 단지의 직전 낙찰·수의계약 금액과 예상 낙찰금액을 붙여 드립니다.",
@@ -349,12 +360,12 @@ export default async function Home() {
   const ANALYSIS: { tag: string; t: string; d: string; href: string; n?: number; unit?: string }[] = [
     { tag: "낙찰", t: "최근 낙찰 결과", d: "최근 한 달 최종낙찰 업체와 개찰 순위, 사정율을 봅니다.", href: "/awards", n: recent?.rows.length, unit: "최근 한 달" },
     { tag: "발주처", t: "발주처 분석", d: "수요기관별 낙찰률·사정율 분포와 자주 낙찰받는 업체를 봅니다.", href: "/analysis/agency" },
+    { tag: "업종", t: "업종별 분석", d: "업종별 낙찰률 추이와 주요 발주기관·낙찰업체를 확인합니다.", href: "/analysis/industry" },
     { tag: "경쟁사", t: "경쟁사 투찰 성향", d: "경쟁사가 주로 쓰는 사정율 구간과 주요 발주처를 확인합니다.", href: "/analysis/rival" },
     { tag: "우리 회사", t: "우리 회사 진단", d: "사업자번호 하나로 10년치 낙찰을 발주처·지역·금액별로 나누고 사정율 습관을 진단합니다.", href: "/analysis/mine" },
-    { tag: "사전 준비", t: "발주계획", d: "기관이 미리 올린 넉 달 치 발주 예정 사업을 업종별로 모았습니다.", href: "/plans", n: plans.length, unit: "발주 예정" },
     { tag: "사전 준비", t: "사전규격 미리보기", d: "본공고 전에 공개된 규격으로 준비 기간을 먼저 확보합니다.", href: "/prespecs", n: preSpecs.length, unit: "최근 2주" },
     { tag: "계약", t: "계약현황", d: "최근 2주 계약업체·계약금액·계약기간을 발주처별로 봅니다.", href: "/contracts", n: contracts.length, unit: "최근 2주" },
-    { tag: "알림", t: "정정·취소 공고", d: "바뀐 마감일·개찰일·금액을 이전 공고와 비교해 보여 드립니다.", href: "/changes", n: changes.length, unit: "최근 2주" },
+    { tag: "공고", t: "공고 분석", d: "공고 하나의 가능성 점수와 등급, 사정율·투찰 금액을 한 장으로 봅니다.", href: bidHref(featured.id) },
   ];
 
   return (
@@ -376,7 +387,7 @@ export default async function Home() {
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가!</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
-            입찰 특화 알고리즘이 나라장터 전 업종 공고마다 면허·지역·규모를 판정하고 경쟁 강도·실적·준비 기간까지 6개 항목으로 평가해 매일 아침 보내 드립니다.<br />아파트 관리 입찰은 같은 단지의 직전 낙찰금액과 함께 보여 드립니다.
+            <b className="font-bold text-ink">비드파인더</b>가 나라장터·아파트 전 업종 공고에서 참가할 수 있는 공고를 찾고, <b className="font-bold text-ink">비드아틀라스</b>가 면허·지역·규모부터 경쟁 강도·실적·준비 기간까지 6개 항목으로 분석하고, <b className="font-bold text-ink">비드인사이트</b>가 평가점수와 낙찰을 예측합니다.
           </p>
           <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -418,21 +429,24 @@ export default async function Home() {
       </section>
       )}
 
-      {/* 분석 엔진 */}
+      {/* 세 엔진 소개 */}
+      <EngineTrio />
+
+      {/* 분석 엔진 (비드아틀라스) */}
       <AnalysisEngine bid={featured} ev={featuredEval} total={bids.length} />
 
       {/* 핵심 기능 — 번갈아 배치 */}
       <section className="container-x pt-28">
         <div className="text-center">
           <p className="eyebrow">핵심 서비스</p>
-          <h2 className="h-section mt-3">찾고, 거르고, 정리하는 일은<br />저희가 합니다.</h2>
+          <h2 className="h-section mt-3">찾고, 거르고, 정리하는 일은<br /><EngineName id="finder" />와 <EngineName id="atlas" />가.</h2>
         </div>
         <div className="mt-16 space-y-20 sm:space-y-28">
           {FEATURES.map((f, i) => (
             <div key={f.label} className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
               <div className={`min-w-0 rounded-[32px] bg-gradient-to-br from-mint-50 via-paper to-sky-100/60 p-4 sm:p-8 ${i % 2 ? "lg:order-2" : ""}`}>{f.visual}</div>
               <div className="min-w-0">
-                <p className="inline-flex rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700">{f.label}</p>
+                <p className="inline-flex flex-wrap items-center gap-x-1.5 rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700"><EngineName id={f.engine} className="font-extrabold text-ink" /><span aria-hidden className="text-mint-300">·</span>{f.label}</p>
                 <h3 className="mt-4 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">{f.title}</h3>
                 <ul className="mt-6 space-y-3">
                   {f.points.map((p, n) => (
@@ -456,10 +470,10 @@ export default async function Home() {
       <section className="container-x pt-28">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="eyebrow">전 업종</p>
+            <p className="eyebrow">전 업종 · 비드파인더</p>
             <h2 className="h-section mt-3">용역·공사·물품,<br className="sm:hidden" /> 모든 업종을 봅니다.</h2>
           </div>
-          <p className="max-w-sm text-ink-500">나라장터의 모든 공고를 받아 업종별로 나누고, 귀사가 가진 면허로 참가할 수 있는 공고만 골라 드립니다.</p>
+          <p className="max-w-sm text-ink-500">비드파인더가 나라장터의 모든 공고를 받아 업종별로 나누고, 귀사가 가진 면허로 참가할 수 있는 공고만 골라 드립니다.</p>
         </div>
         <div className="mt-10 grid gap-4 lg:grid-cols-3">
           {byBiz.map(({ biz, n, cats }) => (
@@ -490,7 +504,7 @@ export default async function Home() {
           <div className="min-w-0">
             <p className="eyebrow">아파트 관리 입찰</p>
             <h3 className="mt-3 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
-            <p className="mt-4 leading-relaxed text-ink-500">공동주택관리정보시스템(K-apt)에 올라온 아파트 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
+            <p className="mt-4 leading-relaxed text-ink-500">비드파인더가 공동주택관리정보시스템(K-apt)에 올라온 아파트 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />비드인사이트 아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
               <Link href="/apt-bids" className="btn-primary">아파트 공고 보기</Link>
               <Link href="/premium/apt" className="btn-ghost">아파트 입찰가격 예측</Link>
@@ -535,10 +549,10 @@ export default async function Home() {
       <section className="container-x pt-28">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="eyebrow">입찰 분석</p>
-            <h2 className="h-section mt-3">공고 밖의 흐름까지<br className="sm:hidden" /> 숫자로 봅니다.</h2>
+            <p className="eyebrow">입찰 분석 · 비드아틀라스</p>
+            <h2 className="h-section mt-3"><EngineName id="atlas" />로<br className="sm:hidden" /> 공고 밖의 흐름까지<br className="sm:hidden" /> 숫자로 봅니다.</h2>
           </div>
-          <p className="max-w-md text-ink-500">2016년부터 쌓은 낙찰 기록과 발주계획·사전규격·계약 정보로 발주처와 경쟁사의 움직임을 미리 읽습니다.</p>
+          <p className="max-w-md text-ink-500">비드아틀라스는 2016년부터 쌓은 낙찰 기록과 사전규격·계약 정보로 발주처와 경쟁사의 움직임을 미리 읽습니다.</p>
         </div>
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {ANALYSIS.map((a) => (
@@ -571,7 +585,7 @@ export default async function Home() {
             </div>
             <div className="px-8 pb-5">
               <p className="text-lg font-extrabold text-mint-300">비드매트릭스</p>
-              <p className="mt-1 text-xs text-ink-300">입찰 특화 알고리즘이 판정·평가</p>
+              <p className="mt-1 text-xs text-ink-300">세 개의 분석 엔진이 찾고·분석·예측</p>
             </div>
             {COMPARE.map(([k, a, b]) => (
               <div key={k} className="contents">
@@ -694,7 +708,7 @@ export default async function Home() {
           <div className="container-x relative grid items-center gap-6 py-16 sm:py-20 lg:grid-cols-[1.1fr_1fr]">
             <div>
               <h2 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl sm:leading-[1.15]">입찰 분석,<br />오늘부터 시작해 보세요.</h2>
-              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 그중 입찰공고 <TrialN />건은 평가점수 예측으로 무료 분석해 보실 수 있습니다.</p>
+              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 그중 입찰공고 <TrialN />건은 비드인사이트로 평가점수를 무료 예측해 보실 수 있습니다.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/apply" className="btn-mint px-7 text-base">무료 체험 시작하기</Link>
                 <Link href="/pricing" className="btn-glass px-7 text-base">요금제 보기</Link>

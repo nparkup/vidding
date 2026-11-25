@@ -6,6 +6,8 @@ import { PageHero } from "@/components/PageHero";
 import { TrialN } from "@/components/Cfg";
 import { PricingCards } from "@/components/PricingCards";
 import { HeroStats } from "@/components/home/HeroStats";
+import { EngineName } from "@/components/EngineName";
+import { ENGINES, type EngineId } from "@/lib/engines";
 import { buildDigest } from "@/lib/digest";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
 import { getAptBids, getAwardCount, getBids, getContracts, getNoticeChanges, getNuriBids, getOrderPlans, getPreSpecs, getRecentAwards } from "@/lib/store";
@@ -15,10 +17,10 @@ export const revalidate = 600;
 
 /** 공고 한 건을 보는 순서. 각 단계는 실제로 있는 기능만 적는다 */
 const FLOW = [
-  { t: "수집", d: "영업일 하루 세 번 나라장터·아파트(K-apt)·누리장터 공고를 새로 받고, 2016년부터의 낙찰 기록을 함께 쌓습니다.", items: ["입찰공고", "낙찰·개찰 결과", "발주계획·사전규격", "계약 정보"] },
-  { t: "판정", d: "업종·지역 제한, 입찰방식, 참가자격을 읽어 귀사가 참가할 수 있는 공고인지 먼저 가립니다.", items: ["업종·면허", "지역제한", "입찰방식", "중소기업 제한"] },
-  { t: "분석", d: "공고 첨부파일을 모두 읽어 배점표를 찾고, 항목별 예상 평가점수와 낙찰 결과로 본 예측을 냅니다.", items: ["배점표 판독", "예상 평가점수", "직전 낙찰", "예상 예정가격"] },
-  { t: "알림", d: "조건에 맞는 공고는 영업일 아침 메일로, 정정·취소와 관심 키워드 공고는 따로 알려 드립니다.", items: ["맞춤 공고 메일", "정정·취소 알림", "키워드 알림"] },
+  { t: "수집", e: ["finder"] as EngineId[], d: "영업일 하루 세 번 나라장터·아파트(K-apt)·누리장터 공고를 새로 받고, 2016년부터의 낙찰 기록을 함께 쌓습니다.", items: ["입찰공고", "낙찰·개찰 결과", "발주계획·사전규격", "계약 정보"] },
+  { t: "판정", e: ["finder"] as EngineId[], d: "업종·지역 제한, 입찰방식, 참가자격을 읽어 귀사가 참가할 수 있는 공고인지 먼저 가립니다.", items: ["업종·면허", "지역제한", "입찰방식", "중소기업 제한"] },
+  { t: "분석", e: ["atlas", "insight"] as EngineId[], d: "공고 첨부파일을 모두 읽어 배점표를 찾고, 항목별 예상 평가점수와 낙찰 결과로 본 예측을 냅니다.", items: ["배점표 판독", "예상 평가점수", "직전 낙찰", "예상 예정가격"] },
+  { t: "알림", e: ["finder"] as EngineId[], d: "조건에 맞는 공고는 영업일 아침 메일로, 정정·취소와 관심 키워드 공고는 따로 알려 드립니다.", items: ["맞춤 공고 메일", "정정·취소 알림", "키워드 알림"] },
 ];
 
 /** 평가점수 예측 한 건에 들어 있는 것 */
@@ -50,28 +52,21 @@ export default async function ServicePage() {
   const aptAwards = (awardCount?.aptAwards ?? apt.awards ?? 0) + (apt.privates ?? 0);
   const digest = buildDigest(SEED_CLIENTS[0], bids, new Date(), [], changes);
 
-  const GROUPS: { title: string; lead: string; items: { t: string; d: string; href: string; n?: number; unit?: string }[] }[] = [
+  const GROUPS: { engine: EngineId; lead: string; items: { t: string; d: string; href: string; n?: number; unit?: string }[] }[] = [
     {
-      title: "공고 찾기",
+      engine: "finder",
       lead: "청소·경비 용역부터 전기·통신 공사, 소프트웨어 유지관리, 급식 식자재, 의료 물품까지 전 업종 공고를 한 곳에서 찾습니다.",
       items: [
-        { t: "공고 검색", d: "나라장터 용역·공사·물품 공고를 업종·지역·금액·마감일로 거르고, 귀사 조건 적합도순으로 정렬합니다.", href: "/bids", n: bids.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
+        { t: "나라장터 공고", d: "나라장터 용역·공사·물품 공고를 업종·지역·금액·마감일로 거르고, 귀사 조건 적합도순으로 정렬합니다.", href: "/bids", n: bids.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
         { t: "아파트 공고", d: "아파트 청소·경비·위탁관리·공사 입찰을 같은 단지의 직전 낙찰금액과 함께 봅니다.", href: "/apt-bids", n: apt.items.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
         { t: "민간 공고", d: "누리장터에 올라온 민간 기업·조합·법인 입찰과 평가 배점표를 봅니다.", href: "/nuri-bids", n: nuri.items.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
         { t: "정정·취소 공고", d: "바뀐 마감일·개찰일·금액을 이전 공고와 비교해 바뀐 항목만 보여 드립니다.", href: "/changes", n: changes.length, unit: "최근 2주" },
+        { t: "발주계획", d: "기관이 미리 올린 발주 예정 사업을 업종별로 모아 봅니다.", href: "/plans", n: plans.length, unit: "발주 예정" },
       ],
     },
     {
-      title: "평가점수 예측",
-      lead: "공고 하나를 고르면 배점표 판독부터 예상 평가점수, 낙찰 결과로 본 예측까지 한 화면에 정리합니다.",
-      items: [
-        { t: "나라장터 예측", d: "적격심사·협상계약 공고의 항목별 예상 평가점수, 이 공고의 직전 낙찰, 예상 예정가격을 봅니다.", href: "/premium" },
-        { t: "아파트 예측", d: "아파트 관리 입찰의 예상 낙찰금액과 같은 단지 낙찰 이력, 응찰 업체를 봅니다.", href: "/premium/apt" },
-      ],
-    },
-    {
-      title: "입찰 분석",
-      lead: "2016년부터 쌓은 낙찰 기록과 발주계획·사전규격·계약 정보로 발주처와 경쟁사의 흐름을 봅니다.",
+      engine: "atlas",
+      lead: "2016년부터 쌓은 낙찰 기록과 사전규격·계약 정보로 발주처와 경쟁사의 흐름을 봅니다.",
       items: [
         { t: "최근 낙찰 결과", d: "최근 한 달 최종낙찰 업체와 개찰 순위, 사정율, 낙찰금액을 봅니다.", href: "/awards", n: recent?.rows.length, unit: "최근 한 달" },
         { t: "발주처 분석", d: "수요기관별 낙찰률·사정율 분포와 자주 낙찰받은 업체, 지금 올라온 공고를 봅니다.", href: "/analysis/agency" },
@@ -79,8 +74,15 @@ export default async function ServicePage() {
         { t: "경쟁사 투찰 성향", d: "기업명이나 사업자번호로 경쟁사가 주로 쓰는 사정율 구간과 주요 발주처를 확인합니다.", href: "/analysis/rival" },
         { t: "우리 회사 진단", d: "우리 회사 낙찰 기록을 발주처·지역·금액별로 나누고 투찰 습관을 점검합니다.", href: "/analysis/mine" },
         { t: "사전규격 미리보기", d: "본공고 전에 공개된 규격으로 준비 기간을 먼저 확보합니다.", href: "/prespecs", n: preSpecs.length, unit: "최근 2주" },
-        { t: "발주계획", d: "기관이 미리 올린 발주 예정 사업을 업종별로 모아 봅니다.", href: "/plans", n: plans.length, unit: "발주 예정" },
         { t: "계약현황", d: "최근 2주 계약업체·계약금액·계약기간을 발주처별로 봅니다.", href: "/contracts", n: contracts.length, unit: "최근 2주" },
+      ],
+    },
+    {
+      engine: "insight",
+      lead: "공고 하나를 고르면 배점표 판독부터 예상 평가점수, 낙찰 결과로 본 예측까지 한 화면에 정리합니다.",
+      items: [
+        { t: "나라장터 예측", d: "적격심사·협상계약 공고의 항목별 예상 평가점수, 이 공고의 직전 낙찰, 예상 예정가격을 봅니다.", href: "/premium" },
+        { t: "아파트 예측", d: "아파트 관리 입찰의 예상 낙찰금액과 같은 단지 낙찰 이력, 응찰 업체를 봅니다.", href: "/premium/apt" },
       ],
     },
   ];
@@ -90,7 +92,7 @@ export default async function ServicePage() {
       <PageHero
         eyebrow="서비스 소개"
         title={<>공고마다 데이터로 분석하고,<br /><span className="text-mint-600">결정은 대표님과 실무자가!</span></>}
-        lead="비드매트릭스는 입찰공고와 낙찰정보를 빅데이터로 분석하는 입찰 분석 정보 서비스입니다. 참가할 공고를 찾고, 평가점수와 낙찰 흐름을 숫자로 확인해 참가 여부와 투찰 금액을 정하는 데 필요한 정보를 드립니다."
+        lead="비드매트릭스는 입찰공고와 낙찰정보를 빅데이터로 분석하는 입찰 분석 정보 서비스입니다. 공고를 찾는 비드파인더, 입찰을 분석하는 비드아틀라스, 평가점수를 예측하는 비드인사이트 세 엔진으로 참가 여부와 투찰 금액을 정하는 데 필요한 정보를 드립니다."
         art={<DeskArt className="w-full" />}
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -106,11 +108,14 @@ export default async function ServicePage() {
 
       <section className="container-x pt-20">
         <p className="eyebrow">분석 과정</p>
-        <h2 className="h-section mt-3">공고 한 건을<br className="sm:hidden" /> 이렇게 분석합니다.</h2>
+        <h2 className="h-section mt-3">세 엔진이 공고 한 건을<br className="sm:hidden" /> 이렇게 분석합니다.</h2>
         <ol className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {FLOW.map(({ t, d, items }, i) => (
+          {FLOW.map(({ t, e, d, items }, i) => (
             <li key={t} className="card flex min-w-0 flex-col p-6">
-              <span className="text-sm font-extrabold tabular-nums text-mint-600">0{i + 1}</span>
+              <p className="flex flex-wrap items-center gap-x-2 text-sm font-extrabold">
+                <span className="tabular-nums text-mint-600">0{i + 1}</span>
+                {e.map((id) => <EngineName key={id} id={id} className="text-ink-700" />)}
+              </p>
               <p className="mt-4 text-xl font-bold">{t}</p>
               <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-500">{d}</p>
               <div className="mt-5 flex flex-wrap gap-1">
@@ -122,15 +127,16 @@ export default async function ServicePage() {
       </section>
 
       {GROUPS.map((g) => (
-        <section key={g.title} className="container-x pt-20">
+        <section key={g.engine} className="container-x pt-20">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
             <div>
-              <p className="eyebrow">메뉴 안내</p>
-              <h2 className="h-section mt-3">{g.title}</h2>
+              <p className="eyebrow">{ENGINES[g.engine].area} 엔진</p>
+              <h2 className="h-section mt-3"><EngineName id={g.engine} /></h2>
+              <p className="mt-2 text-lg font-bold text-ink-700">{ENGINES[g.engine].tagline}</p>
             </div>
             <p className="max-w-md text-ink-500">{g.lead}</p>
           </div>
-          <div className={`mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 ${g.items.length > 2 ? "lg:grid-cols-4" : ""}`}>
+          <div className={`mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 ${g.items.length === 5 ? "lg:grid-cols-5" : g.items.length > 2 ? "lg:grid-cols-4" : ""}`}>
             {g.items.map((a) => (
               <Link key={a.href} href={a.href} className="card group flex min-w-0 flex-col p-5 transition hover:border-mint hover:shadow-lift">
                 <p className="text-lg font-bold group-hover:text-mint-600">{a.t}</p>
@@ -144,7 +150,7 @@ export default async function ServicePage() {
 
       <section className="container-x pt-24">
         <div className="rounded-[28px] bg-paper p-6 sm:rounded-[36px] sm:p-10 lg:p-14">
-          <p className="eyebrow">평가점수 예측 1건에 들어 있는 것</p>
+          <p className="eyebrow">비드인사이트 평가점수 예측 1건에 들어 있는 것</p>
           <h2 className="h-section mt-3">배점표부터 예상 예정가격까지<br className="hidden sm:block" /> 한 화면에.</h2>
           <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PREDICT.map(({ t, d }, i) => (
@@ -155,13 +161,13 @@ export default async function ServicePage() {
               </div>
             ))}
           </div>
-          <Link href="/premium" className="btn-mint mt-8">평가점수 예측 해 보기</Link>
+          <Link href="/premium" className="btn-mint mt-8">비드인사이트로 평가점수 예측하기</Link>
         </div>
       </section>
 
       <section className="container-x grid grid-cols-1 items-center gap-12 overflow-x-clip py-24 lg:grid-cols-2">
         <div className="min-w-0">
-          <p className="eyebrow">매일 받는 것</p>
+          <p className="eyebrow">매일 받는 것 · 비드파인더</p>
           <h2 className="h-section mt-3">영업일 아침,<br />오늘 볼 공고만 메일로.</h2>
           <ul className="mt-8 space-y-3">
             {[

@@ -1,8 +1,9 @@
 import type { Bid } from "@/lib/types";
+import { EngineName } from "@/components/EngineName";
 import { bidPriceGuide, type MatchResult } from "@/lib/analysis";
 import { won } from "@/lib/format";
 
-/** 입찰 분석 엔진: 실제 평가 로직(가중치·등급 기준)과 대표 공고의 평가 과정을 그대로 보여준다 */
+/** 비드아틀라스(입찰 분석 엔진): 실제 평가 로직(가중치·등급 기준)과 대표 공고의 평가 과정을 그대로 보여준다 */
 
 const WEIGHTS = [
   { k: "면허 요건", w: 30, hard: true, d: "투찰가능업종과 보유 면허 대조" },
@@ -39,10 +40,10 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
         <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-sky/20 blur-[110px]" />
         <div className="container-x relative">
           <div className="max-w-3xl">
-            <p className="text-sm font-bold tracking-wide text-mint-400">입찰 특화 분석 엔진</p>
-            <h2 className="h-section mt-3">모든 입찰 공고를<br />정밀 분석합니다.</h2>
+            <p className="text-sm font-bold tracking-wide text-mint-400">비드아틀라스 엔진으로 입찰 특화 분석</p>
+            <h2 className="h-section mt-3"><EngineName id="atlas" dark /> 엔진으로<br />모든 입찰 공고를<br className="sm:hidden" /> 정밀 분석합니다.</h2>
             <p className="mt-5 text-base leading-relaxed text-ink-300 sm:text-lg">
-              면허·지역·규모 3개 필수 조건을 먼저 판정하고, 통과한 공고만 경쟁 강도·실적·준비 기간을 가중해 점수와 등급을 매깁니다.
+              비드아틀라스는 면허·지역·규모 3개 필수 조건을 먼저 판정하고, 통과한 공고만 경쟁 강도·실적·준비 기간을 가중해 점수와 등급을 매깁니다.
               모든 점수는 항목별 근거와 함께 공개됩니다.
             </p>
           </div>

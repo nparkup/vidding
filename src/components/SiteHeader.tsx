@@ -20,7 +20,7 @@ export const NAV: Entry[] = [
     items: [
       { href: "/bids", label: "나라장터 공고", desc: "나라장터 용역·공사·물품 전 업종" },
       { href: "/apt-bids", label: "K-apt 공동주택 입찰공고", desc: "아파트 청소·경비·위탁관리 입찰" },
-      { href: "/nuri-bids", label: "민간 공고", desc: "누리장터 민간 기업·조합·법인 입찰" },
+      { href: "/nuri-bids", label: "누리장터 공고", desc: "누리장터 민간 기업·조합·법인 입찰" },
       { href: "/changes", label: "정정·취소 공고", desc: "바뀌거나 취소된 공고" },
       { href: "/plans", label: "발주계획", desc: "기관이 미리 올린 발주 예정 사업" },
     ],
@@ -43,7 +43,7 @@ export const NAV: Entry[] = [
     items: [
       { href: "/premium", label: "나라장터 입찰 예측", desc: "적격심사·협상 예상 평가점수와 투찰률" },
       { href: "/premium/apt", label: "공동주택 입찰 예측", desc: "아파트 청소·경비 공고 예상 낙찰금액" },
-      { href: "/premium/nuri", label: "민간 예측", desc: "누리장터 민간 공고 예상 평가점수" },
+      { href: "/premium/nuri", label: "누리장터 공고 예측", desc: "누리장터 공고 예상 평가점수" },
     ],
   },
   { label: "요금제", href: "/pricing" },

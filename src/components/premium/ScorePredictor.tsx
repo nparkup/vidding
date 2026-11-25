@@ -587,7 +587,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
           <Step n={1} title="공고 선택" />
-          <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요.<br />{NURI ? `첨부에서 평가 배점표를 읽은 민간 공고 ${bids.length.toLocaleString("ko-KR")}건 중에서 고를 수 있습니다.` : "고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다."}</p>
+          <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요.<br />{NURI ? `첨부에서 평가 배점표를 읽은 누리장터 공고 ${bids.length.toLocaleString("ko-KR")}건 중에서 고를 수 있습니다.` : "고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다."}</p>
           {pickedBid && !bid && <p className="mt-2 text-sm text-ink-300">고른 공고를 불러오는 중…</p>}
           {NURI && bid && (aiRead === "reading" ? (
             <div className="mt-3 rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
@@ -627,7 +627,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
               ["참가자격", "사업자번호로 공고의 업종·지역 제한과 대조"],
               ["예상 평가점수", "항목별 점수와 통과 여부, 점수를 올릴 수 있는 곳"],
               ["투찰률", "통과 가능한 투찰률과 그 금액, 과거 낙찰자 투찰률"],
-              NURI ? ["지난 개찰 결과", "같은 업무·낙찰방법 민간 공고의 개찰 1순위 투찰률과 참가 업체 수"] : ["낙찰 결과 분석", "이 공고의 직전 낙찰·같은 사업·비슷한 공고의 낙찰 업체와 경쟁 강도"],
+              NURI ? ["지난 개찰 결과", "같은 업무·낙찰방법 누리장터 공고의 개찰 1순위 투찰률과 참가 업체 수"] : ["낙찰 결과 분석", "이 공고의 직전 낙찰·같은 사업·비슷한 공고의 낙찰 업체와 경쟁 강도"],
             ].map(([t, d], n) => (
               <li key={t} className="flex gap-3">
                 <span className="w-5 shrink-0 font-bold tabular-nums text-mint-600">{n + 1}</span>
@@ -688,7 +688,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
   tiles.push(chance && scoreStage === "score"
     ? { label: "낙찰 가능성", value: `${chance.low}~${chance.high}%`, tone: chance.low > 0 ? "ink" : "coral", sub: `${fc.competition ? `경쟁 강도 ${fc.competition.level} · ` : ""}${chance.ifPassed ? `통과 기준을 채우면 ${chance.ifPassed.low}~${chance.ifPassed.high}%` : "같은 조건 과거 낙찰로 낸 범위"}` }
     : NURI
-      ? nuriRate ? { label: "지난 개찰 참가 업체", value: `평균 ${nuriRate.bidders}곳`, tone: "ink", sub: `같은 업무·낙찰방법 민간 공고 ${nuriRate.n}건 · 1순위 투찰률 가운데 ${nuriRate.p50}%` } : { label: "지난 개찰 결과", value: "자료 부족", tone: "muted", sub: "같은 업무·낙찰방법의 민간 개찰 결과가 적습니다." }
+      ? nuriRate ? { label: "지난 개찰 참가 업체", value: `평균 ${nuriRate.bidders}곳`, tone: "ink", sub: `같은 업무·낙찰방법 누리장터 공고 ${nuriRate.n}건 · 1순위 투찰률 가운데 ${nuriRate.p50}%` } : { label: "지난 개찰 결과", value: "자료 부족", tone: "muted", sub: "같은 업무·낙찰방법의 민간 개찰 결과가 적습니다." }
     : fc.competition
       ? { label: "경쟁 강도", value: fc.competition.level, tone: "ink", sub: fc.competition.text }
       : analysisLoading
@@ -720,10 +720,10 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
         <section className="card p-6">
           <Step n={1} title="공고 선택" />
           <div className="mt-4 rounded-2xl bg-paper p-4">
-            <p className="text-xs text-ink-500">{NURI ? "민간 공고 · " : ""}{bid.bizType ?? "용역"} · {bid.category} · {NURI ? (bid.awardRaw ?? bid.contractMethod).replace("에의한낙찰자결정", "") : bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
+            <p className="text-xs text-ink-500">{NURI ? "누리장터 공고 · " : ""}{bid.bizType ?? "용역"} · {bid.category} · {NURI ? (bid.awardRaw ?? bid.contractMethod).replace("에의한낙찰자결정", "") : bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
             <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
             <p className="mt-1 text-sm text-ink-500">{bid.agency} · {bid.baseAmount ? `${amountLabel} ${won(bid.baseAmount)}` : "금액 미공개"}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
-            {NURI && <a href={bid.detailUrl} className="mt-2 inline-block text-xs font-semibold text-mint-700 hover:underline">민간 공고 상세 보기</a>}
+            {NURI && <a href={bid.detailUrl} className="mt-2 inline-block text-xs font-semibold text-mint-700 hover:underline">누리장터 공고 상세 보기</a>}
           </div>
           <TrialNote state={trial} />
           {searchBox}
@@ -913,7 +913,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
                 base={bid?.baseAmount ?? 0}
                 baseLabel={amountLabel}
                 hint={NURI
-                  ? nuriRate ? `기본값 = 같은 업무·낙찰방법 민간 공고 개찰 1순위 투찰률 가운데 값 (${nuriRate.n}건, ${nuriRate.p25}~${nuriRate.p75}%). 슬라이더로 바꿀 수 있습니다.` : `같은 업무·낙찰방법의 민간 개찰 결과가 없어 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`
+                  ? nuriRate ? `기본값 = 같은 업무·낙찰방법 누리장터 공고 개찰 1순위 투찰률 가운데 값 (${nuriRate.n}건, ${nuriRate.p25}~${nuriRate.p75}%). 슬라이더로 바꿀 수 있습니다.` : `같은 업무·낙찰방법의 민간 개찰 결과가 없어 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`
                   : fc.rival
                   ? `기본값 = ${fc.rival.basis} (낙찰 결과 분석). 슬라이더로 바꿀 수 있습니다.`
                   : rivalEst
@@ -997,7 +997,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
               ? "점수 구간·서류 인정 범위·정성 등급은 공고 첨부에서 읽은 기준을 적용했습니다. 정성평가는 위원이 제안서와 발표를 보고 매기므로, 제안 준비 수준으로 고른 등급은 예상치입니다. 실제로 인정되는 서류는 제출 전 공고 원문으로 확인하세요."
               : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 기준표 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
             {active.criteria && ` 적용 기준표: ${active.criteria.name} (${active.criteria.status}).`}
-            {NURI && " 민간 공고는 가격 평가 산식과 낙찰하한율이 공고마다 다르고 공고 목록에 값이 없어, 공고서에서 읽지 못한 부분은 나라장터 기준 산식으로 추정했습니다. 공고서의 가격 평가 방법을 꼭 확인하세요."}
+            {NURI && " 누리장터 공고는 가격 평가 산식과 낙찰하한율이 공고마다 다르고 공고 목록에 값이 없어, 공고서에서 읽지 못한 부분은 나라장터 기준 산식으로 추정했습니다. 공고서의 가격 평가 방법을 꼭 확인하세요."}
           </p>
           {validation && <ValidationNote v={validation} />}
         </>)}

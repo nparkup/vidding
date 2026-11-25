@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DistChart } from "@/components/BidPriceAnalysis";
 import { YearChart } from "@/components/charts/YearChart";
 import { HBarList } from "@/components/charts/HBarList";
+import { MoreBars, MoreButton, NameCountLine } from "@/components/analysis/MoreList";
 import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
 import { CHART } from "@/components/charts/useWidth";
 import { METHOD_NAME, bandLabel, bandOfAmount, methodCode, provinceKey, quantile } from "@/lib/awards/analysis";
@@ -206,16 +207,16 @@ export function rivalProfile(wins: AwardWin[], bizno: string): RivalProfile {
   const yearAgo = new Date(Date.now() - 365 * 86400e3).toISOString().slice(0, 10);
   const fourAgo = new Date(Date.now() - 4 * 365 * 86400e3).toISOString().slice(0, 10);
   return {
-    regions: [...rg.entries()].sort((a, b) => b[1][0] - a[1][0]).slice(0, 8).map(([n, [c, a]]) => [n, c, Math.round(a)]),
+    regions: [...rg.entries()].sort((a, b) => b[1][0] - a[1][0]).map(([n, [c, a]]) => [n, c, Math.round(a)]),
     bands: [...bd.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, ws]) => [bandLabel(k), ws.length, med(ws.map((w) => w.rate).filter((v) => v > 0 && v <= 110)) ?? 0]),
     trend: { last: xs.filter((w) => w.date >= yearAgo).length, prevAvg: Math.round((xs.filter((w) => w.date < yearAgo && w.date >= fourAgo).length / 3) * 10) / 10 },
     n: xs.length,
     years: [...ys.entries()].sort((a, b) => a[0] - b[0]).map(([y, [n, a]]) => [y, n, Math.round(a)]),
     groups,
-    agencies: [...ag.entries()].sort((a, b) => b[1][0] - a[1][0]).slice(0, 8).map(([n, [c, a]]) => [n, c, Math.round(a)]),
-    rivals: [...rv.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10),
+    agencies: [...ag.entries()].sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]).map(([n, [c, a]]) => [n, c, Math.round(a)]),
+    rivals: [...rv.entries()].sort((a, b) => b[1] - a[1]),
     links: [...lk.entries()].map(([k, c]) => { const [n, a] = k.split("\t"); return [n, a, c] as [string, string, number]; }),
-    rivalInfo: Object.fromEntries([...rv.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([n]) => [n, meet.get(n)!])),
+    rivalInfo: Object.fromEntries([...rv.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([n]) => [n, meet.get(n)!])), // 관계도 말풍선용 (관계도는 10곳)
     assess: samples.length ? { scope: "agency", samples } : undefined,
     firstShare: ranked >= 5 ? first / ranked : undefined,
   };
@@ -227,6 +228,10 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
   const name = winnerName(wins);
   const st = useMemo(() => assessStats(p.assess, [-3, 3]), [p]);
   const inds = useMemo(() => (mine ? corpIndustries(wins) : []), [wins, mine]);
+  const recentWins = useMemo(() => wins.slice().sort((a, b) => b.date.localeCompare(a.date)), [wins]);
+  const [recentN, setRecentN] = useState(15);
+  const [groupsAll, setGroupsAll] = useState(false);
+  useEffect(() => { setRecentN(15); setGroupsAll(false); }, [wins]);
   if (!p.n) return <p className="card p-6 text-sm text-ink-500">{from ? `${from} 이후 ` : ""}나라장터 낙찰 기록이 없습니다.</p>;
   return (
     <div className="space-y-6">
@@ -243,7 +248,7 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
           <table className="table-x min-w-[460px]">
             <thead className="text-xs text-ink-500"><tr><th className="py-1.5">업무·계약방법</th><th>낙찰</th><th>낙찰률 가운데</th><th>하한율 위 폭</th><th>참가업체</th></tr></thead>
             <tbody className="divide-y divide-ink-100">
-              {p.groups.slice(0, 6).map((g) => (
+              {(groupsAll ? p.groups : p.groups.slice(0, 6)).map((g) => (
                 <tr key={g.label}>
                   <td className="py-2 font-semibold">{g.label}</td>
                   <td className="tabular-nums">{g.n}</td>
@@ -255,6 +260,7 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
             </tbody>
           </table>
         </div>
+        {p.groups.length > 6 && !groupsAll && <MoreButton left={p.groups.length - 6} step={p.groups.length - 6} unit="개" onClick={() => setGroupsAll(true)} />}
       </section>
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-6">
@@ -268,10 +274,8 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
         </section>
         <section className="card p-6">
           <h3 className="font-bold">주요 발주처</h3>
-          <HBarList rows={p.agencies.map(([n, c, a]) => ({ label: n, value: c, text: `${c}건 · ${won(a)}` }))} />
-          {p.rivals.length > 0 && (
-            <p className="mt-3 text-xs leading-relaxed text-ink-500">이 업체가 낙찰받을 때 개찰 1~5위에 함께 든 업체: {p.rivals.slice(0, 8).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
-          )}
+          <MoreBars rows={p.agencies.map(([n, c, a]) => ({ label: n, value: c, text: `${c}건 · ${won(a)}` }))} numbered findId="rv-ag-q" findPlaceholder="발주처 이름으로 찾기" />
+          <NameCountLine label="이 업체가 낙찰받을 때 개찰 1~5위에 함께 든 업체" items={p.rivals} show={8} />
         </section>
       </div>
       <RivalNetwork p={p} name={name || "이 업체"} onPick={onPick} mine={mine} />
@@ -279,7 +283,7 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-6">
           <h3 className="font-bold">지역별 낙찰 <span className="text-sm font-normal text-ink-400">공고 참가 지역 기준</span></h3>
-          <HBarList rows={p.regions.map(([n, c, a]) => ({ label: n === "전국" ? "지역 제한 없음" : n, value: c, text: `${c}건 · ${won(a)}` }))} />
+          <MoreBars rows={p.regions.map(([n, c, a]) => ({ label: n === "전국" ? "지역 제한 없음" : n, value: c, text: `${c}건 · ${won(a)}` }))} findId="rv-rg-q" findPlaceholder="지역으로 찾기" />
         </section>
         <section className="card p-6">
           <h3 className="font-bold">금액 구간별 낙찰 <span className="text-sm font-normal text-ink-400">기초금액 기준</span></h3>
@@ -289,13 +293,14 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
       <section className="card p-6">
         <h3 className="font-bold">최근 낙찰</h3>
         <ul className="mt-3 divide-y divide-ink-100">
-          {wins.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15).map((w) => (
+          {recentWins.slice(0, recentN).map((w) => (
             <li key={`${w.bidNtceNo}-${w.bidNtceOrd}`} className="py-2 text-sm">
               <p className="font-semibold">{w.title}</p>
               <p className="text-xs text-ink-500">{[w.date, w.agency, `낙찰금액 ${won(w.amount)}${w.rate ? ` (낙찰률 ${pct(w.rate)})` : ""}`, w.lwlt ? `하한율 ${pct(w.lwlt)}` : "", w.bidders ? `${w.bidders}곳` : ""].filter(Boolean).join(" · ")}</p>
             </li>
           ))}
         </ul>
+        <MoreButton left={recentWins.length - recentN} step={15} unit="건" onClick={() => setRecentN((v) => v + 15)} />
       </section>
       {mine && <MineIndustry list={inds} name={name} />}
     </div>
@@ -340,17 +345,18 @@ const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` 
 function RivalNetwork({ p, name, onPick, mine }: { p: RivalProfile; name: string; onPick: (bizno: string) => void; mine?: boolean }) {
   const [, bump] = useState(0);
   const g = useMemo(() => {
-    const ags = new Set(p.agencies.map(([a]) => a));
+    const agencies = p.agencies.slice(0, 8);
+    const ags = new Set(agencies.map(([a]) => a));
     const rivals = p.rivals.slice(0, 10);
     const nodes: NetNode[] = [
       { id: "me", label: name, group: "me", weight: p.n, tip: [name, `낙찰 ${p.n.toLocaleString()}건`] },
-      ...p.agencies.map(([a, c, amt]): NetNode => {
+      ...agencies.map(([a, c, amt]): NetNode => {
         const met = p.links.filter(([n, ag]) => ag === a && p.rivalInfo[n]).sort((x, y) => y[2] - x[2]);
         return { id: `a:${a}`, label: a, group: "agency", weight: c, tip: [a, `${name} 낙찰 ${c}건 · ${won(amt)}`, ...(met.length ? [`이 기관 공고에서 함께 든 업체: ${met.slice(0, 3).map(([n, , k]) => `${cut(n, 10)} ${k}회`).join(", ")}`] : [])] };
       }),
       ...rivals.map(([r, c]): NetNode => ({ id: `r:${r}`, label: r, group: "rival", weight: c, tip: [r, `${name} 낙찰 공고에서 개찰 1~5위에 함께 든 횟수 ${c}회`] })),
     ];
-    const edges: NetEdge[] = p.agencies.map(([a, c]) => ({ a: "me", b: `a:${a}`, w: c }));
+    const edges: NetEdge[] = agencies.map(([a, c]) => ({ a: "me", b: `a:${a}`, w: c }));
     for (const [r, c] of rivals) {
       const ls = p.links.filter(([n, a]) => n === r && ags.has(a));
       for (const [, a, k] of ls) edges.push({ a: `r:${r}`, b: `a:${a}`, w: k });

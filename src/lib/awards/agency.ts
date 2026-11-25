@@ -41,13 +41,13 @@ export interface AgencySummary {
   n: number;
   /** 연도별 [연도, 건수, 낙찰금액 합(원), 참가업체 수 평균] (오래된 순) */
   years: [number, number, number, number][];
-  /** 업무·계약방법별 (건수 많은 순, 최근 4년) */
+  /** 업무·계약방법별 (건수 많은 순, 최근 RECENT_YEARS년) */
   groups: AgencyGroupStat[];
-  /** 최근 4년 자주 낙찰받은 업체 [업체명, 건수, 낙찰금액 합] (건수 상위·금액 상위 TOP_WINNERS곳씩 합친 것, 건수 순) */
+  /** 최근 RECENT_YEARS년 자주 낙찰받은 업체 [업체명, 건수, 낙찰금액 합] (건수 상위·금액 상위 STORE_WINNERS곳씩 합친 것, 건수 순) */
   winners: [string, number, number][];
-  /** 최근 4년 개찰 1~5위에 자주 든 업체 [업체명, 횟수] (낙찰 제외, 최대 10곳) */
+  /** 최근 RECENT_YEARS년 개찰 1~5위에 자주 든 업체 [업체명, 횟수] (낙찰 제외, 최대 RANKED_MAX곳) */
   ranked: [string, number][];
-  /** 1곳 단독 낙찰(참가 1곳) 비율 0~1, 최근 4년 */
+  /** 1곳 단독 낙찰(참가 1곳) 비율 0~1, 최근 RECENT_YEARS년 */
   single: number;
   /** 사정율 표본 (업무 무관) */
   assess?: AssessData;
@@ -69,6 +69,15 @@ export function isVagueAgency(name: string | undefined | null): boolean {
 
 /** 자주 낙찰받은 업체 목록 길이 (발주처·업종별 분석 공통). 건수 순·금액 순 각각 이만큼 보여 준다 */
 export const TOP_WINNERS = 20;
+/** 발주처 요약에 담는 자주 낙찰받은 업체: 건수 상위·금액 상위 이만큼씩 (화면은 TOP_WINNERS곳 뒤 더 보기·검색) */
+export const STORE_WINNERS = 50;
+/** 발주처 요약에 담는 개찰 1~5위에 자주 든 업체 수 */
+export const RANKED_MAX = 30;
+
+/** '최근 N년' 기간 (발주처·업종별 분석, 우리 회사 진단 공통) */
+export const RECENT_YEARS = 3;
+/** 최근 RECENT_YEARS년이 시작하는 날 (YYYY-MM-DD) */
+export const recentFrom = (today: string) => `${Number(today.slice(0, 4)) - RECENT_YEARS}${today.slice(4)}`;
 
 /**
  * 업체 집계 [이름, 건수, 금액, ...]에서 건수 상위 TOP_WINNERS곳과 금액 상위 TOP_WINNERS곳을 합쳐(겹치면 한 번) 건수 순으로 돌려준다.
@@ -86,8 +95,7 @@ export function agencySummary(name: string, rows: AgencyRow[], today: string): A
   const seen = new Set<string>();
   const xs = [...rows].sort((a, b) => b[2].localeCompare(a[2])).filter((r) => (seen.has(r[0]) ? false : (seen.add(r[0]), true)));
   if (!xs.length) return undefined;
-  const from4 = `${Number(today.slice(0, 4)) - 4}${today.slice(4)}`;
-  const recent4 = xs.filter((r) => r[2] >= from4);
+  const recent = xs.filter((r) => r[2] >= recentFrom(today));
 
   const byYear = new Map<number, { n: number; amt: number; bid: number; bn: number }>();
   for (const r of xs) {
@@ -99,7 +107,7 @@ export function agencySummary(name: string, rows: AgencyRow[], today: string): A
   const years = [...byYear.entries()].sort((a, b) => a[0] - b[0]).map(([y, v]) => [y, v.n, Math.round(v.amt), v.bn ? Math.round((v.bid / v.bn) * 10) / 10 : 0] as [number, number, number, number]);
 
   const g = new Map<string, AgencyRow[]>();
-  for (const r of recent4) { const k = `${r[3]}|${r[7]}`; (g.get(k) ?? g.set(k, []).get(k)!).push(r); }
+  for (const r of recent) { const k = `${r[3]}|${r[7]}`; (g.get(k) ?? g.set(k, []).get(k)!).push(r); }
   const sorted = (v: number[]) => v.sort((a, b) => a - b);
   const groups: AgencyGroupStat[] = [...g.entries()].map(([k, rs]) => {
     const [biz, method] = k.split("|") as [string, MethodCode];
@@ -117,13 +125,13 @@ export function agencySummary(name: string, rows: AgencyRow[], today: string): A
 
   const win = new Map<string, [number, number]>();
   const rk = new Map<string, number>();
-  for (const r of recent4) {
+  for (const r of recent) {
     if (r[12]) { const v = win.get(r[12]) ?? [0, 0]; v[0]++; v[1] += r[4] > 100 ? r[4] : 0; win.set(r[12], v); }
     for (const [nm] of r[14] ?? []) if (nm && nm !== r[12]) rk.set(nm, (rk.get(nm) ?? 0) + 1);
   }
-  const winners = topWinners([...win.entries()].map(([n, [c, a]]) => [n, c, Math.round(a)] as [string, number, number]));
-  const ranked = [...rk.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  const withBidders = recent4.filter((r) => r[6] > 0);
+  const winners = topWinners([...win.entries()].map(([n, [c, a]]) => [n, c, Math.round(a)] as [string, number, number]), STORE_WINNERS);
+  const ranked = [...rk.entries()].sort((a, b) => b[1] - a[1]).slice(0, RANKED_MAX);
+  const withBidders = recent.filter((r) => r[6] > 0);
 
   return {
     v: 1, name, builtAt: new Date().toISOString(), from: xs[xs.length - 1][2], to: xs[0][2], n: xs.length,

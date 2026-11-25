@@ -11,13 +11,15 @@ import { AGENCY_KINDS, KIND_LABEL, REGION_ORDER, agencyKind, agencyRegion, type 
 import { AssessDistWide } from "@/components/charts/AssessDistWide";
 import { YearChart } from "@/components/charts/YearChart";
 import { HBarList } from "@/components/charts/HBarList";
+import { Treemap, type TreeItem } from "@/components/charts/Treemap";
+import { MetricToggle } from "@/components/charts/ColumnChart";
+import { ListFind, MoreButton, NameCountLine, useMoreList } from "@/components/analysis/MoreList";
 import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
 import { CHART } from "@/components/charts/useWidth";
 import { METHOD_NAME } from "@/lib/awards/analysis";
 import { TOP_WINNERS, agencyId, type AgencySummary } from "@/lib/awards/agency";
 import { cutCats, cutStats, type AgencyCutFile } from "@/lib/awards/agencyCut";
-import { periodLabel } from "@/lib/awards/industry";
-import { ScrollRow } from "@/components/ScrollRow";
+import { RECENT, periodLabel } from "@/lib/awards/industry";
 import { assessStats } from "@/lib/awards/assess";
 import { won } from "@/lib/format";
 import { bidHref } from "@/lib/links";
@@ -184,7 +186,7 @@ export function AgencyExplorer() {
           <aside className="hidden min-w-0 lg:block">
             <p className="text-xs text-ink-500">{matches.length.toLocaleString()}곳 · {SORTS.find((s) => s.key === sort)?.label ?? SORTS[0].label}</p>
             <ul className="mt-2 max-h-[40rem] divide-y divide-ink-100 overflow-y-auto rounded-2xl border border-ink-100 bg-white">
-              {matches.slice(0, 300).map((r) => (
+              {matches.map((r) => (
                 <li key={r.id}>
                   <button type="button" onClick={() => pick(r.id)} className={`flex w-full min-w-0 items-baseline justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-paper ${r.id === id ? "bg-mint-50" : ""}`}>
                     <span className="min-w-0 font-semibold">{r.name}</span>
@@ -207,21 +209,27 @@ export function AgencyExplorer() {
 }
 
 function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
-  const recent4 = s.groups.reduce((a, g) => a + g.n, 0);
-  // 업종·기간 선택 (/agency-cut/{id}.json). 기본(전체 업종·최근 4년)은 발주처 요약 그대로
+  const recentN = s.groups.reduce((a, g) => a + g.n, 0);
+  const [bidsN, setBidsN] = useState(12);
+  // 업종·기간 선택 (/agency-cut/{id}.json). 기본(전체 업종·최근 기간)은 발주처 요약 그대로. 주소 ?cat=업종&period=기간 으로 바로 열 수 있다
+  const sp = useSearchParams();
+  const initCat = CATEGORIES.indexOf((sp.get("cat") ?? "") as (typeof CATEGORIES)[number]);
+  const initPeriod = sp.get("period") || RECENT;
   const [cut, setCut] = useState<AgencyCutFile | null | undefined>();
-  const [cat, setCat] = useState(-1);
-  const [period, setPeriod] = useState("4y");
+  const [cat, setCat] = useState(initCat);
+  const [period, setPeriod] = useState(initPeriod);
   useEffect(() => {
     let alive = true;
-    setCut(undefined); setCat(-1); setPeriod("4y");
+    setCut(undefined); setCat(initCat); setPeriod(initPeriod);
     loadJson<AgencyCutFile>(`/agency-cut/${agencyId(s.name)}.json`).then((f) => alive && setCut(f)).catch(() => alive && setCut(null));
     return () => { alive = false; };
   }, [s]);
   const cats = useMemo(() => (cut ? cutCats(cut) : []), [cut]);
-  const filtered = !!cut && (cat >= 0 || period !== "4y");
+  const filtered = !!cut && (cat >= 0 || period !== RECENT);
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  const cs = useMemo(() => (cut && filtered ? cutStats(cut, cat, period, today) : null), [cut, filtered, cat, period, today]);
+  // 업체 더 보기·찾기는 기본 기간에도 자료(cut)의 모든 업체를 쓴다
+  const full = useMemo(() => (cut ? cutStats(cut, cat, period, today) : null), [cut, cat, period, today]);
+  const cs = filtered ? full : null;
   const cutYears = useMemo(() => (cut ? [...new Set(cut.rows.map((r) => Math.floor(r[0] / 10000)))].sort((a, b) => b - a).slice(0, 11).map(String) : []), [cut]);
   const label = [cat >= 0 ? CATEGORIES[cat] : "", periodLabel(period)].filter(Boolean).join(" · ");
   const view = cs ? { groups: cs.groups, winners: cs.winners.map(([n, c, a]) => [n, c, a] as [string, number, number]), ranked: [] as [string, number][] } : s;
@@ -231,8 +239,8 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
         <h2 className="text-2xl font-extrabold tracking-tight"><AgencyLogo name={s.name} size={30} maxW={170} className="mr-3 -mt-1" />{s.name}</h2>
         <p className="mt-1 text-sm text-ink-500">나라장터 낙찰 {s.n.toLocaleString()}건 · {s.from} ~ {s.to}</p>
         <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Tile k="최근 4년 낙찰" v={`${recent4.toLocaleString()}건`} />
-          <Tile wide k="최근 4년 낙찰금액" v={won(s.groups.reduce((a, g) => a + g.amount, 0))} />
+          <Tile k={`${periodLabel(RECENT)} 낙찰`} v={`${recentN.toLocaleString()}건`} />
+          <Tile wide k={`${periodLabel(RECENT)} 낙찰금액`} v={won(s.groups.reduce((a, g) => a + g.amount, 0))} />
           <Tile k="단독 참가 비율" v={`${Math.round(s.single * 100)}%`} sub="참가 1곳 낙찰" />
           <Tile k="지금 공고" v={`${bids.length}건`} />
         </dl>
@@ -240,7 +248,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
 
       {cut && cut.rows.length > 0 && (
         <section className="card p-4 sm:p-5" aria-label="업종·기간 선택">
-          <div className="grid gap-3 sm:grid-cols-[16rem_1fr] sm:items-end">
+          <div className="grid gap-3">
             {cats.length > 0 && (
               <div className="min-w-0">
                 <label className="label" htmlFor="ag-cut-cat">업종</label>
@@ -252,13 +260,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
             )}
             <div className="min-w-0">
               <p className="label">조회 기간</p>
-              <ScrollRow className="flex gap-1" active={period}>
-                {["4y", "all", ...cutYears].map((p) => (
-                  <button key={p} type="button" aria-pressed={p === period} onClick={() => setPeriod(p)} className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold ${p === period ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
-                    {periodLabel(p)}
-                  </button>
-                ))}
-              </ScrollRow>
+              <PeriodChips opts={[RECENT, "all", ...cutYears]} value={period} onChange={setPeriod} />
             </div>
           </div>
           {cs && (
@@ -280,7 +282,7 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
 
       <MethodTable s={view} period={cs ? label : undefined} />
 
-      <WinnersCard s={view} period={cs ? label : undefined} />
+      <WinnersCard treemap s={full ? { winners: full.winners, ranked: cs ? [] : s.ranked } : view} total={full?.firms} period={cs ? label : undefined} />
 
       <AssessCard s={s} />
 
@@ -290,8 +292,9 @@ function AgencyDetail({ s, bids }: { s: AgencySummary; bids: Bid[] }) {
         <section className="card p-6">
           <h3 className="font-bold">이 기관의 지금 공고</h3>
           <div className="mt-3 space-y-3">
-            {[...bids].sort((a, b) => a.closeAt.localeCompare(b.closeAt)).slice(0, 12).map((b) => <BidRow key={b.id} bid={b} />)}
+            {[...bids].sort((a, b) => a.closeAt.localeCompare(b.closeAt)).slice(0, bidsN).map((b) => <BidRow key={b.id} bid={b} />)}
           </div>
+          <MoreButton left={bids.length - bidsN} step={12} unit="건" onClick={() => setBidsN((v) => v + 12)} />
         </section>
       )}
 
@@ -321,7 +324,7 @@ export function Tile({ k, v, sub, wide }: { k: string; v: string; sub?: string; 
   );
 }
 
-/** 최근 4년 업무·계약방법별 낙찰 건수 비중 (한 줄 막대) */
+/** 최근 기간 업무·계약방법별 낙찰 건수 비중 (한 줄 막대) */
 export function GroupShare({ s, period }: { s: Pick<AgencySummary, "groups">; period?: string }) {
   const gs = s.groups.slice(0, 4);
   const rest = s.groups.slice(4).reduce((a, g) => a + g.n, 0);
@@ -330,7 +333,7 @@ export function GroupShare({ s, period }: { s: Pick<AgencySummary, "groups">; pe
   const parts = [...gs.map((g, i) => ({ label: `${g.biz} ${METHOD_NAME[g.method]}`, n: g.n, color: CHART.cat[i] })), ...(rest ? [{ label: "그 밖", n: rest, color: CHART.ref }] : [])];
   return (
     <div className="mt-5">
-      <p className="text-sm font-semibold">업무·계약방법 비중 <span className="font-normal text-ink-400">{period ?? "최근 4년"} {total.toLocaleString()}건</span></p>
+      <p className="text-sm font-semibold">업무·계약방법 비중 <span className="font-normal text-ink-400">{period ?? periodLabel(RECENT)} {total.toLocaleString()}건</span></p>
       <div className="mt-2 flex h-3 gap-0.5 overflow-hidden rounded-full">
         {parts.map((p) => <span key={p.label} title={`${p.label} ${p.n.toLocaleString()}건`} style={{ width: `${(p.n / total) * 100}%`, background: p.color }} />)}
       </div>
@@ -350,7 +353,7 @@ function AgencyNetwork({ s }: { s: AgencySummary }) {
     nodes.set("ag", { id: "ag", label: s.name, group: "ag", weight: s.n, tip: [s.name, `낙찰 ${s.n.toLocaleString()}건`] });
     const bizN = new Map<string, number>();
     for (const g of s.groups) bizN.set(g.biz, (bizN.get(g.biz) ?? 0) + g.n);
-    for (const [b, n] of bizN) { nodes.set(`b:${b}`, { id: `b:${b}`, label: b, group: "biz", weight: n, tip: [b, `최근 4년 낙찰 ${n.toLocaleString()}건`] }); edge("ag", `b:${b}`, n); }
+    for (const [b, n] of bizN) { nodes.set(`b:${b}`, { id: `b:${b}`, label: b, group: "biz", weight: n, tip: [b, `${periodLabel(RECENT)} 낙찰 ${n.toLocaleString()}건`] }); edge("ag", `b:${b}`, n); }
     const winBiz = new Map<string, Map<string, number>>();
     for (const r of s.recent) { if (!r[8]) continue; const m = winBiz.get(r[8]) ?? new Map<string, number>(); m.set(r[3], (m.get(r[3]) ?? 0) + 1); winBiz.set(r[8], m); }
     const link = (id: string, name: string, w: number) => {
@@ -358,14 +361,14 @@ function AgencyNetwork({ s }: { s: AgencySummary }) {
       const hit = bs && [...bs.keys()].filter((b) => nodes.has(`b:${b}`));
       if (hit?.length) for (const b of hit) edge(`b:${b}`, id, w); else edge("ag", id, w);
     };
-    for (const [n, c, a] of s.winners.slice(0, 10)) { nodes.set(`w:${n}`, { id: `w:${n}`, label: n, group: "win", weight: c, tip: [n, `최근 4년 낙찰 ${c}건 · ${won(a)}`] }); link(`w:${n}`, n, c); }
-    for (const [n, c] of s.ranked.slice(0, 8)) { if (nodes.has(`w:${n}`)) continue; nodes.set(`r:${n}`, { id: `r:${n}`, label: n, group: "rank", weight: c, tip: [n, `최근 4년 개찰 1~5위 ${c}회 (낙찰 제외)`] }); link(`r:${n}`, n, c); }
+    for (const [n, c, a] of s.winners.slice(0, 10)) { nodes.set(`w:${n}`, { id: `w:${n}`, label: n, group: "win", weight: c, tip: [n, `${periodLabel(RECENT)} 낙찰 ${c}건 · ${won(a)}`] }); link(`w:${n}`, n, c); }
+    for (const [n, c] of s.ranked.slice(0, 8)) { if (nodes.has(`w:${n}`)) continue; nodes.set(`r:${n}`, { id: `r:${n}`, label: n, group: "rank", weight: c, tip: [n, `${periodLabel(RECENT)} 개찰 1~5위 ${c}회 (낙찰 제외)`] }); link(`r:${n}`, n, c); }
     return { nodes: [...nodes.values()], edges: [...edges.values()] };
   }, [s]);
   if (g.nodes.length < 3) return null;
   return (
     <section className="card p-6">
-      <h3 className="font-bold">업무·업체 관계도 <span className="text-sm font-normal text-ink-400">최근 4년, 원 크기 = 건수</span></h3>
+      <h3 className="font-bold">업무·업체 관계도 <span className="text-sm font-normal text-ink-400">{periodLabel(RECENT)}, 원 크기 = 건수</span></h3>
       <NetworkGraph
         nodes={g.nodes} edges={g.edges} centerId="ag" ariaLabel="수요기관 업무와 업체 관계도"
         groups={[{ key: "biz", label: "업무 (낙찰 건수)", color: CHART.cat[2] }, { key: "win", label: "자주 낙찰받은 업체", color: CHART.cat[0] }, { key: "rank", label: "개찰 1~5위에 자주 든 업체", color: CHART.cat[1] }]}
@@ -375,18 +378,19 @@ function AgencyNetwork({ s }: { s: AgencySummary }) {
   );
 }
 
-/** 업무·계약방법별 낙찰률·참가업체 (최근 4년). 업종별 분석도 같이 쓴다 */
+/** 업무·계약방법별 낙찰률·참가업체 (최근 기간). 업종별 분석도 같이 쓴다 */
 export function MethodTable({ s, period }: { s: Pick<AgencySummary, "groups">; period?: string }) {
+  const [allGroups, setAllGroups] = useState(false);
   return (
     <section className="card p-6">
-      <h3 className="font-bold">계약방법별 낙찰 <span className="text-sm font-normal text-ink-400">{period ?? "최근 4년"}</span></h3>
+      <h3 className="font-bold">계약방법별 낙찰 <span className="text-sm font-normal text-ink-400">{period ?? periodLabel(RECENT)}</span></h3>
       <div className="mt-3 overflow-x-auto">
         <table className="table-x min-w-[520px]">
           <thead className="text-xs text-ink-500">
             <tr><th className="py-1.5">업무·계약방법</th><th>건수</th><th>낙찰률 가운데 (25~75%)</th><th>하한율 위 폭</th><th>참가업체</th></tr>
           </thead>
           <tbody className="divide-y divide-ink-100">
-            {s.groups.slice(0, 8).map((g) => (
+            {(allGroups ? s.groups : s.groups.slice(0, 8)).map((g) => (
               <tr key={g.label}>
                 <td className="py-2 font-semibold">{g.biz} {METHOD_NAME[g.method]}</td>
                 <td className="tabular-nums">{g.n.toLocaleString()}</td>
@@ -398,12 +402,26 @@ export function MethodTable({ s, period }: { s: Pick<AgencySummary, "groups">; p
           </tbody>
         </table>
       </div>
+      {!allGroups && <MoreButton left={s.groups.length - 8} step={s.groups.length - 8} unit="개" onClick={() => setAllGroups(true)} />}
       <p className="mt-2 text-xs text-ink-400">하한율 위 폭은 낙찰률에서 그 공고 낙찰하한율을 뺀 값의 가운데 값입니다.<br />참가업체는 가운데 값입니다.</p>
     </section>
   );
 }
 
 export type WinnersBy = "count" | "amount";
+
+/** 조회 기간 칩 (최근 기간·전체·연도). 칸이 모자라면 다음 줄로 넘긴다 (발주처·업종별 분석 공통) */
+export function PeriodChips({ opts, value, onChange, className = "" }: { opts: string[]; value: string; onChange: (p: string) => void; className?: string }) {
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className}`} role="group" aria-label="조회 기간">
+      {opts.map((p) => (
+        <button key={p} type="button" aria-pressed={p === value} onClick={() => onChange(p)} className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${p === value ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
+          {periodLabel(p)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** 자주 낙찰받은 업체 제목 줄 + 낙찰 건수 순·낙찰 금액 순 고르기 (발주처·업종별 분석 공통) */
 export function WinnersHead({ period, by, setBy }: { period: string; by: WinnersBy; setBy: (b: WinnersBy) => void }) {
@@ -433,30 +451,77 @@ export function sortWinners<T extends [string, number, number, ...unknown[]]>(ro
   return [...rows].sort((a, b) => (by === "amount" ? b[2] - a[2] || b[1] - a[1] : b[1] - a[1] || b[2] - a[2])).slice(0, k);
 }
 
-/** 자주 낙찰받은 업체 막대 목록: 고른 기준으로 정렬해 TOP_WINNERS곳 */
-export function WinnersList({ rows, by }: { rows: [string, number, number, ...unknown[]][]; by: WinnersBy }) {
-  const list = useMemo(() => sortWinners(rows, by), [rows, by]);
+/**
+ * 자주 낙찰받은 업체 막대 목록: 고른 기준으로 정렬해 TOP_WINNERS곳, 그 뒤는 더 보기·업체 이름 찾기.
+ * total: 이 기간 낙찰받은 업체 수(알면). loadMore: 더 긴 목록을 불러오는 함수(있으면 더 보기·찾기 때 부른다)
+ */
+export function WinnersList({ rows, by, total, loadMore, loading, findId }: { rows: [string, number, number, ...unknown[]][]; by: WinnersBy; total?: number; loadMore?: () => void; loading?: boolean; findId: string }) {
+  const sorted = useMemo(() => sortWinners(rows, by, rows.length), [rows, by]);
+  const m = useMoreList(sorted, (r) => r[0], TOP_WINNERS, by);
+  const canLoad = !!loadMore && !loading;
+  const all = total ?? rows.length;
+  if (!rows.length) return null;
   return (
-    <HBarList rows={list.map(([n, c, a, dt], i) => ({
-      label: `${i + 1}. ${n}`, value: by === "amount" ? a : c,
-      text: by === "amount" ? `${won(a)} · ${c.toLocaleString()}건` : `${c.toLocaleString()}건 · ${won(a)}`,
-      title: typeof dt === "string" && dt ? `최근 낙찰 ${dt}` : undefined,
-    }))} />
+    <>
+      {(all > TOP_WINNERS || rows.length > TOP_WINNERS) && <ListFind id={findId} q={m.q} setQ={m.setQ} placeholder="업체 이름으로 찾기" onFocus={canLoad ? loadMore : undefined} />}
+      <HBarList rows={m.visible.map(({ row: [n, c, a, dt], rank }) => ({
+        label: `${rank}. ${n}`, value: by === "amount" ? a : c,
+        text: by === "amount" ? `${won(a)} · ${c.toLocaleString()}건` : `${c.toLocaleString()}건 · ${won(a)}`,
+        title: typeof dt === "string" && dt ? `최근 낙찰 ${dt}` : undefined,
+      }))} />
+      {m.searching && !m.matched && !loading && <p className="mt-3 text-sm text-ink-500">찾는 업체가 목록에 없습니다.</p>}
+      <MoreButton
+        left={m.left || (canLoad && rows.length < all ? all - rows.length : 0)} step={m.step} loading={loading}
+        onClick={() => { if (!m.left && canLoad) loadMore!(); m.more(); }}
+      />
+      {!loadMore && rows.length < all && (m.searching || !m.left) && (
+        <p className="mt-2 text-xs text-ink-500">낙찰받은 업체 {all.toLocaleString()}곳 중 {by === "amount" ? "낙찰금액이 큰" : "낙찰이 많은"} {rows.length.toLocaleString()}곳까지 담았습니다.</p>
+      )}
+    </>
   );
 }
 
-/** 자주 낙찰받은 업체·개찰 상위 업체 (최근 4년) */
-export function WinnersCard({ s, period }: { s: Pick<AgencySummary, "winners" | "ranked">; period?: string }) {
+/** 자주 낙찰받은 업체·개찰 상위 업체 (최근 기간) */
+export function WinnersCard({ s, period, total, treemap }: { s: { winners: [string, number, number, ...unknown[]][]; ranked: [string, number][] }; period?: string; total?: number; treemap?: boolean }) {
   const [by, setBy] = useState<WinnersBy>("count");
   return (
     <section className="card p-6">
-      <WinnersHead period={period ?? "최근 4년"} by={by} setBy={setBy} />
-      <WinnersList rows={s.winners} by={by} />
-      {s.ranked.length > 0 && (
-        <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
-      )}
+      <WinnersHead period={period ?? periodLabel(RECENT)} by={by} setBy={setBy} />
+      <WinnersList rows={s.winners} by={by} total={total} findId="ag-win-q" />
+      <RankedLine ranked={s.ranked} />
+      {treemap && <WinnersTreemap rows={s.winners} total={total} />}
     </section>
   );
+}
+
+/** 낙찰업체 전체의 낙찰 비중을 면적으로. 건수·금액 기준을 따로 고른다 */
+function WinnersTreemap({ rows, total }: { rows: [string, number, number, ...unknown[]][]; total?: number }) {
+  const [by, setBy] = useState<WinnersBy>("count");
+  const items = useMemo(() => sortWinners(rows, by, rows.length).map(([n, c, a, dt]): TreeItem => ({
+    key: n, label: n, value: by === "amount" ? a : c,
+    sub: by === "amount" ? won(a) : `${c.toLocaleString()}건`,
+    tip: [n, `낙찰 ${c.toLocaleString()}건`, `낙찰금액 ${won(a)}`, ...(typeof dt === "string" && dt ? [`최근 낙찰 ${dt}`] : [])],
+  })), [rows, by]);
+  if (items.length < 2) return null;
+  const partial = total !== undefined && total > rows.length;
+  return (
+    <div className="mt-5 border-t border-ink-100 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">낙찰업체 전체 비중 <span className="font-normal text-ink-400">칸 넓이 = {by === "amount" ? "낙찰금액" : "낙찰 건수"}</span></p>
+        <MetricToggle value={by} onChange={setBy} options={[["count", "건수"], ["amount", "금액"]]} />
+      </div>
+      <Treemap items={items} ariaLabel={`낙찰업체별 ${by === "amount" ? "낙찰금액" : "낙찰 건수"} 비중`} />
+      <p className="mt-2 text-xs leading-relaxed text-ink-500">
+        {partial ? `낙찰받은 업체 ${total!.toLocaleString()}곳 중 자료에 담긴 ${rows.length.toLocaleString()}곳으로 그렸습니다.` : `낙찰받은 업체 ${rows.length.toLocaleString()}곳 전체로 그렸습니다.`}
+        {items.length > 30 && " 앞 30곳 뒤는 '기타'로 묶었고, 기타를 누르면 그 안을 펼쳐 봅니다."}
+      </p>
+    </div>
+  );
+}
+
+/** 개찰 1~5위에 자주 든 업체(낙찰 제외): 앞 6곳, 나머지는 펼쳐 본다 */
+export function RankedLine({ ranked }: { ranked: [string, number][] }) {
+  return <NameCountLine label="개찰 1~5위에 자주 든 업체(낙찰 제외)" items={ranked} />;
 }
 
 /** 사정율 분포 (예정가격 ÷ 기초금액) */

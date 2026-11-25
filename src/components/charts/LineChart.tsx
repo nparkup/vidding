@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Tooltip } from "./Tooltip";
 import { CHART, useWidth } from "./useWidth";
+import { textW } from "./ColumnChart";
 
 export interface Series {
   name: string;
@@ -14,16 +15,23 @@ export interface Series {
 
 /**
  * 선 차트 (같은 단위 값 여러 개, 축 하나). 가까운 점에 세로선과 말풍선.
- * 두 줄 이상이면 범례를 위에 둔다.
+ * 두 줄 이상이면 범례를 위에 둔다. 점마다 값을 적는다(점 사이가 좁으면 세로로 세운다). 두 번째 줄 값은 점 아래에 적는다.
  */
-export function LineChart({ xs, series, tips, fmt, height = 190, ariaLabel, pad = 0.3 }: { xs: string[]; series: Series[]; tips: string[][]; fmt: (v: number) => string; height?: number; ariaLabel: string; pad?: number }) {
+export function LineChart({ xs, series, tips, fmt, height: h0 = 190, ariaLabel, pad = 0.3 }: { xs: string[]; series: Series[]; tips: string[][]; fmt: (v: number) => string; height?: number; ariaLabel: string; pad?: number }) {
   const [ref, W] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const all = series.flatMap((s) => s.values.filter((v): v is number => v !== null && v > 0));
   if (!xs.length || !all.length) return null;
-  const PL = 50, PR = 10, PT = 10, PB = 22;
-  const lo = Math.min(...all) - pad, hi = Math.max(...all) + pad;
   const n = xs.length;
+  const PL = 50, PR = 10;
+  const gap = n <= 1 ? W : (W - PL - PR) / (n - 1);
+  const labeled = series.filter((s) => !s.dash);
+  const labelW = Math.max(0, ...labeled.flatMap((s) => s.values.map((v) => (v !== null && v > 0 ? textW(fmt(v)) : 0))));
+  const vertical = labelW > gap - 4;
+  const room = vertical ? Math.ceil(labelW) + 10 : 16;
+  const PT = 10 + room, PB = 22 + (labeled.length > 1 ? room : 0);
+  const height = h0 + room + (labeled.length > 1 ? room : 0);
+  const lo = Math.min(...all) - pad, hi = Math.max(...all) + pad;
   const x = (i: number) => PL + (n <= 1 ? (W - PL - PR) / 2 : (i / (n - 1)) * (W - PL - PR));
   const y = (v: number) => PT + ((hi - v) / (hi - lo)) * (height - PT - PB);
   const ticks = [lo + pad, (lo + hi) / 2, hi - pad];
@@ -65,6 +73,16 @@ export function LineChart({ xs, series, tips, fmt, height = 190, ariaLabel, pad 
                 {!s.dash && s.values.map((v, i) => v !== null && v > 0 && (
                   <circle key={i} cx={x(i)} cy={y(v)} r={hover === i ? 5 : 4} fill={s.color} stroke="#fff" strokeWidth="2" />
                 ))}
+                {!s.dash && s.values.map((v, i) => {
+                  if (v === null || v <= 0) return null;
+                  const below = labeled.indexOf(s) % 2 === 1;
+                  const cx = x(i), cy = y(v);
+                  if (vertical) {
+                    const ty = below ? cy + 9 : cy - 9;
+                    return <text key={`t${i}`} x={cx + 3.5} y={ty} transform={`rotate(-90 ${cx + 3.5} ${ty})`} textAnchor={below ? "end" : "start"} fontSize="10" fontWeight="600" fill={s.color}>{fmt(v)}</text>;
+                  }
+                  return <text key={`t${i}`} x={cx} y={below ? cy + 16 : cy - 9} textAnchor={i === 0 && n > 1 ? "start" : i === n - 1 && n > 1 ? "end" : "middle"} fontSize="10" fontWeight="600" fill={s.color}>{fmt(v)}</text>;
+                })}
               </g>
             );
           })}

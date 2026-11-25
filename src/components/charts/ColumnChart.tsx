@@ -17,22 +17,29 @@ export interface Col {
 
 /**
  * 세로 막대 차트 (한 가지 값, 축 하나). 막대에 마우스를 올리거나 누르면 말풍선.
- * 가장 큰 막대와 마지막 막대에만 값을 적는다.
+ * 모든 막대 위에 값을 적는다. 막대 폭보다 글자가 길면 세로로 세워 적고, 그만큼 위 여백을 늘린다.
  */
-export function ColumnChart({ cols, fmt, height = 180, onPick, ariaLabel }: { cols: Col[]; fmt: (v: number) => string; height?: number; onPick?: (key: string) => void; ariaLabel: string }) {
+/** 10px 글자 폭 어림 (한글 10px, 숫자·기호 5.8px) */
+export const textW = (t: string) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 0x3000 ? 10 : 5.8), 0);
+
+export function ColumnChart({ cols, fmt, height: h0 = 180, onPick, ariaLabel }: { cols: Col[]; fmt: (v: number) => string; height?: number; onPick?: (key: string) => void; ariaLabel: string }) {
   const [ref, W] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   if (!cols.length) return null;
-  const PL = 46, PR = 6, PT = 18, PB = 22;
+  let height = h0;
+  const PL = 46, PR = 6, PB = 22;
   const max = niceMax(Math.max(...cols.map((c) => c.value)));
   const n = cols.length;
   const slot = (W - PL - PR) / n;
+  // 값 글자 폭이 막대 칸보다 넓으면 세로로 세운다
+  const labelW = Math.max(...cols.map((c) => (c.value > 0 ? textW(fmt(c.value)) : 0)));
+  const vertical = labelW > slot - 4;
+  const PT = vertical ? Math.ceil(labelW) + 8 : 18;
+  height += PT - 18;
   const bw = Math.max(2, Math.min(36, slot - 2));
   const y = (v: number) => PT + (1 - v / max) * (height - PT - PB);
   const base = height - PB;
-  const every = Math.max(1, Math.ceil(40 / slot));
-  const maxI = cols.reduce((m, c, i) => (c.value > cols[m].value ? i : m), 0);
-  const show = new Set([maxI, n - 1]);
+  const every = Math.max(1, Math.ceil((Math.max(...cols.map((c) => textW(c.label))) + 4) / slot));
   const h = hover !== null ? cols[hover] : null;
   return (
     <div ref={ref} className="relative mt-2 min-w-0 select-none" onMouseLeave={() => setHover(null)}>
@@ -55,9 +62,9 @@ export function ColumnChart({ cols, fmt, height = 180, onPick, ariaLabel }: { co
               {bh > 0 && (
                 <path d={`M${x0},${base} V${top + r} Q${x0},${top} ${x0 + r},${top} H${x0 + bw - r} Q${x0 + bw},${top} ${x0 + bw},${top + r} V${base} Z`} fill={fill} />
               )}
-              {show.has(i) && c.value > 0 && hover === null && (
-                <text x={cx} y={top - 4} textAnchor="middle" fontSize="10" fontWeight="600" fill={CHART.ink}>{fmt(c.value)}</text>
-              )}
+              {c.value > 0 && (vertical
+                ? <text x={cx + 3.5} y={top - 4} transform={`rotate(-90 ${cx + 3.5} ${top - 4})`} textAnchor="start" fontSize="10" fontWeight="600" fill={CHART.ink}>{fmt(c.value)}</text>
+                : <text x={cx} y={top - 4} textAnchor="middle" fontSize="10" fontWeight="600" fill={CHART.ink}>{fmt(c.value)}</text>)}
               {i % every === 0 && (
                 <text x={cx} y={height - 6} textAnchor="middle" fontSize="10" fill={CHART.text}>{c.label}</text>
               )}

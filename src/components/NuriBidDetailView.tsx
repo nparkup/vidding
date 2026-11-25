@@ -67,7 +67,7 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
 
   return (
     <div className="container-x py-6 sm:py-8">
-      <Link href="/nuri-bids" className="text-sm text-ink-500 hover:text-ink">민간 공고 목록으로</Link>
+      <Link href="/nuri-bids" className="text-sm text-ink-500 hover:text-ink">누리장터 공고 목록으로</Link>
 
       <header className="mt-3">
         <div className="min-w-0">

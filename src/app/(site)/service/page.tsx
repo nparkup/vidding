@@ -59,7 +59,7 @@ export default async function ServicePage() {
       items: [
         { t: "나라장터 공고", d: "나라장터 용역·공사·물품 공고를 업종·지역·금액·마감일로 거르고, 귀사 조건 적합도순으로 정렬합니다.", href: "/bids", n: bids.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
         { t: "공동주택 입찰공고", d: "아파트 청소·경비·위탁관리·공사 입찰을 같은 단지의 직전 낙찰금액과 함께 봅니다.", href: "/apt-bids", n: apt.items.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
-        { t: "민간 공고", d: "누리장터에 올라온 민간 기업·조합·법인 입찰과 평가 배점표를 봅니다.", href: "/nuri-bids", n: nuri.items.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
+        { t: "누리장터 공고", d: "누리장터에 올라온 민간 기업·조합·법인 입찰과 평가 배점표를 봅니다.", href: "/nuri-bids", n: nuri.items.filter((b) => open(b.closeAt)).length, unit: "마감 전" },
         { t: "정정·취소 공고", d: "바뀐 마감일·개찰일·금액을 이전 공고와 비교해 바뀐 항목만 보여 드립니다.", href: "/changes", n: changes.length, unit: "최근 2주" },
         { t: "발주계획", d: "기관이 미리 올린 발주 예정 사업을 업종별로 모아 봅니다.", href: "/plans", n: plans.length, unit: "발주 예정" },
       ],

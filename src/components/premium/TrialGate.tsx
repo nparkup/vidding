@@ -105,7 +105,7 @@ export function TrialLocked({ used, onPick, state }: { used: TrialEntry[]; onPic
               return (
                 <li key={e.k}>
                   <button type="button" onClick={() => onPick(e)} className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm font-semibold hover:bg-ink-100/60">
-                    <span className="mr-1.5 text-xs font-medium text-ink-400">{e.k.startsWith("apt:") ? "공동주택" : e.k.startsWith("nuri:") ? "민간" : "나라장터"}</span>{label}
+                    <span className="mr-1.5 text-xs font-medium text-ink-400">{e.k.startsWith("apt:") ? "공동주택" : e.k.startsWith("nuri:") ? "누리장터" : "나라장터"}</span>{label}
                   </button>
                 </li>
               );

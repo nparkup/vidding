@@ -76,8 +76,8 @@ export function NuriBidsExplorer() {
     return xs.sort(by[sort]);
   }, [live, q, biz, region, urgent, sheetOnly, sort]);
 
-  if (error) return <div className="card mt-6 p-10 text-center text-ink-500">민간 공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
-  if (!data) return <div className="card mt-6 p-10 text-center text-ink-500">민간 공고를 불러오는 중…</div>;
+  if (error) return <div className="card mt-6 p-10 text-center text-ink-500">누리장터 공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
+  if (!data) return <div className="card mt-6 p-10 text-center text-ink-500">누리장터 공고를 불러오는 중…</div>;
 
   const toggle = (c: string) => setBiz(biz.includes(c) ? biz.filter((x) => x !== c) : [...biz, c]);
   return (

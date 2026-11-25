@@ -90,7 +90,6 @@ export default async function ServicePage() {
   return (
     <>
       <PageHero
-        eyebrow="서비스 소개"
         title={<>공고마다 데이터로 분석하고,<br /><span className="text-mint-600">결정은 대표님과 실무자가!</span></>}
         lead="비드매트릭스는 입찰공고와 낙찰정보를 빅데이터로 분석하는 입찰 분석 정보 서비스입니다. 공고를 찾는 비드파인더, 입찰을 분석하는 비드아틀라스, 평가점수를 예측하는 비드인사이트 세 엔진으로 참가 여부와 투찰 금액을 정하는 데 필요한 정보를 드립니다."
         art={<DeskArt className="w-full" />}
@@ -107,8 +106,7 @@ export default async function ServicePage() {
       </section>
 
       <section className="container-x pt-20">
-        <p className="eyebrow">분석 과정</p>
-        <h2 className="h-section mt-3">세 엔진이 공고 한 건을<br className="sm:hidden" /> 이렇게 분석합니다.</h2>
+        <h2 className="h-section">세 엔진이 공고 한 건을<br className="sm:hidden" /> 이렇게 분석합니다.</h2>
         <ol className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FLOW.map(({ t, e, d, items }, i) => (
             <li key={t} className="card flex min-w-0 flex-col p-6">
@@ -130,9 +128,8 @@ export default async function ServicePage() {
         <section key={g.engine} className="container-x pt-20">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
             <div>
-              <p className="eyebrow">{ENGINES[g.engine].area} 엔진</p>
-              <h2 className="h-section mt-3"><EngineName id={g.engine} /></h2>
-              <p className="mt-2 text-lg font-bold text-ink-700">{ENGINES[g.engine].tagline}</p>
+              <h2 className="h-section"><EngineName id={g.engine} /></h2>
+              <p className="mt-2 text-lg font-bold text-ink-700">{ENGINES[g.engine].area} · {ENGINES[g.engine].tagline}</p>
             </div>
             <p className="max-w-md text-ink-500">{g.lead}</p>
           </div>
@@ -150,8 +147,7 @@ export default async function ServicePage() {
 
       <section className="container-x pt-24">
         <div className="rounded-[28px] bg-paper p-6 sm:rounded-[36px] sm:p-10 lg:p-14">
-          <p className="eyebrow">비드인사이트 평가점수 예측 1건에 들어 있는 것</p>
-          <h2 className="h-section mt-3">배점표부터 예상 예정가격까지<br className="hidden sm:block" /> 한 화면에.</h2>
+          <h2 className="h-section">배점표부터 예상 예정가격까지<br className="hidden sm:block" /> 한 화면에.</h2>
           <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {PREDICT.map(({ t, d }, i) => (
               <div key={t} className="min-w-0 rounded-2xl bg-white p-6 shadow-card">
@@ -167,8 +163,7 @@ export default async function ServicePage() {
 
       <section className="container-x grid grid-cols-1 items-center gap-12 overflow-x-clip py-24 lg:grid-cols-2">
         <div className="min-w-0">
-          <p className="eyebrow">매일 받는 것 · 비드파인더</p>
-          <h2 className="h-section mt-3">영업일 아침,<br />오늘 볼 공고만 메일로.</h2>
+          <h2 className="h-section">영업일 아침,<br />오늘 볼 공고만 메일로.</h2>
           <ul className="mt-8 space-y-3">
             {[
               ["맞춤 공고", " 등록한 업종·지역·금액 조건에 맞는 새 공고와 마감 임박 공고"],
@@ -189,8 +184,7 @@ export default async function ServicePage() {
       </section>
 
       <section className="container-x">
-        <p className="eyebrow">운영 원칙</p>
-        <h2 className="h-section mt-3">숫자와 근거는 드리고,<br className="sm:hidden" /> 결정은 귀사가.</h2>
+        <h2 className="h-section">숫자와 근거는 드리고,<br className="sm:hidden" /> 결정은 귀사가.</h2>
         <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {PRINCIPLES.map(({ t, d }) => (
             <div key={t} className="card min-w-0 p-6">
@@ -204,8 +198,7 @@ export default async function ServicePage() {
       <section className="container-x py-24">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
-            <p className="eyebrow">요금제</p>
-            <h2 className="h-section mt-3">입찰공고 <TrialN />건은<br className="sm:hidden" /> 무료로 먼저 써 보세요.</h2>
+            <h2 className="h-section">입찰공고 <TrialN />건은<br className="sm:hidden" /> 무료로 먼저 써 보세요.</h2>
           </div>
           <p className="max-w-md text-ink-500">모든 기능은 같고, 한 달에 쓸 수 있는 공고 예측 건수만 다릅니다. 금액은 VAT 포함이며 약정이 없습니다. <Link href="/pricing" className="font-semibold text-mint-600 underline-offset-2 hover:underline">요금제 자세히 보기</Link></p>
         </div>

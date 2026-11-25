@@ -438,16 +438,14 @@ export default async function Home() {
       {/* 핵심 기능 — 번갈아 배치 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">핵심 서비스</p>
-          <h2 className="h-section mt-3">찾고, 거르고, 정리하는 일은<br /><EngineName id="finder" />와 <EngineName id="atlas" />가.</h2>
+          <h2 className="h-section">찾고, 거르고, 정리하는 일은<br /><EngineName id="finder" />와 <EngineName id="atlas" />가.</h2>
         </div>
         <div className="mt-16 space-y-20 sm:space-y-28">
           {FEATURES.map((f, i) => (
             <div key={f.label} className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
               <div className={`min-w-0 rounded-[32px] bg-gradient-to-br from-mint-50 via-paper to-sky-100/60 p-4 sm:p-8 ${i % 2 ? "lg:order-2" : ""}`}>{f.visual}</div>
               <div className="min-w-0">
-                <p className="inline-flex flex-wrap items-center gap-x-1.5 rounded-full bg-mint-50 px-3 py-1 text-xs font-bold text-mint-700"><EngineName id={f.engine} className="font-extrabold text-ink" /><span aria-hidden className="text-mint-300">·</span>{f.label}</p>
-                <h3 className="mt-4 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">{f.title}</h3>
+                <h3 className="text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">{f.title}</h3>
                 <ul className="mt-6 space-y-3">
                   {f.points.map((p, n) => (
                     <li key={n} className="flex gap-3 text-ink-500 [&_b]:font-semibold [&_b]:text-ink">
@@ -470,8 +468,7 @@ export default async function Home() {
       <section className="container-x pt-28">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="eyebrow">전 업종 · 비드파인더</p>
-            <h2 className="h-section mt-3">용역·공사·물품,<br className="sm:hidden" /> 모든 업종을 봅니다.</h2>
+            <h2 className="h-section">용역·공사·물품,<br className="sm:hidden" /> 모든 업종을 봅니다.</h2>
           </div>
           <p className="max-w-sm text-ink-500">비드파인더가 나라장터의 모든 공고를 받아 업종별로 나누고, 귀사가 가진 면허로 참가할 수 있는 공고만 골라 드립니다.</p>
         </div>
@@ -502,8 +499,7 @@ export default async function Home() {
       <section className="container-x pt-10">
         <div className="card grid gap-8 overflow-hidden bg-gradient-to-br from-sky-100/70 via-white to-white p-5 sm:p-8 lg:grid-cols-[1fr_1.2fr] lg:items-center">
           <div className="min-w-0">
-            <p className="eyebrow">아파트 관리 입찰</p>
-            <h3 className="mt-3 text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
+            <h3 className="text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
             <p className="mt-4 leading-relaxed text-ink-500">비드파인더가 공동주택관리정보시스템(K-apt)에 올라온 아파트 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />비드인사이트 아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
               <Link href="/apt-bids" className="btn-primary">아파트 공고 보기</Link>
@@ -537,8 +533,7 @@ export default async function Home() {
       {/* 기능 탭 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">주요 화면</p>
-          <h2 className="h-section mt-3">필요할 때만 열어 보세요.</h2>
+          <h2 className="h-section">필요할 때만 열어 보세요.</h2>
         </div>
         <div className="mt-10">
           <FeatureTabs tabs={TABS} />
@@ -549,8 +544,7 @@ export default async function Home() {
       <section className="container-x pt-28">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="eyebrow">입찰 분석 · 비드아틀라스</p>
-            <h2 className="h-section mt-3"><EngineName id="atlas" />로<br className="sm:hidden" /> 공고 밖의 흐름까지<br className="sm:hidden" /> 숫자로 봅니다.</h2>
+            <h2 className="h-section"><EngineName id="atlas" />로<br className="sm:hidden" /> 공고 밖의 흐름까지<br className="sm:hidden" /> 숫자로 봅니다.</h2>
           </div>
           <p className="max-w-md text-ink-500">비드아틀라스는 2016년부터 쌓은 낙찰 기록과 사전규격·계약 정보로 발주처와 경쟁사의 움직임을 미리 읽습니다.</p>
         </div>
@@ -569,8 +563,7 @@ export default async function Home() {
       {/* 비교 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">왜 비드매트릭스인가요</p>
-          <h2 className="h-section mt-3">입찰정보 사이트는 많은데,<br />왜 여전히 힘들까요?</h2>
+          <h2 className="h-section">입찰정보 사이트는 많은데,<br />왜 여전히 힘들까요?</h2>
         </div>
         {/* 데스크톱: 항목별 한 줄 비교 표, 비드매트릭스 열을 강조 */}
         <div className="relative mt-14 hidden lg:block">
@@ -671,8 +664,7 @@ export default async function Home() {
       {/* 체험 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">30초 체험</p>
-          <h2 className="h-section mt-3">우리 회사 조건이면,<br className="sm:hidden" /> 지금 몇 건이나 될까요?</h2>
+          <h2 className="h-section">우리 회사 조건이면,<br className="sm:hidden" /> 지금 몇 건이나 될까요?</h2>
           <p className="lead mx-auto mt-4 max-w-xl">면허와 지역, 규모를 골라 보세요.<br />매일 하는 1차 선별을 실제 공고로 그대로 체험할 수 있습니다.</p>
         </div>
         <div className="mx-auto mt-10 max-w-5xl">
@@ -683,8 +675,7 @@ export default async function Home() {
       {/* 이런 업체에 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <p className="eyebrow">추천 대상</p>
-          <h2 className="h-section mt-3">이런 업체에 잘 맞아요.</h2>
+          <h2 className="h-section">이런 업체에 잘 맞아요.</h2>
         </div>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {PERSONAS.map((p) => (

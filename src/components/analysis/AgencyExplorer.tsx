@@ -14,7 +14,7 @@ import { HBarList } from "@/components/charts/HBarList";
 import { NetworkGraph, type NetEdge, type NetNode } from "@/components/charts/NetworkGraph";
 import { CHART } from "@/components/charts/useWidth";
 import { METHOD_NAME } from "@/lib/awards/analysis";
-import { agencyId, type AgencySummary } from "@/lib/awards/agency";
+import { TOP_WINNERS, agencyId, type AgencySummary } from "@/lib/awards/agency";
 import { cutCats, cutStats, type AgencyCutFile } from "@/lib/awards/agencyCut";
 import { periodLabel } from "@/lib/awards/industry";
 import { ScrollRow } from "@/components/ScrollRow";
@@ -358,7 +358,7 @@ function AgencyNetwork({ s }: { s: AgencySummary }) {
       const hit = bs && [...bs.keys()].filter((b) => nodes.has(`b:${b}`));
       if (hit?.length) for (const b of hit) edge(`b:${b}`, id, w); else edge("ag", id, w);
     };
-    for (const [n, c, a] of s.winners) { nodes.set(`w:${n}`, { id: `w:${n}`, label: n, group: "win", weight: c, tip: [n, `최근 4년 낙찰 ${c}건 · ${won(a)}`] }); link(`w:${n}`, n, c); }
+    for (const [n, c, a] of s.winners.slice(0, 10)) { nodes.set(`w:${n}`, { id: `w:${n}`, label: n, group: "win", weight: c, tip: [n, `최근 4년 낙찰 ${c}건 · ${won(a)}`] }); link(`w:${n}`, n, c); }
     for (const [n, c] of s.ranked.slice(0, 8)) { if (nodes.has(`w:${n}`)) continue; nodes.set(`r:${n}`, { id: `r:${n}`, label: n, group: "rank", weight: c, tip: [n, `최근 4년 개찰 1~5위 ${c}회 (낙찰 제외)`] }); link(`r:${n}`, n, c); }
     return { nodes: [...nodes.values()], edges: [...edges.values()] };
   }, [s]);
@@ -403,12 +403,43 @@ export function MethodTable({ s, period }: { s: Pick<AgencySummary, "groups">; p
   );
 }
 
+export type WinnersBy = "count" | "amount";
+
+/** 자주 낙찰받은 업체 제목 줄 + 낙찰 건수 순·낙찰 금액 순 고르기 (발주처·업종별 분석 공통) */
+export function WinnersHead({ period, by, setBy }: { period: string; by: WinnersBy; setBy: (b: WinnersBy) => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">{period}</span></h3>
+      <div className="flex shrink-0 gap-1.5" role="group" aria-label="정렬 기준">
+        {([["count", "낙찰 건수 순"], ["amount", "낙찰 금액 순"]] as const).map(([k, t]) => (
+          <button key={k} type="button" aria-pressed={k === by} onClick={() => setBy(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${k === by ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 자주 낙찰받은 업체 막대 목록: 고른 기준으로 정렬해 TOP_WINNERS곳 */
+export function WinnersList({ rows, by }: { rows: [string, number, number, ...unknown[]][]; by: WinnersBy }) {
+  const list = useMemo(() => [...rows].sort((a, b) => (by === "amount" ? b[2] - a[2] || b[1] - a[1] : b[1] - a[1] || b[2] - a[2])).slice(0, TOP_WINNERS), [rows, by]);
+  return (
+    <HBarList rows={list.map(([n, c, a, dt], i) => ({
+      label: `${i + 1}. ${n}`, value: by === "amount" ? a : c,
+      text: by === "amount" ? `${won(a)} · ${c.toLocaleString()}건` : `${c.toLocaleString()}건 · ${won(a)}`,
+      title: typeof dt === "string" && dt ? `최근 낙찰 ${dt}` : undefined,
+    }))} />
+  );
+}
+
 /** 자주 낙찰받은 업체·개찰 상위 업체 (최근 4년) */
 export function WinnersCard({ s, period }: { s: Pick<AgencySummary, "winners" | "ranked">; period?: string }) {
+  const [by, setBy] = useState<WinnersBy>("count");
   return (
     <section className="card p-6">
-      <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">{period ?? "최근 4년"}</span></h3>
-      <HBarList rows={s.winners.map(([n, c, a], i) => ({ label: `${i + 1}. ${n}`, value: c, text: `${c}건 · ${won(a)}` }))} />
+      <WinnersHead period={period ?? "최근 4년"} by={by} setBy={setBy} />
+      <WinnersList rows={s.winners} by={by} />
       {s.ranked.length > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
       )}

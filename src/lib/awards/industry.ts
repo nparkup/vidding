@@ -7,7 +7,7 @@
  */
 import { CATEGORIES, type ServiceCategory } from "../types";
 import { quantile, type AgencyRow } from "./analysis";
-import { agencySummary, type AgencySummary } from "./agency";
+import { agencySummary, topWinners, type AgencySummary } from "./agency";
 
 export interface IndustrySummary extends Omit<AgencySummary, "v"> {
   v: 1;
@@ -106,7 +106,7 @@ export interface IndustryPeriodData {
   amount: number;
   firms: number;
   agencyCount: number;
-  /** 자주 낙찰받은 업체 (최대 10곳) */
+  /** 자주 낙찰받은 업체 (건수 상위·금액 상위 TOP_WINNERS곳씩 합친 것, 건수 순) */
   winners: FirmStat[];
   /** 낙찰이 많은 발주기관 [이름, 건수, 낙찰금액] (최대 AGENCY_TOP곳) */
   agencies: [string, number, number][];
@@ -170,7 +170,7 @@ export function industryPeriods(name: ServiceCategory, rows: AgencyRow[], ags: s
     for (const [a, v] of sorted.slice(0, AGENCY_TOP)) agencyWinners[a] = { firms: v.w.size, top: topFirms(v.w, AGENCY_WINNERS) };
     return {
       period, n, amount: Math.round(amount), firms: firmsAll.size, agencyCount: m.size,
-      winners: topFirms(firmsAll, 10), agencies, agencyWinners,
+      winners: topWinners(topFirms(firmsAll, firmsAll.size)), agencies, agencyWinners,
       list: sorted.map(([a, v]) => [a, v.n, Math.round(v.amt), v.w.size, topFirms(v.w, SEARCH_WINNERS)] as IndustryAgencyRow),
     };
   };

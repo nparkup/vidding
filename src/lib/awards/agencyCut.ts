@@ -5,7 +5,7 @@
  * 이 파일은 Node 전용 모듈을 쓰지 않는다.
  */
 import { quantile, type AgencyRow, type MethodCode } from "./analysis";
-import type { AgencyGroupStat } from "./agency";
+import { topWinners, type AgencyGroupStat } from "./agency";
 import type { FirmStat } from "./industry";
 
 const BIZ = ["공사", "용역", "물품", "외자"] as const;
@@ -89,8 +89,7 @@ export function cutStats(f: AgencyCutFile, cat: number, period: string, today: s
       amount: Math.round(rs.reduce((a, r) => a + (r[4] > 100 ? r[4] : 0), 0)),
     };
   }).sort((a, b) => b.n - a.n);
-  const winners = [...win.entries()].sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]).slice(0, 10)
-    .map(([i, [c, a, d]]) => [f.firms[i], c, Math.round(a), ymd(d)] as FirmStat);
+  const winners = topWinners([...win.entries()].map(([i, [c, a, d]]) => [f.firms[i], c, Math.round(a), ymd(d)] as FirmStat));
   return { n: xs.length, amount: Math.round(amount), firms: win.size, single: withB ? single / withB : 0, winners, groups, years };
 }
 

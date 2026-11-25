@@ -513,7 +513,7 @@ function WinnersTreemap({ rows, total }: { rows: [string, number, number, ...unk
       <Treemap items={items} ariaLabel={`낙찰업체별 ${by === "amount" ? "낙찰금액" : "낙찰 건수"} 비중`} />
       <p className="mt-2 text-xs leading-relaxed text-ink-500">
         {partial ? `낙찰받은 업체 ${total!.toLocaleString()}곳 중 자료에 담긴 ${rows.length.toLocaleString()}곳으로 그렸습니다.` : `낙찰받은 업체 ${rows.length.toLocaleString()}곳 전체로 그렸습니다.`}
-        {items.length > 30 && " 그림은 앞 30곳만 칸으로 그렸고(칸의 %는 전체 대비), 나머지는 아래 '기타' 줄에 묶었습니다. 기타 줄을 누르면 그 안을 펼쳐 봅니다."}
+        {items.length > 30 && " 앞 30곳 뒤는 '기타'로 묶었습니다. 기타 칸은 넓이를 그림의 10% 이하로 줄여 그렸고, 실제 비중은 칸 안 숫자로 적었습니다. 기타를 누르면 그 안을 펼쳐 봅니다."}
       </p>
     </div>
   );

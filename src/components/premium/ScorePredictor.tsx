@@ -518,7 +518,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
                     <li key={m.id}>
                       <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
                         <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
-                        <span className="text-xs text-ink-500">{m.agency} · {NURI ? m.awardRaw ?? m.contractMethod : m.contractMethod} · {m.baseAmount ? won(m.baseAmount) : "금액 미공개"}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
+                        <span className="text-xs text-ink-500">{m.agency} · {NURI ? (m.awardRaw ?? m.contractMethod).replace("에의한낙찰자결정", "") : m.contractMethod} · {m.baseAmount ? won(m.baseAmount) : "금액 미공개"}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
                       </button>
                     </li>
                   ))}
@@ -611,7 +611,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
                   <li key={m.id}>
                     <button type="button" className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm hover:bg-ink-100/60" onClick={() => setBidId(m.id)}>
                       <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
-                      <span className="text-xs text-ink-500">{m.category} · {m.agency} · {NURI ? m.awardRaw ?? m.contractMethod : m.contractMethod} · {won(m.baseAmount)}</span>
+                      <span className="text-xs text-ink-500">{m.category} · {m.agency} · {NURI ? (m.awardRaw ?? m.contractMethod).replace("에의한낙찰자결정", "") : m.contractMethod} · {won(m.baseAmount)}</span>
                     </button>
                   </li>
                 ))}
@@ -720,7 +720,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
         <section className="card p-6">
           <Step n={1} title="공고 선택" />
           <div className="mt-4 rounded-2xl bg-paper p-4">
-            <p className="text-xs text-ink-500">{NURI ? "민간 공고 · " : ""}{bid.bizType ?? "용역"} · {bid.category} · {NURI ? bid.awardRaw ?? bid.contractMethod : bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
+            <p className="text-xs text-ink-500">{NURI ? "민간 공고 · " : ""}{bid.bizType ?? "용역"} · {bid.category} · {NURI ? (bid.awardRaw ?? bid.contractMethod).replace("에의한낙찰자결정", "") : bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
             <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
             <p className="mt-1 text-sm text-ink-500">{bid.agency} · {bid.baseAmount ? `${amountLabel} ${won(bid.baseAmount)}` : "금액 미공개"}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
             {NURI && <a href={bid.detailUrl} className="mt-2 inline-block text-xs font-semibold text-mint-700 hover:underline">민간 공고 상세 보기</a>}

@@ -74,7 +74,7 @@ export async function storage(bucket: AdminBucket, fresh: boolean) {
   for (const w of Object.values(rank?.weeks ?? {})) addG("개찰 순위 rank/", w.bytes);
   const own: Record<string, string> = {
     "members/": "회원 가입 정보", "trial/": "무료 체험 사용", "billing/": "결제 기록", "config/": "사이트 설정",
-    "ai-sheets/": "배점표 판독 결과", "ai-relate/": "같은 사업 판정 결과", "ops/": "운영 기록", "apt/": "아파트 공고·낙찰",
+    "ai-sheets/": "배점표 판독 결과", "ai-relate/": "같은 사업 판정 결과", "ops/": "운영 기록", "apt/": "공동주택 공고·낙찰",
   };
   const folders: { prefix: string; label: string; files: number; bytes: number; truncated: boolean }[] = [];
   for (const [prefix, label] of Object.entries(own)) {

@@ -27,7 +27,7 @@ export default function NuriPredictPage() {
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">민간 예측</p>
         <h2 className="h-section mt-3">민간 공고 하나로 직접 계산해 보세요</h2>
-        <p className="lead mt-3 max-w-3xl">첨부에서 평가 배점표를 읽은 민간 공고만 고를 수 있습니다. 배점표가 없는 공고(최고가·최저가, 총회 의결 시공자 선정 등)는 예측 대상이 아닙니다.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터·아파트 예측과 합산)."}</p>
+        <p className="lead mt-3 max-w-3xl">첨부에서 평가 배점표를 읽은 민간 공고만 고를 수 있습니다. 배점표가 없는 공고(최고가·최저가, 총회 의결 시공자 선정 등)는 예측 대상이 아닙니다.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터·공동주택 예측과 합산)."}</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>
             <ScorePredictor source="nuri" />

@@ -16,7 +16,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "공고 분석",
     rows: [
-      { k: "공고 예측", d: "공고 하나의 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 1건으로 셉니다. 나라장터·아파트 합산", v: [<>공고 <TrialN />건</>, <>월 <Price k="liteQuota" />건</>, <>월 <Price k="standardQuota" />건</>] },
+      { k: "공고 예측", d: "공고 하나의 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 1건으로 셉니다. 나라장터·공동주택 합산", v: [<>공고 <TrialN />건</>, <>월 <Price k="liteQuota" />건</>, <>월 <Price k="standardQuota" />건</>] },
       { k: "제출 서류 목록", d: "관심 공고 기준", v: [false, "제한 없음", "제한 없음"] },
       { k: "입찰 가능성 점수·투찰 가이드", d: "6개 항목 100점 평가, S~C 등급", v: [false, true, true] },
     ],

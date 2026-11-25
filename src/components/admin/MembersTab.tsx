@@ -236,7 +236,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
             <ul className="mt-1 space-y-1">
               {m.trial.map((t) => (
                 <li key={t.k} className="[overflow-wrap:anywhere]">
-                  <a href={`${base}${bidLink(t.k)}`} target="_blank" rel="noreferrer" className="text-mint-600 hover:underline">{t.k.startsWith("apt:") ? "아파트" : t.k.startsWith("nuri:") ? "민간" : "나라장터"} {t.k.replace(/^(nara|apt|nuri):/, "")}</a>
+                  <a href={`${base}${bidLink(t.k)}`} target="_blank" rel="noreferrer" className="text-mint-600 hover:underline">{t.k.startsWith("apt:") ? "공동주택" : t.k.startsWith("nuri:") ? "민간" : "나라장터"} {t.k.replace(/^(nara|apt|nuri):/, "")}</a>
                   <span className="ml-2 text-xs text-ink-400">{dt(t.t)}</span>
                 </li>
               ))}

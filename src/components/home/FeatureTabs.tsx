@@ -42,7 +42,8 @@ export function FeatureTabs({ tabs }: { tabs: FeatureTab[] }) {
             {t.cta}
           </Link>
         </div>
-        <div key={`p-${t.label}`} className="animate-fade-up rounded-3xl bg-gradient-to-br from-mint-50 via-paper to-sky-100/60 p-4 sm:p-6">
+        {/* 미리보기는 그림처럼 보여 주기만 한다: 안의 공고 카드 링크로 이동하지 않게 inert + pointer-events-none */}
+        <div key={`p-${t.label}`} inert className="pointer-events-none select-none animate-fade-up rounded-3xl bg-gradient-to-br from-mint-50 via-paper to-sky-100/60 p-4 sm:p-6">
           {t.preview}
         </div>
       </div>

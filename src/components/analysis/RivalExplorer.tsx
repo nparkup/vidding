@@ -14,6 +14,7 @@ import type { AwardLookup, AwardWin } from "@/lib/awards/read";
 import { normalizeBizno, validBizno } from "@/lib/corpLookup";
 import { won } from "@/lib/format";
 import { CorpSearch } from "@/components/CorpSearch";
+import { CorpIndustryLine, MineIndustry, corpIndustries } from "@/components/analysis/MineIndustry";
 
 const STATIC = process.env.NEXT_PUBLIC_STATIC_SITE === "1";
 const API = STATIC ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "/api/premium/perf";
@@ -224,12 +225,14 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
   const p = useMemo(() => rivalProfile(wins, bizno), [wins, bizno]);
   const name = winnerName(wins);
   const st = useMemo(() => assessStats(p.assess, [-3, 3]), [p]);
+  const inds = useMemo(() => (mine ? corpIndustries(wins) : []), [wins, mine]);
   if (!p.n) return <p className="card p-6 text-sm text-ink-500">{from ? `${from} 이후 ` : ""}나라장터 낙찰 기록이 없습니다.</p>;
   return (
     <div className="space-y-6">
       <section className="card p-6">
         <h2 className="text-xl font-extrabold">{name ? `${name} · ` : ""}낙찰 {p.n.toLocaleString()}건</h2>
         <p className="mt-1 text-sm text-ink-500">{from ? `${from} 이후 ` : ""}나라장터 낙찰 기준입니다.<br />떨어진 입찰은 공개 자료에 없어 넣지 않았습니다.{p.firstShare !== undefined ? ` 개찰 순위를 아는 낙찰 중 1위로 낙찰받은 비율 ${Math.round(p.firstShare * 100)}%.` : ""}</p>
+        {mine && <CorpIndustryLine list={inds} />}
         <YearChart years={p.years.slice(-10).map(([y, n, a]) => [y, n, a])} title="연도별 낙찰" />
         <Link href={`/contracts?corp=${bizno}`} className="btn-ghost btn-sm mt-4 inline-flex">이 업체의 최근 2주 계약 보기</Link>
       </section>
@@ -293,6 +296,7 @@ function RivalDetail({ wins, bizno, from, mine, onPick }: { wins: AwardWin[]; bi
           ))}
         </ul>
       </section>
+      {mine && <MineIndustry list={inds} name={name} />}
     </div>
   );
 }

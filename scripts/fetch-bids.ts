@@ -16,6 +16,7 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { applyIndustryLaws, fetchIndustryLaws, type IndustryLawTable } from "../src/lib/nara/industryLaw";
 import { fetchNuriBids } from "../src/lib/nara/nuri";
 import { extractNuriSheets } from "../src/lib/nara/nuriSheets";
+import { accumulateNuriResults } from "./awards/nuriStore";
 import type { NuriBidsFile, NuriDocs } from "../src/lib/nuri";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
@@ -258,6 +259,7 @@ async function main() {
     const r = await fetchNuriBids(laws);
     nuriBids = r.file;
     console.log(r.log);
+    try { console.log(await accumulateNuriResults(nuriBids, r.all)); } catch (e) { console.warn("누리장터 개찰 누적 건너뜀:", e instanceof Error ? e.message : e); }
     const sh = await extractNuriSheets(nuriBids.items, textCache);
     nuriDocs = sh.docs;
     console.log(`누리장터 배점표: 대상(적격심사·제안서평가, 진행 중) ${sh.targets}건 중 첨부 읽음 ${sh.read}건, 배점표 ${sh.found}건, 받기 실패 ${sh.failed}개${sh.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서" : ""}`);

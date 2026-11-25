@@ -134,7 +134,7 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
             </ol>
           </section>
 
-          <PastResults rows={past} agency={b.agency} />
+          <PastResults rows={past} agency={b.agency} from={data.from} />
           <PastContracts rows={deals} agency={b.agency} from={data.from} />
 
           {b.files.length > 0 && (
@@ -169,7 +169,7 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
                   {amount ? <p className="mt-1 text-sm tabular-nums text-ink-200">{b.refAmount ? "기준금액" : "배정예산"} 기준 {won(Math.round((amount * rate.p50) / 100 / 1000) * 1000)}</p> : null}
                   <p className="mt-2 text-xs text-ink-300">절반이 {pct(rate.p25)} ~ {pct(rate.p75)} 사이 · 평균 {rate.bidders}개사 참가</p>
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-ink-500">최근 6개월 누리장터 개찰완료 {rate.n.toLocaleString()}건의 1순위 투찰률입니다. 투찰률은 누리장터가 공개한 값이며 공고마다 기준(기준금액·예정가격)이 다를 수 있습니다.</p>
+                <p className="mt-3 text-xs leading-relaxed text-ink-500">{data.from ? `${data.from}부터 쌓은` : "최근"} 누리장터 개찰완료 {rate.n.toLocaleString()}건의 1순위 투찰률입니다. 투찰률은 누리장터가 공개한 값이며 공고마다 기준(기준금액·예정가격)이 다를 수 있습니다.</p>
               </>
             ) : (
               <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">같은 업무·낙찰방법의 지난 개찰 결과가 5건이 안 돼 투찰률을 보여 주지 않습니다.</p>
@@ -233,7 +233,7 @@ function SheetCard({ sheet: s, predictHref }: { sheet: NonNullable<NuriBid["shee
 
 const avgBidders = (xs: NuriResult[]) => (xs.reduce((a, r) => a + r.bidders, 0) / xs.length).toFixed(1).replace(/\.0$/, "");
 
-function PastResults({ rows, agency }: { rows: NuriResult[]; agency: string }) {
+function PastResults({ rows, agency, from }: { rows: NuriResult[]; agency: string; from?: string }) {
   return (
     <section className="card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -241,7 +241,7 @@ function PastResults({ rows, agency }: { rows: NuriResult[]; agency: string }) {
         <span className="chip">누리장터 민간낙찰정보</span>
       </div>
       {rows.length === 0 ? (
-        <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">최근 6개월 동안 {agency}의 누리장터 개찰 결과가 없습니다.</p>
+        <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">{from ? `${from}부터` : "최근"} {agency}의 누리장터 개찰 결과가 없습니다.</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {rows.slice(0, 8).map((r) => (

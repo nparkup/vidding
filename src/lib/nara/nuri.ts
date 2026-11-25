@@ -179,7 +179,7 @@ function toContract(it: Item): NuriContract | undefined {
 
 const q = (xs: number[], p: number) => { const s = [...xs].sort((a, b) => a - b); const i = (s.length - 1) * p; const lo = Math.floor(i); return s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo); };
 
-function rateStats(results: NuriResult[]): NuriRateStat[] {
+export function rateStats(results: NuriResult[]): NuriRateStat[] {
   const m = new Map<string, NuriResult[]>();
   for (const r of results) {
     const top = r.ranks[0];
@@ -197,7 +197,7 @@ function rateStats(results: NuriResult[]): NuriRateStat[] {
 
 /* ---------- 전체 ---------- */
 
-export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: NuriBidsFile; log: string }> {
+export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: NuriBidsFile; log: string; all: NuriResult[] }> {
   const st = { calls: 0, failed: 0 };
   const now = Date.now();
 
@@ -261,13 +261,20 @@ export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: Nu
   const contracts = [...conBy.values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
 
   // 진행 중 공고의 기관과 관계없는 결과·계약까지 다 보내면 파일이 커지므로, 진행 중 공고 기관 것과 최근 4주 것만 남긴다
+  const keepResults = keepNuriResults(results, items, now);
   const agencies = new Set(items.map((b) => agencyKey(b.agency)));
   const recent = new Date(now - 28 * 864e5).toISOString().slice(0, 10);
-  const keepResults = results.filter((r) => agencies.has(agencyKey(r.agency)) || r.openedAt.slice(0, 10) >= recent);
   const keepContracts = contracts.filter((c) => agencies.has(agencyKey(c.agency)) || (c.date ?? "") >= recent);
   const rates = rateStats(results);
   const withRanks = results.filter((r) => r.ranks.length).length;
   const file: NuriBidsFile = { builtAt: new Date().toISOString(), items, results: keepResults, contracts: keepContracts, rates, from: `${weeks(HISTORY_WEEKS).at(-1)![0].replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")}` };
   const log = `누리장터: 진행 중 공고 ${items.length.toLocaleString()}건 (용역 ${items.filter((b) => b.biz === "용역").length}, 공사 ${items.filter((b) => b.biz === "공사").length}, 물품 ${items.filter((b) => b.biz === "물품").length}, 면허제한 ${items.filter((b) => b.licenseGroups.length).length}, 지역제한 ${items.filter((b) => b.regions.length).length}), 개찰 결과 ${results.length.toLocaleString()}건 중 순위 ${withRanks.toLocaleString()}건(남은 순위 조회 ${rk.budget <= 0 ? "다음 빌드" : "없음"}), 계약 ${contracts.length.toLocaleString()}건, 투찰률 통계 ${rates.length}개 [${rates.map((r) => `${r.biz}·${r.award} ${r.n}건 가운데 ${r.p50}%`).join(", ")}] · 보낸 결과 ${keepResults.length}·계약 ${keepContracts.length} · 호출 ${st.calls}회 실패 ${st.failed}`;
-  return { file, log };
+  return { file, log, all: results };
+}
+
+/** 화면 파일에 담는 개찰 결과: 지금 공고와 같은 기관의 것, 또는 최근 4주 */
+export function keepNuriResults(results: NuriResult[], items: NuriBid[], now = Date.now()): NuriResult[] {
+  const agencies = new Set(items.map((b) => agencyKey(b.agency)));
+  const recent = new Date(now - 28 * 864e5).toISOString().slice(0, 10);
+  return results.filter((r) => agencies.has(agencyKey(r.agency)) || r.openedAt.slice(0, 10) >= recent);
 }

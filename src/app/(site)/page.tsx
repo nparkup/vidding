@@ -37,7 +37,11 @@ const BIZ_ART = { 용역: ITArt, 공사: ConstructionArt, 물품: SupplyArt } as
 
 const COMPARE = [
   ["공고 탐색", "직접 키워드 검색, 수백 건 확인", "조건에 맞는 공고만 매일 배달"],
+<<<<<<< HEAD
   ["공고 범위", "나라장터와 공동주택 입찰공고를 사이트마다 따로 확인", "나라장터 전 업종과 공동주택 관리 입찰을 한 곳에서"],
+=======
+  ["공고 범위", "나라장터와 공동주택 입찰공고를 사이트마다 따로 확인", "나라장터 전 업종과 아파트 관리 입찰을 한 곳에서"],
+>>>>>>> 24c6a7ca9f7ea91c00a85af401b13662b9f46526
   ["업종 범위", "전 업종 공고를 한 목록에 나열", "전 업종 수집 후 귀사 면허에 맞는 공고만"],
   ["참가 가능 여부", "공고문을 열어 직접 판단", "면허·지역·규모 3개 필수 조건 알고리즘 판정"],
   ["준비 서류", "공고문·규정을 직접 해석", "계약방법별 제출 서류 정리"],
@@ -56,7 +60,11 @@ const TRUST = [
 ];
 
 const PERSONAS = [
+<<<<<<< HEAD
   { tags: ["공동주택 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 공동주택 입찰공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", use: "아침 맞춤 공고 메일·공동주택 예측" },
+=======
+  { tags: ["아파트 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 공동주택 입찰공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", use: "아침 맞춤 공고 메일·아파트 예측" },
+>>>>>>> 24c6a7ca9f7ea91c00a85af401b13662b9f46526
   { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 제출 서류 목록으로 마감 전 서류를 한 번 더 봅니다.", use: "입찰 가능성 점수·주간 보고서" },
   { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", use: "사업장별 조건·평가점수 예측" },
 ];
@@ -334,7 +342,11 @@ export default async function Home() {
     {
       engine: "finder" as EngineId,
       label: "공동주택 입찰공고",
+<<<<<<< HEAD
       title: "공동주택 청소·경비·위탁관리 입찰도 함께 봅니다",
+=======
+      title: "아파트 청소·경비·위탁관리 입찰도 함께 봅니다",
+>>>>>>> 24c6a7ca9f7ea91c00a85af401b13662b9f46526
       desc: "공동주택관리정보시스템(K-apt)의 공동주택 입찰공고를 업종별로 모으고, 같은 단지의 직전 낙찰·수의계약 금액과 예상 낙찰금액을 붙여 드립니다.",
       href: "/apt-bids",
       cta: "공동주택 입찰공고 열기",
@@ -499,11 +511,19 @@ export default async function Home() {
       <section className="container-x pt-10">
         <div className="card grid gap-8 overflow-hidden bg-gradient-to-br from-sky-100/70 via-white to-white p-5 sm:p-8 lg:grid-cols-[1fr_1.2fr] lg:items-center">
           <div className="min-w-0">
+<<<<<<< HEAD
             <h3 className="text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">공동주택 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
             <p className="mt-4 leading-relaxed text-ink-500">비드파인더가 공동주택관리정보시스템(K-apt)에 올라온 공동주택 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />비드인사이트 공동주택 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
               <Link href="/apt-bids" className="btn-primary">공동주택 입찰공고 보기</Link>
               <Link href="/premium/apt" className="btn-ghost">공동주택 입찰가격 예측</Link>
+=======
+            <h3 className="text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
+            <p className="mt-4 leading-relaxed text-ink-500">비드파인더가 공동주택관리정보시스템(K-apt)에 올라온 공동주택 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />비드인사이트 아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+              <Link href="/apt-bids" className="btn-primary">공동주택 입찰공고 보기</Link>
+              <Link href="/premium/apt" className="btn-ghost">아파트 입찰가격 예측</Link>
+>>>>>>> 24c6a7ca9f7ea91c00a85af401b13662b9f46526
             </div>
           </div>
           <div className="min-w-0">

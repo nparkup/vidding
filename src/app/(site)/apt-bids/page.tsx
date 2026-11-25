@@ -6,7 +6,11 @@ import { getAptBids, getBids, getNuriBids } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "공동주택 입찰공고",
+<<<<<<< HEAD
   description: "전국 공동주택(아파트) 관리주체가 K-apt에 올린 청소·경비·소독·위탁관리 등 사업자 선정 입찰공고를 업종·지역·마감일로 찾습니다.",
+=======
+  description: "전국 아파트(공동주택) 관리주체가 K-apt에 올린 청소·경비·소독·위탁관리 등 사업자 선정 입찰공고를 업종·지역·마감일로 찾습니다.",
+>>>>>>> 24c6a7ca9f7ea91c00a85af401b13662b9f46526
 };
 export const revalidate = 600;
 

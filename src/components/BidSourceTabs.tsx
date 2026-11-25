@@ -9,7 +9,11 @@ type Source = "g2b" | "apt" | "nuri";
 export function BidSourceTabs({ active, counts }: { active: Source; counts: Record<Source, number> }) {
   const tabs = [
     { key: "g2b", href: "/bids", label: "나라장터 공고", desc: "관공서·공공기관 용역·공사·물품" },
+<<<<<<< HEAD
     { key: "apt", href: "/apt-bids", label: "공동주택 입찰공고", desc: "공동주택 청소·경비·소독·위탁관리" },
+=======
+    { key: "apt", href: "/apt-bids", label: "공동주택 입찰공고", desc: "아파트 청소·경비·소독·위탁관리" },
+>>>>>>> 24c6a7ca9f7ea91c00a85af401b13662b9f46526
     { key: "nuri", href: "/nuri-bids", label: "민간 공고", desc: "민간 기업·조합·법인 입찰" },
   ] as const;
   return (

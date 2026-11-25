@@ -386,8 +386,8 @@ export default async function Home() {
             <br />
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가!</span>
           </h1>
-          <p className="lead mx-auto mt-6 max-w-2xl">
-            <b className="font-bold text-ink">비드파인더</b>가 나라장터·공동주택 전 업종 공고에서 참가할 수 있는 공고를 찾고, <b className="font-bold text-ink">비드아틀라스</b>가 면허·지역·규모부터 경쟁 강도·실적·준비 기간까지 6개 항목으로 분석하고, <b className="font-bold text-ink">비드인사이트</b>가 평가점수와 낙찰을 예측합니다.
+          <p className="lead mx-auto mt-6 max-w-3xl">
+            <b className="font-bold text-ink">비드파인더</b>가 나라장터·K-apt 공동주택 전 업종 입찰공고에서 참가할 수 있는 공고를 찾고,<br /><b className="font-bold text-ink">비드아틀라스</b>가 면허·지역·규모부터 경쟁 강도·실적·준비 기간까지 분석하고,<br /><b className="font-bold text-ink">비드인사이트</b>가 평가점수와 낙찰을 예측합니다.
           </p>
           <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">

@@ -15,18 +15,18 @@ export default function AptPredictPage() {
     <>
       <PageHero
         eyebrow="프리미엄 · 평가점수 예측 · 아파트 예측"
-        title={<>아파트 공고를 고르면,<br />예상 낙찰금액이 나옵니다.</>}
+        title={<>공동주택 입찰공고를 고르면,<br />예상 낙찰금액이 나옵니다.</>}
         lead="공동주택관리정보시스템(K-apt)의 입찰결과·수의계약 공지에서 같은 단지·같은 업종의 직전 계약금액을 찾고, 과거에 직전 계약 다음 낙찰이 얼마나 달라졌는지로 이번 공고의 예상 낙찰금액과 구간을 계산합니다."
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <a href="#predict" className="btn-mint">지금 예측해 보기</a>
-          <Link href="/apt-bids" className="btn-ghost">아파트 공고 보기</Link>
+          <Link href="/apt-bids" className="btn-ghost">공동주택 입찰공고 보기</Link>
         </div>
       </PageHero>
 
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">아파트 예측</p>
-        <h2 className="h-section mt-3">아파트 공고 하나로 직접 계산해 보세요</h2>
+        <h2 className="h-section mt-3">공동주택 입찰공고 하나로 직접 계산해 보세요</h2>
         <p className="lead mt-3 max-w-3xl">공고를 고르면 같은 단지의 직전 계약으로 예상 낙찰금액과 구간이 맨 위에 정리됩니다.<br />계약기간이나 규모가 직전과 다르면 2번에서 바꿔 보세요.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터 예측과 합산)."}</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>

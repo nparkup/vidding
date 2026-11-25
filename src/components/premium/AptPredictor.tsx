@@ -120,7 +120,7 @@ export function AptPredictor() {
 
   const searchBox = (
     <div className={`relative ${bid ? "mt-3" : "mt-4"}`}>
-      <input className="input" placeholder={bid ? "다른 공고 찾기: 단지명·공고명·업종·지역" : "단지명·공고명·업종·지역으로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} aria-label="아파트 공고 검색" />
+      <input className="input" placeholder={bid ? "다른 공고 찾기: 단지명·공고명·업종·지역" : "단지명·공고명·업종·지역으로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} aria-label="공동주택 입찰공고 검색" />
       {query.trim() && (
         <div className="card absolute inset-x-0 top-full z-20 mt-1 overflow-hidden">
           <p className="border-b border-ink-100 px-4 py-2 text-xs text-ink-500">
@@ -145,7 +145,7 @@ export function AptPredictor() {
     </div>
   );
 
-  if (error) return <p className="card p-6 text-sm text-coral">아파트 공고 자료를 불러오지 못했습니다.<br />잠시 후 다시 시도해 주세요.</p>;
+  if (error) return <p className="card p-6 text-sm text-coral">공동주택 입찰공고 자료를 불러오지 못했습니다.<br />잠시 후 다시 시도해 주세요.</p>;
   if (!data) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
   if (!model) return <p className="card p-6 text-sm text-ink-500">아파트 예측 자료가 아직 준비되지 않았습니다.<br />다음 갱신 뒤에 다시 확인해 주세요.</p>;
 
@@ -179,7 +179,7 @@ export function AptPredictor() {
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
           <Step n={1} title="공고 선택" />
-          <p className="mt-2 text-sm text-ink-500">분석할 아파트 공고를 검색해 고르세요.<br />청소·경비·소독·승강기유지·전기안전관리·정화조·저수조·위탁관리 진행 중 공고 {open.length.toLocaleString("ko-KR")}건에서 찾습니다.</p>
+          <p className="mt-2 text-sm text-ink-500">분석할 공동주택 입찰공고를 검색해 고르세요.<br />청소·경비·소독·승강기유지·전기안전관리·정화조·저수조·위탁관리 진행 중 공고 {open.length.toLocaleString("ko-KR")}건에서 찾습니다.</p>
           {picked && <p className="mt-2 text-sm text-coral">고른 공고({picked})는 마감됐거나 목록에서 빠졌습니다.<br />다른 공고를 골라 주세요.</p>}
           {searchBox}
           <TrialIntro />

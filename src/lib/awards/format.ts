@@ -129,7 +129,7 @@ export interface AwardCount {
   /** 나라장터 낙찰 누적 */
   rows: number;
   builtAt: string;
-  /** 나라장터 공고 누적, 아파트 공고와 겹치는 번호 수 */
+  /** 나라장터 공고 누적, 공동주택 입찰공고와 겹치는 번호 수 */
   notices?: number;
   aptDup?: number;
   /** 아파트(K-apt) 공고·낙찰 누적 */

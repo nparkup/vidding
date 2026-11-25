@@ -12,7 +12,7 @@ import { CloseDay } from "./CloseDay";
 import { Tile } from "./CategoryTiles";
 import { ArrowUpDown, BrushCleaning, Building, Droplets, Ellipsis, HardHat, LayoutGrid, Package, PlugZap, Shield, SprayCan, type LucideIcon } from "lucide-react";
 
-/** 아파트 공고 업종별 선 아이콘 (공고 검색 업종 타일과 같은 모양) */
+/** 공동주택 입찰공고 업종별 선 아이콘 (공고 검색 업종 타일과 같은 모양) */
 const APT_ICONS: Record<string, LucideIcon> = {
   청소: BrushCleaning,
   경비: Shield,
@@ -85,8 +85,8 @@ export function AptBidsExplorer() {
     return xs.sort(by[sort]);
   }, [data, q, cats, region, urgent, sort]);
 
-  if (error) return <div className="card mt-6 p-10 text-center text-ink-500">아파트 공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
-  if (!data) return <div className="card mt-6 p-10 text-center text-ink-500">아파트 공고를 불러오는 중…</div>;
+  if (error) return <div className="card mt-6 p-10 text-center text-ink-500">공동주택 입찰공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
+  if (!data) return <div className="card mt-6 p-10 text-center text-ink-500">공동주택 입찰공고를 불러오는 중…</div>;
 
   const toggle = (c: string) => setCats(cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c]);
   return (

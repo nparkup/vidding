@@ -27,13 +27,14 @@ export async function accumulateNuriResults(file: NuriBidsFile, fresh: NuriResul
     if (!p) added++;
     // 순위를 더 많이 받은 쪽을 남기고, 업무·낙찰방법은 아는 쪽 값을 쓴다
     const keep = !p || r.ranks.length >= p.ranks.length ? r : p;
-    m.set(k, { ...keep, biz: keep.biz ?? p?.biz ?? r.biz, award: keep.award ?? p?.award ?? r.award });
+    m.set(k, { ...keep, biz: keep.biz ?? p?.biz ?? r.biz, award: keep.award ?? p?.award ?? r.award, base: keep.base ?? p?.base ?? r.base });
   }
   const all = [...m.values()].sort((a, b) => b.openedAt.localeCompare(a.openedAt));
   await r2Put(KEY, gzipSync(Buffer.from(JSON.stringify(all))), "application/gzip");
   file.rates = rateStats(all);
   file.results = keepNuriResults(all, file.items);
+  // 화면의 '…부터'는 실제로 쌓인 가장 오래된 개찰일
   const from = all.at(-1)?.openedAt.slice(0, 10);
-  if (from && (!file.from || from < file.from)) file.from = from;
+  if (from) file.from = from;
   return `누리장터 개찰 누적: 저장소 ${prev.length.toLocaleString()}건 + 새 회차 ${added.toLocaleString()}건 = ${all.length.toLocaleString()}건 (${from ?? "-"}부터), 투찰률 통계 ${file.rates.length}개`;
 }

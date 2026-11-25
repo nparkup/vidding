@@ -5,7 +5,7 @@ import { BidSourceTabs } from "@/components/BidSourceTabs";
 import { dateTime } from "@/lib/format";
 import { getAptBids, getBids, getNuriBids, getSyncInfo } from "@/lib/store";
 
-export const metadata: Metadata = { title: "공고 검색" };
+export const metadata: Metadata = { title: "나라장터 공고" };
 export const revalidate = 600;
 
 export default async function BidsPage() {

@@ -35,8 +35,8 @@ export interface AccountMember {
 }
 
 export type Usage =
-  | { mode: "paid"; plan: PaidPlanId; quota: number | null; base?: number | null; custom?: boolean; period: { from: string; to: string }; end: string; used: UseEntry[] }
-  | { mode: "trial"; quota: number | null; base?: number | null; custom?: boolean; used: UseEntry[] };
+  | { mode: "paid"; plan: PaidPlanId; quota: number | null; base?: number | null; custom?: boolean; admin?: boolean; period: { from: string; to: string }; end: string; used: UseEntry[] }
+  | { mode: "trial"; quota: number | null; base?: number | null; custom?: boolean; admin?: boolean; used: UseEntry[] };
 
 interface Saved { token: string; exp: number; bizno: string; company: string }
 

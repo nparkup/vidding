@@ -42,7 +42,7 @@ export function AdminConsole({ api }: { api: string }) {
   const call = useMemo(() => makeCall(api, token), [api, token]);
 
   const logout = useCallback((why = "") => {
-    try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* 무시 */ }
+    try { sessionStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TOKEN_KEY); } catch { /* 무시 */ }
     setAuthed(false);
     setMembers(null);
     setToken("");
@@ -86,7 +86,8 @@ export function AdminConsole({ api }: { api: string }) {
       if (!r.ok || !j.token) { setMsg(j.error ?? `로그인하지 못했습니다 (${r.status})`); return; }
       setPw("");
       setToken(j.token);
-      try { sessionStorage.setItem(TOKEN_KEY, j.token); } catch { /* 무시 */ }
+      // 사이트의 다른 화면(새 탭 포함)에서도 관리자로 알아보도록 localStorage 에도 둔다 (lib/adminSession.ts: 공고 예측 한도 없음)
+      try { sessionStorage.setItem(TOKEN_KEY, j.token); localStorage.setItem(TOKEN_KEY, j.token); } catch { /* 무시 */ }
       await load(j.token);
     } catch {
       setMsg("중계 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
@@ -97,7 +98,7 @@ export function AdminConsole({ api }: { api: string }) {
 
   useEffect(() => {
     let saved = "";
-    try { saved = sessionStorage.getItem(TOKEN_KEY) ?? ""; } catch { /* 무시 */ }
+    try { saved = sessionStorage.getItem(TOKEN_KEY) ?? localStorage.getItem(TOKEN_KEY) ?? ""; } catch { /* 무시 */ }
     // 토큰 앞부분이 만료 시각이라 지난 토큰은 서버에 보내지 않는다
     if (saved && Number(saved.split(".")[0]) > Date.now()) { setToken(saved); load(saved); }
     const h = window.location.hash.slice(1);

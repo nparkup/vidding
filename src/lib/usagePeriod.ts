@@ -56,13 +56,15 @@ export function periodOf(start: string | undefined, today = kstToday()): { from:
  * 없으면 요금제 기본 한도(라이트·스탠다드 월 건수, 무료 체험 건수)를 쓴다. quota null = 무제한.
  * 지금 요금제(유료 이용권 또는 무료 체험)에 그대로 적용된다.
  */
-export interface LimitOverride { quota: number | null; memo?: string; at?: string }
+/** admin: 관리자(운영자) 계정. 한도 없이 쓰고 사용 건수를 남기지 않는다 */
+export interface LimitOverride { quota: number | null; admin?: boolean; memo?: string; at?: string }
 
 export const MAX_QUOTA = 100_000;
 
 export function readOverride(v: unknown): LimitOverride | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
+  if (o.admin === true) return { quota: null, admin: true, memo: typeof o.memo === "string" ? o.memo.slice(0, 200) : undefined, at: typeof o.at === "string" ? o.at : undefined };
   const q = o.quota === null ? null : Math.round(Number(o.quota));
   if (q !== null && !(Number.isFinite(q) && q >= 0 && q <= MAX_QUOTA)) return null;
   return { quota: q, memo: typeof o.memo === "string" ? o.memo.slice(0, 200) : undefined, at: typeof o.at === "string" ? o.at : undefined };
@@ -77,6 +79,8 @@ export interface LimitInfo {
   quota: number | null;
   /** 개별 한도를 쓰는지 */
   custom: boolean;
+  /** 관리자 계정 (한도 없음·차감 없음) */
+  admin?: boolean;
   /** 유료 이용권은 한 달 기간, 무료 체험은 기간 없이 누적 */
   period: { from: string; to: string } | null;
 }
@@ -91,6 +95,7 @@ export function limitOf(billing: BillingLike | null | undefined, pricing: Pricin
     base,
     quota: o ? o.quota : base,
     custom: !!o,
+    ...(o?.admin ? { admin: true } : {}),
     period: plan ? periodOf(billing?.start || undefined, today) : null,
   };
 }

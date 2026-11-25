@@ -8,12 +8,14 @@ import { useAccount } from "@/lib/account";
 import { planName } from "@/lib/plans";
 import type { UsageState } from "@/lib/usage";
 import { TRIAL_LIMIT_ENABLED } from "@/lib/trialLimit";
+import { useIsAdmin } from "@/lib/adminSession";
 
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
 
 /** 고른 공고 아래: 무료 체험(또는 이용권) 사용 건수 */
 export function TrialNote({ state }: { state: UsageState | null }) {
   const TRIAL_LIMIT = useSiteConfig().trialLimit;
+  if (state?.admin) return <p className="mt-3 rounded-xl bg-ink-50 px-3 py-2 text-xs text-ink-500">관리자로 로그인되어 있어 한도 없이 분석하고, 사용 건수에 넣지 않습니다.</p>;
   if (!state || state.status !== "ok" || state.off) return null;
   if (state.paid) {
     const n = state.used.length;
@@ -42,7 +44,9 @@ export function TrialIntro() {
   const acc = useAccount();
   const [local, setLocal] = useState<TrialEntry[]>([]);
   useEffect(() => { setLocal(allowedTrial(readTrial())); }, [TRIAL_LIMIT]);
+  const admin = useIsAdmin();
   const u = acc.status === "in" ? acc.usage : undefined;
+  if (admin) return <p className="mt-3 text-xs text-ink-500">관리자로 로그인되어 있어 한도 없이 분석합니다.</p>;
   if (u?.mode === "paid") {
     return (
       <p className="mt-3 text-xs text-ink-500">

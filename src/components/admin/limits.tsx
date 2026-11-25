@@ -22,6 +22,8 @@ export function useMemberQuota() {
 }
 
 export const tierName = (q: Pick<MemberQuota, "tier">) => (q.tier === "trial" ? "무료 체험" : planName(q.tier));
+/** 관리자 계정이면 '관리자', 아니면 요금제 이름 */
+export const tierLabel = (q: MemberQuota) => (q.admin ? "관리자" : tierName(q));
 export const quotaText = (n: number | null) => (n === null ? "무제한" : `${n.toLocaleString()}건`);
 /** 한도 단위: 유료 이용권은 한 달, 무료 체험은 누적 */
 export const unitOf = (q: MemberQuota) => (q.tier === "trial" ? "누적" : "월");
@@ -40,7 +42,7 @@ export function QuotaBadge({ q }: { q: MemberQuota }) {
   const full = fullOf(q);
   return (
     <span className={`inline-block shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold tabular-nums ${full ? "bg-coral-100 text-coral" : q.used ? "bg-mint-50 text-mint-700" : "bg-ink-50 text-ink-400"}`}>
-      {q.tier === "trial" ? "체험" : "이번 달"} {q.used.toLocaleString()}{q.quota !== null ? `/${q.quota.toLocaleString()}` : ""}건{q.custom ? " · 개별" : ""}
+      {q.admin ? "관리자 · 한도 없음" : <>{q.tier === "trial" ? "체험" : "이번 달"} {q.used.toLocaleString()}{q.quota !== null ? `/${q.quota.toLocaleString()}` : ""}건{q.custom ? " · 개별" : ""}</>}
     </span>
   );
 }
@@ -61,7 +63,7 @@ export function LimitEditor({ m, call, guard, onSaved }: {
   m: Member; call: TabProps["call"]; guard: TabProps["guard"]; onSaved: (m: Member, msg: string) => void;
 }) {
   const q = useMemberQuota()(m);
-  const [mode, setMode] = useState<"base" | "num" | "unlimited">(!m.limit ? "base" : m.limit.quota === null ? "unlimited" : "num");
+  const [mode, setMode] = useState<"base" | "num" | "unlimited" | "admin">(!m.limit ? "base" : m.limit.admin ? "admin" : m.limit.quota === null ? "unlimited" : "num");
   const [n, setN] = useState(m.limit?.quota != null ? String(m.limit.quota) : q.base !== null ? String(q.base) : "");
   const [memo, setMemo] = useState(m.limit?.memo ?? "");
   const [err, setErr] = useState("");
@@ -72,6 +74,7 @@ export function LimitEditor({ m, call, guard, onSaved }: {
     setErr("");
     let body: Record<string, unknown>;
     if (mode === "base") body = { reset: true };
+    else if (mode === "admin") body = { admin: true, memo };
     else if (mode === "unlimited") body = { quota: null, memo };
     else {
       const v = Number(n.replace(/[^\d]/g, ""));
@@ -81,7 +84,7 @@ export function LimitEditor({ m, call, guard, onSaved }: {
     setBusy(true);
     try {
       const r = await guard(call<{ member: Member; quota: MemberQuota }>("member-limit", { params: { bizno: m.bizno }, body }));
-      if (r) onSaved({ ...m, limit: (r.member.limit as Member["limit"]) ?? null, quota: r.quota }, `${m.company} 이용 한도를 ${mode === "base" ? "요금제 기본으로 되돌렸습니다" : `${quotaText(r.quota.quota)}으로 정했습니다`}.`);
+      if (r) onSaved({ ...m, limit: (r.member.limit as Member["limit"]) ?? null, quota: r.quota }, `${m.company} 이용 한도를 ${mode === "base" ? "요금제 기본으로 되돌렸습니다" : mode === "admin" ? "관리자 계정(한도 없음·차감 없음)으로 정했습니다" : `${quotaText(r.quota.quota)}으로 정했습니다`}.`);
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -98,7 +101,7 @@ export function LimitEditor({ m, call, guard, onSaved }: {
     <div className="rounded-2xl border border-ink-100 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-bold">이용 한도</p>
-        <p className="text-xs text-ink-400">{tierName(q)} · {periodText(q)}</p>
+        <p className="text-xs text-ink-400">{tierLabel(q)} · {periodText(q)}</p>
       </div>
       <p className="mt-2 flex items-baseline justify-between text-sm">
         <span className="text-ink-500">{q.tier === "trial" ? "공고 예측 (누적)" : "이번 달 공고 예측"}</span>
@@ -107,7 +110,7 @@ export function LimitEditor({ m, call, guard, onSaved }: {
       <div className="mt-1.5"><QuotaBar q={q} /></div>
       <dl className="mt-3 grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1 text-sm">
         <dt className="text-xs text-ink-500">요금제 기본</dt><dd className="tabular-nums">{q.tier === "trial" ? "" : "월 "}{quotaText(q.base)}</dd>
-        <dt className="text-xs text-ink-500">적용 한도</dt><dd className="tabular-nums">{quotaText(q.quota)}{q.custom ? " (개별 한도)" : ""}</dd>
+        <dt className="text-xs text-ink-500">적용 한도</dt><dd className="tabular-nums">{quotaText(q.quota)}{q.admin ? " (관리자 계정, 차감 없음)" : q.custom ? " (개별 한도)" : ""}</dd>
         <dt className="text-xs text-ink-500">남은 건수</dt><dd className="tabular-nums">{left === null ? "제한 없음" : `${left.toLocaleString()}건`}</dd>
         {m.limit?.at && <><dt className="text-xs text-ink-500">개별 한도 설정</dt><dd>{dt(m.limit.at)}{m.limit.memo ? ` · ${m.limit.memo}` : ""}</dd></>}
       </dl>
@@ -122,6 +125,7 @@ export function LimitEditor({ m, call, guard, onSaved }: {
             <span className="text-ink-500">건{q.tier === "trial" ? " (누적)" : " (월)"}</span>
           </label>
           <label className="flex items-center gap-2"><input type="radio" name={`lim-${m.bizno}`} checked={mode === "unlimited"} onChange={() => setMode("unlimited")} />무제한</label>
+          <label className="flex items-center gap-2"><input type="radio" name={`lim-${m.bizno}`} checked={mode === "admin"} onChange={() => setMode("admin")} />관리자 계정 (한도 없음, 사용 건수 안 셈)</label>
         </div>
         {mode !== "base" && <input className="input py-1.5 text-sm" placeholder="사유 메모 (예: 추가 결제 50건, 시범 이용)" value={memo} maxLength={200} onChange={(e) => setMemo(e.target.value)} aria-label="개별 한도 메모" />}
         {err && <p className="rounded-xl bg-coral-100 p-2.5 text-sm text-coral">{err}</p>}

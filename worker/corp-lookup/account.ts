@@ -187,10 +187,10 @@ async function usageOf(bucket: AdminBucket, rec: Rec) {
   if (lim.tier !== "trial" && lim.period) {
     const period = lim.period;
     const u = await readJson<{ used?: UseEntry[] }>(bucket, `usage/${bizno}/${period.from}.json`);
-    return { mode: "paid" as const, plan: lim.tier, quota: lim.quota, base: lim.base, custom: lim.custom, period, end: String(billing?.end ?? ""), used: u?.used ?? [], key: `usage/${bizno}/${period.from}.json` };
+    return { mode: "paid" as const, plan: lim.tier, quota: lim.quota, base: lim.base, custom: lim.custom, admin: !!lim.admin, period, end: String(billing?.end ?? ""), used: u?.used ?? [], key: `usage/${bizno}/${period.from}.json` };
   }
   const t = await readJson<{ used?: UseEntry[] }>(bucket, `trial/${bizno}.json`);
-  return { mode: "trial" as const, quota: lim.quota, base: lim.base, custom: lim.custom, used: t?.used ?? [], key: `trial/${bizno}.json` };
+  return { mode: "trial" as const, quota: lim.quota, base: lim.base, custom: lim.custom, admin: !!lim.admin, used: t?.used ?? [], key: `trial/${bizno}.json` };
 }
 interface UseEntry { k: string; t: number; title?: string }
 
@@ -352,6 +352,8 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
       const suspended = rec.status === "suspended";
       let fresh = false;
       let ok = u.used.some((e) => e.k === k);
+      // 관리자 계정은 한도 없이 열고 사용 건수를 남기지 않는다
+      if (!ok && !suspended && u.admin) ok = true;
       if (!ok && !suspended && (u.quota === null || u.used.length < u.quota)) {
         u.used.push({ k, t: Date.now(), title: s(body.title, 120) || undefined });
         await putJson(bucket, u.key, { used: u.used });

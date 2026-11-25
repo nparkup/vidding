@@ -106,8 +106,10 @@ export interface NuriResult {
   state: string;
   biz?: NuriBiz;
   award?: string;
-  /** 개찰 순위 (최대 5위) */
-  ranks: { rank: number; name: string; amount?: number; rate?: number; note?: string }[];
+  /** 공고의 기준금액(공개한 경우) 또는 배정예산 */
+  base?: number;
+  /** 개찰 순위 (최대 5위). rateBy "base": 누리장터 투찰률 값이 비어 base 대비로 낸 값 */
+  ranks: { rank: number; name: string; amount?: number; rate?: number; rateBy?: "base"; note?: string }[];
 }
 
 export interface NuriContract {

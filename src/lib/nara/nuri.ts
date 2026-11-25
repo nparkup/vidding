@@ -238,8 +238,9 @@ export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: Nu
 
   // 3. 개찰 결과 (최근 26주) + 개찰완료 공고의 순위. 공고 업무·낙찰방법은 공고 목록에서 찾는다
   const resRows = await byWeeks(RES, "getPrvtOpengResultListInfo", HISTORY_WEEKS, pick(RESULT_KEYS), st);
-  const noticeOf = new Map<string, { biz: NuriBiz; award?: string }>();
-  for (const r of rows) if (r.it.bidNtceNo) noticeOf.set(r.it.bidNtceNo, { biz: r.biz, award: clean(r.it.sucsfbidMthdNm) });
+  // 공고의 기준금액(공개한 경우) 또는 배정예산: 누리장터 개찰 순위에 투찰률 값이 비어 있어(2026-11-25 실측 0건) 이 금액 대비로 투찰률을 낸다
+  const noticeOf = new Map<string, { biz: NuriBiz; award?: string; base?: number }>();
+  for (const r of rows) if (r.it.bidNtceNo) noticeOf.set(r.it.bidNtceNo, { biz: r.biz, award: clean(r.it.sucsfbidMthdNm), base: (r.it.refAmtOpenYn === "Y" ? num(r.it.refAmt) : undefined) ?? num(r.it.asignBdgtAmt) });
   const byRound = new Map<string, Item>();
   for (const r of resRows) { const k = `${r.bidNtceNo}-${r.bidNtceOrd}-${r.rbidNo}`; const p = byRound.get(k); if (!p || (p.opengDt ?? "") < (r.opengDt ?? "")) byRound.set(k, r); }
   const rk = { ...st, budget: RANK_BUDGET };
@@ -248,9 +249,10 @@ export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: Nu
     const openedAt = iso(r.opengDt);
     if (!r.bidNtceNo || !openedAt) return undefined;
     const done = r.progrsDivCdNm === "개찰완료";
-    const ranks = done ? await ranksOf(r, rk) : [];
     const n = noticeOf.get(r.bidNtceNo);
-    return { no: r.bidNtceNo, ord: r.bidNtceOrd ?? "000", title: clean(r.bidNtceNm) ?? "", agency: clean(r.dminsttNm) ?? "", openedAt, bidders: Number(r.prtcptCnum) || 0, state: clean(r.progrsDivCdNm) ?? "", biz: n?.biz, award: n?.award, ranks: ranks ?? [] };
+    const base = n?.base && n.base > 0 ? n.base : undefined;
+    const ranks = (done ? await ranksOf(r, rk) : [])?.map((x) => (x.rate || !x.amount || !base ? x : { ...x, rate: Math.round((x.amount / base) * 100000) / 1000, rateBy: "base" as const }));
+    return { no: r.bidNtceNo, ord: r.bidNtceOrd ?? "000", title: clean(r.bidNtceNm) ?? "", agency: clean(r.dminsttNm) ?? "", openedAt, bidders: Number(r.prtcptCnum) || 0, state: clean(r.progrsDivCdNm) ?? "", biz: n?.biz, award: n?.award, base, ranks: ranks ?? [] };
   })).filter((x): x is NuriResult => !!x);
   st.calls = rk.calls; st.failed = rk.failed;
 

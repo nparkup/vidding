@@ -14,11 +14,12 @@ const hashOf = (s: string) => createHash("sha1").update(s).digest("hex").slice(0
 /** docExtract 의 collect 콜백: 규칙 파서 결과가 화면에서 쓰이지 못할 공고만 입력을 만든다 */
 export function makeAiInputs(quals: Record<string, { basis?: EvalBasis } | undefined>) {
   const inputs: Record<string, AiInput> = {};
-  const collect = (bid: Bid, text: string, rule: EvalSheet | undefined) => {
-    if (!text || !hasTableSignal(text)) return;
+  /** 입력을 만들었으면 true */
+  const collect = (bid: Bid, text: string, rule: EvalSheet | undefined): boolean => {
+    if (!text || !hasTableSignal(text)) return false;
     const basis = quals[bid.id]?.basis;
     // 큰 묶음(정량·정성·가격)만 적힌 요약표면 상세 배점표를 찾도록 판독 입력을 만든다 (판독이 못 찾으면 화면은 요약표를 쓴다)
-    if (rule && adoptable(rule, basis) && !coarseSheet(rule)) return;
+    if (rule && adoptable(rule, basis) && !coarseSheet(rule)) return false;
     const body = excerpt(text);
     inputs[bid.id] = {
       v: AI_SHEET_VERSION,
@@ -28,6 +29,7 @@ export function makeAiInputs(quals: Record<string, { basis?: EvalBasis } | undef
       techRatio: basis?.techRatio,
       priceRatio: basis?.priceRatio,
     };
+    return true;
   };
   return { inputs, collect };
 }

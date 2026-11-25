@@ -9,7 +9,7 @@ import type { AgencySummary } from "./awards/agency";
 import type { IndustrySummary } from "./awards/industry";
 import type { PreSpec } from "./preSpecs";
 import type { AptBidsFile, AptHistory } from "./apt";
-import type { NuriBidsFile } from "./nuri";
+import type { NuriBidsFile, NuriDocs } from "./nuri";
 import type { RecentAwardsFile } from "./recentAwards";
 import type { OrderPlan } from "./orderPlans";
 import type { Contract } from "./contracts";
@@ -52,7 +52,7 @@ async function one<T>(name: Parameters<ReturnType<typeof adapter>["get"]>[0], id
 export const storageKind = () => adapter().kind;
 
 /* ---------- 공고 ---------- */
-interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; industries?: Record<string, IndustrySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; nuriBids?: NuriBidsFile; awardCount?: AwardCount; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
+interface BidCache { items: Bid[]; attachments?: Record<string, BidAttachment[]>; sheets?: Record<string, ExtractedSheet>; quals?: Record<string, BidQual>; awardStats?: AwardStats; analyses?: Record<string, AwardAnalysis>; agencies?: Record<string, AgencySummary>; industries?: Record<string, IndustrySummary>; preSpecs?: PreSpec[]; orderPlans?: OrderPlan[]; contracts?: Contract[]; aptBids?: AptBidsFile; nuriBids?: NuriBidsFile; nuriDocs?: Record<string, NuriDocs>; awardCount?: AwardCount; changes?: NoticeChange[]; rateTable?: RateTable; recentAwards?: RecentAwardsFile; syncedAt: string; source: "mock" | "g2b"; error?: string }
 const STALE_MS = 30 * 60 * 1000;
 
 function bidCache(): BidCache {
@@ -167,6 +167,11 @@ export async function getAptBids(): Promise<AptBidsFile> {
 export async function getNuriBids(): Promise<NuriBidsFile> {
   const f = process.env.BIDS_FILE ? fileBids()?.nuriBids : undefined;
   return f ?? { builtAt: new Date().toISOString(), items: [], results: [], contracts: [], rates: [] };
+}
+
+/** 민간 예측의 공고별 평가 자료 (키: 공고번호-차수, 배점표가 있는 공고만) */
+export async function getNuriDocs(): Promise<Record<string, NuriDocs>> {
+  return (process.env.BIDS_FILE ? fileBids()?.nuriDocs : undefined) ?? {};
 }
 
 /** 아파트 예측의 낙찰 결과로 본 예측 (키: K-apt 입찰번호) */

@@ -93,7 +93,7 @@ function UsageCard({ usage }: { usage?: Usage }) {
               <li key={e.k} className="flex items-center justify-between gap-3 py-2">
                 <Link href={bidHref(e.k)} className="min-w-0 font-semibold hover:text-mint-600 [overflow-wrap:anywhere]">
                   <span className="mr-1.5 text-xs font-medium text-ink-400">{e.k.startsWith("apt:") ? "아파트" : "나라장터"}</span>
-                  {e.title || e.k.replace(/^(nara|apt):/, "공고 ")}
+                  {e.title || e.k.replace(/^(nara|apt|nuri):/, "공고 ")}
                 </Link>
                 <span className="shrink-0 text-xs text-ink-400">{when(e.t)}</span>
               </li>

@@ -37,6 +37,8 @@ import { TrialIntro, TrialLocked, TrialNote } from "./TrialGate";
 import { PredictSummary, StepBar, type SummaryTile, type Tone } from "./PredictSummary";
 import { PatentBox } from "./PatentBox";
 import { isPatentItem, type PatentLookup } from "@/lib/patents";
+import { nuriAmountLabel, nuriPastOf, nuriRateOf, useNuriPredict } from "@/lib/nuriPredict";
+import { NuriRateCard } from "./NuriRateCard";
 
 /** 공고 선택 검색에서 한 번에 보여줄 최대 공고 수 (목록은 스크롤) */
 const MAX_MATCHES = 100;
@@ -154,9 +156,17 @@ async function loadValidation(): Promise<Validation | null> {
   return r.ok ? r.json() : null;
 }
 
-export function ScorePredictor() {
+/**
+ * source "nuri": 민간 예측(/premium/nuri). 누리장터 민간 공고 중 첨부 배점표를 읽은 공고만 고를 수 있고,
+ * 낙찰 저장소·배점표 즉석 판독·기준표 검증은 나라장터 자료라 쓰지 않는다. 낙찰 결과 대신 지난 민간 개찰 1순위 투찰률을 보여 준다.
+ */
+export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" } = {}) {
+  const NURI = source === "nuri";
   const sp = useSearchParams();
-  const { bids, error } = useBids();
+  const nara = useBids(!NURI);
+  const nuri = useNuriPredict(NURI);
+  const bids = NURI ? nuri.data?.bids ?? null : nara.bids;
+  const error = NURI ? nuri.error : nara.error;
   const [bidId, setBidId] = useState<string | null>(sp.get("bid"));
   const [query, setQuery] = useState("");
   /** 고객이 항목을 고치거나 더한 평가표. 없으면 공고 기준으로 만든 평가표를 쓴다 */
@@ -188,11 +198,20 @@ export function ScorePredictor() {
     return bidId ? bids.find((b) => b.id === bidId) : undefined;
   }, [bids, bidId]);
   // 무료 체험: 공개 경쟁 공고를 고르면 1건 차감(이미 분석한 공고는 그대로). 3건을 넘으면 분석을 열지 않는다
-  const trialKey = pickedBid && methodProfile(pickedBid).open ? `nara:${pickedBid.id}` : null;
+  const trialKey = pickedBid && methodProfile(pickedBid).open ? `${NURI ? "nuri" : "nara"}:${pickedBid.id}` : null;
   const trial = useUsage(trialKey, pickedBid?.title);
   const trialLocked = !!pickedBid && trial?.status === "locked";
   const bid: Bid | undefined = trialLocked || (trialKey && !trial) ? undefined : pickedBid;
-  const pickTrial = (e: TrialEntry) => { if (e.k.startsWith("nara:")) setBidId(e.k.slice(5)); else window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/premium/apt?apt=${encodeURIComponent(e.k.slice(4))}`; };
+  const pickTrial = (e: TrialEntry) => {
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    if (e.k.startsWith(NURI ? "nuri:" : "nara:")) setBidId(e.k.slice(5));
+    else if (e.k.startsWith("apt:")) window.location.href = `${base}/premium/apt?apt=${encodeURIComponent(e.k.slice(4))}`;
+    else window.location.href = `${base}/premium${e.k.startsWith("nuri:") ? "/nuri" : ""}?bid=${encodeURIComponent(e.k.slice(5))}#predict`;
+  };
+  // 민간 공고: 원래 공고(배정예산·기준금액 구분)와 같은 업무·낙찰방법의 지난 개찰 1순위 투찰률
+  const nuriRaw = NURI && bid ? nuri.data?.raw[bid.id] : undefined;
+  const nuriRate = NURI ? nuriRateOf(nuri.data?.rates ?? [], nuriRaw) : undefined;
+  const amountLabel = NURI ? nuriAmountLabel(nuriRaw) : "기초금액";
   // 사업자번호를 조회했으면 그 번호로 쓴 체험 건수도 중계 서버에서 맞춘다 (다른 브라우저에서 쓴 공고 포함)
   // 가입한 사업자번호가 있으면 조회 전에도 그 번호로 센다. 조회 칸에도 미리 넣어 둔다
   const [memberNo, setMemberNo] = useState<string | undefined>();
@@ -219,8 +238,9 @@ export function ScorePredictor() {
   const basis = docs?.qual?.basis;
   const template = useMemo(() => (bid ? templateSheet(bid, basis) : null), [bid, basis]);
   // 이 공고의 평가표: 공고 원문 배점표 > 공고서에 적힌 기준(통과점수·적용 기준·하한율·기준비율·실적 인정 범위) > 기준표
-  const bidCriteria = useMemo(() => (bid && docs ? bidSheet(bid, basis, { extracted: docs.sheet, notice: docs.notice, quant: docs.quant }) : null), [bid, docs, basis]);
-  const active = sheet ?? bidCriteria ?? template;
+  const bidCriteria = useMemo(() => (bid && docs ? bidSheet(bid, basis, { extracted: docs.sheet, notice: docs.notice, quant: docs.quant, trusted: NURI }) : null), [bid, docs, basis]);
+  // 민간 공고는 기준표가 없어 공고 원문 배점표(규칙 파서 또는 판독)를 읽었을 때만 계산한다
+  const active = sheet ?? (NURI ? (docs?.sheet ? bidCriteria : null) : bidCriteria ?? template);
   // 공고서에 경영상태 기준비율이 있으면 입력 칸 기본값으로 쓴다
   const finBase = active?.financeBase;
   useEffect(() => {
@@ -236,9 +256,11 @@ export function ScorePredictor() {
   }, [floorRate, baseRate]);
   const [validation, setValidation] = useState<Validation | null>(null);
   useEffect(() => {
+    if (NURI) return;
     let alive = true;
     loadValidation().then((v) => alive && setValidation(v)).catch(() => undefined);
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (!bid) return;
@@ -247,6 +269,19 @@ export function ScorePredictor() {
     setSheet(null);
     setAiRead("idle");
     if (!methodProfile(bid).open) return;
+    // 민간 공고: 빌드가 읽은 평가표를 그대로 쓴다 (즉석 판독 없음)
+    if (NURI) {
+      const d: BidDocs = nuri.data?.docs[bid.id] ?? { files: [] };
+      setDocs(d);
+      // 규칙으로 쓸 수 있는 표가 없던 공고: 중계 서버가 빌드 때 만든 판독 입력으로 배점표를 읽는다
+      if (!d.sheet && d.ai && STATIC && CORP_API) {
+        setAiRead("reading");
+        loadAiSheet(bid)
+          .then(({ sheet: s }) => { if (!alive) return; if (s) { setDocs({ ...d, sheet: s, sheetFile: undefined }); setAiRead("done"); } else setAiRead("none"); })
+          .catch(() => alive && setAiRead("fail"));
+      } else if (!d.sheet) setAiRead("none");
+      return () => { alive = false; };
+    }
     loadBidDocs(bid)
       .then((d) => {
         if (!alive) return;
@@ -266,14 +301,17 @@ export function ScorePredictor() {
       })
       .catch(() => alive && setDocs({ files: [] }));
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bid]);
 
   // 전년도 낙찰률 통계: 고른 공고와 같은 업무·계약방법·금액대의 평균을 예상 최저 경쟁 투찰률 기본값으로 쓴다
   const [awardStats, setAwardStats] = useState<AwardStats | null>(null);
   useEffect(() => {
+    if (NURI) return;
     let alive = true;
     loadAwardStats().then((s) => alive && setAwardStats(s)).catch(() => undefined);
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const rivalEst = useMemo(() => (bid ? estimateRival(awardStats, bid) : undefined), [awardStats, bid]);
 
@@ -281,7 +319,7 @@ export function ScorePredictor() {
   const [analysis, setAnalysis] = useState<AwardAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   useEffect(() => {
-    if (!bid) return;
+    if (!bid || NURI) return;
     let alive = true;
     setAnalysis(null);
     setAnalysisLoading(true);
@@ -291,10 +329,11 @@ export function ScorePredictor() {
       .catch(() => undefined)
       .finally(() => alive && setAnalysisLoading(false));
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bid]);
   const fc = useMemo(() => (bid ? forecast(analysis, bid, floorRate) : {}), [analysis, bid, floorRate]);
   // 협상: 예상 최저 경쟁 투찰률 = 과거 같은 사업·비슷한 공고의 개찰 1위 투찰률 > 같은 기관 유사 공고·같은 조건 평균 낙찰률 > 기본값
-  const rivalDefault = fc.rival?.value ?? rivalEst?.rate;
+  const rivalDefault = fc.rival?.value ?? rivalEst?.rate ?? (NURI && bid?.contractMethod === "협상에 의한 계약" ? nuriRate?.p50 : undefined);
   useEffect(() => {
     setCo((c) => ({ ...c, rivalRate: rivalDefault ? Math.min(100, Math.max(80, Math.round(rivalDefault * 100) / 100)) : DEFAULT_COMPANY.rivalRate }));
   }, [rivalDefault]);
@@ -479,7 +518,7 @@ export function ScorePredictor() {
                     <li key={m.id}>
                       <button type="button" className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-paper" onClick={() => { setBidId(m.id); setQuery(""); }}>
                         <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
-                        <span className="text-xs text-ink-500">{m.agency} · {m.contractMethod} · {won(m.baseAmount)}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
+                        <span className="text-xs text-ink-500">{m.agency} · {NURI ? (m.awardRaw ?? m.contractMethod).replace("에의한낙찰자결정", "") : m.contractMethod} · {m.baseAmount ? won(m.baseAmount) : "금액 미공개"}{closedLabel(m) && <span className="text-coral"> · {closedLabel(m)}</span>}</span>
                       </button>
                     </li>
                   ))}
@@ -548,8 +587,20 @@ export function ScorePredictor() {
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
           <Step n={1} title="공고 선택" />
-          <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요.<br />고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다.</p>
+          <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요.<br />{NURI ? `첨부에서 평가 배점표를 읽은 민간 공고 ${bids.length.toLocaleString("ko-KR")}건 중에서 고를 수 있습니다.` : "고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다."}</p>
           {pickedBid && !bid && <p className="mt-2 text-sm text-ink-300">고른 공고를 불러오는 중…</p>}
+          {NURI && bid && (aiRead === "reading" ? (
+            <div className="mt-3 rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
+              <p className="font-semibold text-ink">{bid.title}</p>
+              <p className="mt-1">공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 10초~1분 걸립니다.</p>
+              <LoadingBar label="배점표 판독 중" />
+            </div>
+          ) : (aiRead === "none" || aiRead === "fail") && !docs?.sheet ? (
+            <p className="mt-3 rounded-xl bg-coral-100/60 px-3 py-2 text-sm text-ink">
+              <b>{bid.title}</b><br />
+              {aiRead === "fail" ? "배점표 판독이 잠시 실패했습니다. 잠시 후 다시 골라 주세요." : "이 공고는 첨부에서 항목 배점 합계가 맞는 배점표를 찾지 못해 예측할 수 없습니다. 공고서 원문을 확인해 주세요."}
+            </p>
+          ) : null)}
           {searchBox}
           <TrialIntro />
           {quick.length > 0 && (
@@ -560,7 +611,7 @@ export function ScorePredictor() {
                   <li key={m.id}>
                     <button type="button" className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm hover:bg-ink-100/60" onClick={() => setBidId(m.id)}>
                       <span className="font-semibold"><CloseDdayBadge iso={m.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={m.closeAt} />{m.title}</span>
-                      <span className="text-xs text-ink-500">{m.category} · {m.agency} · {m.contractMethod} · {won(m.baseAmount)}</span>
+                      <span className="text-xs text-ink-500">{m.category} · {m.agency} · {NURI ? (m.awardRaw ?? m.contractMethod).replace("에의한낙찰자결정", "") : m.contractMethod} · {won(m.baseAmount)}</span>
                     </button>
                   </li>
                 ))}
@@ -576,7 +627,7 @@ export function ScorePredictor() {
               ["참가자격", "사업자번호로 공고의 업종·지역 제한과 대조"],
               ["예상 평가점수", "항목별 점수와 통과 여부, 점수를 올릴 수 있는 곳"],
               ["투찰률", "통과 가능한 투찰률과 그 금액, 과거 낙찰자 투찰률"],
-              ["낙찰 결과 분석", "이 공고의 직전 낙찰·같은 사업·비슷한 공고의 낙찰 업체와 경쟁 강도"],
+              NURI ? ["지난 개찰 결과", "같은 업무·낙찰방법 민간 공고의 개찰 1순위 투찰률과 참가 업체 수"] : ["낙찰 결과 분석", "이 공고의 직전 낙찰·같은 사업·비슷한 공고의 낙찰 업체와 경쟁 강도"],
             ].map(([t, d], n) => (
               <li key={t} className="flex gap-3">
                 <span className="w-5 shrink-0 font-bold tabular-nums text-mint-600">{n + 1}</span>
@@ -616,26 +667,28 @@ export function ScorePredictor() {
     tiles.push(scoreStage === "score"
       ? { label: "기술 점수", value: <>{result.techScore}<span className="text-sm font-semibold text-ink-500"> / {result.techMax}점</span></>, sub: `가격 ${Math.round((result.total - result.techScore) * 10) / 10}점 · 투찰률 ${co.bidRate.toFixed(2)}%`, tone: "ink" }
       : baseAmt
-        ? { label: "예상 최저 경쟁 투찰금액", value: amtVal(co.rivalRate), sub: `투찰률 ${co.rivalRate.toFixed(2)}% · 기초금액 기준`, tone: "ink" }
+        ? { label: "예상 최저 경쟁 투찰금액", value: amtVal(co.rivalRate), sub: `투찰률 ${co.rivalRate.toFixed(2)}% · ${amountLabel} 기준`, tone: "ink" }
         : { label: "예상 최저 경쟁 투찰률", value: `${co.rivalRate.toFixed(2)}%`, tone: "ink" });
   } else if (scoreStage === "score" && result.rateWindow) {
     tiles.push(baseAmt
-      ? { label: "통과 가능한 투찰금액", value: <>{amtVal(result.rateWindow.low)}<span className="text-sm font-semibold text-ink-500"> 부터</span></>, tone: "ink", sub: `투찰률 ${result.rateWindow.low}~${result.rateWindow.high}% · 기초금액 기준` }
+      ? { label: "통과 가능한 투찰금액", value: <>{amtVal(result.rateWindow.low)}<span className="text-sm font-semibold text-ink-500"> 부터</span></>, tone: "ink", sub: `투찰률 ${result.rateWindow.low}~${result.rateWindow.high}% · ${amountLabel} 기준` }
       : { label: "통과 가능한 투찰률", value: `${result.rateWindow.low}~${result.rateWindow.high}%`, tone: "ink" });
   } else if (fc.suggestRate) {
     tiles.push(baseAmt
-      ? { label: "과거 낙찰자 투찰금액", value: amtVal(fc.suggestRate.value), tone: "ink", sub: `투찰률 ${fc.suggestRate.value}% · 가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}% · 기초금액 기준` }
+      ? { label: "과거 낙찰자 투찰금액", value: amtVal(fc.suggestRate.value), tone: "ink", sub: `투찰률 ${fc.suggestRate.value}% · 가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}% · ${amountLabel} 기준` }
       : { label: "과거 낙찰자 투찰률", value: `${fc.suggestRate.value}%`, tone: "ink", sub: `가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%` });
   } else {
     const lw = active.lowerLimit ?? bid.lowerLimitRate;
     tiles.push(lw && baseAmt
-      ? { label: "낙찰하한 금액", value: amtVal(lw), tone: "ink", sub: `낙찰하한율 ${lw}% · 기초금액 기준` }
+      ? { label: "낙찰하한 금액", value: amtVal(lw), tone: "ink", sub: `낙찰하한율 ${lw}% · ${amountLabel} 기준` }
       : { label: "낙찰하한율", value: lw ? `${lw}%` : "공고에 없음", tone: lw ? "ink" : "muted" });
   }
   // 예상 예정가격: 기초금액 × 과거 예정가격 비율 (낙찰 결과 분석과 같은 값)
   if (fc.pre && baseAmt) tiles.push({ label: "예상 예정가격", value: <span className="text-base sm:text-lg">{wonFull(Math.round((baseAmt * fc.pre.value) / 100))}</span>, tone: "mint", sub: `기초금액의 ${fc.pre.value.toFixed(3)}% · ${fc.pre.basis}` });
   tiles.push(chance && scoreStage === "score"
     ? { label: "낙찰 가능성", value: `${chance.low}~${chance.high}%`, tone: chance.low > 0 ? "ink" : "coral", sub: `${fc.competition ? `경쟁 강도 ${fc.competition.level} · ` : ""}${chance.ifPassed ? `통과 기준을 채우면 ${chance.ifPassed.low}~${chance.ifPassed.high}%` : "같은 조건 과거 낙찰로 낸 범위"}` }
+    : NURI
+      ? nuriRate ? { label: "지난 개찰 참가 업체", value: `평균 ${nuriRate.bidders}곳`, tone: "ink", sub: `같은 업무·낙찰방법 민간 공고 ${nuriRate.n}건 · 1순위 투찰률 가운데 ${nuriRate.p50}%` } : { label: "지난 개찰 결과", value: "자료 부족", tone: "muted", sub: "같은 업무·낙찰방법의 민간 개찰 결과가 적습니다." }
     : fc.competition
       ? { label: "경쟁 강도", value: fc.competition.level, tone: "ink", sub: fc.competition.text }
       : analysisLoading
@@ -657,7 +710,7 @@ export function ScorePredictor() {
         { href: "#score", label: "항목별 점수" },
         { href: "#rate", label: "투찰률 조정" },
         { href: "#sheet", label: "평가표" },
-        { href: "#award", label: "낙찰 결과 분석" },
+        { href: "#award", label: NURI ? "지난 개찰 결과" : "낙찰 결과 분석" },
       ]}
     />
     {/* 입력과 결과: 결과 패널은 스크롤을 따라다니지 않고 제자리에 둔다 */}
@@ -667,9 +720,10 @@ export function ScorePredictor() {
         <section className="card p-6">
           <Step n={1} title="공고 선택" />
           <div className="mt-4 rounded-2xl bg-paper p-4">
-            <p className="text-xs text-ink-500">{bid.bizType ?? "용역"} · {bid.category} · {bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
+            <p className="text-xs text-ink-500">{NURI ? "민간 공고 · " : ""}{bid.bizType ?? "용역"} · {bid.category} · {NURI ? (bid.awardRaw ?? bid.contractMethod).replace("에의한낙찰자결정", "") : bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
             <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
-            <p className="mt-1 text-sm text-ink-500">{bid.agency} · 기초금액 {won(bid.baseAmount)}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
+            <p className="mt-1 text-sm text-ink-500">{bid.agency} · {bid.baseAmount ? `${amountLabel} ${won(bid.baseAmount)}` : "금액 미공개"}{bid.lowerLimitRate ? ` · 낙찰하한율 ${bid.lowerLimitRate}%` : ""}</p>
+            {NURI && <a href={bid.detailUrl} className="mt-2 inline-block text-xs font-semibold text-mint-700 hover:underline">민간 공고 상세 보기</a>}
           </div>
           <TrialNote state={trial} />
           {searchBox}
@@ -846,6 +900,7 @@ export function ScorePredictor() {
               value={co.bidRate}
               onChange={(v) => set("bidRate", v)}
               base={bid?.baseAmount ?? 0}
+              baseLabel={amountLabel}
               hint={!isNego && fc.suggestRate
                 ? `기본값 = 과거 낙찰자 투찰률 (낙찰 결과 분석). ${fc.suggestRate.basis}. 가운데 절반 ${fc.suggestRate.low}~${fc.suggestRate.high}%.`
                 : !isNego && rivalEst ? `참고: ${rivalBasis(rivalEst)}입니다.` : undefined}
@@ -856,7 +911,10 @@ export function ScorePredictor() {
                 value={co.rivalRate}
                 onChange={(v) => set("rivalRate", v)}
                 base={bid?.baseAmount ?? 0}
-                hint={fc.rival
+                baseLabel={amountLabel}
+                hint={NURI
+                  ? nuriRate ? `기본값 = 같은 업무·낙찰방법 민간 공고 개찰 1순위 투찰률 가운데 값 (${nuriRate.n}건, ${nuriRate.p25}~${nuriRate.p75}%). 슬라이더로 바꿀 수 있습니다.` : `같은 업무·낙찰방법의 민간 개찰 결과가 없어 기본값 ${DEFAULT_COMPANY.rivalRate}%를 씁니다. 슬라이더로 바꿀 수 있습니다.`
+                  : fc.rival
                   ? `기본값 = ${fc.rival.basis} (낙찰 결과 분석). 슬라이더로 바꿀 수 있습니다.`
                   : rivalEst
                   ? `기본값 = ${rivalBasis(rivalEst)}${!rivalEst.prior && awardStats && awardStats.coverage.weeks < awardStats.coverage.totalWeeks ? ` (연간 ${awardStats.coverage.totalWeeks}주 중 ${awardStats.coverage.weeks}주 자료)` : ""}. 슬라이더로 바꿀 수 있습니다.`
@@ -939,10 +997,11 @@ export function ScorePredictor() {
               ? "점수 구간·서류 인정 범위·정성 등급은 공고 첨부에서 읽은 기준을 적용했습니다. 정성평가는 위원이 제안서와 발표를 보고 매기므로, 제안 준비 수준으로 고른 등급은 예상치입니다. 실제로 인정되는 서류는 제출 전 공고 원문으로 확인하세요."
               : "예측값은 평가표와 입력한 기업 정보로 계산한 추정치입니다. 공고 첨부에서 세부기준을 읽지 못한 항목은 기준표 규칙으로 계산했고, 정성평가는 위원 판단에 따라 달라집니다."}
             {active.criteria && ` 적용 기준표: ${active.criteria.name} (${active.criteria.status}).`}
+            {NURI && " 민간 공고는 가격 평가 산식과 낙찰하한율이 공고마다 다르고 공고 목록에 값이 없어, 공고서에서 읽지 못한 부분은 나라장터 기준 산식으로 추정했습니다. 공고서의 가격 평가 방법을 꼭 확인하세요."}
           </p>
           {validation && <ValidationNote v={validation} />}
         </>)}
-        {(scoreStage === "criteria" || scoreStage === "score") && (
+        {!NURI && (scoreStage === "criteria" || scoreStage === "score") && (
           <ForecastCard fc={fc} chance={scoreStage === "score" ? chance : undefined} isNego={isNego} bidRate={co.bidRate} baseAmount={bid.baseAmount} analysis={analysis} />
         )}
       </aside>
@@ -986,7 +1045,8 @@ export function ScorePredictor() {
       </section>
 
     {/* 평가 기준 아래: 직전 낙찰·과거 같은 사업·비슷한 공고의 낙찰 결과 */}
-    <div id="award" className="scroll-mt-24"><AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} baseAmount={bid.baseAmount} /></div>
+    {NURI ? <div id="award" className="scroll-mt-24"><NuriRateCard stat={nuriRate} award={nuriRaw?.award} biz={nuriRaw?.biz} from={nuri.data?.from} baseAmount={bid.baseAmount} amountLabel={amountLabel} past={nuriPastOf(nuri.data?.results ?? [], nuriRaw)} /></div>
+    : <div id="award" className="scroll-mt-24"><AwardAnalysisSection analysis={analysis} loading={analysisLoading} fc={fc} bidRate={co.bidRate} floor={active.lowerLimit ?? bid.lowerLimitRate} isNego={isNego} baseAmount={bid.baseAmount} /></div>}
     </div>
   );
 }
@@ -1291,7 +1351,7 @@ function rivalBasis(e: RivalEstimate) {
 }
 
 /** base: 금액 환산 기준(원). 예정가격은 개찰 때 정해지므로 공고 기초금액으로 계산한다 */
-function Range({ label, value, onChange, hint, base }: { label: string; value: number; onChange: (v: number) => void; hint?: string; base?: number }) {
+function Range({ label, value, onChange, hint, base, baseLabel = "기초금액" }: { label: string; value: number; onChange: (v: number) => void; hint?: string; base?: number; baseLabel?: string }) {
   const amount = base && base > 0 ? Math.floor((base * value) / 100) : undefined;
   return (
     <div className="sm:col-span-3">
@@ -1304,8 +1364,8 @@ function Range({ label, value, onChange, hint, base }: { label: string; value: n
         </span>
       </div>
       <input type="range" min={80} max={100} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#12B886]" />
-      {amount !== undefined && <p className="mt-1 text-xs text-ink-500">금액 = 기초금액 {wonFull(base!)} × {value.toFixed(2)}% (예정가격은 개찰 때 정해지므로 기초금액 기준)</p>}
-      {base !== undefined && amount === undefined && <p className="mt-1 text-xs text-ink-500">공고에 기초금액이 없어 금액은 계산하지 않았습니다.</p>}
+      {amount !== undefined && <p className="mt-1 text-xs text-ink-500">금액 = {baseLabel} {wonFull(base!)} × {value.toFixed(2)}% (예정가격은 개찰 때 정해지므로 {baseLabel} 기준)</p>}
+      {base !== undefined && amount === undefined && <p className="mt-1 text-xs text-ink-500">공고에 {baseLabel}이 없어 금액은 계산하지 않았습니다.</p>}
       {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
     </div>
   );

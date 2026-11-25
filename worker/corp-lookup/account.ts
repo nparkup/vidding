@@ -7,7 +7,7 @@
  * - GET  me       : 가입 정보, 이용권, 이번 기간 공고 예측 사용 건수 (무료 체험이면 체험 사용 공고)
  * - POST me       : 담당자·연락처·이메일·맞춤 조건·메일 수신 고치기
  * - POST password : 비밀번호 바꾸기 (다른 기기의 로그인은 모두 풀린다) → 새 토큰
- * - POST use      : 공고 예측 1건 사용 { k: "nara:공고ID" | "apt:입찰번호", title }. 유료면 이용권 월 건수에서, 아니면 무료 체험에서 뺀다.
+ * - POST use      : 공고 예측 1건 사용 { k: "nara:공고ID" | "apt:입찰번호" | "nuri:공고번호-차수", title }. 유료면 이용권 월 건수에서, 아니면 무료 체험에서 뺀다.
  *                   이미 쓴 공고는 다시 빼지 않는다
  * - GET  mybox / POST mybox : 내 서류함 (담은 공고 목록)
  *
@@ -347,7 +347,7 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
     case "use": {
       if (!post) break;
       const k = s(body.k, 70);
-      if (!/^(nara|apt):[A-Za-z0-9._-]{1,60}$/.test(k)) return json({ error: "잘못된 공고" }, 400);
+      if (!/^(nara|apt|nuri):[A-Za-z0-9._-]{1,60}$/.test(k)) return json({ error: "잘못된 공고" }, 400);
       const u = await usageOf(bucket, rec);
       const suspended = rec.status === "suspended";
       let fresh = false;

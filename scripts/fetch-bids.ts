@@ -16,7 +16,8 @@ import { fetchQualBulk } from "../src/lib/nara/qualification";
 import { applyIndustryLaws, fetchIndustryLaws, type IndustryLawTable } from "../src/lib/nara/industryLaw";
 import { fetchNuriBids } from "../src/lib/nara/nuri";
 import { extractNuriSheets } from "../src/lib/nara/nuriSheets";
-import type { NuriBidsFile } from "../src/lib/nuri";
+import { accumulateNuriResults } from "./awards/nuriStore";
+import type { NuriBidsFile, NuriDocs } from "../src/lib/nuri";
 import { usableLwlt } from "../src/lib/criteria";
 import { jointAllowed } from "../src/lib/noticeInfo";
 import { buildAwardStats } from "../src/lib/nara/awardStats";
@@ -253,12 +254,17 @@ async function main() {
   }
   // 누리장터 민간 입찰 (/nuri-bids): 민간입찰공고·개찰 결과·계약. 실패해도 배포는 계속
   let nuriBids: NuriBidsFile | undefined;
+  let nuriDocs: Record<string, NuriDocs> = {};
   try {
     const r = await fetchNuriBids(laws);
     nuriBids = r.file;
     console.log(r.log);
-    const sh = await extractNuriSheets(nuriBids.items, textCache);
-    console.log(`누리장터 배점표: 대상(적격심사·제안서평가, 진행 중) ${sh.targets}건 중 첨부 읽음 ${sh.read}건, 배점표 ${sh.found}건, 받기 실패 ${sh.failed}개${sh.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서" : ""}`);
+    try { console.log(await accumulateNuriResults(nuriBids, r.all)); } catch (e) { console.warn("누리장터 개찰 누적 건너뜀:", e instanceof Error ? e.message : e); }
+    // 규칙으로 쓸 수 있는 표를 못 읽은 공고는 배점표 판독 입력을 만든다 (나라장터와 같은 /ai-input/{공고번호-차수}.json, 공고번호 체계가 같아 겹치지 않는다)
+    const sh = await extractNuriSheets(nuriBids.items, textCache, undefined, (bid, text) => ai.collect(bid, text, undefined));
+    nuriDocs = sh.docs;
+    for (const id of Object.keys(sh.docs)) if (sh.docs[id].ai && ai.inputs[id]) sheets[id] = { ...sheets[id], ai: ai.inputs[id] };
+    console.log(`누리장터 배점표: 대상(적격심사·제안서평가, 진행 중) ${sh.targets}건 중 첨부 읽음 ${sh.read}건, 배점표 ${sh.found}건, 판독 입력 ${sh.ai}건, 받기 실패 ${sh.failed}개${sh.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서" : ""}`);
   } catch (e) {
     console.warn("누리장터 건너뜀:", e instanceof Error ? e.message : e);
   }
@@ -320,7 +326,7 @@ async function main() {
   } catch (e) {
     console.warn("최근 낙찰 결과 건너뜀:", e instanceof Error ? e.message : e);
   }
-  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, industries, preSpecs, orderPlans, contracts, aptBids, nuriBids, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
+  writeFileSync(out, JSON.stringify({ items, attachments, sheets, quals, awardStats, analyses, agencies, industries, preSpecs, orderPlans, contracts, aptBids, nuriBids, nuriDocs, awardCount, changes, rateTable, recentAwards, syncedAt, source: "g2b" }));
   console.log(`나라장터 공고 ${items.length}건 저장 → ${out}`);
 }
 

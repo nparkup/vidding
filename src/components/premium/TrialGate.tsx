@@ -101,11 +101,11 @@ export function TrialLocked({ used, onPick, state }: { used: TrialEntry[]; onPic
           <p className="text-xs font-semibold text-ink-500">{paid ? "이번 달 분석한 공고 (최근 10건, 다시 열 수 있습니다)" : "체험으로 분석한 공고 (다시 열 수 있습니다)"}</p>
           <ul className="mt-2 space-y-1">
             {shown.map((e) => {
-              const label = e.title || e.k.replace(/^(nara|apt):/, "공고 ");
+              const label = e.title || e.k.replace(/^(nara|apt|nuri):/, "공고 ");
               return (
                 <li key={e.k}>
                   <button type="button" onClick={() => onPick(e)} className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm font-semibold hover:bg-ink-100/60">
-                    <span className="mr-1.5 text-xs font-medium text-ink-400">{e.k.startsWith("apt:") ? "아파트" : "나라장터"}</span>{label}
+                    <span className="mr-1.5 text-xs font-medium text-ink-400">{e.k.startsWith("apt:") ? "아파트" : e.k.startsWith("nuri:") ? "민간" : "나라장터"}</span>{label}
                   </button>
                 </li>
               );

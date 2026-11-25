@@ -590,14 +590,18 @@ export function adoptable(ex: EvalSheet, b?: EvalBasis): boolean {
 export function bidSheet(
   bid: Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category" | "lowerLimitRate">,
   b: EvalBasis | undefined,
-  opts: { extracted?: EvalSheet; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string } } = {},
+  opts: {
+    extracted?: EvalSheet; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string };
+    /** 빌드가 이미 쓸 수 있다고 본 표 (민간 공고: 공고 목록에 맞춰 볼 기술·가격 배점이 없어 nuriUsable 로 거른다) */
+    trusted?: boolean;
+  } = {},
 ): EvalSheet {
-  const { extracted, notice, quant } = opts;
+  const { extracted, notice, quant, trusted } = opts;
   const basis: EvalBasis | undefined = notice?.lowerLimit && !usableLwlt(b?.lwlt) ? { ...b, lwlt: notice.lowerLimit.value } : b;
   const tpl = criteriaSheet(bid, basis, notice);
   const facts: NonNullable<EvalSheet["noticeFacts"]> = [];
   let sheet: EvalSheet;
-  if (extracted && adoptable(extracted, b)) {
+  if (extracted && (trusted || adoptable(extracted, b))) {
     sheet = enrichSheet(extracted, tpl);
     sheet.pass = notice?.pass?.value ?? extracted.pass ?? tpl.pass;
     facts.push({ label: "평가항목·배점", value: `공고 원문 배점표 ${extracted.items.length}개 항목`, quote: extracted.notes[0] ?? "" });

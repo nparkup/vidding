@@ -18,14 +18,15 @@ export function loadBids(): Promise<Bid[]> {
   return cache;
 }
 
-/** 공고 목록을 한 번만 받아 여러 컴포넌트가 함께 쓴다. 받기 전에는 null */
-export function useBids(): { bids: Bid[] | null; error: boolean } {
+/** 공고 목록을 한 번만 받아 여러 컴포넌트가 함께 쓴다. 받기 전에는 null. enabled 가 false 면 받지 않는다 */
+export function useBids(enabled = true): { bids: Bid[] | null; error: boolean } {
   const [bids, setBids] = useState<Bid[] | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     loadBids().then((b) => alive && setBids(b)).catch(() => alive && setError(true));
     return () => { alive = false; };
-  }, []);
+  }, [enabled]);
   return { bids, error };
 }

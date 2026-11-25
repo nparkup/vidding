@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { ACCOUNT_API, accountCall, refreshAccount, useAccount, type Usage, type UseEntry } from "./account";
 import { useTrial, type TrialState } from "./trial";
 import { TRIAL_LIMIT_ENABLED } from "./trialLimit";
+import { useIsAdmin } from "./adminSession";
 import type { PaidPlanId } from "./usagePeriod";
 
 export type UsageState = TrialState & {
@@ -21,13 +22,17 @@ export type UsageState = TrialState & {
   error?: string;
   /** 무료 체험 제한을 꺼 둔 상태 (TRIAL_LIMIT_ENABLED=false): 세지 않고 연다 */
   off?: boolean;
+  /** 관리자 로그인 브라우저: 한도 없이, 세지 않고 연다 */
+  admin?: boolean;
 };
 
 const OPEN: UsageState = { status: "ok", used: [], left: Number.POSITIVE_INFINITY, fresh: false, off: true };
+const ADMIN: UsageState = { ...OPEN, admin: true };
 
 type UseResp = Usage & { ok: boolean; fresh: boolean; suspended?: boolean };
 
 function toState(r: UseResp): UsageState {
+  if (r.admin && r.ok) return ADMIN;
   const used: UseEntry[] = [...r.used].sort((a, b) => a.t - b.t);
   const paid = r.mode === "paid" ? { plan: r.plan, quota: r.quota, to: r.period.to } : undefined;
   const extra = { server: true, paid, ...(r.suspended ? { suspended: true } : {}) };
@@ -38,9 +43,11 @@ function toState(r: UseResp): UsageState {
 
 export function useUsage(key: string | null, title?: string): UsageState | null {
   const acc = useAccount();
-  // 무료 체험 제한을 꺼 두면 유료 이용권 회원만 센다
-  const off = !TRIAL_LIMIT_ENABLED && !(acc.status === "in" && acc.usage?.mode === "paid");
-  if (off) key = null;
+  // 관리자로 로그인한 브라우저는 한도 없이 쓰고 건수를 세지 않는다 (확인되기 전에는 세지 않고 기다린다)
+  const admin = useIsAdmin();
+  // 무료 체험 제한을 꺼 두면 유료 이용권 회원만 센다 (관리자 계정으로 정한 회원은 서버가 세지 않는다)
+  const off = !TRIAL_LIMIT_ENABLED && !(acc.status === "in" && acc.usage?.mode === "paid" && !acc.usage.admin);
+  if (off || admin !== false) key = null;
   const server = acc.status === "in" && !!ACCOUNT_API;
   // 로그인하지 않았을 때만 브라우저 기준으로 센다 (로그인 상태를 알기 전에는 세지 않는다)
   const local = useTrial(acc.status === "out" || (acc.status === "in" && !ACCOUNT_API) ? key : null, title);
@@ -63,7 +70,8 @@ export function useUsage(key: string | null, title?: string): UsageState | null 
     // 확인 실패는 10초 뒤 한 번 더
     if (srv?.st.error) { const t = setTimeout(() => setRetry((n) => n + 1), 10_000); return () => clearTimeout(t); }
   }, [srv]);
-  if (acc.status === "loading") return null;
+  if (admin) return ADMIN;
+  if (acc.status === "loading" || admin === null) return null;
   if (off) return OPEN;
   if (!server) return local;
   if (!key) return null;

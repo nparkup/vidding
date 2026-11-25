@@ -162,6 +162,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
       const next: Record<string, unknown> = { ...cur };
       if (b.reset === true) delete next.limit;
+      else if (b.admin === true) next.limit = { quota: null, admin: true, memo: s(b.memo, 200) || undefined, at: new Date().toISOString() };
       else {
         const q = b.quota === null ? null : Math.round(Number(b.quota));
         if (q !== null && !(Number.isFinite(q) && q >= 0 && q <= MAX_QUOTA)) return json({ error: `한도는 0 ~ ${MAX_QUOTA.toLocaleString()}건 사이로 정해 주세요.` }, 400);
@@ -172,7 +173,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       const bill = await readJson(bucket, `billing/${bizno}.json`);
       const t = await readJson(bucket, `trial/${bizno}.json`);
       const quota = await memberLimit(bucket, next, bill, cfg, ((t?.used as unknown[]) ?? []).length);
-      audit("member-limit", `${bizno} ${b.reset === true ? "기본 한도" : next.limit && (next.limit as { quota: number | null }).quota === null ? "무제한" : `${(next.limit as { quota: number }).quota}건`}`);
+      audit("member-limit", `${bizno} ${b.reset === true ? "기본 한도" : b.admin === true ? "관리자 계정" : next.limit && (next.limit as { quota: number | null }).quota === null ? "무제한" : `${(next.limit as { quota: number }).quota}건`}`);
       return json({ status: "ok", member: adminMember(next), quota }, 200, noStore);
     }
     case "usage-reset": {

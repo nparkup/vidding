@@ -137,7 +137,7 @@ export function UsageTab({ call, guard, members, limit, busy, reload }: TabProps
               return (
                 <tr key={m.bizno}>
                   <td className="leading-snug"><span className="font-semibold">{m.company}</span><span className="block text-xs tabular-nums text-ink-400">{bizFmt(m.bizno)}</span></td>
-                  <td className="whitespace-nowrap text-sm">{tierName(q)}{q.custom && <span className="ml-1.5 rounded-lg bg-sky-100 px-1.5 py-0.5 text-xs font-bold text-sky">개별</span>}</td>
+                  <td className="whitespace-nowrap text-sm">{tierName(q)}{q.custom && <span className="ml-1.5 rounded-lg bg-sky-100 px-1.5 py-0.5 text-xs font-bold text-sky">{q.admin ? "관리자" : "개별"}</span>}</td>
                   <td>
                     <p className="flex items-baseline justify-between gap-2 text-sm tabular-nums"><span><b>{q.used.toLocaleString()}</b> / {quotaText(q.quota)}</span><span className={`text-xs ${fullOf(q) ? "font-bold text-coral" : "text-ink-400"}`}>{left === null ? unitOf(q) : `${unitOf(q)} · 남음 ${left.toLocaleString()}`}</span></p>
                     <div className="mt-1"><QuotaBar q={q} /></div>

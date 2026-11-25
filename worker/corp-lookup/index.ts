@@ -178,6 +178,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       // 관리자가 이용 정지한 사업자번호는 새 공고를 더하지 않는다
       const mem = await env.AWARDS.get(`members/${bizno}.json`);
       let suspended = false;
+      let adminAcc = false;
       if (mem) {
         try {
           const m = JSON.parse(new TextDecoder().decode(await mem.arrayBuffer())) as { status?: string; limit?: unknown };
@@ -185,6 +186,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
           // 관리자가 정한 회원별 개별 한도 (null = 무제한)
           const o = readOverride(m.limit);
           if (o) TRIAL_LIMIT = o.quota === null ? MAX_QUOTA : o.quota;
+          if (o?.admin) adminAcc = true;
         } catch { /* 무시 */ }
       }
       const hit = await env.AWARDS.get(key);
@@ -194,9 +196,9 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       }
       const before = used.length;
       const now = Date.now();
-      if (!suspended) for (const k of keys) if (used.length < TRIAL_LIMIT && !used.some((e) => e.k === k)) used.push({ k, t: now });
+      if (!suspended && !adminAcc) for (const k of keys) if (used.length < TRIAL_LIMIT && !used.some((e) => e.k === k)) used.push({ k, t: now });
       if (used.length !== before) await env.AWARDS.put(key, JSON.stringify({ used }), { httpMetadata: { contentType: "application/json" } });
-      return json({ used, limit: TRIAL_LIMIT, ...(suspended ? { suspended: true } : {}) }, 200, { "Cache-Control": "no-store" });
+      return json({ used, limit: TRIAL_LIMIT, ...(suspended ? { suspended: true } : {}), ...(adminAcc ? { admin: true } : {}) }, 200, { "Cache-Control": "no-store" });
     }
     if (sp.has("corps")) {
       try {

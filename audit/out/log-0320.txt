@@ -1,0 +1,21 @@
+누리장터: 진행 중 공고 429건 (용역 302, 공사 82, 물품 45, 면허제한 30, 지역제한 31), 개찰 결과 3,109건 중 순위 1,499건(남은 순위 조회 다음 빌드), 계약 1,890건, 투찰률 통계 0개 [] · 보낸 결과 1118·계약 617 · 호출 1670회 실패 0
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: TT: undefined function: 21
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: Required "glyf" table is not found -- trying to recover.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: TT: undefined function: 21
+Warning: TT: undefined function: 21
+Warning: TT: undefined function: 21
+Warning: Indexing all PDF objects
+Warning: Required "glyf" table is not found -- trying to recover.
+배점표: 대상 360, 읽음 357, 찾음 127, 판독 입력 108, 실패 2, 시간초과 false
+판독 15건: {"ok":15}

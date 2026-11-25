@@ -57,6 +57,16 @@ export interface AgencySummary {
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
+/**
+ * '각 수요기관'처럼 여러 수요기관을 뭉뚱그린 표기인지 (조달청 단가계약·제3자단가 등에서 수요기관 칸에 들어간다).
+ * 한 기관이 아니므로 발주기관 목록·검색·기관별 낙찰 업체·발주처 분석에서 뺀다.
+ */
+export function isVagueAgency(name: string | undefined | null): boolean {
+  const t = (name ?? "").replace(/[\s·.,()（）]/g, "");
+  if (!t) return true;
+  return /^(각|전체|모든|해당|기타|다수|복수|각급)?(수요|발주|계약)?(기관|수요처|발주처)(들|별|등)?$/.test(t) || /각(수요|발주)?(기관|수요처)/.test(t);
+}
+
 /** 자주 낙찰받은 업체 목록 길이 (발주처·업종별 분석 공통). 건수 순·금액 순 각각 이만큼 보여 준다 */
 export const TOP_WINNERS = 20;
 

@@ -7,7 +7,7 @@
  */
 import { CATEGORIES, type ServiceCategory } from "../types";
 import { quantile, type AgencyRow } from "./analysis";
-import { agencySummary, topWinners, type AgencySummary } from "./agency";
+import { agencySummary, isVagueAgency, topWinners, type AgencySummary } from "./agency";
 
 export interface IndustrySummary extends Omit<AgencySummary, "v"> {
   v: 1;
@@ -53,7 +53,7 @@ export function industrySummary(name: ServiceCategory, rows: AgencyRow[], ags: s
     if (r[6] > 0) v.bids.push(r[6]);
     if (r[2] >= from4) {
       const a = ags[i];
-      if (a) { const x = ag.get(a) ?? [0, 0]; x[0]++; x[1] += r[4] > 100 ? r[4] : 0; ag.set(a, x); }
+      if (a && !isVagueAgency(a)) { const x = ag.get(a) ?? [0, 0]; x[0]++; x[1] += r[4] > 100 ? r[4] : 0; ag.set(a, x); }
       if (r[12]) firms.add(r[12]);
     }
   });
@@ -132,6 +132,8 @@ const addFirm = (w: Map<string, [number, number, string]>, f: string, c: number,
 const topFirms = (w: Map<string, [number, number, string]>, k: number): FirmStat[] =>
   [...w.entries()].sort((x, y) => y[1][0] - x[1][0] || y[1][1] - x[1][1]).slice(0, k).map(([n, [c, a, d]]) => [n, c, Math.round(a), d]);
 
+const VAGUE = "\u0000vague";
+
 /** 업종 하나의 기간별 낙찰 업체·발주기관. rows·ags는 industrySummary와 같다 */
 export function industryPeriods(name: ServiceCategory, rows: AgencyRow[], ags: string[], today: string): IndustryPeriodFile {
   const from4 = `${Number(today.slice(0, 4)) - 4}${today.slice(4)}`;
@@ -145,7 +147,8 @@ export function industryPeriods(name: ServiceCategory, rows: AgencyRow[], ags: s
     if (r[12]) addFirm(v.w, r[12], 1, amt, r[2]);
   };
   rows.forEach((r, i) => {
-    const a = ags[i];
+    // '각 수요기관' 같은 뭉뚱그린 표기는 합계·업체 집계에는 넣고 기관 목록에서만 뺀다
+    const a = ags[i] && isVagueAgency(ags[i]) ? VAGUE : ags[i];
     if (!a) return;
     const y = r[2].slice(0, 4);
     add(byYear.get(y) ?? byYear.set(y, new Map()).get(y)!, a, r);
@@ -164,12 +167,12 @@ export function industryPeriods(name: ServiceCategory, rows: AgencyRow[], ags: s
     const firmsAll = new Map<string, [number, number, string]>();
     let n = 0, amount = 0;
     for (const v of m.values()) { n += v.n; amount += v.amt; for (const [f, [c, a, d]] of v.w) addFirm(firmsAll, f, c, a, d); }
-    const sorted = [...m.entries()].sort((a, b) => b[1].n - a[1].n || b[1].amt - a[1].amt);
+    const sorted = [...m.entries()].filter(([a]) => a !== VAGUE).sort((a, b) => b[1].n - a[1].n || b[1].amt - a[1].amt);
     const agencies = sorted.slice(0, AGENCY_TOP).map(([a, v]) => [a, v.n, Math.round(v.amt)] as [string, number, number]);
     const agencyWinners: IndustryPeriodData["agencyWinners"] = {};
     for (const [a, v] of sorted.slice(0, AGENCY_TOP)) agencyWinners[a] = { firms: v.w.size, top: topFirms(v.w, AGENCY_WINNERS) };
     return {
-      period, n, amount: Math.round(amount), firms: firmsAll.size, agencyCount: m.size,
+      period, n, amount: Math.round(amount), firms: firmsAll.size, agencyCount: sorted.length,
       winners: topWinners(topFirms(firmsAll, firmsAll.size)), agencies, agencyWinners,
       list: sorted.map(([a, v]) => [a, v.n, Math.round(v.amt), v.w.size, topFirms(v.w, SEARCH_WINNERS)] as IndustryAgencyRow),
     };

@@ -22,7 +22,7 @@ export function NuriBidView() {
   const bid = data?.items.find((b) => b.no === no);
 
   useEffect(() => {
-    if (bid) document.title = `${bid.title} 민간 공고 | 비드매트릭스`;
+    if (bid) document.title = `${bid.title} 누리장터 공고 | 비드매트릭스`;
   }, [bid]);
 
   if (error) return <Message text="공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요." />;
@@ -36,7 +36,7 @@ function Message({ text }: { text: string }) {
     <div className="container-x py-20 text-center">
       <p className="text-3xl font-extrabold tracking-tight">공고를 찾을 수 없습니다.</p>
       <p className="mt-3 text-ink-500">{text}</p>
-      <Link href="/nuri-bids" className="btn-primary mt-8">민간 공고 목록으로</Link>
+      <Link href="/nuri-bids" className="btn-primary mt-8">누리장터 공고 목록으로</Link>
     </div>
   );
 }

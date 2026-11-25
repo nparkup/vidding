@@ -117,7 +117,7 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
             )}
           </section>
 
-          {b.sheet ? <SheetCard sheet={b.sheet} /> : null}
+          {b.sheet ? <SheetCard sheet={b.sheet} predictHref={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} /> : null}
 
           <LicenseLaws groups={b.licenseGroups} />
 
@@ -193,7 +193,7 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
 const pts = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(/0+$/, "")}점`;
 
 /** 첨부에서 읽은 평가 배점표: 묶음별 항목과 배점 */
-function SheetCard({ sheet: s }: { sheet: NonNullable<NuriBid["sheet"]> }) {
+function SheetCard({ sheet: s, predictHref }: { sheet: NonNullable<NuriBid["sheet"]>; predictHref: string }) {
   const groups: { name: string; items: typeof s.items }[] = [];
   for (const i of s.items) {
     const g = groups.find((x) => x.name === i.group);
@@ -226,6 +226,7 @@ function SheetCard({ sheet: s }: { sheet: NonNullable<NuriBid["sheet"]> }) {
       </div>
       {s.pass ? <p className="mt-3 text-sm text-ink-700">통과 기준: 총점 {pts(s.pass)} 이상</p> : null}
       <p className="mt-3 text-xs leading-relaxed text-ink-400">세부 평가 기준과 서류 인정 범위는 공고서 원문에서 확인하세요. 항목 이름은 원문 표를 줄여 보여 줄 수 있습니다.</p>
+      <Link href={predictHref} className="btn-primary mt-4 w-full">이 배점표로 평가점수 예측하기</Link>
     </section>
   );
 }

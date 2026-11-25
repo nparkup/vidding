@@ -19,7 +19,7 @@ export const TRIAL_KEY = "bm-trial.v1";
 const EVENT = "bm-trial";
 
 export interface TrialEntry {
-  /** "nara:공고ID" 또는 "apt:입찰번호" */
+  /** "nara:공고ID", "apt:입찰번호" 또는 "nuri:공고번호-차수" */
   k: string;
   /** 처음 분석한 시각 (ms) */
   t: number;

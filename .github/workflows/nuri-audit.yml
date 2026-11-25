@@ -1,0 +1,30 @@
+name: (임시) 민간 공고 배점표 점검
+on:
+  push:
+    branches: [claude/project-thread-qiv2dn]
+    paths: ["audit/run.txt"]
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: 점검
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          npx tsx --conditions=react-server $(cat audit/run.txt) 2>&1 | tee audit/out-log.txt
+      - name: 결과 올리기
+        if: always()
+        run: |
+          mkdir -p audit/out && mv audit/out-log.txt audit/out/log-$(date +%H%M).txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -f audit/out
+          git commit -m "점검 결과" && git pull --rebase -q origin claude/project-thread-qiv2dn && git push

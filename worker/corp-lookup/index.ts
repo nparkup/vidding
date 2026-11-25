@@ -170,7 +170,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       // 무료 체험 사용 공고 (src/lib/trial.ts): 사업자번호마다 처음 분석한 공고 3건까지만 남긴다. 저장 값은 공고 키와 시각뿐
       const bizno = sp.get("trial") ?? "";
       const TRIAL_LIMIT = (await readSiteConfig(env.AWARDS)).trialLimit;
-      const keys = (sp.get("bids") ?? "").split(",").filter((k) => /^(nara|apt):[A-Za-z0-9._-]{1,60}$/.test(k)).slice(0, 6);
+      const keys = (sp.get("bids") ?? "").split(",").filter((k) => /^(nara|apt|nuri):[A-Za-z0-9._-]{1,60}$/.test(k)).slice(0, 6);
       if (!/^\d{10}$/.test(bizno)) return json({ error: "잘못된 사업자번호" }, 400);
       if (!env.AWARDS) return json({ error: "off" }, 503);
       const key = `trial/${bizno}.json`;

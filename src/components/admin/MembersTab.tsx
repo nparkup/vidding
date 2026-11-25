@@ -7,7 +7,7 @@ import { planName } from "@/lib/plans";
 import { useSiteConfig } from "@/lib/siteConfig";
 
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const bidLink = (k: string) => (k.startsWith("apt:") ? `/apt-bids/view?no=${encodeURIComponent(k.slice(4))}` : `/bids/view?id=${encodeURIComponent(k.slice(5))}`);
+const bidLink = (k: string) => (k.startsWith("apt:") ? `/apt-bids/view?no=${encodeURIComponent(k.slice(4))}` : k.startsWith("nuri:") ? `/nuri-bids/view?no=${encodeURIComponent(k.slice(5).replace(/-\d+$/, ""))}` : `/bids/view?id=${encodeURIComponent(k.slice(5))}`);
 
 type Use = "all" | "none" | "some" | "full";
 type St = "all" | "active" | "suspended" | "paid" | "login" | "nologin";
@@ -236,7 +236,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
             <ul className="mt-1 space-y-1">
               {m.trial.map((t) => (
                 <li key={t.k} className="[overflow-wrap:anywhere]">
-                  <a href={`${base}${bidLink(t.k)}`} target="_blank" rel="noreferrer" className="text-mint-600 hover:underline">{t.k.startsWith("apt:") ? "아파트" : "나라장터"} {t.k.replace(/^(nara|apt):/, "")}</a>
+                  <a href={`${base}${bidLink(t.k)}`} target="_blank" rel="noreferrer" className="text-mint-600 hover:underline">{t.k.startsWith("apt:") ? "아파트" : t.k.startsWith("nuri:") ? "민간" : "나라장터"} {t.k.replace(/^(nara|apt|nuri):/, "")}</a>
                   <span className="ml-2 text-xs text-ink-400">{dt(t.t)}</span>
                 </li>
               ))}

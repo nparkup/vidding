@@ -1,7 +1,8 @@
 import "server-only";
 import type { Bid, BidAttachment } from "../types";
 import { extractSheet, templateSheet, type EvalSheet } from "../evalscore";
-import type { NuriBid, NuriSheet } from "../nuri";
+import type { NuriBid, NuriDocs, NuriSheet } from "../nuri";
+import { readNoticeCriteria } from "../noticeCriteria";
 import { download, dropRepeatedEntries, rankFiles, textOf } from "./attachText";
 import { textCacheKey, type TextCache } from "./docExtract";
 import { mapLimit } from "./client";
@@ -13,10 +14,10 @@ import { mapLimit } from "./client";
  */
 export const NURI_SHEET_AWARD = /^(적격심사|제안서)/;
 
-export async function extractNuriSheets(bids: NuriBid[], cache: TextCache, budgetMs = 5 * 60_000): Promise<{ found: number; targets: number; read: number; failed: number; timedOut: boolean }> {
+export async function extractNuriSheets(bids: NuriBid[], cache: TextCache, budgetMs = 5 * 60_000): Promise<{ found: number; targets: number; read: number; failed: number; timedOut: boolean; docs: Record<string, NuriDocs> }> {
   const until = Date.now() + budgetMs;
   const targets = bids.filter((b) => NURI_SHEET_AWARD.test(b.award ?? "") && b.files.length && new Date(b.closeAt).getTime() > Date.now());
-  const st = { found: 0, targets: targets.length, read: 0, failed: 0, timedOut: false };
+  const st = { found: 0, targets: targets.length, read: 0, failed: 0, timedOut: false, docs: {} as Record<string, NuriDocs> };
   await mapLimit(targets, 6, async (b) => {
     const files: BidAttachment[] = rankFiles(b.files.map((f) => ({ name: f.name, url: f.url, kind: "규격서·기타" })));
     if (Date.now() > until && files.some((f) => cache.get(textCacheKey(f)) === undefined)) { st.timedOut = true; return; }
@@ -41,10 +42,18 @@ export async function extractNuriSheets(bids: NuriBid[], cache: TextCache, budge
     }
     if (texts.length) st.read++;
     const sheet = best && toNuriSheet(best.sheet, best.file);
-    if (sheet) { b.sheet = sheet; st.found++; }
+    if (sheet && best) {
+      b.sheet = sheet;
+      st.found++;
+      // 민간 예측(/premium/nuri)이 쓰는 전체 평가표: 점수 구간·인정 범위·평가 요소와 공고서 문장 기준(통과점수·하한율 등)
+      const notice = readNoticeCriteria(texts.join("\n"));
+      st.docs[nuriKey(b)] = { sheet: best.sheet, sheetFile: best.file, ...(notice ? { notice } : {}) };
+    }
   });
   return st;
 }
+
+export const nuriKey = (b: Pick<NuriBid, "no" | "ord">) => `${b.no}-${b.ord}`;
 
 const rank = (s: EvalSheet) => ({ 높음: 3, 보통: 2, 낮음: 1 })[s.confidence] * 100 + s.items.length;
 
@@ -58,8 +67,21 @@ const pseudoBid = (b: NuriBid) => ({
 }) as unknown as Pick<Bid, "contractMethod" | "bizType" | "baseAmount" | "category" | "lowerLimitRate">;
 
 function toNuriSheet(s: EvalSheet, file: string): NuriSheet | undefined {
+  if (!nuriUsable(s)) return undefined;
   const items = s.items.filter((i) => i.max > 0).map((i) => ({ group: i.group, label: i.label, max: i.max }));
   const total = Math.round(items.reduce((a, i) => a + i.max, 0) * 100) / 100;
-  if (!items.length || total < 90 || total > 110) return undefined;
   return { file, total, items, pass: s.pass?.kind === "total" ? s.pass.score : undefined };
+}
+
+/**
+ * 민간 공고 배점표를 쓸지: 나라장터처럼 공고 목록의 기술·가격 배점과 맞춰 볼 값이 없어 표 자체로만 본다.
+ * 항목 둘 이상, 합계 90~110점, 가격 항목은 하나까지, 합계·소계 줄이나 산식 줄을 항목으로 읽지 않았을 것.
+ */
+export function nuriUsable(s: EvalSheet): boolean {
+  const items = s.items.filter((i) => i.max > 0);
+  const total = items.reduce((a, i) => a + i.max, 0);
+  if (items.length < 2 || total < 90 || total > 110) return false;
+  if (s.items.filter((i) => i.kind === "price").length > 1) return false;
+  if (s.items.some((i) => /^(합\s*계|소\s*계|총\s*계|계)(\s|\d|$)/.test(i.label.trim()))) return false;
+  return !s.items.some((i) => /[=＝]|^평점|^[o□■①-⑳]\s/.test(i.label));
 }

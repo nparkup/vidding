@@ -251,8 +251,8 @@ export default async function Home() {
             {docs.flatMap((g) => g.items).slice(0, 6).map((d, i) => (
               <li key={d.name} className="flex items-center gap-3 rounded-xl border border-ink-100 px-3 py-2.5 text-sm">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-300" />
-                <span className="min-w-0 flex-1 font-medium">{d.name}</span>
-                {d.note && <span className="hidden max-w-[45%] text-right text-xs text-ink-300 sm:block">{d.note}</span>}
+                <span className="min-w-0 flex-1 font-medium sm:flex-none sm:whitespace-nowrap">{d.name}</span>
+                {d.note && <span className="hidden min-w-0 flex-1 text-right text-xs text-ink-300 sm:block">{d.note}</span>}
               </li>
             ))}
           </ul>

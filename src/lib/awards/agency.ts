@@ -43,7 +43,7 @@ export interface AgencySummary {
   years: [number, number, number, number][];
   /** 업무·계약방법별 (건수 많은 순, 최근 4년) */
   groups: AgencyGroupStat[];
-  /** 최근 4년 자주 낙찰받은 업체 [업체명, 건수, 낙찰금액 합] (최대 10곳) */
+  /** 최근 4년 자주 낙찰받은 업체 [업체명, 건수, 낙찰금액 합] (건수 상위·금액 상위 TOP_WINNERS곳씩 합친 것, 건수 순) */
   winners: [string, number, number][];
   /** 최근 4년 개찰 1~5위에 자주 든 업체 [업체명, 횟수] (낙찰 제외, 최대 10곳) */
   ranked: [string, number][];
@@ -56,6 +56,20 @@ export interface AgencySummary {
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** 자주 낙찰받은 업체 목록 길이 (발주처·업종별 분석 공통). 건수 순·금액 순 각각 이만큼 보여 준다 */
+export const TOP_WINNERS = 20;
+
+/**
+ * 업체 집계 [이름, 건수, 금액, ...]에서 건수 상위 TOP_WINNERS곳과 금액 상위 TOP_WINNERS곳을 합쳐(겹치면 한 번) 건수 순으로 돌려준다.
+ * 화면은 이 목록을 건수 순 또는 금액 순으로 다시 정렬해 TOP_WINNERS곳씩 보여 준다.
+ */
+export function topWinners<T extends [unknown, number, number, ...unknown[]]>(xs: T[], k = TOP_WINNERS): T[] {
+  const byCount = [...xs].sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+  const keep = new Set(byCount.slice(0, k));
+  for (const x of [...xs].sort((a, b) => b[2] - a[2] || b[1] - a[1]).slice(0, k)) keep.add(x);
+  return byCount.filter((x) => keep.has(x));
+}
 
 export function agencySummary(name: string, rows: AgencyRow[], today: string): AgencySummary | undefined {
   // 같은 공고번호(재입찰 등)는 최근 것만
@@ -97,7 +111,7 @@ export function agencySummary(name: string, rows: AgencyRow[], today: string): A
     if (r[12]) { const v = win.get(r[12]) ?? [0, 0]; v[0]++; v[1] += r[4] > 100 ? r[4] : 0; win.set(r[12], v); }
     for (const [nm] of r[14] ?? []) if (nm && nm !== r[12]) rk.set(nm, (rk.get(nm) ?? 0) + 1);
   }
-  const winners = [...win.entries()].sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]).slice(0, 10).map(([n, [c, a]]) => [n, c, Math.round(a)] as [string, number, number]);
+  const winners = topWinners([...win.entries()].map(([n, [c, a]]) => [n, c, Math.round(a)] as [string, number, number]));
   const ranked = [...rk.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
   const withBidders = recent4.filter((r) => r[6] > 0);
 

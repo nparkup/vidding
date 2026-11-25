@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BidRow } from "@/components/BidRow";
 import { CategoryTiles } from "@/components/CategoryTiles";
-import { AssessCard, GroupShare, MethodTable, Tile } from "@/components/analysis/AgencyExplorer";
+import { AssessCard, GroupShare, MethodTable, Tile, WinnersHead, WinnersList, type WinnersBy } from "@/components/analysis/AgencyExplorer";
 import { ColumnChart } from "@/components/charts/ColumnChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { YearChart } from "@/components/charts/YearChart";
@@ -218,6 +218,7 @@ const SHOW_MATCHES = 30;
 /** 기간(최근 4년·전체·연도별)을 골라 자주 낙찰받은 업체와 발주기관별 낙찰 업체를 함께 본다 */
 function PeriodSection({ s, agencyIds }: { s: IndustrySummary; agencyIds: Map<string, string> }) {
   const [period, setPeriod] = useState("4y");
+  const [by, setBy] = useState<WinnersBy>("count");
   const [d, setD] = useState<IndustryPeriodData | null | undefined>();
   const id = industryId(s.name);
   useEffect(() => { setPeriod("4y"); }, [s]);
@@ -259,11 +260,11 @@ function PeriodSection({ s, agencyIds }: { s: IndustrySummary; agencyIds: Map<st
       </section>
 
       <section className="card p-6">
-        <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">{periodLabel(period)}</span></h3>
+        <WinnersHead period={periodLabel(period)} by={by} setBy={setBy} />
         {data === undefined && <p className="mt-3 text-sm text-ink-400">불러오는 중…</p>}
         {data === null && <p className="mt-3 text-sm text-ink-500">이 기간 자료는 다음 정기 갱신 뒤 채워집니다.</p>}
         {data && (data.winners.length
-          ? <HBarList rows={data.winners.map(([n, c, a, dt], i) => ({ label: `${i + 1}. ${n}`, value: c, text: `${c.toLocaleString()}건 · ${won(a)}`, title: dt ? `최근 낙찰 ${dt}` : undefined }))} />
+          ? <WinnersList rows={data.winners} by={by} />
           : <p className="mt-3 text-sm text-ink-500">이 기간 낙찰이 없습니다.</p>)}
         {period === "4y" && s.ranked.length > 0 && (
           <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>

@@ -30,7 +30,8 @@ export const industryOf = (id: string): ServiceCategory | undefined => CATEGORIE
 
 /** 주요 발주기관 수, 기관마다 보여 줄 낙찰 업체 수 */
 export const AGENCY_TOP = 30;
-export const AGENCY_WINNERS = 10;
+/** 발주기관별 낙찰 업체: 건수 상위·금액 상위 이만큼씩 (topWinners) */
+export const AGENCY_WINNERS = 20;
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -170,7 +171,7 @@ export function industryPeriods(name: ServiceCategory, rows: AgencyRow[], ags: s
     const sorted = [...m.entries()].filter(([a]) => a !== VAGUE).sort((a, b) => b[1].n - a[1].n || b[1].amt - a[1].amt);
     const agencies = sorted.slice(0, AGENCY_TOP).map(([a, v]) => [a, v.n, Math.round(v.amt)] as [string, number, number]);
     const agencyWinners: IndustryPeriodData["agencyWinners"] = {};
-    for (const [a, v] of sorted.slice(0, AGENCY_TOP)) agencyWinners[a] = { firms: v.w.size, top: topFirms(v.w, AGENCY_WINNERS) };
+    for (const [a, v] of sorted.slice(0, AGENCY_TOP)) agencyWinners[a] = { firms: v.w.size, top: topWinners(topFirms(v.w, v.w.size), AGENCY_WINNERS) };
     return {
       period, n, amount: Math.round(amount), firms: firmsAll.size, agencyCount: sorted.length,
       winners: topWinners(topFirms(firmsAll, firmsAll.size)), agencies, agencyWinners,

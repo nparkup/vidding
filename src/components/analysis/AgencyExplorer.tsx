@@ -410,20 +410,32 @@ export function WinnersHead({ period, by, setBy }: { period: string; by: Winners
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h3 className="font-bold">자주 낙찰받은 업체 <span className="text-sm font-normal text-ink-400">{period}</span></h3>
-      <div className="flex shrink-0 gap-1.5" role="group" aria-label="정렬 기준">
-        {([["count", "낙찰 건수 순"], ["amount", "낙찰 금액 순"]] as const).map(([k, t]) => (
-          <button key={k} type="button" aria-pressed={k === by} onClick={() => setBy(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${k === by ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
-            {t}
-          </button>
-        ))}
-      </div>
+      <WinnersSort by={by} setBy={setBy} />
     </div>
   );
 }
 
+/** 낙찰 건수 순·낙찰 금액 순 고르기 */
+export function WinnersSort({ by, setBy, className = "" }: { by: WinnersBy; setBy: (b: WinnersBy) => void; className?: string }) {
+  return (
+    <div className={`flex shrink-0 gap-1.5 ${className}`} role="group" aria-label="정렬 기준">
+      {([["count", "낙찰 건수 순"], ["amount", "낙찰 금액 순"]] as const).map(([k, t]) => (
+        <button key={k} type="button" aria-pressed={k === by} onClick={() => setBy(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${k === by ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** [이름, 건수, 금액, ...] 목록을 고른 기준으로 정렬해 TOP_WINNERS곳 */
+export function sortWinners<T extends [string, number, number, ...unknown[]]>(rows: T[], by: WinnersBy, k = TOP_WINNERS): T[] {
+  return [...rows].sort((a, b) => (by === "amount" ? b[2] - a[2] || b[1] - a[1] : b[1] - a[1] || b[2] - a[2])).slice(0, k);
+}
+
 /** 자주 낙찰받은 업체 막대 목록: 고른 기준으로 정렬해 TOP_WINNERS곳 */
 export function WinnersList({ rows, by }: { rows: [string, number, number, ...unknown[]][]; by: WinnersBy }) {
-  const list = useMemo(() => [...rows].sort((a, b) => (by === "amount" ? b[2] - a[2] || b[1] - a[1] : b[1] - a[1] || b[2] - a[2])).slice(0, TOP_WINNERS), [rows, by]);
+  const list = useMemo(() => sortWinners(rows, by), [rows, by]);
   return (
     <HBarList rows={list.map(([n, c, a, dt], i) => ({
       label: `${i + 1}. ${n}`, value: by === "amount" ? a : c,

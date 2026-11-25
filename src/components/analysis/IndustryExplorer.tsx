@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BidRow } from "@/components/BidRow";
 import { CategoryTiles } from "@/components/CategoryTiles";
-import { AssessCard, GroupShare, MethodTable, Tile, WinnersHead, WinnersList, type WinnersBy } from "@/components/analysis/AgencyExplorer";
+import { AssessCard, GroupShare, MethodTable, Tile, WinnersHead, WinnersList, WinnersSort, sortWinners, type WinnersBy } from "@/components/analysis/AgencyExplorer";
 import { ColumnChart } from "@/components/charts/ColumnChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { YearChart } from "@/components/charts/YearChart";
@@ -15,7 +15,8 @@ import { ScrollRow } from "@/components/ScrollRow";
 import { daysLeft } from "@/lib/analysis";
 import { METHOD_NAME } from "@/lib/awards/analysis";
 import { isVagueAgency } from "@/lib/awards/agency";
-import { industryId, periodLabel, type FirmStat, type IndustryAgencyRow, type IndustryIndexRow, type IndustryPeriodData, type IndustrySummary } from "@/lib/awards/industry";
+import { AGENCY_KINDS, agencyKind, type AgencyKind } from "@/lib/agencyKind";
+import { AGENCY_WINNERS, industryId, periodLabel, type FirmStat, type IndustryAgencyRow, type IndustryIndexRow, type IndustryPeriodData, type IndustrySummary } from "@/lib/awards/industry";
 import { won } from "@/lib/format";
 import { useBids } from "@/lib/useBids";
 import { CATEGORIES, CATEGORY_GROUPS, type Bid, type ServiceCategory } from "@/lib/types";
@@ -287,24 +288,56 @@ function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; list
     setAll(null);
     loadJson<IndustryAgencyRow[]>(listPath).then((l) => setAll((l ?? []).filter((r) => !isVagueAgency(r[0])))).catch(() => setAll([]));
   };
+  const [kind, setKind] = useState<AgencyKind | "">("");
+  const [by, setBy] = useState<WinnersBy>("count");
   const t = q.replace(/\s+/g, "");
-  const matches = useMemo(() => (t && all ? all.filter((r) => r[0].replace(/\s+/g, "").includes(t)) : []), [all, t]);
-  // 검색하면 첫 기관을 펼친다
+  const filtering = !!t || !!kind;
+  // 목록을 아직 못 받았으면 상위 기관 안에서 구분만 먼저 거른다
+  const pool = useMemo<IndustryAgencyRow[] | null>(
+    () => all ?? (kind && !t ? d.agencies.map(([n, c, a]) => [n, c, a, d.agencyWinners[n]?.firms ?? 0, d.agencyWinners[n]?.top ?? []] as IndustryAgencyRow) : null),
+    [all, kind, t, d],
+  );
+  const matches = useMemo(
+    () => (filtering && pool ? pool.filter((r) => (!t || r[0].replace(/\s+/g, "").includes(t)) && (!kind || agencyKind(r[0]) === kind)) : []),
+    [pool, t, kind, filtering],
+  );
+  /** 구분 칩 숫자: 검색어는 적용하고 구분은 빼고 센다 (전체 목록을 받은 뒤) */
+  const kindCounts = useMemo(() => {
+    if (!all) return null;
+    const c: Record<string, number> = {};
+    for (const r of all) if (!t || r[0].replace(/\s+/g, "").includes(t)) { const k = agencyKind(r[0]); c[k] = (c[k] ?? 0) + 1; }
+    return c;
+  }, [all, t]);
+  // 검색·구분을 고르면 첫 기관을 펼친다
   const first = matches[0]?.[0];
   useEffect(() => { if (first) setOpen(first); }, [first]);
-  const rows: AgRow[] = t
+  const rows: AgRow[] = filtering
     ? matches.slice(0, SHOW_MATCHES).map((r) => ({ name: r[0], n: r[1], amt: r[2], w: d.agencyWinners[r[0]] ?? { firms: r[3], top: r[4] } }))
     : d.agencies.map(([n, c, a]) => ({ name: n, n: c, amt: a, w: d.agencyWinners[n] }));
+  const chip = (on: boolean) => `shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${on ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`;
   const max = Math.max(1, ...rows.map((r) => r.n));
   return (
     <section className="card p-6">
       <h3 className="font-bold">발주기관별 낙찰 업체 <span className="text-sm font-normal text-ink-400">{periodLabel(d.period)}</span></h3>
       <div className="mt-3 min-w-0">
+        <p className="label">기관으로 구분</p>
+        <ScrollRow className="flex gap-1" active={kind || "all"}>
+          <button type="button" aria-pressed={!kind} onClick={() => setKind("")} className={chip(!kind)}>
+            전체{kindCounts ? ` ${Object.values(kindCounts).reduce((a, b) => a + b, 0).toLocaleString()}` : ""}
+          </button>
+          {AGENCY_KINDS.map((k) => (
+            <button key={k.key} type="button" title={k.title} aria-pressed={kind === k.key} onClick={() => { load(); setKind(kind === k.key ? "" : k.key); }} className={chip(kind === k.key)}>
+              {k.label}{kindCounts ? ` ${(kindCounts[k.key] ?? 0).toLocaleString()}` : ""}
+            </button>
+          ))}
+        </ScrollRow>
+      </div>
+      <div className="mt-3 min-w-0">
         <label className="label" htmlFor="ind-ag-q">이 업종의 발주기관 검색</label>
         <input id="ind-ag-q" className="input" placeholder={listPath ? "예: 서울특별시교육청, 한국도로공사" : "기관 검색은 다음 정기 갱신 뒤 쓸 수 있습니다"} disabled={!listPath} value={q} onFocus={load} onChange={(e) => { load(); setQ(e.target.value); }} />
         <p className="mt-1.5 text-xs text-ink-500">
-          {t
-            ? all === null || all === undefined ? "기관 목록을 불러오는 중…" : `이 기간 이 업종에 낙찰이 있는 기관 ${all.length.toLocaleString()}곳 중 ${matches.length.toLocaleString()}곳${matches.length > SHOW_MATCHES ? ` (앞 ${SHOW_MATCHES}곳 표시)` : ""}`
+          {filtering
+            ? !all ? (listPath ? "기관 목록을 불러오는 중…" : `낙찰이 많은 기관 ${d.agencies.length}곳 중 ${matches.length.toLocaleString()}곳입니다.`) : `이 기간 이 업종에 낙찰이 있는 기관 ${all.length.toLocaleString()}곳 중 ${matches.length.toLocaleString()}곳${matches.length > SHOW_MATCHES ? ` (낙찰 많은 순 앞 ${SHOW_MATCHES}곳 표시)` : ""}`
             : `이 업종 낙찰이 많은 기관 ${d.agencies.length}곳입니다. 기관을 누르면 이 업종에서 그 기관 공고를 낙찰받은 업체를 봅니다.`}
         </p>
       </div>
@@ -329,14 +362,15 @@ function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; list
                   {r.w ? (
                     <>
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="text-sm font-semibold">낙찰받은 업체 {r.w.firms.toLocaleString()}곳{r.w.firms > r.w.top.length ? ` 중 많이 낙찰받은 ${r.w.top.length}곳` : ""}</p>
+                        <p className="text-sm font-semibold">낙찰받은 업체 {r.w.firms.toLocaleString()}곳{r.w.firms > Math.min(r.w.top.length, AGENCY_WINNERS) ? ` 중 ${by === "amount" ? "낙찰금액이 큰" : "많이 낙찰받은"} ${Math.min(r.w.top.length, AGENCY_WINNERS)}곳` : ""}</p>
                         {id && <Link href={`/analysis/agency?id=${id}`} className="text-xs font-semibold text-mint-700 underline-offset-2 hover:underline">이 기관 발주처 분석</Link>}
                       </div>
+                      <WinnersSort by={by} setBy={setBy} className="mt-2" />
                       <div className="mt-2 hidden grid-cols-[1fr_4rem_12rem_6rem] gap-3 text-xs font-semibold text-ink-500 sm:grid">
                         <span>업체</span><span className="text-right">낙찰</span><span className="text-right">낙찰금액</span><span className="text-right">최근 낙찰</span>
                       </div>
                       <ol className="mt-1 divide-y divide-ink-100">
-                        {r.w.top.map(([f, fc, fa, fd], j) => (
+                        {sortWinners(r.w.top, by).map(([f, fc, fa, fd], j) => (
                           <li key={f} className="grid min-w-0 grid-cols-1 gap-0.5 py-1.5 text-sm sm:grid-cols-[1fr_4rem_12rem_6rem] sm:items-baseline sm:gap-3">
                             <span className="min-w-0 break-keep font-semibold [overflow-wrap:anywhere]">{j + 1}. {f}</span>
                             <span className="text-xs tabular-nums text-ink-500 sm:hidden">{[`${fc.toLocaleString()}건`, won(fa), fd && `최근 ${fd}`].filter(Boolean).join(" · ")}</span>
@@ -353,7 +387,7 @@ function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; list
             </li>
           );
         })}
-        {t && all && !matches.length && <li className="py-3 text-sm text-ink-500">이 기간 이 업종에 낙찰이 있는 기관 중 맞는 곳이 없습니다.</li>}
+        {filtering && pool && !matches.length && <li className="py-3 text-sm text-ink-500">이 기간 이 업종에 낙찰이 있는 기관 중 맞는 곳이 없습니다.</li>}
       </ol>
     </section>
   );

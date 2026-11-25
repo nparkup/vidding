@@ -2,6 +2,10 @@
 
 /** 관리자 화면이 중계 서버(worker/corp-lookup/admin.ts)를 부르는 공통 함수와 자료형 */
 
+import type { LimitInfo, LimitOverride } from "@/lib/usagePeriod";
+
+export type MemberQuota = LimitInfo & { used: number };
+
 export interface TrialUse { k: string; t: number }
 export interface Payment { id: string; date: string; kind: "pay" | "refund"; amount: number; method: string; memo: string }
 export interface Billing {
@@ -34,8 +38,10 @@ export interface Member {
   billing?: Billing | null;
   /** 로그인 계정 (비밀번호를 정했으면). 비밀번호 해시는 서버가 보내지 않는다 */
   login?: { email: string; setAt: string; lastLogin: string | null; temp: boolean } | null;
-  /** 유료 이용권 이번 기간 공고 예측 사용 건수 */
-  paidUse?: { used: number; from: string; to: string } | null;
+  /** 관리자가 정한 회원별 개별 이용 한도 (없으면 요금제 기본 한도) */
+  limit?: LimitOverride | null;
+  /** 지금 요금제·적용 한도·이번 기간 공고 예측 사용 건수 (무료 체험은 누적). 예전 중계 서버 응답에는 없다 */
+  quota?: MemberQuota | null;
   /** 사업자번호를 넣은 조회가 마지막으로 온 때(ms)와 누적 횟수 (지표 수집 시작 뒤부터) */
   seen?: { last: number; n: number } | null;
 }

@@ -4,12 +4,12 @@ import { useMemo, useState } from "react";
 import type { TabProps } from "./AdminConsole";
 import { bizFmt, downloadCsv, dt, SIZE_LABEL, type Member } from "./adminApi";
 import { planName } from "@/lib/plans";
-import { useSiteConfig } from "@/lib/siteConfig";
+import { fullOf, LimitEditor, QuotaBadge, tierName, useMemberQuota } from "./limits";
 
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const bidLink = (k: string) => (k.startsWith("apt:") ? `/apt-bids/view?no=${encodeURIComponent(k.slice(4))}` : k.startsWith("nuri:") ? `/nuri-bids/view?no=${encodeURIComponent(k.slice(5).replace(/-\d+$/, ""))}` : `/bids/view?id=${encodeURIComponent(k.slice(5))}`);
 
-type Use = "all" | "none" | "some" | "full";
+type Use = "all" | "none" | "some" | "full" | "custom";
 type St = "all" | "active" | "suspended" | "paid" | "login" | "nologin";
 
 export const isPaid = (m: Member) => m.billing?.status === "active";
@@ -23,15 +23,18 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
+  const quotaOf = useMemberQuota();
   const sorted = useMemo(() => [...members].sort((a, b) => (b.joinedAt ?? "").localeCompare(a.joinedAt ?? "")), [members]);
   const shown = useMemo(() => {
     const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return sorted.filter((m) => {
-      const n = m.trial.length;
+      const q = quotaOf(m);
+      const n = q.used;
       if (mailOnly && !m.agreeMail) return false;
       if (use === "none" && n > 0) return false;
-      if (use === "some" && (n === 0 || n >= limit)) return false;
-      if (use === "full" && n < limit) return false;
+      if (use === "some" && (n === 0 || fullOf(q))) return false;
+      if (use === "full" && !fullOf(q)) return false;
+      if (use === "custom" && !q.custom) return false;
       if (st === "active" && m.status === "suspended") return false;
       if (st === "suspended" && m.status !== "suspended") return false;
       if (st === "paid" && !isPaid(m)) return false;
@@ -40,7 +43,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
       const hay = `${m.company} ${m.bizno} ${bizFmt(m.bizno)} ${m.name} ${m.email} ${m.phone} ${m.memo ?? ""}`.toLowerCase();
       return words.every((w) => hay.includes(w));
     });
-  }, [sorted, q, mailOnly, use, st, limit]);
+  }, [sorted, q, mailOnly, use, st, quotaOf]);
 
   const stats = useMemo(() => {
     const week = Date.now() - 7 * 86400_000;
@@ -56,10 +59,10 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
   }, [members]);
 
   function csv() {
-    downloadCsv("회원", ["회사명", "사업자등록번호", "담당자", "연락처", "이메일", "가입일", "상태", "결제", "체험 사용", "분석한 공고", "메일 수신 동의", "업종·면허", "지역", "규모", "관심 키워드", "메모"],
+    downloadCsv("회원", ["회사명", "사업자등록번호", "담당자", "연락처", "이메일", "가입일", "상태", "결제", "요금제", "적용 한도", "개별 한도", "이번 기간 사용", "체험 사용", "분석한 공고", "메일 수신 동의", "업종·면허", "지역", "규모", "관심 키워드", "메모"],
       shown.map((m) => [
         m.company, bizFmt(m.bizno), m.name, m.phone, m.email, dt(m.joinedAt), m.status === "suspended" ? "이용 정지" : "정상",
-        isPaid(m) ? planName(m.billing!.plan) : "", `${m.trial.length}/${limit}`, m.trial.map((t) => t.k).join(" "), m.agreeMail ? "동의" : "",
+        isPaid(m) ? planName(m.billing!.plan) : "", ...(() => { const q = quotaOf(m); return [tierName(q), q.quota === null ? "무제한" : q.quota, q.custom ? "예" : "", q.used]; })(), `${m.trial.length}/${limit}`, m.trial.map((t) => t.k).join(" "), m.agreeMail ? "동의" : "",
         (m.licenses ?? []).join(" "), (m.regions ?? []).join(" "), SIZE_LABEL[m.size ?? ""] ?? "", m.keywords ?? "", m.memo ?? "",
       ]));
   }
@@ -89,11 +92,12 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
           <option value="nologin">비밀번호 없는 예전 가입</option>
           <option value="suspended">이용 정지</option>
         </select>
-        <select className="input sm:w-auto" value={use} onChange={(e) => setUse(e.target.value as Use)} aria-label="체험 사용">
-          <option value="all">체험 사용 전체</option>
+        <select className="input sm:w-auto" value={use} onChange={(e) => setUse(e.target.value as Use)} aria-label="이용 한도 사용">
+          <option value="all">한도 사용 전체</option>
           <option value="none">아직 안 씀</option>
-          <option value="some">사용 중 (1~{limit - 1}건)</option>
-          <option value="full">{limit}건 모두 사용</option>
+          <option value="some">사용 중 (한도 남음)</option>
+          <option value="full">한도 모두 사용</option>
+          <option value="custom">개별 한도 회원</option>
         </select>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={mailOnly} onChange={(e) => setMailOnly(e.target.checked)} />메일 수신 동의만</label>
       </div>
@@ -115,7 +119,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
                 <p className="mt-1.5 text-sm">{m.name} · <span className="tabular-nums">{m.phone}</span> · <a href={`mailto:${m.email}`} className="text-mint-600 [overflow-wrap:anywhere] hover:underline">{m.email}</a></p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {m.paidUse ? <PaidBadge m={m} /> : <TrialBadge n={m.trial.length} limit={limit} />}
+                <QuotaBadge q={quotaOf(m)} />
                 <span className="text-xs text-ink-400">메일 {m.agreeMail ? "동의" : "미동의"}</span>
                 <button type="button" onClick={() => setOpen(open === m.bizno ? null : m.bizno)} className="btn-ghost btn-sm">{open === m.bizno ? "닫기" : "상세"}</button>
               </div>
@@ -129,7 +133,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
         ))}
         {!shown.length && <li className="card p-6 text-center text-sm text-ink-400">{stats.total ? "조건에 맞는 회원이 없습니다." : "아직 가입한 회원이 없습니다."}</li>}
       </ul>
-      <p className="mt-3 text-xs text-ink-400">탈퇴 처리는 가입 정보·로그인 계정·서류함과 결제 기록을 지우고, 이미 쓴 무료 체험 건수는 남겨 둡니다(다시 가입해도 {limit}건이 새로 생기지 않게). 이용 정지한 사업자번호는 로그인할 수 없고 무료 체험·이용권 공고가 더 늘지 않습니다. 결제 중(결제정보 '이용 중', 기간 안)인 회원은 무료 체험 대신 이용권 한 달 건수로 셉니다.</p>
+      <p className="mt-3 text-xs text-ink-400">탈퇴 처리는 가입 정보·로그인 계정·서류함과 결제 기록을 지우고, 이미 쓴 무료 체험 건수는 남겨 둡니다(다시 가입해도 {limit}건이 새로 생기지 않게). 이용 정지한 사업자번호는 로그인할 수 없고 무료 체험·이용권 공고가 더 늘지 않습니다. 결제 중(결제정보 '이용 중', 기간 안)인 회원은 무료 체험 대신 이용권 한 달 건수로 셉니다. 회원 상세의 이용 한도에서 회원마다 개별 한도를 정할 수 있습니다.</p>
     </>
   );
 }
@@ -145,15 +149,6 @@ export function Stats({ items }: { items: [string, number | string][] }) {
       ))}
     </div>
   );
-}
-
-/** 유료 회원: 이번 기간 공고 예측 사용 건수 */
-function PaidBadge({ m }: { m: Member }) {
-  const p = useSiteConfig().pricing;
-  const plan = m.billing?.plan;
-  const q = plan === "lite" ? p.liteQuota : plan === "standard" ? p.standardQuota : null;
-  const n = m.paidUse?.used ?? 0;
-  return <span className={`inline-block shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold tabular-nums ${q !== null && n >= q ? "bg-coral-100 text-coral" : "bg-mint-50 text-mint-700"}`}>이번 달 {n.toLocaleString()}{q !== null ? `/${q.toLocaleString()}` : ""}건</span>;
 }
 
 export function TrialBadge({ n, limit }: { n: number; limit: number }) {
@@ -181,7 +176,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
     setErr("");
     try {
       const r = await guard(call<{ member: Member }>("member", { params: { bizno: m.bizno }, body: { ...f, licenses: split(f.licenses), regions: split(f.regions) } }));
-      if (r) onSaved({ ...m, ...r.member, trial: m.trial, billing: m.billing, paidUse: m.paidUse, seen: m.seen }, `${f.company} 정보를 저장했습니다.`);
+      if (r) onSaved({ ...m, ...r.member, trial: m.trial, billing: m.billing, quota: m.quota, seen: m.seen }, `${f.company} 정보를 저장했습니다.`);
     } catch (e) { setErr((e as Error).message); } finally { setSaving(false); }
   }
   async function del() {
@@ -190,7 +185,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
   }
   async function resetTrial() {
     setSaving(true);
-    try { if (await guard(call("trial-reset", { params: { bizno: m.bizno }, body: {} }))) onSaved({ ...m, trial: [] }, `${m.company} 무료 체험 기록을 초기화했습니다.`); } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
+    try { if (await guard(call("trial-reset", { params: { bizno: m.bizno }, body: {} }))) onSaved({ ...m, trial: [], quota: m.quota && m.quota.tier === "trial" ? { ...m.quota, used: 0 } : m.quota }, `${m.company} 무료 체험 기록을 초기화했습니다.`); } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
   }
 
   async function issueTemp() {
@@ -206,7 +201,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); save(); }}>
         <Field label="회사명"><input className="input" value={f.company} onChange={set("company")} /></Field>
         <Field label="담당자"><input className="input" value={f.name} onChange={set("name")} /></Field>
@@ -230,6 +225,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
         </div>
       </form>
       <div className="space-y-4 text-sm">
+        <LimitEditor m={m} call={call} guard={guard} onSaved={onSaved} />
         <div>
           <p className="text-xs font-semibold text-ink-500">무료 체험으로 분석한 공고 ({m.trial.length}/{limit})</p>
           {m.trial.length ? (
@@ -249,7 +245,6 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
           <dt className="text-xs text-ink-500">마지막 조회</dt><dd>{m.seen ? `${dt(m.seen.last)} (${m.seen.n.toLocaleString()}회)` : "-"}</dd>
           <dt className="text-xs text-ink-500">로그인 계정</dt><dd className="[overflow-wrap:anywhere]">{m.login ? `${m.login.email}${m.login.temp ? " (임시 비밀번호)" : ""}` : "비밀번호 없음 (예전 가입)"}</dd>
           <dt className="text-xs text-ink-500">마지막 로그인</dt><dd>{m.login?.lastLogin ? dt(m.login.lastLogin) : "-"}</dd>
-          {m.paidUse && <><dt className="text-xs text-ink-500">이번 달 예측</dt><dd className="tabular-nums">{m.paidUse.used.toLocaleString()}건 ({m.paidUse.from} 시작)</dd></>}
         </dl>
         {temp && (
           <div className="rounded-xl bg-mint-50 p-3">

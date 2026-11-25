@@ -23,7 +23,7 @@
  * - mybox/{사업자번호}.json           : 내 서류함
  */
 import { normalizeBizno, validBizno } from "../../src/lib/corpLookup";
-import { activePlan, kstToday, periodOf, quotaOf } from "../../src/lib/usagePeriod";
+import { limitOf, type LimitInfo } from "../../src/lib/usagePeriod";
 import { readSiteConfig, type AdminBucket } from "./admin";
 
 export interface AccountEnv {
@@ -179,18 +179,18 @@ export async function deleteAccountData(bucket: AdminBucket, rec: Rec | null, bi
   await bucket.delete(`mybox/${bizno}.json`);
 }
 
-/** 이번 기간 사용 현황 */
+/** 이번 기간 사용 현황. 한도는 요금제 기본 한도, 관리자가 정한 회원별 개별 한도(rec.limit)가 있으면 그 값 */
 async function usageOf(bucket: AdminBucket, rec: Rec) {
   const bizno = String(rec.bizno);
   const [billing, cfg] = await Promise.all([readJson(bucket, `billing/${bizno}.json`), readSiteConfig(bucket)]);
-  const plan = activePlan(billing as Parameters<typeof activePlan>[0]);
-  if (plan) {
-    const period = periodOf(String(billing?.start ?? "") || undefined);
+  const lim = limitOf(billing as Parameters<typeof limitOf>[0], cfg.pricing, cfg.trialLimit, rec.limit);
+  if (lim.tier !== "trial" && lim.period) {
+    const period = lim.period;
     const u = await readJson<{ used?: UseEntry[] }>(bucket, `usage/${bizno}/${period.from}.json`);
-    return { mode: "paid" as const, plan, quota: quotaOf(plan, cfg.pricing), period, end: String(billing?.end ?? ""), used: u?.used ?? [], key: `usage/${bizno}/${period.from}.json` };
+    return { mode: "paid" as const, plan: lim.tier, quota: lim.quota, base: lim.base, custom: lim.custom, period, end: String(billing?.end ?? ""), used: u?.used ?? [], key: `usage/${bizno}/${period.from}.json` };
   }
   const t = await readJson<{ used?: UseEntry[] }>(bucket, `trial/${bizno}.json`);
-  return { mode: "trial" as const, quota: cfg.trialLimit, used: t?.used ?? [], key: `trial/${bizno}.json` };
+  return { mode: "trial" as const, quota: lim.quota, base: lim.base, custom: lim.custom, used: t?.used ?? [], key: `trial/${bizno}.json` };
 }
 interface UseEntry { k: string; t: number; title?: string }
 
@@ -377,10 +377,10 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
   return json({ error: "지원하지 않는 요청입니다." }, 400);
 }
 
-/** 관리자 화면 회원 목록용: 유료 회원의 이번 기간 사용 건수 */
-export async function paidUsageCount(bucket: AdminBucket, bizno: string, billing: Record<string, unknown> | null): Promise<{ used: number; from: string; to: string } | null> {
-  if (!activePlan(billing as Parameters<typeof activePlan>[0])) return null;
-  const period = periodOf(String(billing?.start ?? "") || undefined, kstToday());
-  const u = await readJson<{ used?: UseEntry[] }>(bucket, `usage/${bizno}/${period.from}.json`);
-  return { used: u?.used?.length ?? 0, ...period };
+/** 관리자 화면 회원 목록용: 지금 요금제·적용 한도와 이번 기간 사용 건수 (무료 체험은 누적 건수) */
+export async function memberLimit(bucket: AdminBucket, rec: Rec, billing: Record<string, unknown> | null, cfg: { pricing: { liteQuota: number; standardQuota: number }; trialLimit: number }, trialUsed: number): Promise<LimitInfo & { used: number }> {
+  const lim = limitOf(billing as Parameters<typeof limitOf>[0], cfg.pricing, cfg.trialLimit, rec.limit);
+  if (lim.tier === "trial" || !lim.period) return { ...lim, used: trialUsed };
+  const u = await readJson<{ used?: UseEntry[] }>(bucket, `usage/${String(rec.bizno)}/${lim.period.from}.json`);
+  return { ...lim, used: u?.used?.length ?? 0 };
 }

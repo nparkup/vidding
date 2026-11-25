@@ -7,7 +7,6 @@ const TABS = [
   { href: "/analysis/industry", key: "industry", label: "업종별 분석" },
   { href: "/analysis/rival", key: "rival", label: "경쟁사 투찰 성향" },
   { href: "/analysis/mine", key: "mine", label: "우리 회사 진단" },
-  { href: "/plans", key: "plan", label: "발주계획" },
   { href: "/prespecs", key: "prespec", label: "사전규격 미리보기" },
   { href: "/contracts", key: "contract", label: "계약현황" },
 ];

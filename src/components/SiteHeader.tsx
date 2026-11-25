@@ -22,6 +22,7 @@ export const NAV: Entry[] = [
       { href: "/apt-bids", label: "아파트 공고", desc: "아파트 청소·경비·위탁관리 입찰" },
       { href: "/nuri-bids", label: "민간 공고", desc: "누리장터 민간 기업·조합·법인 입찰" },
       { href: "/changes", label: "정정·취소 공고", desc: "바뀌거나 취소된 공고" },
+      { href: "/plans", label: "발주계획", desc: "기관이 미리 올린 발주 예정 사업" },
     ],
   },
   {
@@ -32,7 +33,6 @@ export const NAV: Entry[] = [
       { href: "/analysis/industry", label: "업종별 분석", desc: "업종별 낙찰률 추이·주요 발주기관·낙찰업체" },
       { href: "/analysis/rival", label: "경쟁사 투찰 성향", desc: "경쟁사 사정율·주요 발주처" },
       { href: "/analysis/mine", label: "우리 회사 진단", desc: "우리 회사 낙찰 기록으로 투찰 습관 점검" },
-      { href: "/plans", label: "발주계획", desc: "기관이 미리 올린 발주 예정 사업" },
       { href: "/prespecs", label: "사전규격 미리보기", desc: "본공고 전에 공개된 규격" },
       { href: "/contracts", label: "계약현황", desc: "최근 2주 계약업체·금액·기간" },
       { href: "/mybox", label: "내 서류함", desc: "담아 둔 관심공고와 제출서류", mybox: true },

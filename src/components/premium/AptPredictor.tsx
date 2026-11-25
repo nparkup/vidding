@@ -349,7 +349,7 @@ export function AptPredictor() {
       {/* 공고 내용 (전체 폭) */}
       <div id="notice" className="scroll-mt-24"><NoticePanel bid={bid} /></div>
 
-      {/* 공고 내용 아래: 같은 단지 지난 계약·비슷한 낙찰 (나라장터 예측의 낙찰 결과 분석 자리) */}
+      {/* 공고 내용 아래: 같은 단지 지난 계약·비슷한 낙찰 (나라장터 입찰 예측의 낙찰 결과 분석 자리) */}
       <div id="history" className="scroll-mt-24"><AptAwardSection bid={bid} /></div>
     </div>
   );

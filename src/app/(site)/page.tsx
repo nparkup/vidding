@@ -306,7 +306,7 @@ export default async function Home() {
       title: "적격심사·협상 공고의 예상 점수와 투찰률을 미리 계산합니다",
       desc: "공고 첨부의 배점표와 공고서 기준을 읽고 귀사 실적·경영상태·신뢰도 가감점을 넣어 항목별 예상 점수를 냅니다. 같은 사업의 과거 낙찰률과 참가 예상 기업까지 함께 봅니다.",
       href: "/premium",
-      cta: "비드인사이트 나라장터 예측 열기",
+      cta: "비드인사이트 나라장터 입찰 예측 열기",
       preview: (
         <div className="rounded-2xl bg-white p-5 shadow-lift">
           <p className="text-xs text-ink-400">{featured.demandAgency}</p>

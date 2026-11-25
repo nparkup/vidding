@@ -42,7 +42,7 @@ export default function NuriPredictPage() {
             <p className="mt-2 text-sm leading-relaxed text-ink-500">조달청 누리장터 민간입찰공고·민간낙찰정보를 하루 세 번 모으고, 적격심사·제안서평가 공고의 첨부에서 평가항목·배점·점수 구간을 읽습니다.</p>
           </div>
           <div className="card p-7">
-            <p className="text-lg font-bold">나라장터 예측과 다른 점</p>
+            <p className="text-lg font-bold">나라장터 입찰 예측과 다른 점</p>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">민간 공고는 발주처마다 자체 기준을 쓰고 공식 기준표·낙찰하한율 값이 없습니다. 원문 배점표가 있는 공고만 예측하고, 가격 평가 산식은 공고서에서 읽지 못하면 추정합니다.</p>
           </div>
           <div className="card p-7">

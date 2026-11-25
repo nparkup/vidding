@@ -546,7 +546,7 @@ export default async function Home() {
           <div>
             <h2 className="h-section"><EngineName id="atlas" />로<br className="sm:hidden" /> 공고 밖의 흐름까지<br className="sm:hidden" /> 숫자로 봅니다.</h2>
           </div>
-          <p className="max-w-md text-ink-500">비드아틀라스는 2016년부터 쌓은 낙찰 기록과 사전규격·계약 정보로 발주처와 경쟁사의 움직임을 미리 읽습니다.</p>
+          <p className="max-w-md text-ink-500">비드아틀라스는 10년간의 낙찰 기록과 사전규격·계약 정보로 발주처와 경쟁사의 움직임을 미리 읽습니다.</p>
         </div>
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {ANALYSIS.map((a) => (

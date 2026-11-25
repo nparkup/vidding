@@ -120,7 +120,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
         <div className="min-w-0 lg:flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <CloseDdayBadge iso={b.closeAt} />
-            <span className="chip">아파트 · {b.category}</span>
+            <span className="chip">공동주택 · {b.category}</span>
             {b.award && <span className="chip">{b.award}</span>}
             {b.kind && b.kind !== "일반경쟁" && <span className="chip">{b.kind}</span>}
             {b.state !== "신규공고" && <span className="chip border-amber/40 bg-amber-100/60 text-ink">{b.state}</span>}

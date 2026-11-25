@@ -25,7 +25,7 @@ const PRICE: Record<string, [number, number, number, number]> = {
   "claude-sonnet-5-5": [2, 10, 2.5, 0.1],
   "claude-opus-5-5": [4, 20, 5, 0.2],
 };
-const SOURCE: Record<string, string> = { worker: "중계 서버", "pages-build": "사이트 빌드", "awards-collect": "낙찰 수집", "awards-rank": "개찰 순위 수집", "awards-apt": "아파트 수집", "awards-raw": "낙찰 원자료", "awards-index": "낙찰 색인" };
+const SOURCE: Record<string, string> = { worker: "중계 서버", "pages-build": "사이트 빌드", "awards-collect": "낙찰 수집", "awards-rank": "개찰 순위 수집", "awards-apt": "공동주택 수집", "awards-raw": "낙찰 원자료", "awards-index": "낙찰 색인" };
 const srcName = (s: string) => SOURCE[s] ?? s;
 const svcOf = (key: string) => key.split("/")[0] || key;
 const gb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(2)}GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)}MB` : `${Math.round(b / 1e3).toLocaleString()}KB`);

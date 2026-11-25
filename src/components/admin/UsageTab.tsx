@@ -95,7 +95,7 @@ export function UsageTab({ call, guard, members, limit, busy, reload }: TabProps
                 <tr key={m.bizno}>
                   <td className="leading-snug"><span className="font-semibold">{m.company}</span><span className="block text-xs tabular-nums text-ink-400">{bizFmt(m.bizno)}</span></td>
                   <td className="text-center"><TrialBadge n={m.trial.length} limit={limit} /></td>
-                  <td className="max-w-[16rem] text-xs text-ink-500">{m.trial.length ? m.trial.map((t) => t.k.replace(/^(nara|apt|nuri):/, (x) => (x === "apt:" ? "아파트 " : x === "nuri:" ? "민간 " : ""))).join(", ") : "-"}</td>
+                  <td className="max-w-[16rem] text-xs text-ink-500">{m.trial.length ? m.trial.map((t) => t.k.replace(/^(nara|apt|nuri):/, (x) => (x === "apt:" ? "공동주택 " : x === "nuri:" ? "민간 " : ""))).join(", ") : "-"}</td>
                   <td className="text-right tabular-nums">{(m.seen?.n ?? 0).toLocaleString()}</td>
                   <td className="whitespace-nowrap text-sm tabular-nums">{la ? dt(la) : <span className="text-ink-300">-</span>}</td>
                   <td className="text-sm">{m.billing?.status === "active" ? planName(m.billing.plan) : <span className="text-ink-300">-</span>}</td>

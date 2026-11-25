@@ -17,7 +17,7 @@ export const revalidate = 600;
 
 /** 공고 한 건을 보는 순서. 각 단계는 실제로 있는 기능만 적는다 */
 const FLOW = [
-  { t: "수집", e: ["finder"] as EngineId[], d: "영업일 하루 세 번 나라장터·아파트(K-apt)·누리장터 공고를 새로 받고, 10년간의 낙찰 기록을 함께 쌓습니다.", items: ["입찰공고", "낙찰·개찰 결과", "발주계획·사전규격", "계약 정보"] },
+  { t: "수집", e: ["finder"] as EngineId[], d: "영업일 하루 세 번 나라장터·공동주택(K-apt)·누리장터 공고를 새로 받고, 10년간의 낙찰 기록을 함께 쌓습니다.", items: ["입찰공고", "낙찰·개찰 결과", "발주계획·사전규격", "계약 정보"] },
   { t: "판정", e: ["finder"] as EngineId[], d: "업종·지역 제한, 입찰방식, 참가자격을 읽어 귀사가 참가할 수 있는 공고인지 먼저 가립니다.", items: ["업종·면허", "지역제한", "입찰방식", "중소기업 제한"] },
   { t: "분석", e: ["atlas", "insight"] as EngineId[], d: "공고 첨부파일을 모두 읽어 배점표를 찾고, 항목별 예상 평가점수와 낙찰 결과로 본 예측을 냅니다.", items: ["배점표 판독", "예상 평가점수", "직전 낙찰", "예상 예정가격"] },
   { t: "알림", e: ["finder"] as EngineId[], d: "조건에 맞는 공고는 영업일 아침 메일로, 정정·취소와 관심 키워드 공고는 따로 알려 드립니다.", items: ["맞춤 공고 메일", "정정·취소 알림", "키워드 알림"] },
@@ -82,7 +82,7 @@ export default async function ServicePage() {
       lead: "공고 하나를 고르면 배점표 판독부터 예상 평가점수, 낙찰 결과로 본 예측까지 한 화면에 정리합니다.",
       items: [
         { t: "나라장터 예측", d: "적격심사·협상계약 공고의 항목별 예상 평가점수, 이 공고의 직전 낙찰, 예상 예정가격을 봅니다.", href: "/premium" },
-        { t: "아파트 예측", d: "아파트 관리 입찰의 예상 낙찰금액과 같은 단지 낙찰 이력, 응찰 업체를 봅니다.", href: "/premium/apt" },
+        { t: "공동주택 입찰 예측", d: "아파트 관리 입찰의 예상 낙찰금액과 같은 단지 낙찰 이력, 응찰 업체를 봅니다.", href: "/premium/apt" },
       ],
     },
   ];
@@ -101,7 +101,7 @@ export default async function ServicePage() {
       </PageHero>
 
       <section className="container-x pt-14">
-        <p className="text-center text-sm font-semibold text-ink-500">나라장터 2016년부터, 아파트 2013년부터 쌓은 데이터로 분석합니다</p>
+        <p className="text-center text-sm font-semibold text-ink-500">나라장터 2016년부터, 공동주택 2013년부터 쌓은 데이터로 분석합니다</p>
         <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
       </section>
 

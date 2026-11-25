@@ -44,7 +44,7 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
     b.rebid && { k: "재입찰", v: b.rebid },
     b.detail?.until && { k: "사업 기한", v: ymd(b.detail.until) },
     b.detail?.place && { k: "사업 장소", v: b.detail.place, wide: b.detail.place.length > 14 },
-    b.apt && { k: "아파트 단지", v: b.apt.name, sub: [b.apt.households && `${b.apt.households.toLocaleString()}세대`, b.apt.buildings && `${b.apt.buildings}개 동`, b.apt.heating].filter(Boolean).join(" · ") || undefined },
+    b.apt && { k: "공동주택 단지", v: b.apt.name, sub: [b.apt.households && `${b.apt.households.toLocaleString()}세대`, b.apt.buildings && `${b.apt.buildings}개 동`, b.apt.heating].filter(Boolean).join(" · ") || undefined },
   ];
   const shown = cells.filter((c): c is Cell => !!c);
 

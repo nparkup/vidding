@@ -56,7 +56,7 @@ const TRUST = [
 ];
 
 const PERSONAS = [
-  { tags: ["아파트 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 공동주택 입찰공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", use: "아침 맞춤 공고 메일·아파트 예측" },
+  { tags: ["아파트 청소·경비", "직원 10명 내외"], t: "대표가 현장과 입찰을 같이 보는 회사", d: "나라장터 공고는 아침 메일로 받고, 공동주택 입찰공고는 같은 단지의 직전 낙찰금액과 예상 낙찰금액을 보고 투찰가를 정하세요.", use: "아침 맞춤 공고 메일·공동주택 입찰 예측" },
   { tags: ["전기·통신공사", "직원 30~50명"], t: "입찰 담당자가 따로 없는 회사", d: "가능성 점수와 주간 보고서로 회의 없이 참가 여부를 정하고, 제출 서류 목록으로 마감 전 서류를 한 번 더 봅니다.", use: "입찰 가능성 점수·주간 보고서" },
   { tags: ["IT·엔지니어링", "여러 지역·면허"], t: "지사·면허가 여러 개인 회사", d: "사업장별 조건을 따로 등록해 지역별 공고를 나눠 받고, 협상계약 제안서 준비까지 함께합니다.", use: "사업장별 조건·평가점수 예측" },
 ];
@@ -387,7 +387,7 @@ export default async function Home() {
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가!</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-2xl">
-            <b className="font-bold text-ink">비드파인더</b>가 나라장터·아파트 전 업종 공고에서 참가할 수 있는 공고를 찾고, <b className="font-bold text-ink">비드아틀라스</b>가 면허·지역·규모부터 경쟁 강도·실적·준비 기간까지 6개 항목으로 분석하고, <b className="font-bold text-ink">비드인사이트</b>가 평가점수와 낙찰을 예측합니다.
+            <b className="font-bold text-ink">비드파인더</b>가 나라장터·공동주택 전 업종 공고에서 참가할 수 있는 공고를 찾고, <b className="font-bold text-ink">비드아틀라스</b>가 면허·지역·규모부터 경쟁 강도·실적·준비 기간까지 6개 항목으로 분석하고, <b className="font-bold text-ink">비드인사이트</b>가 평가점수와 낙찰을 예측합니다.
           </p>
           <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -500,10 +500,10 @@ export default async function Home() {
         <div className="card grid gap-8 overflow-hidden bg-gradient-to-br from-sky-100/70 via-white to-white p-5 sm:p-8 lg:grid-cols-[1fr_1.2fr] lg:items-center">
           <div className="min-w-0">
             <h3 className="text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
-            <p className="mt-4 leading-relaxed text-ink-500">비드파인더가 공동주택관리정보시스템(K-apt)에 올라온 공동주택 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />비드인사이트 아파트 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
+            <p className="mt-4 leading-relaxed text-ink-500">비드파인더가 공동주택관리정보시스템(K-apt)에 올라온 공동주택 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />비드인사이트 공동주택 입찰 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
               <Link href="/apt-bids" className="btn-primary">공동주택 입찰공고 보기</Link>
-              <Link href="/premium/apt" className="btn-ghost">아파트 입찰가격 예측</Link>
+              <Link href="/premium/apt" className="btn-ghost">공동주택 입찰가격 예측</Link>
             </div>
           </div>
           <div className="min-w-0">

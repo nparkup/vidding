@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { GROUP_OF, IndustryDetail, loadJson } from "@/components/analysis/IndustryExplorer";
 import { Tile } from "@/components/analysis/AgencyExplorer";
-import { ScrollRow } from "@/components/ScrollRow";
+import { MoreButton } from "@/components/analysis/MoreList";
 import { CHART } from "@/components/charts/useWidth";
-import { isVagueAgency } from "@/lib/awards/agency";
-import { industryId, type IndustrySummary } from "@/lib/awards/industry";
+import { isVagueAgency, recentFrom } from "@/lib/awards/agency";
+import { RECENT, industryId, periodLabel, type FirmStat, type IndustrySummary } from "@/lib/awards/industry";
 import type { AwardWin } from "@/lib/awards/read";
 import { classify } from "@/lib/classify";
 import { won } from "@/lib/format";
@@ -19,7 +19,7 @@ export interface CorpIndustry {
   /** 저장 기간 전체 낙찰 건수·금액 */
   n: number;
   amount: number;
-  /** 최근 4년 낙찰 건수·금액 (업종별 분석의 최근 4년과 맞춰 보기 위함) */
+  /** 최근 RECENT_YEARS년 낙찰 건수·금액 (업종별 분석의 최근 기간과 맞춰 보기 위함) */
   n4: number;
   amount4: number;
   share: number;
@@ -33,7 +33,7 @@ const BIZ: Record<string, BizType> = { 용역: "용역", 공사: "공사", 물�
  */
 export function corpIndustries(wins: AwardWin[]): CorpIndustry[] {
   const seen = new Set<string>();
-  const since = new Date(Date.now() - 4 * 365 * 86400e3).toISOString().slice(0, 10);
+  const since = recentFrom(new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10));
   const m = new Map<ServiceCategory, CorpIndustry>();
   let total = 0;
   for (const w of wins) {
@@ -88,25 +88,36 @@ export function MineIndustry({ list, name }: { list: CorpIndustry[]; name: strin
     return () => { alive = false; };
   }, [cat]);
   const me = list.find((c) => c.cat === cat);
+  // 자주 낙찰받은 업체 순위: 업종 요약 목록에 없으면 최근 기간의 긴 업체 목록(/industry-period/{id}-{기간}-firms.json)에서 찾는다
+  const [firms, setFirms] = useState<FirmStat[] | null>(null);
+  useEffect(() => {
+    if (!cat) return;
+    let alive = true;
+    setFirms(null);
+    loadJson<FirmStat[]>(`/industry-period/${industryId(cat)}-${RECENT}-firms.json`).then((l) => alive && setFirms(l ?? [])).catch(() => alive && setFirms([]));
+    return () => { alive = false; };
+  }, [cat]);
   const place = useMemo(() => {
     if (!sum || !name) return undefined;
     const k = normName(name);
-    const byCount = [...sum.winners].sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+    const pool: [string, number, number, ...unknown[]][] = firms && firms.length > sum.winners.length ? firms : sum.winners;
+    const byCount = [...pool].sort((a, b) => b[1] - a[1] || b[2] - a[2]);
     const i = byCount.findIndex(([n]) => normName(n) === k);
     return i >= 0 ? i + 1 : 0;
-  }, [sum, name]);
+  }, [sum, name, firms]);
+  const [shown, setShown] = useState(8);
   if (!list.length || !cat) return null;
   const ind4 = sum ? sum.groups.reduce((a, g) => a + g.n, 0) : 0;
   const indAmt4 = sum ? sum.groups.reduce((a, g) => a + g.amount, 0) : 0;
   const max = Math.max(1, ...list.map((c) => c.n));
-  const chip = (on: boolean) => `shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold ${on ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`;
+  const chip = (on: boolean) => `rounded-full border px-3 py-1.5 text-sm font-semibold ${on ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`;
   return (
     <div id="mine-industry" className="scroll-mt-24 space-y-6">
       <section className="card p-6">
         <h3 className="font-bold">이 회사가 속한 업종 <span className="text-sm font-normal text-ink-400">업종별 분석 21개 업종 기준</span></h3>
         <p className="mt-1 text-xs leading-relaxed text-ink-500">낙찰받은 공고마다 공고명과 투찰 가능 업종으로 공고 검색·업종별 분석과 같은 규칙에 따라 업종을 매겼습니다.<br />업종을 누르면 아래에 그 업종의 업종별 분석이 나옵니다.</p>
         <ol className="mt-3 divide-y divide-ink-100">
-          {list.slice(0, 8).map((c) => {
+          {list.slice(0, shown).map((c) => {
             const on = c.cat === cat;
             return (
               <li key={c.cat} className="min-w-0 py-2">
@@ -124,17 +135,17 @@ export function MineIndustry({ list, name }: { list: CorpIndustry[]; name: strin
             );
           })}
         </ol>
-        {list.length > 8 && <p className="mt-2 text-xs text-ink-500">낙찰이 적은 {list.length - 8}개 업종은 줄였습니다.</p>}
+        <MoreButton left={list.length - shown} step={8} unit="개 업종" onClick={() => setShown((v) => v + 8)} />
       </section>
 
       <section className="card p-6">
         <p className="text-xs font-semibold text-ink-400">업종별 분석</p>
         {list.length > 1 && (
-          <ScrollRow className="mt-2 flex gap-1" active={cat}>
-            {list.slice(0, 8).map((c) => (
+          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="업종">
+            {list.map((c) => (
               <button key={c.cat} type="button" aria-pressed={c.cat === cat} onClick={() => setCat(c.cat)} className={chip(c.cat === cat)}>{c.cat}</button>
             ))}
-          </ScrollRow>
+          </div>
         )}
         <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-2xl font-extrabold tracking-tight">{cat}</h2>
@@ -145,17 +156,17 @@ export function MineIndustry({ list, name }: { list: CorpIndustry[]; name: strin
         {sum === null && <p className="mt-3 text-sm text-ink-500">이 업종의 낙찰 분석을 아직 만들지 못했습니다. 다음 정기 갱신 뒤 다시 확인해 주세요.</p>}
         {sum && (
           <>
-            <p className="mt-4 text-sm font-semibold">이 업종에서 {name || "이 회사"}의 자리 <span className="font-normal text-ink-400">최근 4년</span></p>
+            <p className="mt-4 text-sm font-semibold">이 업종에서 {name || "이 회사"}의 자리 <span className="font-normal text-ink-400">{periodLabel(RECENT)}</span></p>
             <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Tile k="이 회사 낙찰" v={`${(me?.n4 ?? 0).toLocaleString()}건`} sub={ind4 ? `업종 전체 ${ind4.toLocaleString()}건 중 ${pctOf((me?.n4 ?? 0) / ind4)}` : undefined} />
               <Tile wide k="이 회사 낙찰금액" v={won(me?.amount4 ?? 0)} sub={indAmt4 ? `업종 전체 ${won(indAmt4)} 중 ${pctOf((me?.amount4 ?? 0) / indAmt4)}` : undefined} />
-              <Tile k="자주 낙찰받은 업체 순위" v={place ? `${place}위` : "순위 밖"} sub={place ? `낙찰 건수 기준, 업체 ${sum.firms.toLocaleString()}곳 중` : `건수 상위 ${sum.winners.length}곳 안에 없음`} />
+              <Tile k="자주 낙찰받은 업체 순위" v={place ? `${place}위` : "순위 밖"} sub={place ? `낙찰 건수 기준, 업체 ${sum.firms.toLocaleString()}곳 중` : firms === null ? "순위 찾는 중" : `낙찰 많은 업체 ${Math.max(firms.length, sum.winners.length).toLocaleString()}곳 안에 없음`} />
             </dl>
             <p className="mt-4 text-sm font-semibold">업종 전체</p>
             <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Tile k="최근 4년 낙찰" v={`${ind4.toLocaleString()}건`} />
-              <Tile wide k="최근 4년 낙찰금액" v={won(indAmt4)} />
-              <Tile k="낙찰받은 업체" v={`${sum.firms.toLocaleString()}곳`} sub="최근 4년, 서로 다른 업체" />
+              <Tile k={`${periodLabel(RECENT)} 낙찰`} v={`${ind4.toLocaleString()}건`} />
+              <Tile wide k={`${periodLabel(RECENT)} 낙찰금액`} v={won(indAmt4)} />
+              <Tile k="낙찰받은 업체" v={`${sum.firms.toLocaleString()}곳`} sub={`${periodLabel(RECENT)}, 서로 다른 업체`} />
               <Tile k="단독 참가 비율" v={`${Math.round(sum.single * 100)}%`} sub="참가 1곳 낙찰" />
             </dl>
           </>

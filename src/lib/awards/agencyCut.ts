@@ -5,7 +5,7 @@
  * 이 파일은 Node 전용 모듈을 쓰지 않는다.
  */
 import { quantile, type AgencyRow, type MethodCode } from "./analysis";
-import { topWinners, type AgencyGroupStat } from "./agency";
+import { recentFrom, type AgencyGroupStat } from "./agency";
 import type { FirmStat } from "./industry";
 
 const BIZ = ["공사", "용역", "물품", "외자"] as const;
@@ -46,11 +46,11 @@ export interface CutStats {
 const ymd = (d: number) => `${String(d).slice(0, 4)}-${String(d).slice(4, 6)}-${String(d).slice(6, 8)}`;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
-/** cat: 업종 순번(-1이면 전체), period: "4y" | "all" | 연도 */
+/** cat: 업종 순번(-1이면 전체), period: 최근 기간("3y") | "all" | 연도 */
 export function cutStats(f: AgencyCutFile, cat: number, period: string, today: string): CutStats {
-  const from4 = Number(`${Number(today.slice(0, 4)) - 4}${today.slice(5, 7)}${today.slice(8, 10)}`);
+  const from4 = Number(recentFrom(today).replace(/-/g, ""));
   const byCat = f.rows.filter((r) => cat < 0 || r[1] === cat);
-  const inPeriod = (d: number) => (period === "4y" ? d >= from4 : period === "all" ? true : Math.floor(d / 10000) === Number(period));
+  const inPeriod = (d: number) => (/^\d+y$/.test(period) ? d >= from4 : period === "all" ? true : Math.floor(d / 10000) === Number(period));
   const xs = byCat.filter((r) => inPeriod(r[0]));
 
   const ys = new Map<number, [number, number, number, number]>();
@@ -89,7 +89,8 @@ export function cutStats(f: AgencyCutFile, cat: number, period: string, today: s
       amount: Math.round(rs.reduce((a, r) => a + (r[4] > 100 ? r[4] : 0), 0)),
     };
   }).sort((a, b) => b.n - a.n);
-  const winners = topWinners([...win.entries()].map(([i, [c, a, d]]) => [f.firms[i], c, Math.round(a), ymd(d)] as FirmStat));
+  // 화면이 더 보기·검색을 하도록 낙찰받은 업체 전부 (건수 순)
+  const winners = [...win.entries()].map(([i, [c, a, d]]) => [f.firms[i], c, Math.round(a), ymd(d)] as FirmStat).sort((a, b) => b[1] - a[1] || b[2] - a[2]);
   return { n: xs.length, amount: Math.round(amount), firms: win.size, single: withB ? single / withB : 0, winners, groups, years };
 }
 

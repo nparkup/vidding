@@ -5,18 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BidRow } from "@/components/BidRow";
 import { CategoryTiles } from "@/components/CategoryTiles";
-import { AssessCard, GroupShare, MethodTable, Tile, WinnersHead, WinnersList, WinnersSort, sortWinners, type WinnersBy } from "@/components/analysis/AgencyExplorer";
+import { AssessCard, GroupShare, MethodTable, PeriodChips, RankedLine, Tile, WinnersHead, WinnersList, WinnersSort, sortWinners, type WinnersBy } from "@/components/analysis/AgencyExplorer";
+import { MoreButton, useMoreList } from "@/components/analysis/MoreList";
 import { ColumnChart } from "@/components/charts/ColumnChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { YearChart } from "@/components/charts/YearChart";
 import { CHART } from "@/components/charts/useWidth";
 import { HBarList } from "@/components/charts/HBarList";
-import { ScrollRow } from "@/components/ScrollRow";
 import { daysLeft } from "@/lib/analysis";
 import { METHOD_NAME } from "@/lib/awards/analysis";
-import { isVagueAgency } from "@/lib/awards/agency";
+import { TOP_WINNERS, isVagueAgency } from "@/lib/awards/agency";
 import { AGENCY_KINDS, agencyKind, type AgencyKind } from "@/lib/agencyKind";
-import { AGENCY_WINNERS, industryId, periodLabel, type FirmStat, type IndustryAgencyRow, type IndustryIndexRow, type IndustryPeriodData, type IndustrySummary } from "@/lib/awards/industry";
+import { AGENCY_TOP, RECENT, industryId, periodLabel, type FirmStat, type IndustryAgencyRow, type IndustryIndexRow, type IndustryPeriodData, type IndustrySummary } from "@/lib/awards/industry";
 import { won } from "@/lib/format";
 import { useBids } from "@/lib/useBids";
 import { CATEGORIES, CATEGORY_GROUPS, type Bid, type ServiceCategory } from "@/lib/types";
@@ -83,7 +83,7 @@ export function IndustryExplorer() {
             <p className="mt-0.5 text-xs text-ink-500">업종을 누르면 그 업종의 낙찰 분석을 봅니다. 낙찰률·참가업체는 최근 해 적격심사 공고의 가운데 값입니다.</p>
           </div>
           <div className="hidden grid-cols-[1fr_5rem_6rem_7rem_12rem_7rem_5rem] gap-3 border-b border-ink-100 bg-paper px-4 py-2 text-xs font-semibold text-ink-500 lg:grid">
-            <span>업종</span><span>업무</span><span className="text-right">지금 공고</span><span className="text-right">낙찰 (10년)</span><span className="text-right">최근 4년 낙찰금액</span><span className="text-right">낙찰률</span><span className="text-right">참가업체</span>
+            <span>업종</span><span>업무</span><span className="text-right">지금 공고</span><span className="text-right">낙찰 (10년)</span><span className="text-right">{periodLabel(RECENT)} 낙찰금액</span><span className="text-right">낙찰률</span><span className="text-right">참가업체</span>
           </div>
           <ul className="divide-y divide-ink-100">
             {CATEGORIES.map((c) => {
@@ -96,7 +96,7 @@ export function IndustryExplorer() {
                     <span className="text-xs text-ink-500 lg:hidden">
                       {[GROUP_OF[c], `지금 공고 ${o.toLocaleString()}건`, r ? `낙찰 ${r[2].toLocaleString()}건` : "", r?.[4] ? `낙찰률 ${pct(r[4])}` : "", r?.[5] ? `참가 ${r[5]}곳` : ""].filter(Boolean).join(" · ")}
                     </span>
-                    {r && r[3] > 0 && <span className="text-xs text-ink-500 lg:hidden">최근 4년 낙찰금액 {won(r[3])}</span>}
+                    {r && r[3] > 0 && <span className="text-xs text-ink-500 lg:hidden">{periodLabel(RECENT)} 낙찰금액 {won(r[3])}</span>}
                     <span className="hidden text-ink-600 lg:inline">{GROUP_OF[c]}</span>
                     <span className="hidden text-right tabular-nums lg:inline">{o.toLocaleString()}</span>
                     <span className="hidden text-right tabular-nums lg:inline">{r ? r[2].toLocaleString() : "-"}</span>
@@ -125,6 +125,7 @@ export function IndustryExplorer() {
 /** 업종 하나의 낙찰 분석. embedded: 다른 화면(우리 회사 진단) 안에 넣을 때 지금 공고·최근 낙찰은 빼고 제목 카드를 생략한다 */
 export function IndustryDetail({ s, bids, agencyIds, embedded }: { s: IndustrySummary; bids: Bid[]; agencyIds: Map<string, string>; embedded?: boolean }) {
   const recent4 = s.groups.reduce((a, g) => a + g.n, 0);
+  const [bidsN, setBidsN] = useState(12);
   return (
     <div className="space-y-6">
       {!embedded && <section className="card p-6">
@@ -132,9 +133,9 @@ export function IndustryDetail({ s, bids, agencyIds, embedded }: { s: IndustrySu
         <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight">{s.name}</h2>
         <p className="mt-1 text-sm text-ink-500">나라장터 낙찰 {s.n.toLocaleString()}건 · {s.from} ~ {s.to}</p>
         <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Tile k="최근 4년 낙찰" v={`${recent4.toLocaleString()}건`} />
-          <Tile wide k="최근 4년 낙찰금액" v={won(s.groups.reduce((a, g) => a + g.amount, 0))} />
-          <Tile k="낙찰받은 업체" v={`${s.firms.toLocaleString()}곳`} sub="최근 4년, 서로 다른 업체" />
+          <Tile k={`${periodLabel(RECENT)} 낙찰`} v={`${recent4.toLocaleString()}건`} />
+          <Tile wide k={`${periodLabel(RECENT)} 낙찰금액`} v={won(s.groups.reduce((a, g) => a + g.amount, 0))} />
+          <Tile k="낙찰받은 업체" v={`${s.firms.toLocaleString()}곳`} sub={`${periodLabel(RECENT)}, 서로 다른 업체`} />
           <Tile k="단독 참가 비율" v={`${Math.round(s.single * 100)}%`} sub="참가 1곳 낙찰" />
           <Tile k="지금 공고" v={`${bids.length.toLocaleString()}건`} sub="마감 전" />
         </dl>
@@ -161,8 +162,9 @@ export function IndustryDetail({ s, bids, agencyIds, embedded }: { s: IndustrySu
             <Link href={`/bids?cat=${encodeURIComponent(s.name)}`} className="text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">공고 검색에서 {bids.length.toLocaleString()}건 모두 보기</Link>
           </div>
           <div className="mt-3 space-y-3">
-            {[...bids].sort((a, b) => a.closeAt.localeCompare(b.closeAt)).slice(0, 12).map((b) => <BidRow key={b.id} bid={b} />)}
+            {[...bids].sort((a, b) => a.closeAt.localeCompare(b.closeAt)).slice(0, bidsN).map((b) => <BidRow key={b.id} bid={b} />)}
           </div>
+          <MoreButton left={bids.length - bidsN} step={12} unit="건" onClick={() => setBidsN((v) => v + 12)} />
         </section>
       )}
 
@@ -215,30 +217,36 @@ function TrendCard({ s }: { s: IndustrySummary }) {
   );
 }
 
-type AgRow = { name: string; n: number; amt: number; w?: { firms: number; top: FirmStat[] } };
-const SHOW_MATCHES = 30;
 
-/** 기간(최근 4년·전체·연도별)을 골라 자주 낙찰받은 업체와 발주기관별 낙찰 업체를 함께 본다 */
+/** 기간(최근 기간·전체·연도별)을 골라 자주 낙찰받은 업체와 발주기관별 낙찰 업체를 함께 본다 */
 function PeriodSection({ s, agencyIds }: { s: IndustrySummary; agencyIds: Map<string, string> }) {
-  const [period, setPeriod] = useState("4y");
+  const [period, setPeriod] = useState(RECENT);
   const [by, setBy] = useState<WinnersBy>("count");
   const [d, setD] = useState<IndustryPeriodData | null | undefined>();
+  // 자주 낙찰받은 업체 더 보기·찾기용 긴 목록 (/industry-period/{id}-{기간}-firms.json): undefined 아직, null 불러오는 중
+  const [firms, setFirms] = useState<FirmStat[] | null | undefined>();
   const id = industryId(s.name);
-  useEffect(() => { setPeriod("4y"); }, [s]);
+  useEffect(() => { setPeriod(RECENT); }, [s]);
   useEffect(() => {
     let alive = true;
-    setD(undefined);
+    setD(undefined); setFirms(undefined);
     loadJson<IndustryPeriodData>(`/industry-period/${id}-${period}.json`).then((x) => alive && setD(x && { ...x, agencies: x.agencies.filter(([a]) => !isVagueAgency(a)) })).catch(() => alive && setD(null));
     return () => { alive = false; };
   }, [id, period]);
-  // 기간 자료가 아직 없으면 최근 4년은 업종 요약에 든 값으로 보여 준다
-  const fallback: IndustryPeriodData | null = period === "4y" ? {
+  const loadFirms = () => {
+    if (firms !== undefined) return;
+    setFirms(null);
+    loadJson<FirmStat[]>(`/industry-period/${id}-${period}-firms.json`).then((l) => setFirms(l ?? [])).catch(() => setFirms([]));
+  };
+  // 기간 자료가 아직 없으면 최근 기간은 업종 요약에 든 값으로 보여 준다
+  const fallback: IndustryPeriodData | null = period === RECENT ? {
     period, n: s.groups.reduce((a, g) => a + g.n, 0), amount: s.groups.reduce((a, g) => a + g.amount, 0), firms: s.firms, agencyCount: 0,
-    winners: s.winners.map(([n, c, a]) => [n, c, a, ""] as FirmStat), agencies: s.agencies, agencyWinners: s.agencyWinners ?? {},
+    winners: s.winners.map(([n, c, a]) => [n, c, a, ""] as FirmStat), agencies: s.agencies.filter(([a]) => !isVagueAgency(a)), agencyWinners: s.agencyWinners ?? {},
   } : null;
   const data = d ?? (d === null ? fallback : undefined);
   const years = s.years.map(([y]) => String(y)).reverse();
-  const opts = ["4y", "all", ...years];
+  const opts = [RECENT, "all", ...years];
+  const rows = firms && firms.length > (data?.winners.length ?? 0) ? firms : data?.winners ?? [];
   return (
     <>
       <section className="card p-4 sm:p-5" aria-label="조회 기간">
@@ -246,13 +254,7 @@ function PeriodSection({ s, agencyIds }: { s: IndustrySummary; agencyIds: Map<st
           <p className="text-sm font-bold">조회 기간</p>
           <p className="text-xs text-ink-500">아래 자주 낙찰받은 업체와 발주기관별 낙찰 업체가 이 기간으로 바뀝니다.</p>
         </div>
-        <ScrollRow className="mt-3 flex gap-1" active={period}>
-          {opts.map((p) => (
-            <button key={p} type="button" aria-pressed={p === period} onClick={() => setPeriod(p)} className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold ${p === period ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`}>
-              {periodLabel(p)}
-            </button>
-          ))}
-        </ScrollRow>
+        <PeriodChips className="mt-3" opts={opts} value={period} onChange={setPeriod} />
         {data && (
           <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Tile k="낙찰" v={`${data.n.toLocaleString()}건`} sub={periodLabel(period)} />
@@ -267,40 +269,38 @@ function PeriodSection({ s, agencyIds }: { s: IndustrySummary; agencyIds: Map<st
         {data === undefined && <p className="mt-3 text-sm text-ink-400">불러오는 중…</p>}
         {data === null && <p className="mt-3 text-sm text-ink-500">이 기간 자료는 다음 정기 갱신 뒤 채워집니다.</p>}
         {data && (data.winners.length
-          ? <WinnersList rows={data.winners} by={by} />
+          ? <WinnersList key={`${id}-${period}`} rows={rows} by={by} total={data.firms} loadMore={d && firms === undefined ? loadFirms : undefined} loading={firms === null} findId="ind-win-q" />
           : <p className="mt-3 text-sm text-ink-500">이 기간 낙찰이 없습니다.</p>)}
-        {period === "4y" && s.ranked.length > 0 && (
-          <p className="mt-3 text-xs leading-relaxed text-ink-500">개찰 1~5위에 자주 든 업체(낙찰 제외): {s.ranked.slice(0, 6).map(([n, c]) => `${n} ${c}회`).join(", ")}</p>
-        )}
+        {period === RECENT && <RankedLine ranked={s.ranked} />}
       </section>
 
-      {data && <AgencyWinners key={`${id}-${period}`} d={data} listPath={d ? `/industry-period/${id}-${period}-ag.json` : null} agencyIds={agencyIds} />}
+      {data && <AgencyWinners key={`${id}-${period}`} d={data} cat={s.name} listPath={d ? `/industry-period/${id}-${period}-ag.json` : null} agencyIds={agencyIds} />}
     </>
   );
 }
 
-/** 발주기관별 낙찰 업체: 이 업종 낙찰이 많은 기관(펼치면 낙찰 업체) + 이 업종의 모든 발주기관 검색 */
-function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; listPath: string | null; agencyIds: Map<string, string> }) {
+/** 발주기관별 낙찰 업체: 이 업종 낙찰이 많은 기관(펼치면 낙찰 업체) + 기관 구분·검색·더 보기로 이 업종의 모든 발주기관 */
+function AgencyWinners({ d, cat, listPath, agencyIds }: { d: IndustryPeriodData; cat: ServiceCategory; listPath: string | null; agencyIds: Map<string, string> }) {
   const [open, setOpen] = useState<string | null>(d.agencies[0]?.[0] ?? null);
   const [q, setQ] = useState("");
   const [all, setAll] = useState<IndustryAgencyRow[] | null | undefined>();
+  const [limit, setLimit] = useState(AGENCY_TOP);
   const load = () => {
     if (all !== undefined || !listPath) return;
     setAll(null);
     loadJson<IndustryAgencyRow[]>(listPath).then((l) => setAll((l ?? []).filter((r) => !isVagueAgency(r[0])))).catch(() => setAll([]));
   };
   const [kind, setKind] = useState<AgencyKind | "">("");
-  const [by, setBy] = useState<WinnersBy>("count");
   const t = q.replace(/\s+/g, "");
-  const filtering = !!t || !!kind;
-  // 목록을 아직 못 받았으면 상위 기관 안에서 구분만 먼저 거른다
-  const pool = useMemo<IndustryAgencyRow[] | null>(
-    () => all ?? (kind && !t ? d.agencies.map(([n, c, a]) => [n, c, a, d.agencyWinners[n]?.firms ?? 0, d.agencyWinners[n]?.top ?? []] as IndustryAgencyRow) : null),
-    [all, kind, t, d],
+  useEffect(() => { setLimit(AGENCY_TOP); }, [t, kind]);
+  // 전체 목록을 받기 전에는 상위 기관 안에서 먼저 보여 준다
+  const pool = useMemo<IndustryAgencyRow[]>(
+    () => all ?? d.agencies.map(([n, c, a]) => [n, c, a, d.agencyWinners[n]?.firms ?? 0, d.agencyWinners[n]?.top ?? []] as IndustryAgencyRow),
+    [all, d],
   );
   const matches = useMemo(
-    () => (filtering && pool ? pool.filter((r) => (!t || r[0].replace(/\s+/g, "").includes(t)) && (!kind || agencyKind(r[0]) === kind)) : []),
-    [pool, t, kind, filtering],
+    () => pool.map((r, i) => ({ r, rank: i + 1 })).filter(({ r }) => (!t || r[0].replace(/\s+/g, "").includes(t)) && (!kind || agencyKind(r[0]) === kind)),
+    [pool, t, kind],
   );
   /** 구분 칩 숫자: 검색어는 적용하고 구분은 빼고 센다 (전체 목록을 받은 뒤) */
   const kindCounts = useMemo(() => {
@@ -310,19 +310,19 @@ function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; list
     return c;
   }, [all, t]);
   // 검색·구분을 고르면 첫 기관을 펼친다
-  const first = matches[0]?.[0];
+  const first = (t || kind) ? matches[0]?.r[0] : undefined;
   useEffect(() => { if (first) setOpen(first); }, [first]);
-  const rows: AgRow[] = filtering
-    ? matches.slice(0, SHOW_MATCHES).map((r) => ({ name: r[0], n: r[1], amt: r[2], w: d.agencyWinners[r[0]] ?? { firms: r[3], top: r[4] } }))
-    : d.agencies.map(([n, c, a]) => ({ name: n, n: c, amt: a, w: d.agencyWinners[n] }));
-  const chip = (on: boolean) => `shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${on ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`;
+  const rows = matches.slice(0, limit).map(({ r, rank }) => ({ rank, name: r[0], n: r[1], amt: r[2], w: d.agencyWinners[r[0]] ?? { firms: r[3], top: r[4] } }));
+  // 남은 기관: 전체 목록을 받았으면 정확히, 아니면 이 기간 발주기관 수로 어림
+  const left = all || !listPath ? Math.max(0, matches.length - limit) : (t || kind) ? 1 : Math.max(0, (d.agencyCount || pool.length) - limit);
+  const chip = (on: boolean) => `rounded-full border px-3 py-1 text-xs font-semibold ${on ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:text-ink"}`;
   const max = Math.max(1, ...rows.map((r) => r.n));
   return (
     <section className="card p-6">
       <h3 className="font-bold">발주기관별 낙찰 업체 <span className="text-sm font-normal text-ink-400">{periodLabel(d.period)}</span></h3>
       <div className="mt-3 min-w-0">
         <p className="label">기관으로 구분</p>
-        <ScrollRow className="flex gap-1" active={kind || "all"}>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="기관으로 구분">
           <button type="button" aria-pressed={!kind} onClick={() => setKind("")} className={chip(!kind)}>
             전체{kindCounts ? ` ${Object.values(kindCounts).reduce((a, b) => a + b, 0).toLocaleString()}` : ""}
           </button>
@@ -331,26 +331,25 @@ function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; list
               {k.label}{kindCounts ? ` ${(kindCounts[k.key] ?? 0).toLocaleString()}` : ""}
             </button>
           ))}
-        </ScrollRow>
+        </div>
       </div>
       <div className="mt-3 min-w-0">
         <label className="label" htmlFor="ind-ag-q">이 업종의 발주기관 검색</label>
         <input id="ind-ag-q" className="input" placeholder={listPath ? "예: 서울특별시교육청, 한국도로공사" : "기관 검색은 다음 정기 갱신 뒤 쓸 수 있습니다"} disabled={!listPath} value={q} onFocus={load} onChange={(e) => { load(); setQ(e.target.value); }} />
         <p className="mt-1.5 text-xs text-ink-500">
-          {filtering
-            ? !all ? (listPath ? "기관 목록을 불러오는 중…" : `낙찰이 많은 기관 ${d.agencies.length}곳 중 ${matches.length.toLocaleString()}곳입니다.`) : `이 기간 이 업종에 낙찰이 있는 기관 ${all.length.toLocaleString()}곳 중 ${matches.length.toLocaleString()}곳${matches.length > SHOW_MATCHES ? ` (낙찰 많은 순 앞 ${SHOW_MATCHES}곳 표시)` : ""}`
+          {all === null ? "기관 목록을 불러오는 중…"
+            : all ? `이 기간 이 업종에 낙찰이 있는 기관 ${all.length.toLocaleString()}곳 중 ${matches.length.toLocaleString()}곳 (낙찰 많은 순)`
             : `이 업종 낙찰이 많은 기관 ${d.agencies.length}곳입니다. 기관을 누르면 이 업종에서 그 기관 공고를 낙찰받은 업체를 봅니다.`}
         </p>
       </div>
       <ol className="mt-2 divide-y divide-ink-100">
-        {rows.map((r, i) => {
+        {rows.map((r) => {
           const on = open === r.name;
-          const id = agencyIds.get(r.name);
           return (
             <li key={r.name} className="min-w-0 py-2">
               <button type="button" aria-expanded={on} onClick={() => setOpen(on ? null : r.name)} className="block w-full min-w-0 text-left text-sm">
                 <span className="flex min-w-0 items-baseline justify-between gap-2">
-                  <span className="min-w-0 font-semibold">{t ? "" : `${i + 1}. `}{r.name}</span>
+                  <span className="min-w-0 font-semibold">{r.rank}. {r.name}</span>
                   <span className="shrink-0 text-xs tabular-nums text-ink-500">{r.n.toLocaleString()}건<span className="ml-1.5 text-ink-400">{on ? "닫기" : "업체 보기"}</span></span>
                 </span>
                 <span className="mt-0.5 block text-xs tabular-nums text-ink-500">낙찰금액 {won(r.amt)}</span>
@@ -358,38 +357,53 @@ function AgencyWinners({ d, listPath, agencyIds }: { d: IndustryPeriodData; list
                   <span className="block h-2 rounded-full" style={{ width: `${Math.max(1.5, (r.n / max) * 100)}%`, background: on ? CHART.cat[0] : CHART.cat[2] }} />
                 </span>
               </button>
-              {on && (
-                <div className="mt-3 rounded-xl bg-paper p-3 sm:p-4">
-                  {r.w ? (
-                    <>
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="text-sm font-semibold">낙찰받은 업체 {r.w.firms.toLocaleString()}곳{r.w.firms > Math.min(r.w.top.length, AGENCY_WINNERS) ? ` 중 ${by === "amount" ? "낙찰금액이 큰" : "많이 낙찰받은"} ${Math.min(r.w.top.length, AGENCY_WINNERS)}곳` : ""}</p>
-                        {id && <Link href={`/analysis/agency?id=${id}`} className="text-xs font-semibold text-mint-700 underline-offset-2 hover:underline">이 기관 발주처 분석</Link>}
-                      </div>
-                      <WinnersSort by={by} setBy={setBy} className="mt-2" />
-                      <div className="mt-2 hidden grid-cols-[1fr_4rem_12rem_6rem] gap-3 text-xs font-semibold text-ink-500 sm:grid">
-                        <span>업체</span><span className="text-right">낙찰</span><span className="text-right">낙찰금액</span><span className="text-right">최근 낙찰</span>
-                      </div>
-                      <ol className="mt-1 divide-y divide-ink-100">
-                        {sortWinners(r.w.top, by).map(([f, fc, fa, fd], j) => (
-                          <li key={f} className="grid min-w-0 grid-cols-1 gap-0.5 py-1.5 text-sm sm:grid-cols-[1fr_4rem_12rem_6rem] sm:items-baseline sm:gap-3">
-                            <span className="min-w-0 break-keep font-semibold [overflow-wrap:anywhere]">{j + 1}. {f}</span>
-                            <span className="text-xs tabular-nums text-ink-500 sm:hidden">{[`${fc.toLocaleString()}건`, won(fa), fd && `최근 ${fd}`].filter(Boolean).join(" · ")}</span>
-                            <span className="hidden text-right tabular-nums sm:inline">{fc.toLocaleString()}건</span>
-                            <span className="hidden text-right tabular-nums sm:inline">{won(fa)}</span>
-                            <span className="hidden text-right text-xs tabular-nums text-ink-500 sm:inline">{fd}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </>
-                  ) : <p className="text-sm text-ink-500">이 기관의 낙찰 업체는 다음 정기 갱신 뒤 채워집니다.</p>}
-                </div>
-              )}
+              {on && <AgencyFirms name={r.name} w={r.w} aid={agencyIds.get(r.name)} cat={cat} period={d.period} />}
             </li>
           );
         })}
-        {filtering && pool && !matches.length && <li className="py-3 text-sm text-ink-500">이 기간 이 업종에 낙찰이 있는 기관 중 맞는 곳이 없습니다.</li>}
+        {all !== null && (t || kind) && !matches.length && <li className="py-3 text-sm text-ink-500">이 기간 이 업종에 낙찰이 있는 기관 중 맞는 곳이 없습니다.</li>}
       </ol>
+      <MoreButton left={left} step={AGENCY_TOP} loading={all === null} onClick={() => { load(); setLimit((l) => l + AGENCY_TOP); }} />
     </section>
+  );
+}
+
+/** 펼친 기관의 낙찰 업체: 건수·금액 순, 20곳 뒤 더 보기. 담긴 목록보다 업체가 많으면 발주처 분석(같은 업종·기간)으로 이어 준다 */
+function AgencyFirms({ name, w, aid, cat, period }: { name: string; w?: { firms: number; top: FirmStat[] }; aid?: string; cat: ServiceCategory; period: string }) {
+  const [by, setBy] = useState<WinnersBy>("count");
+  const sorted = useMemo(() => (w ? sortWinners(w.top, by, w.top.length) : []), [w, by]);
+  const m = useMoreList(sorted, (r) => r[0], TOP_WINNERS, by);
+  if (!w || !w.top.length) return <div className="mt-3 rounded-xl bg-paper p-3 text-sm text-ink-500 sm:p-4">이 기관의 낙찰 업체는 다음 정기 갱신 뒤 채워집니다.</div>;
+  const more = w.firms > w.top.length;
+  const href = aid ? `/analysis/agency?id=${aid}&cat=${encodeURIComponent(cat)}&period=${encodeURIComponent(period)}` : null;
+  return (
+    <div className="mt-3 rounded-xl bg-paper p-3 sm:p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-semibold">낙찰받은 업체 {w.firms.toLocaleString()}곳</p>
+        {href && <Link href={href} className="text-xs font-semibold text-mint-700 underline-offset-2 hover:underline">이 기관 발주처 분석</Link>}
+      </div>
+      <WinnersSort by={by} setBy={setBy} className="mt-2" />
+      <div className="mt-2 hidden grid-cols-[1fr_4rem_12rem_6rem] gap-3 text-xs font-semibold text-ink-500 sm:grid">
+        <span>업체</span><span className="text-right">낙찰</span><span className="text-right">낙찰금액</span><span className="text-right">최근 낙찰</span>
+      </div>
+      <ol className="mt-1 divide-y divide-ink-100">
+        {m.visible.map(({ row: [f, fc, fa, fd], rank }) => (
+          <li key={f} className="grid min-w-0 grid-cols-1 gap-0.5 py-1.5 text-sm sm:grid-cols-[1fr_4rem_12rem_6rem] sm:items-baseline sm:gap-3">
+            <span className="min-w-0 break-keep font-semibold [overflow-wrap:anywhere]">{rank}. {f}</span>
+            <span className="text-xs tabular-nums text-ink-500 sm:hidden">{[`${fc.toLocaleString()}건`, won(fa), fd && `최근 ${fd}`].filter(Boolean).join(" · ")}</span>
+            <span className="hidden text-right tabular-nums sm:inline">{fc.toLocaleString()}건</span>
+            <span className="hidden text-right tabular-nums sm:inline">{won(fa)}</span>
+            <span className="hidden text-right text-xs tabular-nums text-ink-500 sm:inline">{fd}</span>
+          </li>
+        ))}
+      </ol>
+      <MoreButton left={m.left} step={m.step} onClick={m.more} />
+      {more && !m.left && (
+        <p className="mt-2 text-xs text-ink-500">
+          여기엔 {by === "amount" ? "낙찰금액이 큰" : "낙찰이 많은"} {w.top.length}곳까지 담았습니다.
+          {href && <> 나머지 {(w.firms - w.top.length).toLocaleString()}곳은 <Link href={href} className="font-semibold text-mint-700 underline-offset-2 hover:underline">{name} 발주처 분석</Link>에서 이 업종·기간으로 모두 볼 수 있습니다.</>}
+        </p>
+      )}
+    </div>
   );
 }

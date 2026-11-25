@@ -7,18 +7,18 @@
  */
 import { CATEGORIES, type ServiceCategory } from "../types";
 import { quantile, type AgencyRow } from "./analysis";
-import { agencySummary, isVagueAgency, topWinners, type AgencySummary } from "./agency";
+import { RECENT_YEARS, STORE_WINNERS, agencySummary, isVagueAgency, recentFrom, topWinners, type AgencySummary } from "./agency";
 
 export interface IndustrySummary extends Omit<AgencySummary, "v"> {
   v: 1;
   name: ServiceCategory;
   /** 연도별 [연도, 적격심사 낙찰률 가운데 값(%, 없으면 0), 참가업체 수 가운데 값, 적격심사 표본 수] (오래된 순) */
   trend: [number, number, number, number][];
-  /** 최근 4년 낙찰이 많은 수요기관 [이름, 건수, 낙찰금액 합(원)] (최대 AGENCY_TOP곳) */
+  /** 최근 RECENT_YEARS년 낙찰이 많은 수요기관 [이름, 건수, 낙찰금액 합(원)] (최대 AGENCY_TOP곳) */
   agencies: [string, number, number][];
-  /** agencies 기관마다 최근 4년 이 업종에서 낙찰받은 업체 (키: 수요기관 이름). firms = 서로 다른 업체 수, top = [업체명, 건수, 낙찰금액 합(원), 최근 낙찰일] (최대 AGENCY_WINNERS곳) */
+  /** agencies 기관마다 최근 RECENT_YEARS년 이 업종에서 낙찰받은 업체 (키: 수요기관 이름). firms = 서로 다른 업체 수, top = [업체명, 건수, 낙찰금액 합(원), 최근 낙찰일] (최대 AGENCY_WINNERS곳) */
   agencyWinners?: Record<string, { firms: number; top: [string, number, number, string][] }>;
-  /** 최근 4년 낙찰한 업체 수 (서로 다른 업체) */
+  /** 최근 RECENT_YEARS년 낙찰한 업체 수 (서로 다른 업체) */
   firms: number;
   /** recent[i]의 수요기관 */
   recentAgency: string[];
@@ -30,8 +30,10 @@ export const industryOf = (id: string): ServiceCategory | undefined => CATEGORIE
 
 /** 주요 발주기관 수, 기관마다 보여 줄 낙찰 업체 수 */
 export const AGENCY_TOP = 30;
-/** 발주기관별 낙찰 업체: 건수 상위·금액 상위 이만큼씩 (topWinners) */
-export const AGENCY_WINNERS = 20;
+/** 발주기관별 낙찰 업체: 건수 상위·금액 상위 이만큼씩 담는다 (topWinners). 화면은 TOP_WINNERS곳 뒤 더 보기 */
+export const AGENCY_WINNERS = 30;
+/** 기간마다 따로 내는 낙찰 업체 목록(/industry-period/{id}-{기간}-firms.json): 건수 상위·금액 상위 이만큼씩 */
+export const FIRM_LIST = 1000;
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -42,7 +44,7 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
 export function industrySummary(name: ServiceCategory, rows: AgencyRow[], ags: string[], today: string): IndustrySummary | undefined {
   const base = agencySummary(name, rows, today);
   if (!base) return undefined;
-  const from4 = `${Number(today.slice(0, 4)) - 4}${today.slice(4)}`;
+  const from4 = recentFrom(today);
 
   const ys = new Map<number, { rates: number[]; bids: number[] }>();
   const ag = new Map<string, [number, number]>();
@@ -79,7 +81,7 @@ export function industrySummary(name: ServiceCategory, rows: AgencyRow[], ags: s
   for (const [a, m] of aw) {
     agencyWinners[a] = {
       firms: m.size,
-      top: [...m.entries()].sort((x, y) => y[1][0] - x[1][0] || y[1][1] - x[1][1]).slice(0, AGENCY_WINNERS).map(([n, [c, amt, d]]) => [n, c, Math.round(amt), d] as [string, number, number, string]),
+      top: topWinners([...m.entries()].map(([n, [c, amt, d]]) => [n, c, Math.round(amt), d] as [string, number, number, string]), AGENCY_WINNERS),
     };
   }
 
@@ -90,10 +92,12 @@ export function industrySummary(name: ServiceCategory, rows: AgencyRow[], ags: s
   return { ...base, v: 1, name, trend, agencies, agencyWinners, firms: firms.size, recentAgency: base.recent.map((x) => byNo.get(x[0]) ?? "") };
 }
 
-/* ---------- 기간별 낙찰 업체·발주기관 (최근 4년·전체·연도별) ---------- */
+/* ---------- 기간별 낙찰 업체·발주기관 (최근 RECENT_YEARS년·전체·연도별) ---------- */
 
-/** 기간: "4y" 최근 4년, "all" 저장 기간 전체, "2024" 같은 연도 */
+/** 기간: RECENT("3y") 최근 RECENT_YEARS년, "all" 저장 기간 전체, "2024" 같은 연도 */
 export type IndustryPeriod = string;
+/** 최근 기간 키 */
+export const RECENT = `${RECENT_YEARS}y`;
 /** [업체명, 낙찰 건수, 낙찰금액 합(원), 최근 낙찰일] */
 export type FirmStat = [string, number, number, string];
 /** 업종 안 발주기관 한 줄 (검색용): [수요기관, 낙찰 건수, 낙찰금액 합(원), 낙찰받은 업체 수, 많이 낙찰받은 업체 SEARCH_WINNERS곳] */
@@ -115,13 +119,14 @@ export interface IndustryPeriodData {
   agencyWinners: Record<string, { firms: number; top: FirmStat[] }>;
 }
 /** 업종 하나의 기간별 자료 (R2 stats/industry-period/{id}.json.gz). list는 검색용 모든 발주기관 (/industry-period/{id}-{기간}-ag.json) */
-export interface IndustryPeriodFile { v: 1; builtAt: string; name: string; periods: Record<IndustryPeriod, IndustryPeriodData & { list: IndustryAgencyRow[] }> }
+export interface IndustryPeriodFile { v: 1; builtAt: string; name: string; periods: Record<IndustryPeriod, IndustryPeriodData & { list: IndustryAgencyRow[]; firmList?: FirmStat[] }> }
 
 /** 검색 목록의 기관마다 담는 낙찰 업체 수 */
 export const SEARCH_WINNERS = 5;
 
 export function periodLabel(p: IndustryPeriod): string {
-  return p === "4y" ? "최근 4년" : p === "all" ? "전체 기간" : `${p}년`;
+  const m = /^(\d+)y$/.exec(p);
+  return m ? `최근 ${m[1]}년` : p === "all" ? "전체 기간" : `${p}년`;
 }
 
 type Acc = { n: number; amt: number; w: Map<string, [number, number, string]> };
@@ -137,8 +142,8 @@ const VAGUE = "\u0000vague";
 
 /** 업종 하나의 기간별 낙찰 업체·발주기관. rows·ags는 industrySummary와 같다 */
 export function industryPeriods(name: ServiceCategory, rows: AgencyRow[], ags: string[], today: string): IndustryPeriodFile {
-  const from4 = `${Number(today.slice(0, 4)) - 4}${today.slice(4)}`;
-  // 연도 → 기관 → 집계, 그리고 최근 4년 → 기관 → 집계
+  const from4 = recentFrom(today);
+  // 연도 → 기관 → 집계, 그리고 최근 RECENT_YEARS년 → 기관 → 집계
   const byYear = new Map<string, Map<string, Acc>>();
   const recent = new Map<string, Acc>();
   const add = (m: Map<string, Acc>, a: string, r: AgencyRow) => {
@@ -174,18 +179,19 @@ export function industryPeriods(name: ServiceCategory, rows: AgencyRow[], ags: s
     for (const [a, v] of sorted.slice(0, AGENCY_TOP)) agencyWinners[a] = { firms: v.w.size, top: topWinners(topFirms(v.w, v.w.size), AGENCY_WINNERS) };
     return {
       period, n, amount: Math.round(amount), firms: firmsAll.size, agencyCount: sorted.length,
-      winners: topWinners(topFirms(firmsAll, firmsAll.size)), agencies, agencyWinners,
+      winners: topWinners(topFirms(firmsAll, firmsAll.size), STORE_WINNERS), agencies, agencyWinners,
+      firmList: topWinners(topFirms(firmsAll, firmsAll.size), FIRM_LIST),
       list: sorted.map(([a, v]) => [a, v.n, Math.round(v.amt), v.w.size, topFirms(v.w, SEARCH_WINNERS)] as IndustryAgencyRow),
     };
   };
   const periods: IndustryPeriodFile["periods"] = {};
-  periods["4y"] = build("4y", recent);
+  periods[RECENT] = build(RECENT, recent);
   periods.all = build("all", merge([...byYear.values()]));
   for (const [y, m] of [...byYear.entries()].sort()) periods[y] = build(y, m);
   return { v: 1, builtAt: new Date().toISOString(), name, periods };
 }
 
-/** 업종 목록(/industry-data/index.json) 한 줄: [업종, id, 10년 낙찰 건수, 최근 4년 낙찰금액, 최근 해 적격심사 낙찰률 가운데 값, 최근 해 참가업체 가운데 값] */
+/** 업종 목록(/industry-data/index.json) 한 줄: [업종, id, 10년 낙찰 건수, 최근 RECENT_YEARS년 낙찰금액, 최근 해 적격심사 낙찰률 가운데 값, 최근 해 참가업체 가운데 값] */
 export type IndustryIndexRow = [string, string, number, number, number, number];
 
 export function industryIndexRow(s: IndustrySummary): IndustryIndexRow {

@@ -114,7 +114,7 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
 
   return (
     <div className="container-x py-6 sm:py-8">
-      <Link href="/apt-bids" className="text-sm text-ink-500 hover:text-ink">아파트 공고 목록으로</Link>
+      <Link href="/apt-bids" className="text-sm text-ink-500 hover:text-ink">공동주택 입찰공고 목록으로</Link>
 
       <header className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
         <div className="min-w-0 lg:flex-1">

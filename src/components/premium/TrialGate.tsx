@@ -46,7 +46,7 @@ export function TrialIntro() {
   if (u?.mode === "paid") {
     return (
       <p className="mt-3 text-xs text-ink-500">
-        {planName(u.plan)} 이용권으로 분석합니다.<br />이번 달 {u.used.length.toLocaleString()}건{u.quota !== null ? ` 사용, ${Math.max(0, u.quota - u.used.length).toLocaleString()}건 남았습니다` : " 분석했습니다"}. 나라장터·아파트 공고를 합쳐 세고, {md(u.period.to)}에 새로 시작합니다.
+        {planName(u.plan)} 이용권으로 분석합니다.<br />이번 달 {u.used.length.toLocaleString()}건{u.quota !== null ? ` 사용, ${Math.max(0, u.quota - u.used.length).toLocaleString()}건 남았습니다` : " 분석했습니다"}. 나라장터·공동주택 입찰공고를 합쳐 세고, {md(u.period.to)}에 새로 시작합니다.
       </p>
     );
   }
@@ -56,7 +56,7 @@ export function TrialIntro() {
   const left = Math.max(0, TRIAL_LIMIT - used.length);
   return (
     <p className="mt-3 text-xs text-ink-500">
-      무료 체험으로 입찰공고 {TRIAL_LIMIT}건까지 분석할 수 있습니다.<br />나라장터·아파트 공고를 합쳐 셉니다.{used.length ? ` 지금 ${used.length}건 사용, ${left}건 남았습니다.` : ""}
+      무료 체험으로 입찰공고 {TRIAL_LIMIT}건까지 분석할 수 있습니다.<br />나라장터·공동주택 입찰공고를 합쳐 셉니다.{used.length ? ` 지금 ${used.length}건 사용, ${left}건 남았습니다.` : ""}
     </p>
   );
 }

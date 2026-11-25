@@ -126,7 +126,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
           )}
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
             <Link href="/premium#predict" className="btn-mint">나라장터 공고 분석하기</Link>
-            <Link href="/premium/apt" className="btn-ghost">아파트 공고 분석하기</Link>
+            <Link href="/premium/apt" className="btn-ghost">공동주택 입찰공고 분석하기</Link>
           </div>
           <p className="mt-3 text-xs text-ink-400">공고 상세의 &lsquo;이 공고 점수 예측하기&rsquo;로 열어도 체험 건수로 셉니다.<br />이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
         </div>

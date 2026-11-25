@@ -6,11 +6,7 @@ import { getAptBids, getBids, getNuriBids } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "공동주택 입찰공고",
-<<<<<<< HEAD
   description: "전국 공동주택(아파트) 관리주체가 K-apt에 올린 청소·경비·소독·위탁관리 등 사업자 선정 입찰공고를 업종·지역·마감일로 찾습니다.",
-=======
-  description: "전국 아파트(공동주택) 관리주체가 K-apt에 올린 청소·경비·소독·위탁관리 등 사업자 선정 입찰공고를 업종·지역·마감일로 찾습니다.",
->>>>>>> 24c6a7ca9f7ea91c00a85af401b13662b9f46526
 };
 export const revalidate = 600;
 
@@ -22,7 +18,7 @@ export default async function AptBidsPage() {
     <div className="container-x py-10 sm:py-14">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">공동주택 청소·경비·위탁관리 등 진행 중 공고 {data.items.length.toLocaleString()}건</p>
+          <p className="eyebrow">아파트 청소·경비·위탁관리 등 진행 중 공고 {data.items.length.toLocaleString()}건</p>
           <h1 className="mt-2 text-4xl font-extrabold tracking-[-0.04em]">공고 검색</h1>
         </div>
         <p className="inline-flex items-center gap-2 self-start rounded-full border border-ink-100 bg-white px-3 py-1.5 text-xs text-ink-500 sm:self-auto">

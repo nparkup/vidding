@@ -147,7 +147,7 @@ export function AptPredictor() {
 
   if (error) return <p className="card p-6 text-sm text-coral">공동주택 입찰공고 자료를 불러오지 못했습니다.<br />잠시 후 다시 시도해 주세요.</p>;
   if (!data) return <p className="card p-6 text-sm text-ink-300">공고 목록을 불러오는 중…</p>;
-  if (!model) return <p className="card p-6 text-sm text-ink-500">공동주택 예측 자료가 아직 준비되지 않았습니다.<br />다음 갱신 뒤에 다시 확인해 주세요.</p>;
+  if (!model) return <p className="card p-6 text-sm text-ink-500">공동주택 입찰 예측 자료가 아직 준비되지 않았습니다.<br />다음 갱신 뒤에 다시 확인해 주세요.</p>;
 
   // 무료 체험 3건을 다 쓴 뒤 새 공고를 고른 경우
   if (trialLocked && pickedBid && trial) {

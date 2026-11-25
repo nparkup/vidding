@@ -7,7 +7,7 @@ export function EngineTrio() {
   return (
     <section className="container-x pt-24">
       <div className="text-center">
-        <h2 className="h-section">찾고, 분석하고, 예측하는<br />비드매트릭스 솔루션</h2>
+        <h2 className="h-section">찾고, 분석하고, 예측하는<br />비드매트릭스 코어 솔루션</h2>
       </div>
       <ol className="mt-12 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {ENGINE_LIST.map((e, i) => (

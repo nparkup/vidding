@@ -35,7 +35,7 @@ export function NuriRateCard({ stat, award, biz, from, baseAmount, amountLabel, 
       ) : (
         <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">같은 업무·낙찰방법의 지난 개찰 결과가 5건이 안 돼 투찰률을 보여 주지 않습니다.</p>
       )}
-      <p className="mt-3 text-xs leading-relaxed text-ink-500">누리장터는 최종 낙찰 자료를 공개하지 않아 개찰 1순위를 씁니다. 투찰률은 누리장터가 공개한 값이며 공고마다 기준(기준금액·예정가격)이 다를 수 있습니다.</p>
+      <p className="mt-3 text-xs leading-relaxed text-ink-500">누리장터는 최종 낙찰 자료를 공개하지 않아 개찰 1순위를 씁니다. 누리장터가 투찰률을 공개하지 않아, 투찰률은 1순위 투찰금액을 그 공고의 기준금액(공개하지 않았으면 배정예산)으로 나눈 값입니다.</p>
       {past.length > 0 && (
         <div className="mt-5 border-t border-ink-100 pt-4">
           <p className="text-sm font-bold">같은 기관의 지난 개찰 {past.length}건</p>

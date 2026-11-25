@@ -7,7 +7,7 @@ import { AptPriceRedirect } from "@/components/premium/AptPriceRedirect";
 import { TRIAL_LIMIT_ENABLED } from "@/lib/trialLimit";
 
 export const metadata: Metadata = {
-  title: "나라장터 예측",
+  title: "나라장터 입찰 예측",
   description: "공고 첨부파일의 평가기준과 나라장터 기업 정보로 적격심사·협상계약 예상 점수를 계산합니다.",
 };
 
@@ -16,7 +16,7 @@ export default function PremiumPage() {
     <>
       <AptPriceRedirect />
       <PageHero
-        eyebrow="프리미엄 · 평가점수 예측 · 나라장터 예측"
+        eyebrow="프리미엄 · 평가점수 예측 · 나라장터 입찰 예측"
         title={<>공고를 고르면,<br />우리 회사 점수가 나옵니다.</>}
         lead="입찰공고에 첨부된 공고서·규격서에서 평가기준과 배점을 추출하고, 나라장터에 등록된 기업 정보와 신용평가 서류를 결합해 이 공고에서 받을 예상 점수와 통과 여부를 계산합니다."
       >
@@ -27,7 +27,7 @@ export default function PremiumPage() {
       </PageHero>
 
       <section id="predict" className="container-x scroll-mt-20 pt-12">
-        <p className="eyebrow">나라장터 예측</p>
+        <p className="eyebrow">나라장터 입찰 예측</p>
         <h2 className="h-section mt-3">공고 하나로 직접 계산해 보세요</h2>
         <p className="lead mt-3 max-w-3xl">공고를 고르고 사업자번호나 기업명으로 우리 회사를 조회하면 참가자격, 예상 평가점수, 통과 가능한 투찰률이 맨 위에 정리됩니다.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다."}</p>
         <div className="mt-8">

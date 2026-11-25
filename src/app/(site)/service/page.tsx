@@ -272,7 +272,7 @@ export default async function ServicePage() {
         menus={[
           { t: "나라장터 입찰 예측", d: "적격심사·협상계약 공고의 항목별 예상 평가점수와 투찰 금액을 봅니다.", href: "/premium" },
           { t: "공동주택 입찰 예측", d: "아파트 관리 입찰의 예상 낙찰금액과 같은 단지 낙찰 이력, 응찰 업체를 봅니다.", href: "/premium/apt" },
-          { t: "민간 예측", d: "누리장터 공고 중 평가 배점표가 있는 공고의 예상 평가점수를 봅니다.", href: "/premium/nuri" },
+          { t: "누리장터 공고 예측", d: "누리장터 공고 중 평가 배점표가 있는 공고의 예상 평가점수를 봅니다.", href: "/premium/nuri" },
         ]}
       >
         <div className="space-y-3 rounded-[28px] bg-paper p-5 sm:p-8">

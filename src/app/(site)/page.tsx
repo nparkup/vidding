@@ -2,7 +2,8 @@ import Link from "next/link";
 import { TrialN } from "@/components/Cfg";
 import { Check, X } from "lucide-react";
 import { HeroCity } from "@/components/art/HeroCity";
-import { ConstructionArt, ITArt, SupplyArt } from "@/components/art/Sectors";
+import { ConstructionArt, SupplyArt } from "@/components/art/Sectors";
+import { AllIndustries, type Biz, type BizSummary, type SourceKey } from "@/components/home/AllIndustries";
 import { DeskArt } from "@/components/art/Desk";
 import { BidRow } from "@/components/BidRow";
 import { GradeBadge, ScoreBar } from "@/components/Badges";
@@ -20,20 +21,25 @@ import { bidPriceGuide, documentChecklist, evaluate, rank } from "@/lib/analysis
 import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
-import { getAptBids, getAwardCount, getBids, getContracts, getPreSpecs, getRecentAwards } from "@/lib/store";
-import { APT_CATEGORIES } from "@/lib/apt";
+import { getAptBids, getAwardCount, getBids, getContracts, getNuriBids, getPreSpecs, getRecentAwards } from "@/lib/store";
 import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
 import { aptBidHref, bidHref } from "@/lib/links";
 
 export const revalidate = 600;
 
-const BIZ_INFO: Record<keyof typeof CATEGORY_GROUPS, { d: string; tone: string }> = {
-  용역: { d: "청소·시설관리, IT, 설계·감리, 연구, 행사, 폐기물 처리 등", tone: "from-mint-50" },
-  공사: { d: "건축·토목, 전기·통신, 소방·기계설비, 조경·산림 공사", tone: "from-sky-100" },
-  물품: { d: "의료·의약품, 급식 식자재, 전산장비, 관급자재 등 구매", tone: "from-amber-100" },
+/** 공동주택 입찰공고 업종을 나라장터 업종 기준에 맞춘다. 나라장터에 없는 아파트 업무는 그 이름 그대로 둔다 */
+const APT_TO_BIZ: Record<string, [Biz, string]> = {
+  청소: ["용역", "청소"],
+  경비: ["용역", "경비"],
+  소독: ["용역", "방역·소독"],
+  승강기유지: ["용역", "승강기유지"],
+  전기안전관리: ["용역", "전기안전관리"],
+  "정화조·저수조": ["용역", "정화조·저수조"],
+  "기타 용역": ["용역", "기타 용역"],
+  "주택관리(위탁)": ["용역", "주택관리(위탁)"],
+  공사: ["공사", "공동주택 보수공사"],
+  "물품·기타": ["물품", "기타 물품"],
 };
-
-const BIZ_ART = { 용역: ITArt, 공사: ConstructionArt, 물품: SupplyArt } as const;
 
 const COMPARE = [
   ["공고 탐색", "직접 키워드 검색, 수백 건 확인", "조건에 맞는 공고만 매일 배달"],
@@ -81,7 +87,6 @@ export default async function Home() {
   const [preSpecs, contracts, recent] = await Promise.all([getPreSpecs(), getContracts(), getRecentAwards()]);
   // 공동주택 입찰공고: 마감 전 공고만, 업종별 건수와 직전 낙찰금액이 붙은 예시
   const aptOpen = apt.items.filter((b) => new Date(b.closeAt).getTime() > builtAt);
-  const aptCats = APT_CATEGORIES.map((c) => ({ c, n: aptOpen.filter((b) => b.category === c).length })).filter((x) => x.n > 0);
   const aptWithPrior = aptOpen.filter((b) => b.prior && b.prior.amount > 0);
   const aptSamples = [...aptWithPrior.filter((b) => b.category !== "공사"), ...aptOpen.filter((b) => !b.prior)].slice(0, 1);
   // 공동주택 입찰공고 중 나라장터 공고와 번호가 겹치는 것은 한 번만 센다
@@ -136,19 +141,38 @@ export default async function Home() {
     // 기관이 적으면 띠 한 바퀴가 화면보다 짧아 빈 곳이 보이므로 같은 목록을 이어 붙여 24칸 이상으로 만든다
     return list.length ? Array.from({ length: Math.ceil(24 / list.length) }, () => list).flat() : [];
   })();
-  // 업무 구분·업종별 공고 수 (외자는 물품에 포함)
-  const bizOf = (b: (typeof bids)[number]): keyof typeof CATEGORY_GROUPS => {
-    const t: BizType = b.bizType ?? "용역";
-    return t === "외자" ? "물품" : t;
+  // 업무 구분·업종별 진행 중 공고 수: 나라장터·공동주택·누리장터를 같은 업종 기준으로 합친다 (외자는 물품)
+  const nuriOpen = (await getNuriBids()).items.filter((b) => new Date(b.closeAt).getTime() > builtAt);
+  const naraOpen = bids.filter((b) => new Date(b.closeAt).getTime() > builtAt);
+  const groupOf = (c: string): Biz | undefined => (Object.keys(CATEGORY_GROUPS) as Biz[]).find((g) => (CATEGORY_GROUPS[g] as readonly string[]).includes(c));
+  const tally = new Map<Biz, { by: Record<SourceKey, number>; cats: Map<string, number> }>(
+    (["용역", "공사", "물품"] as Biz[]).map((g) => [g, { by: { g2b: 0, apt: 0, nuri: 0 }, cats: new Map() }]),
+  );
+  const add = (g: Biz, src: SourceKey, c: string) => {
+    const t = tally.get(g)!;
+    t.by[src]++;
+    t.cats.set(c, (t.cats.get(c) ?? 0) + 1);
   };
-  const byBiz = (Object.keys(CATEGORY_GROUPS) as (keyof typeof CATEGORY_GROUPS)[]).map((biz) => {
-    const list = bids.filter((b) => bizOf(b) === biz);
-    const cats = (CATEGORY_GROUPS[biz] as readonly string[])
-      .map((c) => ({ c, n: list.filter((b) => b.category === c).length }))
-      .filter((x) => x.n > 0)
-      .sort((a, b) => b.n - a.n);
-    return { biz, n: list.length, cats };
-  });
+  for (const b of naraOpen) {
+    const t: BizType = b.bizType ?? "용역";
+    add(t === "외자" ? "물품" : t, "g2b", b.category);
+  }
+  for (const b of aptOpen) {
+    const [g, c] = APT_TO_BIZ[b.category] ?? ["용역", "기타 용역"];
+    add(g, "apt", c);
+  }
+  for (const b of nuriOpen) {
+    const g = groupOf(b.category) ?? (b.biz === "공사" ? "공사" : b.biz === "물품" ? "물품" : "용역");
+    add(g, "nuri", groupOf(b.category) ? b.category : g === "공사" ? "기타 공사" : g === "물품" ? "기타 물품" : "기타 용역");
+  }
+  const byBiz: BizSummary[] = [...tally].map(([biz, t]) => ({
+    biz,
+    by: t.by,
+    n: t.by.g2b + t.by.apt + t.by.nuri,
+    cats: [...t.cats].map(([c, n]) => ({ c, n })).sort((x, y) => y.n - x.n),
+  }));
+  const allBy: Record<SourceKey, number> = { g2b: naraOpen.length, apt: aptOpen.length, nuri: nuriOpen.length };
+  const allTotal = allBy.g2b + allBy.apt + allBy.nuri;
 
   const FEATURES = [
     {
@@ -464,71 +488,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 업종 */}
-      <section className="container-x pt-28">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="h-section">용역·공사·물품,<br className="sm:hidden" /> 모든 업종을 봅니다.</h2>
-          </div>
-          <p className="max-w-sm text-ink-500">비드파인더가 나라장터의 모든 공고를 받아 업종별로 나누고, 귀사가 가진 면허로 참가할 수 있는 공고만 골라 드립니다.</p>
-        </div>
-        <div className="mt-10 grid gap-4 lg:grid-cols-3">
-          {byBiz.map(({ biz, n, cats }) => (
-            <div key={biz} className={`card overflow-hidden bg-gradient-to-b ${BIZ_INFO[biz].tone} to-white to-40% p-5 sm:p-6`}>
-              {(() => { const Art = BIZ_ART[biz]; return <Art className="mx-auto -mt-2 mb-3 h-36 w-auto" />; })()}
-              <div className="flex items-baseline justify-between">
-                <Link href={`/bids?biz=${encodeURIComponent(biz)}`} className="text-2xl font-extrabold hover:text-mint-600">{biz}</Link>
-                <span className="text-sm font-bold text-ink-500">공고 <span className="tabular-nums text-ink">{n.toLocaleString()}</span>건</span>
-              </div>
-              <p className="mt-1.5 text-sm text-ink-500">{BIZ_INFO[biz].d}</p>
-              <ul className="mt-5 flex flex-wrap gap-1.5">
-                {cats.map(({ c, n: cn }) => (
-                  <li key={c}>
-                    <Link href={`/bids?cat=${encodeURIComponent(c)}`} className="inline-flex items-center gap-1.5 rounded-full border border-ink-100 bg-white px-3 py-1.5 text-sm text-ink-700 transition hover:border-mint hover:text-mint-600">
-                      {c}<span className="text-xs font-bold tabular-nums text-ink-300">{cn.toLocaleString()}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 아파트 관리 입찰 */}
-      <section className="container-x pt-10">
-        <div className="card grid gap-8 overflow-hidden bg-gradient-to-br from-sky-100/70 via-white to-white p-5 sm:p-8 lg:grid-cols-[1fr_1.2fr] lg:items-center">
-          <div className="min-w-0">
-            <h3 className="text-2xl font-extrabold leading-snug tracking-[-0.03em] sm:text-[32px]">아파트 청소·경비·위탁관리 공고도<br className="hidden sm:block" /> 같은 화면에서 봅니다.</h3>
-            <p className="mt-4 leading-relaxed text-ink-500">비드파인더가 공동주택관리정보시스템(K-apt)에 올라온 공동주택 입찰공고를 업종별로 나누고, 같은 단지의 직전 낙찰·수의계약 금액을 찾아 붙입니다.<br />비드인사이트 공동주택 입찰 예측에서는 직전 계약금액과 지난 낙찰 흐름으로 이번 공고의 예상 낙찰금액 범위를 계산합니다.</p>
-            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
-              <Link href="/apt-bids" className="btn-primary">공동주택 입찰공고 보기</Link>
-              <Link href="/premium/apt" className="btn-ghost">공동주택 입찰가격 예측</Link>
-            </div>
-          </div>
-          <div className="min-w-0">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-white p-4 shadow-card">
-                <p className="text-xs text-ink-400">진행 중인 공동주택 입찰공고</p>
-                <p className="mt-1 text-3xl font-extrabold tabular-nums">{aptOpen.length.toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-400">건</span></p>
-              </div>
-              <div className="rounded-2xl bg-white p-4 shadow-card">
-                <p className="text-xs text-ink-400">직전 낙찰금액 확인</p>
-                <p className="mt-1 text-3xl font-extrabold tabular-nums text-mint-600">{aptWithPrior.length.toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-400">건</span></p>
-              </div>
-            </div>
-            {aptCats.length > 0 && (
-              <ul className="mt-4 flex flex-wrap gap-1.5">
-                {aptCats.map(({ c, n }) => (
-                  <li key={c} className="inline-flex items-center gap-1.5 rounded-full border border-ink-100 bg-white px-3 py-1.5 text-sm text-ink-700">
-                    {c}<span className="text-xs font-bold tabular-nums text-ink-300">{n.toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </section>
+      {/* 업종: 나라장터·공동주택·누리장터 통합 */}
+      <AllIndustries total={allTotal} by={allBy} groups={byBiz} aptWithPrior={aptWithPrior.length} />
 
       {/* 기능 탭 */}
       <section className="container-x pt-28">

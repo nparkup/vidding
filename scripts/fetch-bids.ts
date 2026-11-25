@@ -260,9 +260,11 @@ async function main() {
     nuriBids = r.file;
     console.log(r.log);
     try { console.log(await accumulateNuriResults(nuriBids, r.all)); } catch (e) { console.warn("누리장터 개찰 누적 건너뜀:", e instanceof Error ? e.message : e); }
-    const sh = await extractNuriSheets(nuriBids.items, textCache);
+    // 규칙으로 쓸 수 있는 표를 못 읽은 공고는 배점표 판독 입력을 만든다 (나라장터와 같은 /ai-input/{공고번호-차수}.json, 공고번호 체계가 같아 겹치지 않는다)
+    const sh = await extractNuriSheets(nuriBids.items, textCache, undefined, (bid, text) => ai.collect(bid, text, undefined));
     nuriDocs = sh.docs;
-    console.log(`누리장터 배점표: 대상(적격심사·제안서평가, 진행 중) ${sh.targets}건 중 첨부 읽음 ${sh.read}건, 배점표 ${sh.found}건, 받기 실패 ${sh.failed}개${sh.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서" : ""}`);
+    for (const id of Object.keys(sh.docs)) if (sh.docs[id].ai && ai.inputs[id]) sheets[id] = { ...sheets[id], ai: ai.inputs[id] };
+    console.log(`누리장터 배점표: 대상(적격심사·제안서평가, 진행 중) ${sh.targets}건 중 첨부 읽음 ${sh.read}건, 배점표 ${sh.found}건, 판독 입력 ${sh.ai}건, 받기 실패 ${sh.failed}개${sh.timedOut ? ", 시간 한도로 남은 공고는 다음 빌드에서" : ""}`);
   } catch (e) {
     console.warn("누리장터 건너뜀:", e instanceof Error ? e.message : e);
   }

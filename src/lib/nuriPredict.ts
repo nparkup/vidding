@@ -4,6 +4,7 @@
  * 민간 예측(/premium/nuri): 누리장터 민간 공고 중 첨부 배점표를 읽은 공고를 나라장터 예측 화면(ScorePredictor)이 쓰는 모양으로 바꾼다.
  * 공고 목록은 /nuri-bids-data.json, 평가표는 /nuri-docs-data.json (빌드가 첨부에서 읽은 전체 평가표·공고서 문장 기준).
  * 민간 공고는 조달청·행안부 공식 기준표나 공고 목록의 낙찰하한율이 없어, 원문 배점표가 있는 공고만 예측한다.
+ * 규칙 파서가 쓸 수 있는 표를 못 읽은 공고(ai)는 고를 때 배점표 판독으로 읽고, 판독도 못 하면 예측하지 않는다.
  */
 import { useEffect, useState } from "react";
 import type { BidQual } from "./eligibility";
@@ -13,10 +14,12 @@ import { loadSiteJson } from "./useSiteJson";
 
 export interface NuriPredictDocs {
   files: BidAttachment[];
-  sheet: NuriDocs["sheet"];
-  sheetFile: string;
+  sheet?: NuriDocs["sheet"];
+  sheetFile?: string;
   notice?: NuriDocs["notice"];
   qual: BidQual;
+  /** 배점표 판독 입력이 있다 (고를 때 중계 서버가 읽는다) */
+  ai?: string;
 }
 
 export interface NuriPredictData {
@@ -107,7 +110,7 @@ export function loadNuriPredict(): Promise<NuriPredictData> {
         const id = nuriId(b);
         const x = d[id];
         raw[id] = b;
-        docs[id] = { files: b.files.map((f0) => ({ name: f0.name, url: f0.url, kind: "규격서·기타" })), sheet: x.sheet, sheetFile: x.sheetFile, notice: x.notice, qual: nuriQual(b) };
+        docs[id] = { files: b.files.map((f0) => ({ name: f0.name, url: f0.url, kind: "규격서·기타" })), sheet: x.sheet, sheetFile: x.sheetFile, notice: x.notice, qual: nuriQual(b), ai: x.ai ? "1" : undefined };
       }
       return { bids, docs, rates: f.rates, results: f.results, raw, from: f.from };
     })

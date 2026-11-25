@@ -14,15 +14,20 @@ import { mapLimit } from "./client";
  */
 export const NURI_SHEET_AWARD = /^(적격심사|제안서)/;
 
-export async function extractNuriSheets(bids: NuriBid[], cache: TextCache, budgetMs = 5 * 60_000): Promise<{ found: number; targets: number; read: number; failed: number; timedOut: boolean; docs: Record<string, NuriDocs> }> {
+export async function extractNuriSheets(
+  bids: NuriBid[], cache: TextCache, budgetMs = 5 * 60_000,
+  /** 규칙 파서가 쓸 수 있는 표를 못 읽은 공고의 본문을 넘긴다 (배점표 판독 입력, scripts/aiSheets.ts makeAiInputs). 돌려주는 값이 참이면 판독 입력을 만든 것 */
+  collect?: (bid: Bid, text: string) => boolean,
+): Promise<{ found: number; targets: number; read: number; failed: number; timedOut: boolean; ai: number; docs: Record<string, NuriDocs> }> {
   const until = Date.now() + budgetMs;
   const targets = bids.filter((b) => NURI_SHEET_AWARD.test(b.award ?? "") && b.files.length && new Date(b.closeAt).getTime() > Date.now());
-  const st = { found: 0, targets: targets.length, read: 0, failed: 0, timedOut: false, docs: {} as Record<string, NuriDocs> };
+  const st = { found: 0, targets: targets.length, read: 0, failed: 0, timedOut: false, ai: 0, docs: {} as Record<string, NuriDocs> };
   await mapLimit(targets, 6, async (b) => {
     const files: BidAttachment[] = rankFiles(b.files.map((f) => ({ name: f.name, url: f.url, kind: "규격서·기타" })));
     if (Date.now() > until && files.some((f) => cache.get(textCacheKey(f)) === undefined)) { st.timedOut = true; return; }
     const seen = new Set(files.map((f) => f.name.trim()));
     const texts: string[] = [];
+    const named: string[] = [];
     let best: { sheet: EvalSheet; file: string } | undefined;
     for (const f of files) {
       let t = cache.get(textCacheKey(f));
@@ -37,6 +42,7 @@ export async function extractNuriSheets(bids: NuriBid[], cache: TextCache, budge
       t = dropRepeatedEntries(t, seen);
       if (!t.trim()) continue;
       texts.push(t);
+      named.push(`=== 파일: ${f.name} ===\n${t}`);
       const sheet = extractSheet(texts.join("\n"), templateSheet(pseudoBid(b)));
       if (sheet && (!best || rank(sheet) > rank(best.sheet))) best = { sheet, file: f.name };
     }
@@ -48,12 +54,24 @@ export async function extractNuriSheets(bids: NuriBid[], cache: TextCache, budge
       // 민간 예측(/premium/nuri)이 쓰는 전체 평가표: 점수 구간·인정 범위·평가 요소와 공고서 문장 기준(통과점수·하한율 등)
       const notice = readNoticeCriteria(texts.join("\n"));
       st.docs[nuriKey(b)] = { sheet: best.sheet, sheetFile: best.file, ...(notice ? { notice } : {}) };
+    } else if (texts.length && collect?.(aiBid(b), named.join("\n"))) {
+      // 합계가 맞지 않는 표(묶음 머리글·점수 구간 줄이 항목으로 읽힌 표 등)와 규칙으로 못 읽은 표: 고를 때 배점표 판독으로 읽는다
+      b.aiSheet = true;
+      st.ai++;
+      const notice = readNoticeCriteria(texts.join("\n"));
+      st.docs[nuriKey(b)] = { ai: true, ...(notice ? { notice } : {}) };
     }
   });
   return st;
 }
 
 export const nuriKey = (b: Pick<NuriBid, "no" | "ord">) => `${b.no}-${b.ord}`;
+
+/** 판독 입력용 공고 정보 (id 는 나라장터와 같은 번호 체계의 공고번호-차수) */
+const aiBid = (b: NuriBid) => ({
+  id: nuriKey(b), title: b.title, agency: b.agency, baseAmount: b.refAmount ?? b.budget ?? 0,
+  contractMethod: /제안서/.test(b.award ?? "") ? "협상에 의한 계약" : "적격심사",
+}) as Bid;
 
 const rank = (s: EvalSheet) => ({ 높음: 3, 보통: 2, 낮음: 1 })[s.confidence] * 100 + s.items.length;
 

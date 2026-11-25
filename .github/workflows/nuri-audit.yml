@@ -17,6 +17,7 @@ jobs:
       - name: 점검
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NODE_OPTIONS: --max-old-space-size=6144
         run: |
           npx tsx --conditions=react-server $(cat audit/run.txt) 2>&1 | tee audit/out-log.txt

@@ -66,6 +66,8 @@ export interface NuriBid {
   files: NuriFile[];
   /** 첨부에서 읽은 평가 배점표 (빌드가 읽어 합계가 90~110점인 표만. 없으면 못 읽었거나 배점표가 없는 공고) */
   sheet?: NuriSheet;
+  /** 규칙으로 쓸 수 있는 배점표를 못 읽었지만 배점표가 있을 법해, 민간 예측에서 고르면 배점표 판독으로 읽는 공고 */
+  aiSheet?: boolean;
 }
 
 /** 공고 첨부의 평가 배점표 (항목 이름·배점만 화면에 보인다) */
@@ -82,9 +84,12 @@ export interface NuriSheet {
  * 빌드가 첨부에서 읽은 전체 평가표와 공고서 문장 기준. 배점표가 있는 공고만 있다.
  */
 export interface NuriDocs {
-  sheet: EvalSheet;
-  sheetFile: string;
+  /** 규칙 파서가 읽은 표 (없으면 ai: 고를 때 배점표 판독으로 읽는다) */
+  sheet?: EvalSheet;
+  sheetFile?: string;
   notice?: NoticeCriteria;
+  /** 배점표 판독 입력이 있다 (/ai-input/{공고번호-차수}.json) */
+  ai?: boolean;
 }
 
 /** 개찰 결과 한 건 (상위 순위만, 업체는 이름만) */

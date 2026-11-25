@@ -239,7 +239,8 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
   const template = useMemo(() => (bid ? templateSheet(bid, basis) : null), [bid, basis]);
   // 이 공고의 평가표: 공고 원문 배점표 > 공고서에 적힌 기준(통과점수·적용 기준·하한율·기준비율·실적 인정 범위) > 기준표
   const bidCriteria = useMemo(() => (bid && docs ? bidSheet(bid, basis, { extracted: docs.sheet, notice: docs.notice, quant: docs.quant, trusted: NURI }) : null), [bid, docs, basis]);
-  const active = sheet ?? bidCriteria ?? template;
+  // 민간 공고는 기준표가 없어 공고 원문 배점표(규칙 파서 또는 판독)를 읽었을 때만 계산한다
+  const active = sheet ?? (NURI ? (docs?.sheet ? bidCriteria : null) : bidCriteria ?? template);
   // 공고서에 경영상태 기준비율이 있으면 입력 칸 기본값으로 쓴다
   const finBase = active?.financeBase;
   useEffect(() => {
@@ -269,7 +270,18 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
     setAiRead("idle");
     if (!methodProfile(bid).open) return;
     // 민간 공고: 빌드가 읽은 평가표를 그대로 쓴다 (즉석 판독 없음)
-    if (NURI) { setDocs(nuri.data?.docs[bid.id] ?? { files: [] }); return () => { alive = false; }; }
+    if (NURI) {
+      const d: BidDocs = nuri.data?.docs[bid.id] ?? { files: [] };
+      setDocs(d);
+      // 규칙으로 쓸 수 있는 표가 없던 공고: 중계 서버가 빌드 때 만든 판독 입력으로 배점표를 읽는다
+      if (!d.sheet && d.ai && STATIC && CORP_API) {
+        setAiRead("reading");
+        loadAiSheet(bid)
+          .then(({ sheet: s }) => { if (!alive) return; if (s) { setDocs({ ...d, sheet: s, sheetFile: undefined }); setAiRead("done"); } else setAiRead("none"); })
+          .catch(() => alive && setAiRead("fail"));
+      } else if (!d.sheet) setAiRead("none");
+      return () => { alive = false; };
+    }
     loadBidDocs(bid)
       .then((d) => {
         if (!alive) return;
@@ -577,6 +589,18 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
           <Step n={1} title="공고 선택" />
           <p className="mt-2 text-sm text-ink-500">분석할 공고를 검색해 고르세요.<br />{NURI ? `첨부에서 평가 배점표를 읽은 민간 공고 ${bids.length.toLocaleString("ko-KR")}건 중에서 고를 수 있습니다.` : "고른 공고의 첨부파일에서 평가기준을 확인해 평가표를 바로 적용합니다."}</p>
           {pickedBid && !bid && <p className="mt-2 text-sm text-ink-300">고른 공고를 불러오는 중…</p>}
+          {NURI && bid && (aiRead === "reading" ? (
+            <div className="mt-3 rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">
+              <p className="font-semibold text-ink">{bid.title}</p>
+              <p className="mt-1">공고 첨부의 배점표를 읽고 있습니다. 처음 읽는 공고는 10초~1분 걸립니다.</p>
+              <LoadingBar label="배점표 판독 중" />
+            </div>
+          ) : (aiRead === "none" || aiRead === "fail") && !docs?.sheet ? (
+            <p className="mt-3 rounded-xl bg-coral-100/60 px-3 py-2 text-sm text-ink">
+              <b>{bid.title}</b><br />
+              {aiRead === "fail" ? "배점표 판독이 잠시 실패했습니다. 잠시 후 다시 골라 주세요." : "이 공고는 첨부에서 항목 배점 합계가 맞는 배점표를 찾지 못해 예측할 수 없습니다. 공고서 원문을 확인해 주세요."}
+            </p>
+          ) : null)}
           {searchBox}
           <TrialIntro />
           {quick.length > 0 && (

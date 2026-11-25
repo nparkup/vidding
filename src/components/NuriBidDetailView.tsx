@@ -117,7 +117,13 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
             )}
           </section>
 
-          {b.sheet ? <SheetCard sheet={b.sheet} predictHref={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} /> : null}
+          {b.sheet ? <SheetCard sheet={b.sheet} predictHref={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} /> : b.aiSheet ? (
+            <section className="card p-5">
+              <h2 className="text-lg font-bold">평가 배점표</h2>
+              <p className="mt-1 text-sm text-ink-500">첨부에 배점표가 있지만 표 모양이 복잡해 바로 읽지 못했습니다. 평가점수 예측에서 이 공고를 고르면 배점표를 판독해 계산합니다.</p>
+              <Link href={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} className="btn-primary mt-4 w-full">배점표 판독하고 평가점수 예측하기</Link>
+            </section>
+          ) : null}
 
           <LicenseLaws groups={b.licenseGroups} />
 

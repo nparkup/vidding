@@ -39,7 +39,7 @@ export const NAV: Entry[] = [
     ],
   },
   {
-    label: "평가점수 예측",
+    label: "입찰점수 예측",
     items: [
       { href: "/premium", label: "나라장터 입찰 예측", desc: "적격심사·협상 예상 평가점수와 투찰률" },
       { href: "/premium/apt", label: "공동주택 입찰 예측", desc: "아파트 청소·경비 공고 예상 낙찰금액" },

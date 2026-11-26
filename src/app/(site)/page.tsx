@@ -442,7 +442,7 @@ export default async function Home() {
       {/* 핵심 기능 — 번갈아 배치 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <h2 className="h-section">찾고, 거르고, 정리해서,<br className="sm:hidden" /> 알려주는 일도<br />비드매트릭스가 해드립니다.</h2>
+          <h2 className="h-section">찾고, 정리해서, 알려주는<br />비드매트릭스</h2>
         </div>
         <div className="mt-16 space-y-20 sm:space-y-28">
           {FEATURES.map((f, i) => (

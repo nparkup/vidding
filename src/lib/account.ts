@@ -4,7 +4,7 @@
  * 회원 로그인 (중계 서버 worker/corp-lookup/account.ts, ?account=).
  * - 로그인하면 30일 토큰을 이 브라우저(localStorage bm-auth.v1)에 둔다. bidmate. 접두어가 아니어서 새로고침 초기화에 지워지지 않는다.
  * - 비밀번호는 서버로만 보내고 브라우저에 저장하지 않는다.
- * - 로그인하면 사업자번호를 bm-member.v1 에도 적어(member.ts) 기존 화면(평가점수 예측의 사업자번호 칸)이 그대로 쓰게 한다.
+ * - 로그인하면 사업자번호를 bm-member.v1 에도 적어(member.ts) 기존 화면(입찰점수 예측의 사업자번호 칸)이 그대로 쓰게 한다.
  * - 정적 배포(GitHub Pages)에서만 동작한다. 중계 서버 주소가 없으면 로그인 화면이 안내만 보여 준다.
  */
 import { useEffect, useSyncExternalStore } from "react";
@@ -137,7 +137,7 @@ export function useAccount(): AccountState {
   return useSyncExternalStore(subscribe, () => state, () => LOADING);
 }
 
-/** 이 화면이 열릴 때 사용 건수를 다시 받는다 (내 정보·평가점수 예측) */
+/** 이 화면이 열릴 때 사용 건수를 다시 받는다 (내 정보·입찰점수 예측) */
 export function useAccountRefresh() {
   useEffect(() => { if (readSaved()) refreshAccount(); }, []);
 }

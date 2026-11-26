@@ -84,7 +84,7 @@ function UsageCard({ usage }: { usage?: Usage }) {
             <div className={`h-full rounded-full ${pct >= 100 ? "bg-coral" : "bg-mint"}`} style={{ width: `${pct}%` }} />
           </div>
         )}
-        <p className="mt-2 text-xs text-ink-400">공고 예측 1건은 공고 하나의 평가점수 예측·배점표 판독·낙찰 결과로 본 예측입니다.<br />나라장터·공동주택 입찰공고를 합쳐 세고, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
+        <p className="mt-2 text-xs text-ink-400">공고 예측 1건은 공고 하나의 입찰점수 예측·배점표 판독·낙찰 결과로 본 예측입니다.<br />나라장터·공동주택 입찰공고를 합쳐 세고, 이미 분석한 공고는 다시 열어도 차감되지 않습니다.</p>
       </div>
       {used.length > 0 ? (
         <div className="mt-4 border-t border-ink-100 pt-4">

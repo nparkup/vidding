@@ -6,7 +6,7 @@ import { CREDIT_GRADES, tidyItemLabel, type EvalItem, type EvalSheet, type ItemK
 /**
  * 규칙 파서가 배점표를 못 읽은 공고의 첨부 본문을 Claude에 보내 그 공고의 배점표를 읽는다.
  * - 빌드는 AI를 부르지 않는다: 후보 공고의 평가 관련 본문만 잘라(excerpt) /ai-input/{공고}.json 으로 내보낸다.
- * - 평가점수 예측에서 그 공고를 고르면 중계 서버(worker/corp-lookup ?aisheet=)가 그 본문으로 한 번 부르고 결과를 R2에 캐시한다.
+ * - 입찰점수 예측에서 그 공고를 고르면 중계 서버(worker/corp-lookup ?aisheet=)가 그 본문으로 한 번 부르고 결과를 R2에 캐시한다.
  *   키(ANTHROPIC_API_KEY)는 Worker 비밀값에만 있다. 본문은 사이트가 만든 것만 쓰므로 아무 글이나 보내 키를 쓸 수는 없다.
  * - 답은 그대로 쓰지 않는다: 항목 이름이 원문에 있는지, 배점 합계가 100점(기술+가격)과 맞는지, 나라장터 기술·가격 배점과
  *   맞는지(criteria.ts adoptable) 확인해 통과한 것만 평가표로 돌려준다.

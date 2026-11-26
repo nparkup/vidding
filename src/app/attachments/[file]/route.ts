@@ -5,7 +5,7 @@ let byId: Map<string, Bid> | null = null;
 
 /**
  * 공고 한 건의 첨부파일 목록, 빌드 때 첨부에서 추출한 평가표와 공고서의 기준(notice), 참가자격 자료(업종·지역 제한): /attachments/{공고번호-차수}.json
- * 정적 배포에서 평가점수 예측 화면이 고른 공고의 파일만 받도록 공고별로 나눠 만든다.
+ * 정적 배포에서 입찰점수 예측 화면이 고른 공고의 파일만 받도록 공고별로 나눠 만든다.
  */
 export const dynamic = "force-static";
 export const dynamicParams = false;

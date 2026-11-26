@@ -198,7 +198,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
 
           <section className="card p-5">
             <p className="text-xs font-semibold text-mint-600">프리미엄</p>
-            <h2 className="mt-1 text-lg font-bold">평가점수 예측</h2>
+            <h2 className="mt-1 text-lg font-bold">입찰점수 예측</h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-500">
               이 공고의 첨부파일에서 평가항목과 배점을 읽고, 귀사의 실적·신용등급·인력으로 {bid.contractMethod === "협상에 의한 계약" ? "기술점수와 협상적격 여부" : bid.contractMethod === "적격심사" ? "적격심사 예상 점수와 통과 가능한 투찰률" : "예상 점수"}를 계산합니다.
             </p>
@@ -207,7 +207,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
 
           <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-5 text-white shadow-glow">
             <p className="font-bold">이 공고, 함께 준비할까요?</p>
-            <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 이 공고 같은 조건의 새 공고를 매일 아침 메일로 받고, 평가점수 예측을 공고 수 제한 없이 쓰실 수 있습니다.</p>
+            <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 이 공고 같은 조건의 새 공고를 매일 아침 메일로 받고, 입찰점수 예측을 공고 수 제한 없이 쓰실 수 있습니다.</p>
             <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>
           </section>
         </aside>

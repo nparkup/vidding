@@ -242,7 +242,7 @@ function ProfileForm({ onApply }: { onApply: (p: Record<string, string>) => void
         </div>
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="perf" value="1" className="mt-1 h-4 w-4 accent-[#0FA37F]" />
-          <span>실적으로 만점 받을 수 있는 공고만 보기<span className="block text-xs text-ink-500">용역·물품은 3년, 공사는 5년 실적이 공고 금액의 1배 이상인 공고. 공고별 정확한 기준은 평가점수 예측에서 계산합니다.</span></span>
+          <span>실적으로 만점 받을 수 있는 공고만 보기<span className="block text-xs text-ink-500">용역·물품은 3년, 공사는 5년 실적이 공고 금액의 1배 이상인 공고. 공고별 정확한 기준은 입찰점수 예측에서 계산합니다.</span></span>
         </label>
         <button className="btn-mint w-full" disabled={lic.length === 0}>조건 적용</button>
       </form>

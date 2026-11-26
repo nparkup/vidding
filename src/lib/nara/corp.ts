@@ -4,7 +4,7 @@ import type { BidAttachment } from "../types";
 import { NARA_APIS } from "./endpoints";
 
 /**
- * 평가점수 예측용 나라장터 조회.
+ * 입찰점수 예측용 나라장터 조회.
  * - 조달업체 정보 조회는 src/lib/corpLookup.ts (국세청·금융위원회 정보와 함께 조회)
  * - 공고 첨부파일: 입찰공고정보서비스(BidPublicInfoService), 공고번호로 조회 (inqryDiv=2). 활용신청 승인 후 동작
  */

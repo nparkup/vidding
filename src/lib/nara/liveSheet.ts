@@ -9,7 +9,7 @@ import { AI_SHEET_VERSION, excerpt, hasTableSignal, readSheetWithAI, type AiShee
 import { docStem, download, dropRepeatedEntries, dropRepeatedPreSpec, preSpecText, rankFiles, textOf } from "./attachText";
 
 /**
- * 빌드에서 첨부를 다 읽지 못한 공고: 평가점수 예측에서 공고를 고르면 중계 서버(worker/corp-lookup ?aisheet=)가
+ * 빌드에서 첨부를 다 읽지 못한 공고: 입찰점수 예측에서 공고를 고르면 중계 서버(worker/corp-lookup ?aisheet=)가
  * 그 자리에서 첨부를 모두 받아 읽는다 (같은 파일명은 하나만). 규칙 파서로 쓸 수 있는 배점표가 나오면 그대로,
  * 아니면 배점표 신호가 있을 때만 Claude로 읽는다. 첨부 목록과 공고 정보는 사이트의 /attachments/{공고}.json 에서만 받는다.
  */

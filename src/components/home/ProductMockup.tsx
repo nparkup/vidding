@@ -21,7 +21,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
     { t: "맞춤 공고", on: true, n: digest.recommended.length },
     { t: "공동주택 입찰공고" },
     { t: "정정·취소 알림" },
-    { t: "평가점수 예측" },
+    { t: "입찰점수 예측" },
     { t: "제출 서류" },
   ];
   return (

@@ -6,6 +6,7 @@
  * - POST member&bizno=        : 가입 정보 고치기 (회사명·담당자·연락처·이메일·업종·지역·규모·키워드·메일 수신·상태·메모)
  * - POST member-create        : 회원 직접 등록 (가입과 같은 항목 + 비밀번호(비우면 임시 비밀번호 발급) + 이용권 + 이용 한도)
  * - POST member-delete&bizno= : 탈퇴 처리 (가입 정보·결제 기록 삭제, 무료 체험 사용 기록은 남긴다)
+ * - POST withdraw-cancel&bizno= : 회원의 탈퇴 예약 취소
  * - POST trial-reset&bizno=   : 무료 체험 사용 기록 초기화
  * - POST member-limit&bizno=  : 회원별 개별 이용 한도 { quota: 숫자 | null(무제한), memo } 또는 { reset: true } (요금제 기본 한도로)
  * - POST usage-reset&bizno=   : 유료 이용권 이번 기간 공고 예측 사용 기록 초기화
@@ -24,7 +25,7 @@
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
 import { actions, apiUsage, storage } from "./ops";
-import { adminMember, createMemberByAdmin, deleteAccountData, issueTempPassword, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
+import { adminMember, cancelWithdraw, createMemberByAdmin, finishWithdraw, issueTempPassword, processDueWithdrawals, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
 import { limitOf, MAX_QUOTA } from "../../src/lib/usagePeriod";
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../../src/lib/siteConfigCore";
 
@@ -177,11 +178,18 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
     }
     case "member-delete": {
       if (!post || !needBizno()) break;
-      await deleteAccountData(bucket, await readJson(bucket, `members/${bizno}.json`), bizno);
-      await bucket.delete(`members/${bizno}.json`);
-      await bucket.delete(`billing/${bizno}.json`);
+      const cur = await readJson(bucket, `members/${bizno}.json`);
+      const done = cur ? await finishWithdraw(bucket, cur, "admin") : null;
       audit("member-delete", bizno);
-      return json({ status: "deleted" }, 200, noStore);
+      return json({ status: "deleted", withdrawn: done }, 200, noStore);
+    }
+    case "withdraw-cancel": {
+      if (!post || !needBizno()) break;
+      const cur = await readJson(bucket, `members/${bizno}.json`);
+      if (!cur) return json({ error: "가입 정보가 없습니다." }, 404);
+      const next = await cancelWithdraw(bucket, cur);
+      audit("withdraw-cancel", bizno);
+      return json({ status: "ok", member: adminMember(next) }, 200, noStore);
     }
     case "trial-reset": {
       if (!post || !needBizno()) break;
@@ -335,6 +343,8 @@ function cleanBilling(b: Record<string, unknown>): Billing | { error: string } {
 
 /** 가입자 목록: members/ 전부와 사업자번호별 무료 체험 사용 공고(trial/), 결제 기록(billing/), 마지막 조회(Metrics seen) */
 async function listMembers(bucket: AdminBucket, env: AdminEnv, cfg: SiteConfig) {
+  // 마지막 이용일이 지난 탈퇴 예약은 목록을 만들기 전에 처리한다 (매일 예약 작업이 놓친 경우)
+  await processDueWithdrawals(bucket).catch(() => 0);
   const keys: string[] = [];
   let cursor: string | undefined;
   do {
@@ -370,7 +380,21 @@ async function listMembers(bucket: AdminBucket, env: AdminEnv, cfg: SiteConfig) 
     }));
     out.push(...part.filter(Boolean));
   }
-  return { members: out, limit: cfg.trialLimit, pricing: cfg.pricing, at: new Date().toISOString() };
+  // 탈퇴한 회원 기록 (최근 순)
+  const wkeys: string[] = [];
+  cursor = undefined;
+  do {
+    const r = await bucket.list({ prefix: "withdraw/done/", cursor, limit: 1000 });
+    wkeys.push(...r.objects.map((o) => o.key));
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor && wkeys.length < 5000);
+  const withdrawn: Record<string, unknown>[] = [];
+  for (let i = 0; i < wkeys.length; i += 20) {
+    const part = await Promise.all(wkeys.slice(i, i + 20).map((k) => readJson(bucket, k)));
+    withdrawn.push(...(part.filter(Boolean) as Record<string, unknown>[]));
+  }
+  withdrawn.sort((a, b) => String(b.at ?? "").localeCompare(String(a.at ?? "")));
+  return { members: out, withdrawn, limit: cfg.trialLimit, pricing: cfg.pricing, at: new Date().toISOString() };
 }
 
 /** 관리자 비밀번호 비교: 해시끼리 끝까지 비교해 응답 시간으로 맞힌 글자 수를 알 수 없게 한다 */

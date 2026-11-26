@@ -44,7 +44,7 @@ import { AI_SHEET_VERSION, readAiInput, type AiInput, type AiSheetResult } from 
 import { liveKey, readSheetLive, type LiveDocs } from "../../src/lib/nara/liveSheet";
 import { fetchPatents, fetchPatentsRgst, type PatentLookup } from "../../src/lib/patents";
 import { handleAdmin, readSiteConfig } from "./admin";
-import { handleAccount } from "./account";
+import { handleAccount, processDueWithdrawals } from "./account";
 import { metricsStub, patchFetch, takePending, truncIp, type MetricsNs, type RecBody } from "./metrics";
 export { Metrics } from "./metrics";
 
@@ -114,6 +114,10 @@ export default {
     }
     if (env.METRICS && req.method !== "OPTIONS") ctx.waitUntil(flushMetrics(req, res, Date.now() - t0, err, env.METRICS).catch(() => undefined));
     return res;
+  },
+  /** 매일 0시 10분(한국, wrangler.toml crons): 마지막 이용일이 지난 회원 탈퇴 예약을 처리한다 */
+  async scheduled(_ev: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
+    if (env.AWARDS) ctx.waitUntil(processDueWithdrawals(env.AWARDS).then(() => undefined));
   },
 };
 

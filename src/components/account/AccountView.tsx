@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { accountCall, logout, refreshAccount, saveSession, useAccount, useAccountRefresh, type AccountMember, type Usage } from "@/lib/account";
 import { planName } from "@/lib/plans";
+import { daysBetween, kstToday, nextDay } from "@/lib/usagePeriod";
 import { useSiteConfig } from "@/lib/siteConfig";
 
 const bizFmt = (n: string) => `${n.slice(0, 3)}-${n.slice(3, 5)}-${n.slice(5)}`;
@@ -12,10 +13,20 @@ const dayBefore = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) - 86400_0
 const when = (t: number) => new Date(t).toLocaleDateString("ko-KR", { month: "long", day: "numeric", timeZone: "Asia/Seoul" });
 const bidHref = (k: string) => (k.startsWith("apt:") ? `/premium/apt?apt=${encodeURIComponent(k.slice(4))}` : `/premium?bid=${encodeURIComponent(k.slice(5))}#predict`);
 
-/** 내 정보: 이용권·이번 달 사용 건수, 가입 정보 고치기, 비밀번호 바꾸기, 로그아웃 */
+/** 내 정보: 이용권·이번 달 사용 건수, 가입 정보 고치기, 비밀번호 바꾸기, 로그아웃, 회원 탈퇴 */
 export function AccountView({ email }: { email: string }) {
   const acc = useAccount();
   useAccountRefresh();
+  const [left, setLeft] = useState("");
+  if (left) {
+    return (
+      <div className="card p-6 text-center sm:p-10">
+        <p className="text-xl font-extrabold">탈퇴했습니다</p>
+        <p className="mt-2 text-sm text-ink-500">{left} 가입 정보와 로그인 계정, 서류함을 지웠습니다.<br />그동안 이용해 주셔서 감사합니다.</p>
+        <div className="mt-5 flex justify-center"><Link href="/" className="btn-ghost">처음 화면으로</Link></div>
+      </div>
+    );
+  }
   if (acc.status === "loading") return <div className="h-64 animate-pulse rounded-2xl bg-ink-100/60" />;
   if (acc.status === "out") {
     return (
@@ -46,7 +57,7 @@ export function AccountView({ email }: { email: string }) {
       <UsageCard usage={acc.usage} />
       {m ? <ProfileForm m={m} /> : <div className="h-40 animate-pulse rounded-2xl bg-ink-100/60" />}
       <PasswordForm />
-      <p className="text-xs text-ink-400">탈퇴를 원하시면 {email}로 요청해 주세요.<br />가입 정보와 서류함을 바로 지웁니다.</p>
+      {m && <WithdrawCard m={m} usage={acc.usage} onDone={() => setLeft(acc.company)} />}
     </div>
   );
 }
@@ -177,3 +188,130 @@ function PasswordForm() {
   );
 }
 
+
+/**
+ * 회원 탈퇴. 남은 이용권이 있으면 두 가지 중에서 고른다.
+ * - 이용권이 끝난 뒤 탈퇴: 마지막 이용일까지 그대로 쓰고, 다음 결제는 하지 않으며, 다음 날 가입 정보를 지운다 (중간에 취소할 수 있다)
+ * - 바로 탈퇴: 지금 지운다. 남은 이용 기간은 사라지고 환불하지 않는다 (요금 FAQ: 일할 환불 없음)
+ */
+function WithdrawCard({ m, usage, onDone }: { m: AccountMember; usage?: Usage; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"scheduled" | "now">("scheduled");
+  const [pw, setPw] = useState("");
+  const [reason, setReason] = useState("");
+  const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const today = kstToday();
+  // 남은 이용권의 마지막 이용일 (종료일이 없으면 이번 달 기간의 마지막 날)
+  const last = usage?.mode === "paid" ? (usage.end || dayBefore(usage.period.to)) : "";
+  const hasPass = !!last && last >= today;
+  const pick = hasPass ? mode : "now";
+  const w = m.withdraw;
+
+  async function cancel() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await accountCall("withdraw-cancel", {});
+      await refreshAccount();
+      setMsg({ ok: true, t: "탈퇴 예약을 취소했습니다. 계속 이용하실 수 있습니다." });
+    } catch (err) { setMsg({ ok: false, t: (err as Error).message }); } finally { setBusy(false); }
+  }
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ok) { setMsg({ ok: false, t: "안내 내용을 확인하고 체크해 주세요." }); return; }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await accountCall<{ status: string }>("withdraw", { mode: pick, password: pw, reason });
+      setPw("");
+      if (r.status === "withdrawn") { logout(); onDone(); return; }
+      await refreshAccount();
+      setOpen(false);
+      setOk(false);
+      setMsg({ ok: true, t: `탈퇴를 예약했습니다. ${day(last)}까지 그대로 이용하실 수 있습니다.` });
+    } catch (err) { setMsg({ ok: false, t: (err as Error).message }); } finally { setBusy(false); }
+  }
+
+  if (w) {
+    return (
+      <section className="card border-coral/30 p-5 sm:p-6">
+        <p className="font-bold">탈퇴 예정</p>
+        <p className="mt-2 text-sm text-ink-600">{day(w.on)}까지 이용권을 그대로 쓰실 수 있습니다.<br />다음 결제는 하지 않고, {day(nextDay(w.on))}에 가입 정보와 로그인 계정, 서류함을 지웁니다.</p>
+        {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-mint-700" : "text-coral"}`}>{msg.t}</p>}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={cancel} disabled={busy} className="btn-primary btn-sm">{busy ? "처리 중…" : "탈퇴 예약 취소"}</button>
+          <button type="button" onClick={() => { setOpen((x) => !x); setMode("now"); }} className="btn-ghost btn-sm text-coral">지금 바로 탈퇴</button>
+        </div>
+        {open && <WithdrawForm pick="now" hasPass={hasPass} last={last} today={today} pw={pw} setPw={setPw} reason={reason} setReason={setReason} ok={ok} setOk={setOk} busy={busy} onSubmit={submit} onClose={() => setOpen(false)} />}
+      </section>
+    );
+  }
+
+  return (
+    <section className="card p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-bold">회원 탈퇴</p>
+          <p className="mt-1 text-xs text-ink-400">가입 정보와 로그인 계정, 서류함을 지웁니다.</p>
+        </div>
+        {!open && <button type="button" onClick={() => { setOpen(true); setMsg(null); }} className="btn-ghost btn-sm text-coral">탈퇴하기</button>}
+      </div>
+      {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-mint-700" : "text-coral"}`}>{msg.t}</p>}
+      {open && (
+        <>
+          {hasPass && (
+            <fieldset className="mt-4">
+              <legend className="text-sm font-semibold">이용권이 {day(last)}까지 남아 있습니다. 언제 탈퇴할지 골라 주세요.</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <Choice on={mode === "scheduled"} onPick={() => setMode("scheduled")} title="이용권이 끝난 뒤 탈퇴">
+                  {day(last)}까지 그대로 이용하고, 다음 결제는 하지 않습니다.<br />{day(nextDay(last))}에 가입 정보를 지웁니다. 그 전에는 예약을 취소할 수 있습니다.
+                </Choice>
+                <Choice on={mode === "now"} onPick={() => setMode("now")} title="지금 바로 탈퇴">
+                  지금 바로 지웁니다. 남은 이용 기간({day(today)} ~ {day(last)}, {daysBetween(today, last)}일)은 사라지며 환불되지 않습니다.
+                </Choice>
+              </div>
+            </fieldset>
+          )}
+          <WithdrawForm pick={pick} hasPass={hasPass} last={last} today={today} pw={pw} setPw={setPw} reason={reason} setReason={setReason} ok={ok} setOk={setOk} busy={busy} onSubmit={submit} onClose={() => { setOpen(false); setOk(false); setPw(""); }} />
+        </>
+      )}
+    </section>
+  );
+}
+
+function Choice({ on, onPick, title, children }: { on: boolean; onPick: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <label className={`block cursor-pointer rounded-xl border p-3 text-sm transition ${on ? "border-ink-900 bg-ink-50" : "border-ink-100 hover:border-ink-300"}`}>
+      <span className="flex items-center gap-2 font-semibold"><input type="radio" name="w-mode" checked={on} onChange={onPick} />{title}</span>
+      <span className="mt-1 block text-xs leading-relaxed text-ink-500">{children}</span>
+    </label>
+  );
+}
+
+function WithdrawForm({ pick, hasPass, last, today, pw, setPw, reason, setReason, ok, setOk, busy, onSubmit, onClose }: {
+  pick: "scheduled" | "now"; hasPass: boolean; last: string; today: string; pw: string; setPw: (v: string) => void; reason: string; setReason: (v: string) => void;
+  ok: boolean; setOk: (v: boolean) => void; busy: boolean; onSubmit: (e: React.FormEvent) => void; onClose: () => void;
+}) {
+  const now = pick === "now";
+  return (
+    <form onSubmit={onSubmit} className="mt-4 space-y-4 border-t border-ink-100 pt-4">
+      <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-ink-500">
+        <li>{now ? "지금 바로" : `${day(nextDay(last))}에`} 가입 정보, 로그인 계정, 내 서류함, 결제 기록을 지우며 되돌릴 수 없습니다.</li>
+        {now && hasPass && <li className="font-semibold text-coral">남은 이용권 기간({day(today)} ~ {day(last)})은 바로 끝나며, 남은 기간에 대한 환불은 없습니다.</li>}
+        {!now && <li>{day(last)}까지는 지금처럼 공고 예측과 모든 기능을 쓰실 수 있고, 다음 결제는 하지 않습니다.</li>}
+        <li>무료 체험으로 분석한 공고 기록은 남겨 두어, 다시 가입해도 무료 체험 건수가 새로 생기지 않습니다.</li>
+      </ul>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div><label className="label" htmlFor="w-pw">비밀번호 확인</label><input id="w-pw" type="password" required autoComplete="current-password" maxLength={64} className="input" value={pw} onChange={(e) => setPw(e.target.value)} /></div>
+        <div><label className="label" htmlFor="w-reason">탈퇴 사유 <span className="font-normal text-ink-300">(선택)</span></label><input id="w-reason" maxLength={300} className="input" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+      </div>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={ok} onChange={(e) => setOk(e.target.checked)} />위 내용을 확인했고 {now ? "지금 탈퇴합니다" : "이용권이 끝난 뒤 탈퇴합니다"}.</label>
+      <div className="flex flex-wrap gap-2">
+        <button className="rounded-full bg-coral px-4 py-1.5 text-sm font-bold text-white disabled:opacity-60" disabled={busy}>{busy ? "처리 중…" : now ? "지금 탈퇴" : "탈퇴 예약"}</button>
+        <button type="button" onClick={onClose} className="btn-ghost btn-sm">닫기</button>
+      </div>
+    </form>
+  );
+}

@@ -2,7 +2,7 @@
 
 /** 관리자 화면이 중계 서버(worker/corp-lookup/admin.ts)를 부르는 공통 함수와 자료형 */
 
-import type { LimitInfo, LimitOverride } from "@/lib/usagePeriod";
+import type { LimitInfo, LimitOverride, WithdrawInfo } from "@/lib/usagePeriod";
 
 export type MemberQuota = LimitInfo & { used: number };
 
@@ -36,6 +36,8 @@ export interface Member {
   updatedAt?: string;
   status?: "active" | "suspended";
   memo?: string;
+  /** 회원이 신청한 탈퇴 예약 (on = 마지막 이용일, 다음 날 지운다) */
+  withdraw?: WithdrawInfo | null;
   trial: TrialUse[];
   billing?: Billing | null;
   /** 로그인 계정 (비밀번호를 정했으면). 비밀번호 해시는 서버가 보내지 않는다 */
@@ -46,6 +48,22 @@ export interface Member {
   quota?: MemberQuota | null;
   /** 사업자번호를 넣은 조회가 마지막으로 온 때(ms)와 누적 횟수 (지표 수집 시작 뒤부터) */
   seen?: { last: number; n: number } | null;
+}
+
+/** 탈퇴한 회원 기록 (중계 서버 withdraw/done/). 담당자·연락처·이메일은 남기지 않는다 */
+export interface Withdrawn {
+  bizno: string;
+  company: string;
+  /** now = 회원이 바로 탈퇴, scheduled = 이용권이 끝난 뒤 탈퇴, admin = 관리자 탈퇴 처리 */
+  mode: "now" | "scheduled" | "admin";
+  at: string;
+  requestedAt?: string;
+  joinedAt?: string | null;
+  plan?: string | null;
+  passEnd?: string | null;
+  /** 바로 탈퇴해 남은 이용 기간이 사라졌으면 그 마지막 날 */
+  forfeit?: string | null;
+  reason?: string;
 }
 
 export class AuthError extends Error {}

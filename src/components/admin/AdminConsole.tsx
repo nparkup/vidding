@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Logo } from "@/components/Logo";
-import { AuthError, makeCall, type Member } from "./adminApi";
+import { AuthError, makeCall, type Member, type Withdrawn } from "./adminApi";
 import { MembersTab } from "./MembersTab";
 import { BillingTab } from "./BillingTab";
 import { UsageTab } from "./UsageTab";
@@ -34,6 +34,7 @@ export function AdminConsole({ api }: { api: string }) {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
   const [members, setMembers] = useState<Member[] | null>(null);
+  const [withdrawn, setWithdrawn] = useState<Withdrawn[]>([]);
   const [limit, setLimit] = useState(3);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -64,10 +65,11 @@ export function AdminConsole({ api }: { api: string }) {
     setBusy(true);
     setMsg("");
     try {
-      const j = await makeCall(api, t)<{ members?: Member[]; limit?: number }>("members");
+      const j = await makeCall(api, t)<{ members?: Member[]; withdrawn?: Withdrawn[]; limit?: number }>("members");
       setAuthed(true);
       setLimit(j.limit ?? 3);
       setMembers((j.members ?? []).map((m) => ({ ...m, trial: Array.isArray(m.trial) ? m.trial : [] })));
+      setWithdrawn(Array.isArray(j.withdrawn) ? j.withdrawn : []);
     } catch (e) {
       if (e instanceof AuthError) logout(e.message);
       else setMsg((e as Error).message);
@@ -113,7 +115,8 @@ export function AdminConsole({ api }: { api: string }) {
   const updateMember = (m: Member) => setMembers((l) => l?.map((x) => (x.bizno === m.bizno ? { ...x, ...m } : x)) ?? null);
   const addMember = (m: Member) => setMembers((l) => [m, ...(l ?? []).filter((x) => x.bizno !== m.bizno)]);
   const removeMember = (bizno: string) => setMembers((l) => l?.filter((x) => x.bizno !== bizno) ?? null);
-  const shared = { call, guard, members: members ?? [], limit, busy, reload: () => load(token), updateMember, addMember, removeMember };
+  const addWithdrawn = (w: Withdrawn) => setWithdrawn((l) => [w, ...l.filter((x) => x.bizno !== w.bizno)]);
+  const shared = { call, guard, members: members ?? [], withdrawn, addWithdrawn, limit, busy, reload: () => load(token), updateMember, addMember, removeMember };
 
   return (
     <div className="min-h-screen bg-paper">
@@ -174,6 +177,9 @@ export interface TabProps {
   call: ReturnType<typeof makeCall>;
   guard: <T>(p: Promise<T>) => Promise<T | undefined>;
   members: Member[];
+  /** 탈퇴한 회원 기록 (최근 순) */
+  withdrawn: Withdrawn[];
+  addWithdrawn: (w: Withdrawn) => void;
   limit: number;
   busy: boolean;
   reload: () => void;

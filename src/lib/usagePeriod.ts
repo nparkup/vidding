@@ -99,3 +99,27 @@ export function limitOf(billing: BillingLike | null | undefined, pricing: Pricin
     period: plan ? periodOf(billing?.start || undefined, today) : null,
   };
 }
+
+/** YYYY-MM-DD 하루 뒤 */
+export function nextDay(d: string): string {
+  return new Date(Date.parse(`${d}T00:00:00Z`) + 86400_000).toISOString().slice(0, 10);
+}
+
+/** 두 날짜 사이 날 수 (from·to 모두 포함) */
+export function daysBetween(from: string, to: string): number {
+  return Math.max(0, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400_000) + 1);
+}
+
+/**
+ * 탈퇴할 때 남은 이용권의 마지막 이용일. 이용 중인 유료 이용권이 없으면 null (바로 탈퇴만 된다).
+ * 결제 기록 종료일이 있으면 그날, 없으면 이번 달 기간의 마지막 날 (다음 결제는 하지 않는다).
+ */
+export function passLastDay(b: BillingLike | null | undefined, today = kstToday()): string | null {
+  if (!activePlan(b, today)) return null;
+  if (b?.end) return b.end;
+  const p = periodOf(b?.start, today);
+  return new Date(Date.parse(`${p.to}T00:00:00Z`) - 86400_000).toISOString().slice(0, 10);
+}
+
+/** 회원 탈퇴 상태 (members/{사업자번호}.json 의 withdraw). scheduled = 이용권이 끝난 다음 날 지운다 */
+export interface WithdrawInfo { mode: "scheduled"; on: string; requestedAt: string; reason?: string }

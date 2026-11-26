@@ -6,6 +6,10 @@ compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
+# 매일 0시 10분(한국 = UTC 15:10): 이용권이 끝난 회원 탈퇴 예약 처리 (account.ts processDueWithdrawals)
+[triggers]
+crons = ["10 15 * * *"]
+
 [vars]
 ALLOWED_ORIGINS = "https://nparkup.github.io,http://localhost:3000"
 # 공고 배점표 AI 판독: 입력 파일(/ai-input/{공고}.json)을 읽어 올 사이트와 모델. 키는 비밀값 ANTHROPIC_API_KEY

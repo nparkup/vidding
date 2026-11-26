@@ -556,7 +556,7 @@ export default async function Home() {
       {/* 체험 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <h2 className="h-section">우리 회사 조건이면,<br className="sm:hidden" /> 지금 몇 건이나 될까요?</h2>
+          <h2 className="h-section">우리 회사가 낙찰 될 확률이 높은<br className="sm:hidden" /> 공고는 몇 건이나 될까요?</h2>
           <p className="lead mx-auto mt-4 max-w-xl">면허와 지역, 규모를 골라 보세요.<br />매일 하는 1차 선별을 실제 공고로 그대로 체험할 수 있습니다.</p>
         </div>
         <div className="mx-auto mt-10 max-w-5xl">

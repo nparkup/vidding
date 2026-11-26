@@ -15,7 +15,6 @@ export default async function SampleReport() {
   return (
     <>
     <PageHero
-      eyebrow="보고서 샘플"
       title={<>주 1회<br />주요 공고 분석보고서</>}
       lead="매주 월요일 아침, 지난주 공고 흐름과 이번 주 집중할 공고를 한 장으로 정리해 드립니다. 아래 샘플은 가상의 고객사 조건을 이번 주 실제 나라장터 공고에 적용해 자동으로 작성한 것입니다."
       art={<DeskArt className="w-full" />}

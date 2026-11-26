@@ -19,7 +19,6 @@ export default function CiCreditsPage() {
   return (
     <>
       <PageHero
-        eyebrow="발주기관 CI"
         title="발주기관 CI 출처"
         lead="공고 목록과 상세 화면의 발주기관 CI는 위키미디어 공용에 공개된 파일을 받아 이 사이트에 함께 올린 것입니다. 기관을 알아보기 쉽게 하려는 표시이며 고객사나 제휴 관계를 뜻하지 않습니다. 중앙행정기관과 소속기관은 모두 대한민국 정부상징을 씁니다."
       />

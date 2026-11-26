@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function MyBoxPage() {
   return (
     <>
-      <PageHero eyebrow="내 서류함" title={<>담아 둔 공고,<br />마감 순으로 챙기세요.</>} lead="공고 상세에서 담은 공고를 마감·개찰 일정과 함께 모았습니다. 라벨과 메모로 나누고, 제출서류 체크 진행도 같이 봅니다." />
+      <PageHero title={<>담아 둔 공고,<br />마감 순으로 챙기세요.</>} lead="공고 상세에서 담은 공고를 마감·개찰 일정과 함께 모았습니다. 라벨과 메모로 나누고, 제출서류 체크 진행도 같이 봅니다." />
       <MyBox />
     </>
   );

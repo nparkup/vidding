@@ -14,7 +14,6 @@ export default function NuriPredictPage() {
   return (
     <>
       <PageHero
-        eyebrow="프리미엄 · 입찰점수 예측 · 누리장터 입찰 예측"
         title={<>누리장터 공고도,<br />우리 회사 점수가 나옵니다.</>}
         lead="누리장터 공고(재건축조합·민간 기업·사회복지법인 등)의 첨부에서 평가 배점표를 읽고, 국세청·나라장터·금융위원회 기업 정보와 결합해 이 공고에서 받을 예상 점수와 통과 여부를 계산합니다."
       >
@@ -25,8 +24,7 @@ export default function NuriPredictPage() {
       </PageHero>
 
       <section id="predict" className="container-x scroll-mt-20 pt-12">
-        <p className="eyebrow">누리장터 입찰 예측</p>
-        <h2 className="h-section mt-3">누리장터 공고 하나로 직접 계산해 보세요</h2>
+        <h2 className="h-section">누리장터 공고 하나로 직접 계산해 보세요</h2>
         <p className="lead mt-3 max-w-3xl">첨부에서 평가 배점표를 읽은 누리장터 공고만 고를 수 있습니다. 배점표가 없는 공고(최고가·최저가, 총회 의결 시공자 선정 등)는 예측 대상이 아닙니다.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다(나라장터·공동주택 입찰 예측과 합산)."}</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>

@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "자주 묻는 질문" };
 export default function FaqPage() {
   return (
     <>
-    <PageHero eyebrow="FAQ" title="자주 묻는 질문" lead="서비스 이용과 요금·이용권에 관한 질문을 모았습니다.">
+    <PageHero title="자주 묻는 질문" lead="서비스 이용과 요금·이용권에 관한 질문을 모았습니다.">
       <div className="mt-7 flex flex-wrap gap-2">
         {FAQ_SECTIONS.map((s) => (
           <a key={s.id} href={`#${s.id}`} className="rounded-full border border-ink-100 bg-white px-4 py-2 text-sm font-semibold text-ink hover:border-mint hover:text-mint-600">{s.title}</a>

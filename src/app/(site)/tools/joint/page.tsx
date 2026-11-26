@@ -12,7 +12,6 @@ export default function JointToolPage() {
   return (
     <>
       <PageHero
-        eyebrow="실무 도구 · 공동도급"
         title={<>혼자 안 되면,<br />지분을 어떻게 나눌까.</>}
         lead="공고 조건과 함께할 업체의 시공능력평가액, 실적, 지분율을 넣으면 단독으로 들어갈 수 있는지, 구성원마다 몇 %까지 참여할 수 있는지, 조건을 다 채우는지 바로 계산합니다."
       />

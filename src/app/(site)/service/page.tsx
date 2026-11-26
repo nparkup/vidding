@@ -62,7 +62,7 @@ export default async function ServicePage() {
           <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-mint/20 blur-3xl" />
           <div className="container-x relative py-14 sm:py-20">
             <h1 className="max-w-4xl text-4xl font-extrabold leading-[1.15] tracking-[-0.04em] sm:text-[52px]">
-              공고를 찾고, 흐름을 읽고,<br /><span className="text-mint-400">점수를 미리 계산합니다.</span>
+              공고를 찾고, 흐름을 읽고,<br /><span className="text-mint-400">점수를 계산해서 예측합니다.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-300">
               비드매트릭스는 입찰공고와 10년간의 낙찰 기록을 분석하는 입찰 분석 정보 서비스입니다. 참가 여부와 투찰 금액을 정하는 데 필요한 숫자와 근거를 공고마다 정리해 드립니다.
@@ -76,8 +76,7 @@ export default async function ServicePage() {
       </section>
 
       <section className="container-x pt-16">
-        <h2 className="h-section">세 엔진으로 나눠 드립니다.</h2>
-        <div className="mt-8 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {ENGINE_LIST.map((e) => (
             <div key={e.id} className="card flex min-w-0 flex-col p-6">
               <p className="text-3xl font-extrabold tracking-[-0.03em] sm:text-[34px]"><EngineName id={e.id} /></p>

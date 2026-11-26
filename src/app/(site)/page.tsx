@@ -386,7 +386,7 @@ export default async function Home() {
             입찰공고 낙찰정보 빅데이터 분석 정보
           </p>
           <h1 className="mx-auto mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.15] tracking-[-0.045em] sm:text-6xl lg:text-[72px]">
-            공고마다 데이터로 분석하고,
+            공고마다 데이터로 분석하고
             <br />
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가!</span>
           </h1>

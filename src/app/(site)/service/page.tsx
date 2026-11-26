@@ -1,3 +1,4 @@
+import { Brand } from "@/components/BrandText";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TrialN } from "@/components/Cfg";
@@ -65,7 +66,7 @@ export default async function ServicePage() {
               공고를 찾고, 흐름을 읽고,<br /><span className="text-mint-400">점수를 계산해서 예측합니다.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-300">
-              비드매트릭스는 입찰공고와 10년간의 낙찰 기록을 분석하는 입찰 분석 정보 서비스입니다. 참가 여부와 투찰 금액을 정하는 데 필요한 숫자와 근거를 공고마다 정리해 드립니다.
+              <Brand tail="매트릭스" dark />는 입찰공고와 10년간의 낙찰 기록을 분석하는 입찰 분석 정보 서비스입니다. 참가 여부와 투찰 금액을 정하는 데 필요한 숫자와 근거를 공고마다 정리해 드립니다.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/apply" className="btn-mint">무료 체험</Link>

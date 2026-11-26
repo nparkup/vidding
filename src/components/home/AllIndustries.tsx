@@ -1,3 +1,4 @@
+import { Brand } from "@/components/BrandText";
 import Link from "next/link";
 import { ConstructionArt, ITArt, SupplyArt } from "@/components/art/Sectors";
 
@@ -47,7 +48,7 @@ export function AllIndustries({ total, by, groups, aptWithPrior }: { total: numb
     <section className="container-x pt-28">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <h2 className="h-section">용역·공사·물품,<br /> 모든 업종을 한 화면에서 봅니다.</h2>
-        <p className="max-w-md text-ink-500">비드파인더가 나라장터, 공동주택 입찰 공고 K-apt, 누리장터 공고를 함께 받아 같은 업종 기준으로 나누고, 귀사가 참가할 수 있는 공고만 골라 드립니다.</p>
+        <p className="max-w-md text-ink-500"><Brand tail="파인더" />가 나라장터, 공동주택 입찰 공고 K-apt, 누리장터 공고를 함께 받아 같은 업종 기준으로 나누고, 귀사가 참가할 수 있는 공고만 골라 드립니다.</p>
       </div>
 
       {/* 합계와 출처 구성 */}

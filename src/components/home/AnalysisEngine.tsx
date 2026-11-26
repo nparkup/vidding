@@ -1,3 +1,4 @@
+import { Brand } from "@/components/BrandText";
 import type { Bid } from "@/lib/types";
 import { EngineName } from "@/components/EngineName";
 import { bidPriceGuide, type MatchResult } from "@/lib/analysis";
@@ -43,7 +44,7 @@ export function AnalysisEngine({ bid, ev, total }: { bid: Bid; ev: MatchResult; 
             <p className="text-sm font-bold tracking-wide text-mint-400">비드아틀라스 엔진으로 입찰 특화 분석</p>
             <h2 className="h-section mt-3"><EngineName id="atlas" dark /> 엔진으로<br />모든 입찰 공고를<br className="sm:hidden" /> 정밀 분석합니다.</h2>
             <p className="mt-5 text-base leading-relaxed text-ink-300 sm:text-lg">
-              비드아틀라스는 면허·지역·규모 3개 필수 조건을 먼저 판정하고, 통과한 공고만 경쟁 강도·실적·준비 기간을 가중해 점수와 등급을 매깁니다.
+              <Brand tail="아틀라스" dark />는 면허·지역·규모 3개 필수 조건을 먼저 판정하고, 통과한 공고만 경쟁 강도·실적·준비 기간을 가중해 점수와 등급을 매깁니다.
               모든 점수는 항목별 근거와 함께 공개됩니다.
             </p>
           </div>

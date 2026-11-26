@@ -1,3 +1,4 @@
+import { Brand } from "@/components/BrandText";
 import type { Digest } from "@/lib/digest";
 import { date, dday, won } from "@/lib/format";
 import { changeSummary } from "@/lib/noticeChanges";
@@ -15,8 +16,8 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
         <span className="ml-2 truncate">받은편지함 · 오전 7:00</span>
       </div>
       <div className="p-5 sm:p-6">
-        <p className="text-xs text-ink-300">보낸사람 비드매트릭스 &lt;daily@bidmatrix.kr&gt;</p>
-        <p className="mt-1 font-bold">[비드매트릭스] {today} {client.company} 맞춤 공고 {recommended.length}건</p>
+        <p className="text-xs text-ink-300">보낸사람 <Brand tail="매트릭스" /> &lt;daily@bidmatrix.kr&gt;</p>
+        <p className="mt-1 font-bold">[<Brand tail="매트릭스" />] {today} {client.company} 맞춤 공고 {recommended.length}건</p>
         <div className="mt-4 grid grid-cols-2 gap-2 text-center">
           <div className="rounded-xl bg-mint-50 p-3">
             <p className="text-xl font-extrabold text-mint-600">{newToday}</p>

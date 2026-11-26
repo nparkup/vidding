@@ -2,6 +2,7 @@
  * 관리자 화면(/admin) API. 모든 요청은 ?admin=동작 이고, 로그인(login)만 빼고 Authorization: Bearer 토큰이 있어야 한다.
  *
  * - POST login                : 아이디·비밀번호(+ 2단계 인증 코드) → 12시간 서명 토큰. IP마다 15분에 5번 틀리면 15분 잠금
+ * - POST download            : CSV 내려받기 기록 (감사 기록만)
  * - GET/POST backup           : 회원·결제 자료 백업 목록·지금 백업·복구 시험 (backup.ts)
  * - GET/POST totp             : 관리자 2단계 인증 상태·설정·켜기·끄기 (security.ts)
  * - GET  members              : 가입자 전부 + 무료 체험 사용 공고 + 결제 요약 + 마지막 조회 시각
@@ -128,6 +129,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
   switch (action) {
     case "members": {
       if (post) break;
+      audit("members-view", "회원 목록 조회");
       return json(await listMembers(bucket, env, await readSiteConfig(bucket)), 200, noStore);
     }
     case "member": {
@@ -305,6 +307,14 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
         return json(r, 200, noStore);
       }
       break;
+    }
+    case "download": {
+      // 관리자 화면이 CSV를 내려받을 때 남기는 기록 (파일은 화면에서 만든다)
+      if (!post) break;
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { /* 빈 입력 */ }
+      audit("download", `${s(b.what, 20) || "CSV"} ${Math.max(0, Math.round(Number(b.rows) || 0))}명`);
+      return json({ status: "ok" }, 200, noStore);
     }
     case "settings": {
       if (!post) return json({ config: await readSiteConfig(bucket), defaults: DEFAULT_CONFIG }, 200, noStore);

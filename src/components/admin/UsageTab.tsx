@@ -70,6 +70,8 @@ export function UsageTab({ call, guard, members, limit, busy, reload }: TabProps
           : lastActive(b) - lastActive(a)), [members, sort, tier, qs]);
 
   function csv() {
+    // 개인정보 다운로드 기록 (관리자 > 시스템 정보 > 접속·로그 감사 기록)
+    call("download", { body: { what: "회원사용량", rows: members.length } }).catch(() => undefined);
     downloadCsv("회원사용량", ["회사명", "사업자등록번호", "요금제", "적용 한도", "개별 한도", "이번 기간 사용", "남은 건수", "기간", "체험 사용", "분석한 공고", "첫 분석", "마지막 분석", "사업자번호 조회 횟수", "마지막 활동", "결제"],
       sorted.map((m) => {
         const ts = m.trial.map((t) => t.t).sort((a, b) => a - b);

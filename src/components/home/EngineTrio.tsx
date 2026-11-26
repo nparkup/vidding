@@ -16,7 +16,7 @@ export function EngineTrio() {
               <span className="text-sm font-extrabold tabular-nums text-mint-600">0{i + 1}</span>
               <span className="chip bg-paper">{e.area}</span>
             </div>
-            <p className="mt-5 text-[28px] font-extrabold leading-tight tracking-[-0.03em]"><EngineName id={e.id} /></p>
+            <p className="mt-5 text-[34px] font-extrabold leading-tight sm:text-[38px] tracking-[-0.03em]"><EngineName id={e.id} /></p>
             <p className="mt-1 font-bold text-ink-700">{e.tagline}</p>
             <p className="mt-3 flex-1 text-sm leading-relaxed text-ink-500">{e.desc}</p>
             <ul className="mt-5 flex flex-wrap gap-1">

@@ -567,7 +567,7 @@ export default async function Home() {
       {/* 이런 업체에 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <h2 className="h-section">이런 업체에 잘 맞아요.</h2>
+          <h2 className="h-section">이런 기업에는 비드매트릭스가 필요해요.</h2>
         </div>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {PERSONAS.map((p) => (

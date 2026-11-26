@@ -120,8 +120,8 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
           {b.sheet ? <SheetCard sheet={b.sheet} predictHref={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} /> : b.aiSheet ? (
             <section className="card p-5">
               <h2 className="text-lg font-bold">평가 배점표</h2>
-              <p className="mt-1 text-sm text-ink-500">첨부에 배점표가 있지만 표 모양이 복잡해 바로 읽지 못했습니다. 평가점수 예측에서 이 공고를 고르면 배점표를 판독해 계산합니다.</p>
-              <Link href={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} className="btn-primary mt-4 w-full">배점표 판독하고 평가점수 예측하기</Link>
+              <p className="mt-1 text-sm text-ink-500">첨부에 배점표가 있지만 표 모양이 복잡해 바로 읽지 못했습니다. 입찰점수 예측에서 이 공고를 고르면 배점표를 판독해 계산합니다.</p>
+              <Link href={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} className="btn-primary mt-4 w-full">배점표 판독하고 입찰점수 예측하기</Link>
             </section>
           ) : null}
 
@@ -187,7 +187,7 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
 
           <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-5 text-white shadow-glow">
             <p className="font-bold">이 공고, 함께 준비할까요?</p>
-            <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 같은 조건의 새 공고를 매일 아침 메일로 받고, 평가점수 예측을 쓰실 수 있습니다.</p>
+            <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 같은 조건의 새 공고를 매일 아침 메일로 받고, 입찰점수 예측을 쓰실 수 있습니다.</p>
             <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>
           </section>
         </aside>
@@ -232,7 +232,7 @@ function SheetCard({ sheet: s, predictHref }: { sheet: NonNullable<NuriBid["shee
       </div>
       {s.pass ? <p className="mt-3 text-sm text-ink-700">통과 기준: 총점 {pts(s.pass)} 이상</p> : null}
       <p className="mt-3 text-xs leading-relaxed text-ink-400">세부 평가 기준과 서류 인정 범위는 공고서 원문에서 확인하세요. 항목 이름은 원문 표를 줄여 보여 줄 수 있습니다.</p>
-      <Link href={predictHref} className="btn-primary mt-4 w-full">이 배점표로 평가점수 예측하기</Link>
+      <Link href={predictHref} className="btn-primary mt-4 w-full">이 배점표로 입찰점수 예측하기</Link>
     </section>
   );
 }

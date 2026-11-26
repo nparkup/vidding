@@ -95,7 +95,7 @@ export function TrialLocked({ used, onPick, state }: { used: TrialEntry[]; onPic
         <>
           <p className="font-bold">무료 체험 {TRIAL_LIMIT}건을 모두 사용했습니다</p>
           <p className="mt-2 text-sm text-ink-700">
-            무료 체험은 입찰공고 {TRIAL_LIMIT}건까지 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 제공합니다.
+            무료 체험은 입찰공고 {TRIAL_LIMIT}건까지 입찰점수 예측·배점표 판독·낙찰 결과로 본 예측을 제공합니다.
             다른 공고를 분석하려면 요금제를 신청해 주세요.
           </p>
         </>

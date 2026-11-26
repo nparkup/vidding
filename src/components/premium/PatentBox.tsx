@@ -4,7 +4,7 @@ import type { EvalItem } from "@/lib/evalscore";
 import { countPatents, patentRule, type PatentLookup } from "@/lib/patents";
 
 /**
- * 평가점수 예측 3단계: 공고 배점표에 특허 항목이 있을 때만 보인다.
+ * 입찰점수 예측 3단계: 공고 배점표에 특허 항목이 있을 때만 보인다.
  * 특허청 등록원부(공공데이터포털) 조회 결과 중 지금 살아 있는 특허권을 보여 주고, 공고에 인정되지 않는 건은 고객이 뺄 수 있다.
  * 조회에 없는 건(출원 건, 조회 뒤 등록된 건)은 직접 더한다.
  */

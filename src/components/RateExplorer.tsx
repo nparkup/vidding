@@ -25,7 +25,7 @@ export function RateExplorer({ table, tiers }: { table: RateTable | null; tiers:
 
       <section className="card min-w-0 p-5 sm:p-6">
         <h2 className="text-lg font-bold">조달청 적격심사 세부기준 ({biz})</h2>
-        <p className="mt-1 text-sm text-ink-500">추정가격 구간별 낙찰하한율·통과점수·실적 평가. 공고 평가점수 예측에 쓰는 기준표와 같은 값입니다.</p>
+        <p className="mt-1 text-sm text-ink-500">추정가격 구간별 낙찰하한율·통과점수·실적 평가. 공고 입찰점수 예측에 쓰는 기준표와 같은 값입니다.</p>
         <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="table-x min-w-[760px]">
             <thead><tr><th>기준표 (구간)</th><th className="text-right">낙찰하한율</th><th className="text-right">통과점수</th><th>실적 평가</th><th>대조</th></tr></thead>

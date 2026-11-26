@@ -4,7 +4,7 @@ import type { AwardAnalysis } from "./analysis";
 /**
  * 같은 사업 확인: 규칙(공고명 유사도·구분어·사업 종류·금액)으로 확실히 가르지 못한 '애매한 후보'(analysis.maybe, 최대 10건)만
  * Claude(Haiku)에 공고명·날짜·금액을 보여 지금 공고와 같은 사업(매년·매기 다시 발주하는 같은 계약)인지 묻는다.
- * - 빌드는 부르지 않는다. 평가점수 예측에서 공고를 고르면 중계 서버(worker/corp-lookup ?relate=)가 사이트의
+ * - 빌드는 부르지 않는다. 입찰점수 예측에서 공고를 고르면 중계 서버(worker/corp-lookup ?relate=)가 사이트의
  *   /award-analysis/{공고}.json 에서 후보를 읽어 한 번 부르고, 결과를 R2 ai-relate/v{버전}/{공고}-{후보 해시}.json 에 둔다.
  * - 입력은 공고명·기관·날짜·금액뿐이라 공고 하나에 입력 1~2천, 출력 수백 토큰 (약 0.5원).
  * - 핵심어로 찾은 다른 기관 낙찰(analysis.related.rows, 최대 30건)도 같은 종류의 일인지 함께 묻는다 (약 0.9원).

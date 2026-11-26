@@ -8,7 +8,7 @@ import type { Bid } from "../types";
 export type PriorTarget = Pick<Bid, "id" | "title" | "demandAgency" | "bizType">;
 
 /**
- * 전년도 낙찰률 통계 (평가점수 예측의 '예상 최저 경쟁 투찰률' 기본값).
+ * 전년도 낙찰률 통계 (입찰점수 예측의 '예상 최저 경쟁 투찰률' 기본값).
  *
  * - 낙찰률: 낙찰정보서비스 getScsbidListSttus{Servc,Cnstwk,Thng} (공고 1건당 1행, 조회 기간 최대 7일) → 공고번호·낙찰률
  * - 계약방법·추정가격: 입찰공고정보서비스 getBidPblancListInfo{Servc,Cnstwk,Thng}02 (하루치 한 번) → 공고번호로 붙인다

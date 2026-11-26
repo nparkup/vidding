@@ -545,7 +545,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
           {searchBox}
         </section>
         <aside className="card min-w-0 p-6">
-          <p className="font-bold text-coral">평가점수 예측 대상이 아닌 공고</p>
+          <p className="font-bold text-coral">입찰점수 예측 대상이 아닌 공고</p>
           <p className="mt-2 text-sm text-ink-700">{profile.closedReason}입니다.<br />나라장터도 이런 공고는 정보공개 차원에서 올리는 것이며 계약대상자가 아닌 업체는 참가할 수 없다고 안내합니다.</p>
           <dl className="mt-4 space-y-2 text-sm">
             <div><dt className="text-xs text-ink-500">참가할 수 있는 업체</dt><dd>{profile.who}</dd></div>

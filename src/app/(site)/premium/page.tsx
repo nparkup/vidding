@@ -16,7 +16,7 @@ export default function PremiumPage() {
     <>
       <AptPriceRedirect />
       <PageHero
-        eyebrow="프리미엄 · 평가점수 예측 · 나라장터 입찰 예측"
+        eyebrow="프리미엄 · 입찰점수 예측 · 나라장터 입찰 예측"
         title={<>공고를 고르면,<br />우리 회사 점수가 나옵니다.</>}
         lead="입찰공고에 첨부된 공고서·규격서에서 평가기준과 배점을 추출하고, 나라장터에 등록된 기업 정보와 신용평가 서류를 결합해 이 공고에서 받을 예상 점수와 통과 여부를 계산합니다."
       >

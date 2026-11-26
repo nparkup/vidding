@@ -38,7 +38,7 @@ interface Done {
 }
 
 /**
- * 무료 체험 회원가입 폼. 가입하면 입찰공고 3건을 평가점수 예측(src/lib/trial.ts)으로 무료 분석할 수 있다.
+ * 무료 체험 회원가입 폼. 가입하면 입찰공고 3건을 입찰점수 예측(src/lib/trial.ts)으로 무료 분석할 수 있다.
  * - 정적 배포(GitHub Pages): 중계 서버에 가입 정보를 저장하고(사업자번호 하나에 하나), 이 브라우저에 사업자번호를 적어 둔다.
  *   맞춤 공고 조건을 넣었으면 브라우저에서 바로 참가 가능 공고를 계산한다.
  * - 서버 배포: action(서버 액션)으로 접수 저장
@@ -118,7 +118,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
             </p>
           ) : (
             <p className="mt-2 text-sm text-ink-500">
-              {done.company || "귀사"}의 무료 체험이 시작되었습니다{done.status === "ok" ? "(로그인되었습니다)" : ""}. 입찰공고 <TrialN />건을 골라 평가점수 예측·배점표 판독·낙찰 결과로 본 예측을 써 보세요.
+              {done.company || "귀사"}의 무료 체험이 시작되었습니다{done.status === "ok" ? "(로그인되었습니다)" : ""}. 입찰공고 <TrialN />건을 골라 입찰점수 예측·배점표 판독·낙찰 결과로 본 예측을 써 보세요.
             </p>
           )}
           {done.status === "local" && (

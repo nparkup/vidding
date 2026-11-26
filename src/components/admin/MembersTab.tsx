@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { TabProps } from "./AdminConsole";
 import { bizFmt, downloadCsv, dt, SIZE_LABEL, type Member } from "./adminApi";
 import { planName } from "@/lib/plans";
+import { MemberCreate } from "./MemberCreate";
 import { fullOf, LimitEditor, QuotaBadge, tierName, useMemberQuota } from "./limits";
 
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -15,13 +16,14 @@ type St = "all" | "active" | "suspended" | "paid" | "login" | "nologin";
 export const isPaid = (m: Member) => m.billing?.status === "active";
 
 /** 회원정보 관리: 검색·거르기, 가입 정보 고치기, 이용 정지·해제, 메모, 무료 체험 초기화, 탈퇴 처리, CSV */
-export function MembersTab({ call, guard, members, limit, busy, reload, updateMember, removeMember }: TabProps) {
+export function MembersTab({ call, guard, members, limit, busy, reload, updateMember, addMember, removeMember }: TabProps) {
   const [q, setQ] = useState("");
   const [mailOnly, setMailOnly] = useState(false);
   const [use, setUse] = useState<Use>("all");
   const [st, setSt] = useState<St>("all");
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [adding, setAdding] = useState(false);
 
   const quotaOf = useMemberQuota();
   const sorted = useMemo(() => [...members].sort((a, b) => (b.joinedAt ?? "").localeCompare(a.joinedAt ?? "")), [members]);
@@ -72,13 +74,16 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold">회원정보</h1>
-          <p className="mt-1 text-sm text-ink-500">회원가입한 업체입니다. 최근 가입 순. 상세에서 정보를 고치거나 이용을 정지할 수 있습니다.</p>
+          <p className="mt-1 text-sm text-ink-500">회원가입한 업체입니다. 최근 가입 순. 상세에서 정보를 고치거나 이용을 정지할 수 있고, 회원 등록으로 관리자가 직접 회원을 만들 수 있습니다.</p>
         </div>
         <div className="flex gap-2">
+          <button type="button" onClick={() => setAdding((x) => !x)} className="btn-primary btn-sm">{adding ? "등록 닫기" : "회원 등록"}</button>
           <button type="button" onClick={reload} className="btn-ghost btn-sm" disabled={busy}>{busy ? "불러오는 중…" : "새로 불러오기"}</button>
-          <button type="button" onClick={csv} className="btn-primary btn-sm" disabled={!shown.length}>CSV 내려받기</button>
+          <button type="button" onClick={csv} className="btn-ghost btn-sm" disabled={!shown.length}>CSV 내려받기</button>
         </div>
       </div>
+
+      {adding && <MemberCreate call={call} guard={guard} onClose={() => setAdding(false)} onCreated={(x, msg) => { addMember(x); setNote(msg); setQ(""); setSt("all"); setUse("all"); setMailOnly(false); }} />}
 
       <Stats items={[["전체 회원", stats.total], ["최근 7일 가입", stats.recent], ["결제 중", stats.paid], ["로그인 계정", stats.login], ["체험 사용", stats.used], ["이용 정지", stats.suspended]]} />
 
@@ -115,7 +120,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
                   {isPaid(m) && <span className="rounded-lg bg-mint-50 px-2 py-0.5 text-xs font-bold text-mint-700">{planName(m.billing!.plan)}</span>}
                   {!m.login && <span className="rounded-lg bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-400">비밀번호 없음</span>}
                 </p>
-                <p className="text-xs tabular-nums text-ink-400">{bizFmt(m.bizno)} · 가입 {dt(m.joinedAt)}</p>
+                <p className="text-xs tabular-nums text-ink-400">{bizFmt(m.bizno)} · 가입 {dt(m.joinedAt)}{m.createdBy === "admin" ? " (관리자 등록)" : ""}</p>
                 <p className="mt-1.5 text-sm">{m.name} · <span className="tabular-nums">{m.phone}</span> · <a href={`mailto:${m.email}`} className="text-mint-600 [overflow-wrap:anywhere] hover:underline">{m.email}</a></p>
               </div>
               <div className="flex shrink-0 items-center gap-2">

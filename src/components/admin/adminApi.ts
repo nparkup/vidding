@@ -31,6 +31,8 @@ export interface Member {
   agreeMail?: boolean;
   plan?: string;
   joinedAt?: string;
+  /** 관리자 화면에서 직접 등록했으면 "admin" */
+  createdBy?: string;
   updatedAt?: string;
   status?: "active" | "suspended";
   memo?: string;

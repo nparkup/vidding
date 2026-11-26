@@ -4,6 +4,7 @@
  * - POST login                : 아이디·비밀번호 → 12시간 서명 토큰
  * - GET  members              : 가입자 전부 + 무료 체험 사용 공고 + 결제 요약 + 마지막 조회 시각
  * - POST member&bizno=        : 가입 정보 고치기 (회사명·담당자·연락처·이메일·업종·지역·규모·키워드·메일 수신·상태·메모)
+ * - POST member-create        : 회원 직접 등록 (가입과 같은 항목 + 비밀번호(비우면 임시 비밀번호 발급) + 이용권 + 이용 한도)
  * - POST member-delete&bizno= : 탈퇴 처리 (가입 정보·결제 기록 삭제, 무료 체험 사용 기록은 남긴다)
  * - POST trial-reset&bizno=   : 무료 체험 사용 기록 초기화
  * - POST member-limit&bizno=  : 회원별 개별 이용 한도 { quota: 숫자 | null(무제한), memo } 또는 { reset: true } (요금제 기본 한도로)
@@ -23,7 +24,7 @@
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
 import { actions, apiUsage, storage } from "./ops";
-import { adminMember, deleteAccountData, issueTempPassword, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
+import { adminMember, createMemberByAdmin, deleteAccountData, issueTempPassword, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
 import { limitOf, MAX_QUOTA } from "../../src/lib/usagePeriod";
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../../src/lib/siteConfigCore";
 
@@ -131,6 +132,41 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       await putJson(bucket, `members/${bizno}.json`, next);
       audit("member-edit", `${bizno}${cur.status !== next.status ? ` 상태 ${next.status === "suspended" ? "이용 정지" : "정상"}` : ""}`);
       return json({ status: "ok", member: adminMember(next) }, 200, noStore);
+    }
+    case "member-create": {
+      if (!post) break;
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
+      // 이용 한도·이용권은 저장 전에 먼저 확인한다
+      const lb = (b.limit ?? {}) as Record<string, unknown>;
+      let limit: Record<string, unknown> | undefined;
+      const at = new Date().toISOString();
+      if (lb.mode === "admin") limit = { quota: null, admin: true, memo: s(lb.memo, 200) || undefined, at };
+      else if (lb.mode === "unlimited") limit = { quota: null, memo: s(lb.memo, 200) || undefined, at };
+      else if (lb.mode === "num") {
+        const q = Math.round(Number(lb.quota));
+        if (!(Number.isFinite(q) && q >= 0 && q <= MAX_QUOTA)) return json({ error: `한도는 0 ~ ${MAX_QUOTA.toLocaleString()}건 사이로 정해 주세요.` }, 400);
+        limit = { quota: q, memo: s(lb.memo, 200) || undefined, at };
+      }
+      let bill: Billing | null = null;
+      if (b.billing && typeof b.billing === "object" && (b.billing as Record<string, unknown>).plan) {
+        const r = cleanBilling({ ...(b.billing as Record<string, unknown>), status: "active", payments: [] });
+        if ("error" in r) return json(r, 400);
+        if (!r.plan) return json({ error: "이용권을 확인해 주세요." }, 400);
+        bill = r;
+      }
+      const made = await createMemberByAdmin(bucket, b);
+      if ("error" in made) return json({ error: made.error }, made.status, noStore);
+      const rec = made.rec;
+      const no = String(rec.bizno);
+      if (limit) { rec.limit = limit; await putJson(bucket, `members/${no}.json`, rec); }
+      if (bill) await putJson(bucket, `billing/${no}.json`, { ...bill, updatedAt: at });
+      const cfg = await readSiteConfig(bucket);
+      const t = await readJson(bucket, `trial/${no}.json`);
+      const trial = (t?.used as unknown[]) ?? [];
+      const quota = await memberLimit(bucket, rec, bill as unknown as Record<string, unknown> | null, cfg, trial.length);
+      audit("member-create", `${no}${bill ? ` ${bill.plan}` : ""}${limit?.admin ? " 관리자 계정" : ""}`);
+      return json({ status: "ok", member: { ...adminMember(rec), trial, billing: bill, quota, seen: null }, ...(made.temp ? { temp: made.temp } : {}) }, 200, noStore);
     }
     case "password-temp": {
       if (!post || !needBizno()) break;

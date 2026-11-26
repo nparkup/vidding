@@ -159,14 +159,50 @@ export async function issueTempPassword(bucket: AdminBucket, bizno: string): Pro
   if (!rec) return { error: "가입 정보가 없습니다." };
   const email = rec.auth?.email ?? String(rec.email ?? "");
   if (!EMAIL.test(email)) return { error: "회원 이메일이 없어 로그인 계정을 만들 수 없습니다. 이메일부터 저장해 주세요." };
-  // 헷갈리는 글자(0·O·1·l·I)를 뺀 영문+숫자 10자
-  const abc = "abcdefghjkmnpqrstuvwxyz23456789";
-  let temp = "";
-  while (pwProblem(temp)) temp = Array.from(crypto.getRandomValues(new Uint8Array(10)), (x) => abc[x % abc.length]).join("");
+  const temp = makeTempPassword();
   if (!(await moveEmail(bucket, bizno, rec.auth?.email, email))) return { error: "이 이메일은 다른 회원이 로그인에 쓰고 있습니다." };
   rec.auth = { email: normEmail(email), pw: await hashPassword(temp), ver: (rec.auth?.ver ?? 0) + 1, setAt: new Date().toISOString(), lastLogin: rec.auth?.lastLogin, temp: true };
   await putJson(bucket, `members/${bizno}.json`, rec);
   return { temp };
+}
+
+/** 임시 비밀번호: 헷갈리는 글자(0·O·1·l·I)를 뺀 영문+숫자 10자 */
+export function makeTempPassword(): string {
+  const abc = "abcdefghjkmnpqrstuvwxyz23456789";
+  let temp = "";
+  while (pwProblem(temp)) temp = Array.from(crypto.getRandomValues(new Uint8Array(10)), (x) => abc[x % abc.length]).join("");
+  return temp;
+}
+
+/**
+ * 관리자 화면: 회원 직접 등록. 회원가입과 같은 항목(회사명·사업자등록번호·담당자·연락처·이메일·맞춤 조건)을 받고
+ * 로그인 계정도 같이 만든다. 비밀번호를 비워 두면 임시 비밀번호를 만들어 한 번만 돌려준다(저장은 해시만).
+ * mustChange 면 회원이 로그인했을 때 비밀번호를 바꾸라고 안내한다(임시 비밀번호는 늘 안내).
+ */
+export async function createMemberByAdmin(bucket: AdminBucket, body: Record<string, unknown>): Promise<{ rec: Rec; temp?: string } | { error: string; status: number }> {
+  const bizno = normalizeBizno(s(body.bizno, 20));
+  if (!validBizno(bizno)) return { error: "올바른 사업자등록번호가 아닙니다. 숫자 10자리를 다시 확인해 주세요.", status: 400 };
+  const email = normEmail(s(body.email, 120));
+  if (!EMAIL.test(email)) return { error: "이메일 주소를 확인해 주세요. 로그인 아이디로 씁니다.", status: 400 };
+  const m: Rec = {
+    company: s(body.company, 100), bizno, name: s(body.name, 40), email, phone: s(body.phone, 30),
+    licenses: list(body.licenses, 40), regions: list(body.regions, 20), size: s(body.size, 40), keywords: s(body.keywords, 200),
+    agreePrivacy: body.agreePrivacy === true, agreeMail: body.agreeMail === true, plan: s(body.plan, 20),
+    status: body.status === "suspended" ? "suspended" : "active", memo: s(body.memo, 1000),
+  };
+  if (!m.company || !m.name || !m.phone) return { error: "회사명, 담당자 이름, 연락처를 입력해 주세요.", status: 400 };
+  let pw = String(body.password ?? "");
+  let temp: string | undefined;
+  if (!pw) pw = temp = makeTempPassword();
+  const bad = pwProblem(pw);
+  if (bad) return { error: bad, status: 400 };
+  const key = `members/${bizno}.json`;
+  if (await readJson(bucket, key)) return { error: "이미 가입된 사업자등록번호입니다. 목록에서 그 회원을 찾아 고쳐 주세요.", status: 409 };
+  if (!(await moveEmail(bucket, bizno, undefined, email))) return { error: "이 이메일은 다른 회원이 로그인에 쓰고 있습니다.", status: 409 };
+  const now = new Date().toISOString();
+  const rec: Rec = { ...m, joinedAt: now, createdBy: "admin", auth: { email, pw: await hashPassword(pw), ver: 1, setAt: now, temp: !!temp || body.mustChange === true } };
+  await putJson(bucket, key, rec);
+  return { rec, temp };
 }
 
 /** 탈퇴: 로그인 색인·서류함도 지운다 */

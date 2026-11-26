@@ -1,6 +1,8 @@
 import "server-only";
 import type { Bid, BizType, ContractMethod, Region, ServiceCategory } from "../types";
 import { splitLicenses } from "../licenses";
+import { mapRegions } from "../regions";
+export { mapRegions };
 import { CHANGE_DAYS, diffBids, type NoticeChange } from "../noticeChanges";
 import { NARA_BASE, STD_BID_API } from "./endpoints";
 import { classify } from "../classify";
@@ -74,27 +76,6 @@ function toIso(date?: string, time?: string): string | undefined {
   const t = time && /^\d{1,2}:\d{2}$/.test(time) ? time.padStart(5, "0") : "00:00";
   const d = new Date(`${date}T${t}:00+09:00`);
   return isNaN(d.getTime()) ? undefined : d.toISOString();
-}
-
-const REGION_ALIASES: [string, Region[]][] = [
-  ["서울", ["서울"]], ["경기", ["경기"]], ["인천", ["인천"]], ["강원", ["강원"]],
-  ["충청북", ["충북"]], ["충북", ["충북"]], ["충청남", ["충남"]], ["충남", ["충남"]],
-  ["대전", ["대전"]], ["세종", ["세종"]],
-  ["전라북", ["전북"]], ["전북", ["전북"]],
-  // 2026년 출범한 전남광주통합특별시: 광주·전남 업체 모두 해당
-  ["전남광주", ["광주", "전남"]], ["전라남", ["전남"]], ["전남", ["전남"]], ["광주", ["광주"]],
-  ["경상북", ["경북"]], ["경북", ["경북"]], ["경상남", ["경남"]], ["경남", ["경남"]],
-  ["대구", ["대구"]], ["울산", ["울산"]], ["부산", ["부산"]], ["제주", ["제주"]],
-];
-
-export function mapRegions(s?: string): Region[] {
-  if (!s?.trim()) return [];
-  const out = new Set<Region>();
-  for (const part of s.split(",")) {
-    const hit = REGION_ALIASES.find(([k]) => part.includes(k));
-    if (hit) hit[1].forEach((r) => out.add(r));
-  }
-  return [...out];
 }
 
 function mapMethod(s?: string): ContractMethod {

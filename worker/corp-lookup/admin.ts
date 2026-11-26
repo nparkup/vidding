@@ -2,6 +2,7 @@
  * 관리자 화면(/admin) API. 모든 요청은 ?admin=동작 이고, 로그인(login)만 빼고 Authorization: Bearer 토큰이 있어야 한다.
  *
  * - POST login                : 아이디·비밀번호(+ 2단계 인증 코드) → 12시간 서명 토큰. IP마다 15분에 5번 틀리면 15분 잠금
+ * - GET/POST backup           : 회원·결제 자료 백업 목록·지금 백업·복구 시험 (backup.ts)
  * - GET/POST totp             : 관리자 2단계 인증 상태·설정·켜기·끄기 (security.ts)
  * - GET  members              : 가입자 전부 + 무료 체험 사용 공고 + 결제 요약 + 마지막 조회 시각
  * - POST member&bizno=        : 가입 정보 고치기 (회사명·담당자·연락처·이메일·업종·지역·규모·키워드·메일 수신·상태·메모)
@@ -26,6 +27,7 @@
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
 import { actions, apiUsage, storage } from "./ops";
+import { listBackups, runBackup, verifyBackup, type BBucket } from "./backup";
 import { adminFail, adminFailClear, adminLocked, newTotpSecret, readTotp, totpOk, writeTotp, type AdminTotp } from "./security";
 import { adminMember, cancelWithdraw, createMemberByAdmin, finishWithdraw, issueTempPassword, processDueWithdrawals, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
 import { limitOf, MAX_QUOTA } from "../../src/lib/usagePeriod";
@@ -58,6 +60,8 @@ export interface AdminEnv {
   METRICS?: MetricsNs;
   /** GitHub Actions 상태 조회용 (선택, 읽기 전용 토큰). 없으면 공개 API */
   GITHUB_TOKEN?: string;
+  BACKUP?: BBucket;
+  BACKUP_KEY?: string;
   /** 기본 nparkup/vidding */
   GITHUB_REPO?: string;
 }
@@ -282,6 +286,23 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
         audit("totp-off", "2단계 인증 끔");
         const exp = Date.now() + ADMIN_SESSION_MS;
         return json({ on: false, token: await signAdmin(exp, env, null), exp }, 200, noStore);
+      }
+      break;
+    }
+    case "backup": {
+      // 회원·결제 자료 백업 (backup.ts). GET 목록, POST { step: "run" } 지금 백업, { step: "verify" } 복구 시험(덮어쓰지 않음)
+      if (!post) return json({ ...(await listBackups(env.BACKUP)), encrypted: !!env.BACKUP_KEY }, 200, noStore);
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
+      if (b.step === "run") {
+        const r = await runBackup(bucket as unknown as BBucket, env.BACKUP, env.BACKUP_KEY);
+        audit("backup", "error" in r ? `실패: ${r.error}` : `${r.key} ${r.bytes}바이트`);
+        return json(r, "error" in r ? 503 : 200, noStore);
+      }
+      if (b.step === "verify") {
+        const r = await verifyBackup(bucket as unknown as BBucket, env.BACKUP, env.BACKUP_KEY);
+        audit("backup-verify", r.ok ? `${(r as { file: string }).file} 확인` : `실패: ${(r as { reason: string }).reason}`);
+        return json(r, 200, noStore);
       }
       break;
     }

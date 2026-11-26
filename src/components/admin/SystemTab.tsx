@@ -15,7 +15,7 @@ const ROUTE: Record<string, string> = {
   trial: "무료 체험 확인", signup: "회원가입", pv: "페이지 조회 신호", config: "사이트 설정 읽기", presence: "이용자 수(사용 안 함)", other: "기타",
 };
 const routeName = (r: string) => (r.startsWith("admin:") ? `관리자 ${r.slice(6)}` : ROUTE[r] ?? r);
-const AUDIT: Record<string, string> = { login: "로그인", "login-fail": "로그인 실패", "member-edit": "회원 수정", "member-delete": "탈퇴 처리", "withdraw-cancel": "탈퇴 예약 취소", "trial-reset": "체험 초기화", "member-limit": "이용 한도", "usage-reset": "이용권 사용 초기화", billing: "결제 기록", settings: "페이지 설정", opsconfig: "API 한도·환율", "login-locked": "잠긴 상태 로그인 시도", "totp-on": "2단계 인증 켬", "totp-off": "2단계 인증 끔", "password-temp": "임시 비밀번호", "member-create": "회원 등록" };
+const AUDIT: Record<string, string> = { login: "로그인", "login-fail": "로그인 실패", "member-edit": "회원 수정", "member-delete": "탈퇴 처리", "withdraw-cancel": "탈퇴 예약 취소", "trial-reset": "체험 초기화", "member-limit": "이용 한도", "usage-reset": "이용권 사용 초기화", billing: "결제 기록", settings: "페이지 설정", opsconfig: "API 한도·환율", "login-locked": "잠긴 상태 로그인 시도", "totp-on": "2단계 인증 켬", "totp-off": "2단계 인증 끔", backup: "백업", "backup-verify": "복구 시험", "password-temp": "임시 비밀번호", "member-create": "회원 등록" };
 const EVENT: Record<string, string> = { push: "머지", schedule: "예약", workflow_dispatch: "수동", pull_request: "PR 검사" };
 const SUB = [["incident", "장애"], ["traffic", "트래픽"], ["access", "접속·로그"]] as const;
 type Sub = (typeof SUB)[number][0];

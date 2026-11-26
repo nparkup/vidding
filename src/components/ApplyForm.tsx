@@ -240,7 +240,9 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
                 <li>수집 항목: 회사명, 사업자등록번호, 담당자 이름, 이메일, 연락처, 입력하신 맞춤 공고 조건, 비밀번호(복원할 수 없는 암호화 값으로만 저장)</li>
                 <li>이용 목적: 회원 확인과 로그인, 무료 체험·이용권 사용 건수 확인, 이용 안내와 요금제 상담</li>
                 <li>보유 기간: 회원 탈퇴 때까지. 탈퇴는 로그인 후 내 정보에서 직접 하실 수 있고, 탈퇴하면 바로 지웁니다(남은 이용권이 있으면 이용권이 끝난 다음 날 지우도록 고를 수 있습니다).</li>
+                <li>자료는 해외 클라우드(Cloudflare, 미국)에 저장됩니다. 탈퇴 후에도 결제 기록은 법에 따라 5년 보관합니다.</li>
                 <li>동의하지 않으실 수 있으며, 이 경우 회원가입과 무료 체험을 이용하실 수 없습니다.</li>
+                <li>자세한 내용은 <Link href="/privacy" target="_blank" className="font-semibold text-mint-600 underline">개인정보처리방침</Link>을 확인해 주세요.</li>
               </ul>
             </details>
             <label className="flex items-start gap-2 text-sm">

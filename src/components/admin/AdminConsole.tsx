@@ -11,6 +11,7 @@ import { ApiTab } from "./ApiTab";
 import { SystemTab } from "./SystemTab";
 import { ScrollRow } from "@/components/ScrollRow";
 import { TotpCard } from "./TotpCard";
+import { BackupCard } from "./BackupCard";
 
 /** 이 시간 동안 화면 조작이 없으면 자동으로 로그아웃한다 */
 const IDLE_MS = 30 * 60_000;
@@ -188,6 +189,7 @@ export function AdminConsole({ api }: { api: string }) {
             {tab === "billing" && <BillingTab {...shared} />}
             {tab === "usage" && <UsageTab {...shared} />}
             {tab === "settings" && <TotpCard call={call} onToken={newToken} />}
+            {tab === "settings" && <BackupCard call={call} />}
             {tab === "settings" && <SettingsTab {...shared} />}
             {tab === "api" && <ApiTab {...shared} />}
             {tab === "system" && <SystemTab {...shared} />}

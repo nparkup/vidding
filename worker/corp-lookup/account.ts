@@ -25,11 +25,13 @@
  * - trial/{사업자번호}.json           : 무료 체험 사용 공고 (?trial= 과 같은 파일)
  * - mybox/{사업자번호}.json           : 내 서류함
  * - withdraw/pending/{사업자번호}.json : 탈퇴 예약 (on = 마지막 이용일). 매일 0시 10분(한국) 예약 작업과 로그인·관리자 목록이 지난 예약을 처리한다
- * - withdraw/done/{사업자번호}.json    : 탈퇴한 회원 기록 (회사명·사업자번호·탈퇴 방식·날짜만. 담당자·연락처·이메일은 남기지 않는다)
+ * - withdraw/done/{사업자번호}.json    : 탈퇴한 회원 기록 (회사명·사업자번호·탈퇴 방식·날짜만. 담당자·연락처·이메일은 남기지 않는다). 5년 뒤 지운다
+ * - retain/billing/{삭제일}-{사업자번호}-{시각}.json : 탈퇴한 회원의 결제 기록 (전자상거래법 5년 보존, backup.ts purgeRetained 가 지운다)
  */
 import { normalizeBizno, validBizno } from "../../src/lib/corpLookup";
 import { kstToday, limitOf, passLastDay, type BillingLike, type LimitInfo, type WithdrawInfo } from "../../src/lib/usagePeriod";
 import { readSiteConfig, type AdminBucket } from "./admin";
+import { BILLING_RETAIN_YEARS, PRIVACY_VERSION } from "../../src/lib/privacy";
 
 export interface AccountEnv {
   AWARDS?: AdminBucket;
@@ -153,7 +155,14 @@ export async function finishWithdraw(bucket: AdminBucket, rec: Rec, mode: "now" 
     forfeit: mode !== "scheduled" && last && last >= today ? last : null,
     reason: reason || undefined,
   };
-  await putJson(bucket, `withdraw/done/${bizno}.json`, done);
+  const deleteAfter = new Date(Date.now() + BILLING_RETAIN_YEARS * 365.25 * 86400e3).toISOString();
+  await putJson(bucket, `withdraw/done/${bizno}.json`, { ...done, deleteAfter });
+  // 결제 기록은 전자상거래법상 5년 보존: 회원 정보와 떼어 retain/billing/ 으로 옮기고 5년 뒤 지운다 (backup.ts purgeRetained)
+  if (billing) {
+    await putJson(bucket, `retain/billing/${deleteAfter.slice(0, 10).replace(/-/g, "")}-${bizno}-${Date.now()}.json`, {
+      bizno, company: done.company, withdrawnAt: done.at, deleteAfter, reason: "전자상거래법 대금결제 기록 5년 보존", billing,
+    });
+  }
   await deleteAccountData(bucket, rec, bizno);
   await bucket.delete(`members/${bizno}.json`);
   await bucket.delete(`billing/${bizno}.json`);
@@ -398,7 +407,9 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
     if (!m.agreePrivacy) return json({ error: "개인정보 수집·이용에 동의해 주세요." }, 400);
     if (cur) return json({ status: "exists", hasPassword: !!cur.auth }, 200, noStore);
     if (!(await moveEmail(bucket, bizno, undefined, email))) return json({ error: "이미 다른 사업자번호로 가입된 이메일입니다. 로그인하거나 다른 이메일을 써 주세요." }, 409);
-    const rec: Rec = { ...m, joinedAt: nowIso(), auth: { email, pw: await hashPassword(pw), ver: 1, setAt: nowIso(), lastLogin: nowIso() } };
+    // 동의 이력: 어느 판의 개인정보처리방침에 언제 동의했는지 (선택 동의인 메일 수신도 따로)
+    const consent = { privacy: { version: PRIVACY_VERSION, at: nowIso() }, mail: { on: m.agreeMail, at: nowIso() } };
+    const rec: Rec = { ...m, consent, joinedAt: nowIso(), auth: { email, pw: await hashPassword(pw), ver: 1, setAt: nowIso(), lastLogin: nowIso() } };
     await putJson(bucket, key, rec);
     return json({ status: "ok", ...(await issue(rec)) }, 200, noStore);
   }
@@ -415,7 +426,11 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
         const next: Rec = { ...rec };
         for (const [k, max] of [["name", 40], ["phone", 30], ["size", 40], ["keywords", 200]] as [string, number][]) if (k in body) next[k] = s(body[k], max);
         for (const [k, max] of [["licenses", 40], ["regions", 20]] as [string, number][]) if (k in body) next[k] = list(body[k], max);
-        if ("agreeMail" in body) next.agreeMail = body.agreeMail === true;
+        if ("agreeMail" in body && (body.agreeMail === true) !== (rec.agreeMail === true)) {
+          next.agreeMail = body.agreeMail === true;
+          // 메일 수신 동의를 바꾼 시각을 남긴다 (동의 철회 이력)
+          next.consent = { ...((rec.consent as Record<string, unknown>) ?? {}), mail: { on: next.agreeMail, at: nowIso() } };
+        }
         if (!next.name || !next.phone) return json({ error: "담당자 이름과 연락처는 비울 수 없습니다." }, 400);
         if ("email" in body) {
           const email = normEmail(s(body.email, 120));

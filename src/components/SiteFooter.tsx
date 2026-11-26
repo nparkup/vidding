@@ -38,7 +38,7 @@ export function SiteFooter() {
       <div className="border-t border-ink-100">
         <div className="container-x flex flex-col gap-2 py-6 text-xs text-ink-400 sm:flex-row sm:justify-between">
           <p>© {new Date().getFullYear()} <Brand tail="매트릭스" />.</p>
-          <p>본 서비스의 분석은 참고용이며 최종 입찰 판단과 책임은 이용자에게 있습니다. <Link href="/admin" className="ml-2 underline-offset-2 hover:underline">관리자</Link></p>
+          <p>본 서비스의 분석은 참고용이며 최종 입찰 판단과 책임은 이용자에게 있습니다. <Link href="/privacy" className="ml-2 font-bold text-ink-500 underline-offset-2 hover:underline">개인정보처리방침</Link> <Link href="/admin" className="ml-2 underline-offset-2 hover:underline">관리자</Link></p>
         </div>
       </div>
     </footer>

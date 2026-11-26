@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { PageHero } from "@/components/PageHero";
+import { EngineName } from "@/components/EngineName";
 import { NaraPredictFlow } from "@/components/premium/NaraPredictFlow";
 import { AptPriceRedirect } from "@/components/premium/AptPriceRedirect";
 import { TRIAL_LIMIT_ENABLED } from "@/lib/trialLimit";
@@ -28,7 +29,7 @@ export default function PremiumPage() {
 
       <section id="predict" className="container-x scroll-mt-20 pt-12">
         <p className="eyebrow">나라장터 입찰 예측</p>
-        <h2 className="h-section mt-3">세 단계로 입찰 점수를 예측합니다</h2>
+        <h2 className="h-section mt-3"><EngineName id="insight" />가 정밀하게 입찰 점수를 예측합니다</h2>
         <p className="lead mt-3 max-w-3xl">회원가입 때 등록한 기업으로 입찰 기업을 조회하고, 그 기업이 참가할 수 있는 공고 중 하나를 고르면 참가자격, 예상 평가점수, 통과 가능한 투찰률을 계산합니다.{TRIAL_LIMIT_ENABLED && " 무료 체험으로 입찰공고 3건까지 분석할 수 있습니다."}</p>
         <div className="mt-8">
           <Suspense fallback={<p className="card p-6 text-sm text-ink-300">불러오는 중…</p>}>

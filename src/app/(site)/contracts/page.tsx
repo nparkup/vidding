@@ -12,7 +12,7 @@ export default function ContractPage() {
   return (
     <>
       <PageHero
-        eyebrow="입찰데이터 분석 · 계약현황"
+        eyebrow="입찰 분석 · 계약현황"
         title={<>누가 얼마에<br />계약했는지 확인하세요.</>}
         lead="낙찰 뒤 실제로 맺은 계약을 매일 모았습니다. 경쟁사가 최근 어느 기관과 얼마에 계약했는지, 계약이 언제 끝나는지 볼 수 있습니다."
       />

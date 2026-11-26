@@ -10,6 +10,10 @@ import { SettingsTab } from "./SettingsTab";
 import { ApiTab } from "./ApiTab";
 import { SystemTab } from "./SystemTab";
 import { ScrollRow } from "@/components/ScrollRow";
+import { TotpCard } from "./TotpCard";
+
+/** 이 시간 동안 화면 조작이 없으면 자동으로 로그아웃한다 */
+const IDLE_MS = 30 * 60_000;
 
 /** 로그인 토큰(12시간)은 이 탭에만 둔다. 비밀번호는 저장하지 않는다 */
 const TOKEN_KEY = "bm-admin-token";
@@ -31,6 +35,7 @@ type TabId = (typeof TABS)[number]["id"];
 export function AdminConsole({ api }: { api: string }) {
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
+  const [code, setCode] = useState("");
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -83,10 +88,11 @@ export function AdminConsole({ api }: { api: string }) {
     setBusy(true);
     setMsg("");
     try {
-      const r = await fetch(`${api}?admin=login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, password: pw }) });
+      const r = await fetch(`${api}?admin=login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, password: pw, code }) });
       const j = (await r.json().catch(() => ({}))) as { token?: string; error?: string };
       if (!r.ok || !j.token) { setMsg(j.error ?? `로그인하지 못했습니다 (${r.status})`); return; }
       setPw("");
+      setCode("");
       setToken(j.token);
       // 사이트의 다른 화면(새 탭 포함)에서도 관리자로 알아보도록 localStorage 에도 둔다 (lib/adminSession.ts: 공고 예측 한도 없음)
       try { sessionStorage.setItem(TOKEN_KEY, j.token); localStorage.setItem(TOKEN_KEY, j.token); } catch { /* 무시 */ }
@@ -106,6 +112,22 @@ export function AdminConsole({ api }: { api: string }) {
     const h = window.location.hash.slice(1);
     if (TABS.some((t) => t.id === h)) setTab(h as TabId);
   }, [load]);
+
+  // 관리자 화면을 30분 동안 건드리지 않으면 로그아웃 (다른 사람이 자리를 비운 화면을 쓰지 못하게)
+  useEffect(() => {
+    if (!authed) return;
+    let last = Date.now();
+    const touch = () => { last = Date.now(); };
+    const evs = ["pointerdown", "keydown", "scroll", "visibilitychange"] as const;
+    evs.forEach((e) => window.addEventListener(e, touch, { passive: true }));
+    const t = window.setInterval(() => { if (Date.now() - last > IDLE_MS) logout("30분 동안 사용하지 않아 로그아웃했습니다."); }, 30_000);
+    return () => { evs.forEach((e) => window.removeEventListener(e, touch)); window.clearInterval(t); };
+  }, [authed, logout]);
+
+  const newToken = (t: string) => {
+    setToken(t);
+    try { sessionStorage.setItem(TOKEN_KEY, t); localStorage.setItem(TOKEN_KEY, t); } catch { /* 무시 */ }
+  };
 
   const pick = (t: TabId) => {
     setTab(t);
@@ -139,9 +161,11 @@ export function AdminConsole({ api }: { api: string }) {
             <input id="admin-id" autoComplete="username" className="input" value={id} onChange={(e) => setId(e.target.value)} />
             <label className="label mt-3" htmlFor="admin-pw">비밀번호</label>
             <input id="admin-pw" type="password" autoComplete="current-password" className="input" value={pw} onChange={(e) => setPw(e.target.value)} />
+            <label className="label mt-3" htmlFor="admin-code">인증 코드 <span className="font-normal text-ink-400">(2단계 인증을 켠 경우)</span></label>
+            <input id="admin-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6자리" className="input" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
             {msg && <p className="mt-3 rounded-xl bg-coral-100 p-3 text-sm text-coral">{msg}</p>}
             <button className="btn-primary mt-5 w-full" disabled={busy || !id || !pw}>{busy ? "확인 중…" : "로그인"}</button>
-            <p className="mt-3 text-xs text-ink-400">로그인은 12시간 동안 이 탭에서만 유지되고, 탭을 닫거나 로그아웃하면 끝납니다.</p>
+            <p className="mt-3 text-xs text-ink-400">로그인은 최대 12시간, 30분 동안 사용하지 않으면 자동으로 끝납니다. 같은 곳에서 5번 틀리면 15분 동안 로그인할 수 없습니다.</p>
           </form>
         </main>
       ) : (
@@ -163,6 +187,7 @@ export function AdminConsole({ api }: { api: string }) {
             {tab === "members" && <MembersTab {...shared} />}
             {tab === "billing" && <BillingTab {...shared} />}
             {tab === "usage" && <UsageTab {...shared} />}
+            {tab === "settings" && <TotpCard call={call} onToken={newToken} />}
             {tab === "settings" && <SettingsTab {...shared} />}
             {tab === "api" && <ApiTab {...shared} />}
             {tab === "system" && <SystemTab {...shared} />}

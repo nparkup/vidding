@@ -1,7 +1,8 @@
 /**
  * 관리자 화면(/admin) API. 모든 요청은 ?admin=동작 이고, 로그인(login)만 빼고 Authorization: Bearer 토큰이 있어야 한다.
  *
- * - POST login                : 아이디·비밀번호 → 12시간 서명 토큰
+ * - POST login                : 아이디·비밀번호(+ 2단계 인증 코드) → 12시간 서명 토큰. IP마다 15분에 5번 틀리면 15분 잠금
+ * - GET/POST totp             : 관리자 2단계 인증 상태·설정·켜기·끄기 (security.ts)
  * - GET  members              : 가입자 전부 + 무료 체험 사용 공고 + 결제 요약 + 마지막 조회 시각
  * - POST member&bizno=        : 가입 정보 고치기 (회사명·담당자·연락처·이메일·업종·지역·규모·키워드·메일 수신·상태·메모)
  * - POST member-create        : 회원 직접 등록 (가입과 같은 항목 + 비밀번호(비우면 임시 비밀번호 발급) + 이용권 + 이용 한도)
@@ -25,6 +26,7 @@
  */
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
 import { actions, apiUsage, storage } from "./ops";
+import { adminFail, adminFailClear, adminLocked, newTotpSecret, readTotp, totpOk, writeTotp, type AdminTotp } from "./security";
 import { adminMember, cancelWithdraw, createMemberByAdmin, finishWithdraw, issueTempPassword, processDueWithdrawals, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
 import { limitOf, MAX_QUOTA } from "../../src/lib/usagePeriod";
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../../src/lib/siteConfigCore";
@@ -89,22 +91,31 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
 
   if (action === "login") {
     if (req.method !== "POST") return json({ error: "POST만 지원합니다." }, 405);
-    let b: { id?: unknown; password?: unknown } = {};
+    const fullIp = req.headers.get("CF-Connecting-IP") ?? "";
+    if (await adminLocked(bucket, fullIp)) {
+      audit("login-locked", "잠금 중 시도");
+      return json({ error: "로그인을 여러 번 실패해 15분 동안 이 곳에서 로그인할 수 없습니다." }, 429, noStore);
+    }
+    let b: { id?: unknown; password?: unknown; code?: unknown } = {};
     try { b = (await req.json()) as typeof b; } catch { /* 빈 입력 */ }
     const idOk = await sameSecret(String(b.id ?? ""), env.ADMIN_ID);
     const pwOk = await sameSecret(String(b.password ?? ""), env.ADMIN_PASSWORD);
-    if (!idOk || !pwOk) {
-      audit("login-fail", idOk ? "비밀번호 틀림" : "아이디 틀림");
+    // 2단계 인증을 켰으면 인증 앱 6자리도 맞아야 한다. 어느 것이 틀렸는지는 알려 주지 않는다
+    const totp = await readTotp(bucket, true);
+    const codeOk = !totp?.on || (await totpOk(totp.secret, String(b.code ?? "")));
+    if (!idOk || !pwOk || !codeOk) {
+      await adminFail(bucket, fullIp);
+      audit("login-fail", !idOk ? "아이디 틀림" : !pwOk ? "비밀번호 틀림" : "인증 코드 틀림");
       await new Promise((r) => setTimeout(r, 1000)); // 비밀번호 대입을 느리게
-      return json({ error: "아이디 또는 비밀번호가 맞지 않습니다." }, 401, noStore);
+      return json({ error: totp?.on ? "아이디, 비밀번호 또는 인증 코드가 맞지 않습니다." : "아이디 또는 비밀번호가 맞지 않습니다." }, 401, noStore);
     }
-    audit("login", "로그인");
+    await adminFailClear(bucket, fullIp);
+    audit("login", totp?.on ? "로그인 (2단계 인증)" : "로그인");
     const exp = Date.now() + ADMIN_SESSION_MS;
-    return json({ token: await signAdmin(exp, env), exp }, 200, noStore);
+    return json({ token: await signAdmin(exp, env, totp), exp }, 200, noStore);
   }
-
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!(await checkAdmin(token, env))) return json({ error: "로그인이 필요합니다." }, 401, noStore);
+  if (!(await checkAdmin(token, env, bucket))) return json({ error: "로그인이 필요합니다." }, 401, noStore);
 
   const bizno = sp.get("bizno") ?? sp.get("delete") ?? "";
   const needBizno = () => /^\d{10}$/.test(bizno);
@@ -241,6 +252,38 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       await putJson(bucket, `billing/${bizno}.json`, { ...rec, updatedAt: new Date().toISOString() });
       audit("billing", `${bizno} ${rec.plan || "-"} ${rec.status}`);
       return json({ status: "ok", billing: rec }, 200, noStore);
+    }
+    case "totp": {
+      // 관리자 2단계 인증 (security.ts). GET 상태, POST { step: "setup" | "enable" | "disable", code }
+      const cur = await readTotp(bucket, true);
+      if (!post) return json({ on: !!cur?.on, pending: !!cur && !cur.on }, 200, noStore);
+      let b: Record<string, unknown> = {};
+      try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
+      if (b.step === "setup") {
+        if (cur?.on) return json({ error: "이미 켜져 있습니다. 끈 뒤 다시 설정해 주세요." }, 400, noStore);
+        const secret = newTotpSecret();
+        await writeTotp(bucket, { secret, on: false, at: new Date().toISOString() });
+        const label = encodeURIComponent(`비드매트릭스 관리자:${env.ADMIN_ID}`);
+        return json({ secret, uri: `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent("비드매트릭스")}&digits=6&period=30` }, 200, noStore);
+      }
+      if (b.step === "enable") {
+        if (!cur || cur.on) return json({ error: "먼저 새 인증 키를 만들어 주세요." }, 400, noStore);
+        if (!(await totpOk(cur.secret, String(b.code ?? "")))) return json({ error: "인증 코드가 맞지 않습니다. 인증 앱의 지금 숫자를 넣어 주세요." }, 400, noStore);
+        const next = { ...cur, on: true, at: new Date().toISOString() };
+        await writeTotp(bucket, next);
+        audit("totp-on", "2단계 인증 켬");
+        // 서명 키가 바뀌어 기존 토큰(다른 기기 포함)은 모두 풀린다. 이 화면은 새 토큰으로 이어 간다
+        const exp = Date.now() + ADMIN_SESSION_MS;
+        return json({ on: true, token: await signAdmin(exp, env, next), exp }, 200, noStore);
+      }
+      if (b.step === "disable") {
+        if (cur?.on && !(await totpOk(cur.secret, String(b.code ?? "")))) return json({ error: "인증 코드가 맞지 않습니다." }, 400, noStore);
+        await writeTotp(bucket, null);
+        audit("totp-off", "2단계 인증 끔");
+        const exp = Date.now() + ADMIN_SESSION_MS;
+        return json({ on: false, token: await signAdmin(exp, env, null), exp }, 200, noStore);
+      }
+      break;
     }
     case "settings": {
       if (!post) return json({ config: await readSiteConfig(bucket), defaults: DEFAULT_CONFIG }, 200, noStore);
@@ -406,18 +449,19 @@ async function sameSecret(a: string, b: string): Promise<boolean> {
   return d === 0;
 }
 
-/** 관리자 토큰 서명 키: 아이디·비밀번호에서 만든다. 비밀번호를 바꾸면 이전 토큰은 모두 무효가 된다 */
-async function adminKey(env: AdminEnv) {
-  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`bidmate-admin:${env.ADMIN_ID}:${env.ADMIN_PASSWORD}`));
+/** 관리자 토큰 서명 키: 아이디·비밀번호(와 켜져 있으면 2단계 인증 키)에서 만든다. 비밀번호를 바꾸거나 2단계 인증을 켜고 끄면 이전 토큰은 모두 무효가 된다 */
+async function adminKey(env: AdminEnv, totp: AdminTotp | null | undefined) {
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`bidmate-admin:${env.ADMIN_ID}:${env.ADMIN_PASSWORD}${totp?.on ? `:${totp.secret}` : ""}`));
   return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 }
 const hex = (b: ArrayBuffer) => Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, "0")).join("");
-async function signAdmin(exp: number, env: AdminEnv): Promise<string> {
-  const sig = await crypto.subtle.sign("HMAC", await adminKey(env), new TextEncoder().encode(`admin.${exp}`));
+async function signAdmin(exp: number, env: AdminEnv, totp: AdminTotp | null | undefined): Promise<string> {
+  const sig = await crypto.subtle.sign("HMAC", await adminKey(env, totp), new TextEncoder().encode(`admin.${exp}`));
   return `${exp}.${hex(sig)}`;
 }
-export async function checkAdmin(token: string, env: AdminEnv): Promise<boolean> {
+export async function checkAdmin(token: string, env: AdminEnv, bucket?: AdminBucket): Promise<boolean> {
   const m = /^(\d{10,16})\.([0-9a-f]{64})$/.exec(token);
   if (!m || Number(m[1]) < Date.now()) return false;
-  return sameSecret(token, await signAdmin(Number(m[1]), env));
+  const totp = bucket ? await readTotp(bucket) : null;
+  return sameSecret(token, await signAdmin(Number(m[1]), env, totp));
 }

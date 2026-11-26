@@ -12,6 +12,8 @@
  * - GET /?awards=사업자번호&biz=용역 : 그 업체의 최근 3년 낙찰을 공고 분류와 함께. 조달청 API를 부르지 않는다 (6시간 캐시)
  * - GET /?awardmeta=1 : 저장소 수집 범위·완료 여부
  *
+ * 보안 (security.ts): IP별 요청 제한(RL_AUTH·RL_AI·RL_API), Claude 하루 상한, 모든 응답 보안 헤더, 관리자 2단계 인증.
+ *
  * 회원 로그인 (account.ts): ?account=동작. 가입·로그인·내 정보·이용권 공고 예측 건수 차감·내 서류함.
  * 관리자 화면 (admin.ts): ?admin=동작. 로그인 뒤 서명 토큰으로 회원·결제·사용량·지표를 읽고 쓴다.
  * 운영 지표 (metrics.ts): 요청마다 경로·상태·처리 시간과 바깥 API 호출 수를 Durable Object Metrics에 날짜별로 더한다. ?pv= 는 페이지 조회.
@@ -47,6 +49,7 @@ import { handleAdmin, readSiteConfig } from "./admin";
 import { handleAccount, processDueWithdrawals } from "./account";
 import { metricsStub, patchFetch, takePending, truncIp, type MetricsNs, type RecBody } from "./metrics";
 export { Metrics } from "./metrics";
+import { overLimit, takeAiBudget, withSecurityHeaders, type RateLimiter } from "./security";
 
 interface Env {
   DATA_GO_KR_SERVICE_KEY: string;
@@ -78,6 +81,12 @@ interface Env {
   /** 회원 로그인 토큰 서명 키 (선택, 16자 이상). 없으면 R2 config/auth-key.json 에 만들어 둔 무작위 키를 쓴다 */
   MEMBER_SECRET?: string;
   /** 실시간 이용자 수 (wrangler.toml durable_objects). 없으면 ?presence 는 503 */
+  /** 요청 제한 (wrangler.toml [[ratelimits]], IP마다 1분). 없으면 막지 않는다 */
+  RL_AUTH?: RateLimiter;
+  RL_AI?: RateLimiter;
+  RL_API?: RateLimiter;
+  /** 배점표 판독·같은 사업 판정이 하루에 Claude를 새로 부르는 상한 (기본 1500) */
+  AI_DAILY_LIMIT?: string;
   PRESENCE?: { idFromName(name: string): unknown; get(id: unknown): { fetch(req: Request | string): Promise<Response> } };
 }
 
@@ -113,7 +122,7 @@ export default {
       res = new Response(JSON.stringify({ error: "중계 서버 오류" }), { status: 500, headers: { "Content-Type": "application/json; charset=utf-8" } });
     }
     if (env.METRICS && req.method !== "OPTIONS") ctx.waitUntil(flushMetrics(req, res, Date.now() - t0, err, env.METRICS).catch(() => undefined));
-    return res;
+    return withSecurityHeaders(res);
   },
   /** 매일 0시 10분(한국, wrangler.toml crons): 마지막 이용일이 지난 회원 탈퇴 예약을 처리한다 */
   async scheduled(_ev: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
@@ -133,6 +142,19 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
 
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...cors, "Access-Control-Max-Age": "86400" } });
     {
+      // 요청 제한 (IP마다 1분): 로그인류 10번, 배점표 판독·같은 사업 판정 30번(캐시 포함), 그 밖의 조회 120번 (wrangler.toml [[ratelimits]])
+      const ip = req.headers.get("CF-Connecting-IP") ?? "";
+      const q = new URL(req.url).searchParams;
+      const act = q.get("account") ?? q.get("admin") ?? "";
+      const auth = (q.has("account") && ["login", "signup", "claim", "password", "withdraw"].includes(act)) || (q.has("admin") && act === "login") || q.has("adminlogin");
+      const ai = q.has("aisheet") || q.has("relate");
+      const api = !auth && !ai && !q.has("account") && !q.has("admin") && !q.has("members") && !q.has("pv") && !q.has("config") && !q.has("presence");
+      const rl = auth ? env.RL_AUTH : ai ? env.RL_AI : api ? env.RL_API : undefined;
+      if (ip && rl && (await overLimit(rl, `${auth ? "auth" : ai ? "ai" : "api"}:${ip}`))) {
+        return json({ error: "요청이 너무 많습니다. 1분 뒤에 다시 시도해 주세요.", code: "rate-limit" }, 429, { "Retry-After": "60", "Cache-Control": "no-store" });
+      }
+    }
+    {
       const sp0 = new URL(req.url).searchParams;
       if (sp0.has("admin") || sp0.has("adminlogin") || sp0.has("members")) {
         if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
@@ -150,11 +172,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
         return new Response(null, { status: 204, headers: cors });
       }
     }
-    if (req.method === "POST" && new URL(req.url).searchParams.has("signup")) {
-      if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
-      if (!env.AWARDS) return json({ error: "off" }, 503);
-      return json(...(await signup(req, env.AWARDS)));
-    }
+    // 예전 비밀번호 없는 가입 주소(?signup)는 없앴다: 남의 사업자번호를 먼저 등록해 둘 수 있었다. 가입은 ?account=signup 만
     if (req.method !== "GET") return json({ error: "GET만 지원합니다." }, 405);
     if (origin && !cors["Access-Control-Allow-Origin"]) return json({ error: "허용되지 않은 사이트입니다." }, 403);
     const sp = new URL(req.url).searchParams;
@@ -183,26 +201,42 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       const mem = await env.AWARDS.get(`members/${bizno}.json`);
       let suspended = false;
       let adminAcc = false;
+      let member = false;
       if (mem) {
         try {
-          const m = JSON.parse(new TextDecoder().decode(await mem.arrayBuffer())) as { status?: string; limit?: unknown };
+          const m = JSON.parse(new TextDecoder().decode(await mem.arrayBuffer())) as { status?: string; limit?: unknown; auth?: unknown };
           suspended = m.status === "suspended";
+          member = !!m.auth;
           // 관리자가 정한 회원별 개별 한도 (null = 무제한)
           const o = readOverride(m.limit);
           if (o) TRIAL_LIMIT = o.quota === null ? MAX_QUOTA : o.quota;
           if (o?.admin) adminAcc = true;
         } catch { /* 무시 */ }
       }
+      // 비밀번호를 정한 회원의 사업자번호는 로그인 없이 체험 기록을 늘리지 않는다 (남이 대신 소진하지 못하게. 회원은 ?account=use 로 센다)
       const hit = await env.AWARDS.get(key);
       let used: { k: string; t: number }[] = [];
+      let salt = "";
       if (hit) {
-        try { used = (JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())) as { used?: typeof used }).used ?? []; } catch { used = []; }
+        try {
+          const j = JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())) as { used?: typeof used; s?: string };
+          used = j.used ?? [];
+          salt = j.s ?? "";
+        } catch { used = []; }
       }
       const before = used.length;
       const now = Date.now();
-      if (!suspended && !adminAcc) for (const k of keys) if (used.length < TRIAL_LIMIT && !used.some((e) => e.k === k)) used.push({ k, t: now });
-      if (used.length !== before) await env.AWARDS.put(key, JSON.stringify({ used }), { httpMetadata: { contentType: "application/json" } });
-      return json({ used, limit: TRIAL_LIMIT, ...(suspended ? { suspended: true } : {}), ...(adminAcc ? { admin: true } : {}) }, 200, { "Cache-Control": "no-store" });
+      if (!suspended && !adminAcc && !member) for (const k of keys) if (used.length < TRIAL_LIMIT && !used.some((e) => e.k === k)) used.push({ k, t: now });
+      if (!/^[0-9a-f]{32}$/.test(salt)) salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join("");
+      if (used.length !== before || !hit) await env.AWARDS.put(key, JSON.stringify({ used, s: salt }), { httpMetadata: { contentType: "application/json" } });
+      // 이 브라우저가 보낸 공고만 그대로 돌려주고, 나머지는 건수만 알 수 있게 가린다 (사업자번호만으로 남의 분석 공고를 볼 수 없게)
+      const mine = new Set(keys);
+      const shown = await Promise.all(used.map(async (e) => {
+        if (mine.has(e.k)) return e;
+        const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${salt}|${e.k}`));
+        return { k: `x:${Array.from(new Uint8Array(h).slice(0, 8), (x) => x.toString(16).padStart(2, "0")).join("")}`, t: e.t, title: "다른 기기에서 분석한 공고" };
+      }));
+      return json({ used: shown, limit: TRIAL_LIMIT, ...(suspended ? { suspended: true } : {}), ...(adminAcc ? { admin: true } : {}), ...(member ? { member: true } : {}) }, 200, { "Cache-Control": "no-store" });
     }
     if (sp.has("corps")) {
       try {
@@ -238,6 +272,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
           const lkey = `ai-sheets/v${AI_SHEET_VERSION}/${id}-live-${liveKey(docs)}.json`;
           const lhit = await env.AWARDS?.get(lkey);
           if (lhit) return json(JSON.parse(new TextDecoder().decode(await lhit.arrayBuffer())), 200, { "X-Cache": "HIT" });
+          if (!(await takeAiBudget(env.AWARDS, env.AI_DAILY_LIMIT))) return json({ status: "error", reason: "오늘 배점표 판독 한도에 다다랐습니다. 내일 다시 시도해 주세요." }, 429);
           const hosts = (env.ATTACH_HOSTS ?? "www.g2b.go.kr").split(",").map((h) => h.trim());
           const allowUrl = (u: string) => { try { const x = new URL(u); return (x.protocol === "https:" || x.protocol === "http:") && hosts.includes(x.hostname); } catch { return false; } };
           const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 120_000 });
@@ -249,6 +284,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
         const key = `ai-sheets/v${AI_SHEET_VERSION}/${id}-${input.hash}.json`;
         const hit = await env.AWARDS?.get(key);
         if (hit) return json(JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())), 200, { "X-Cache": "HIT" });
+        if (!(await takeAiBudget(env.AWARDS, env.AI_DAILY_LIMIT))) return json({ status: "error", reason: "오늘 배점표 판독 한도에 다다랐습니다. 내일 다시 시도해 주세요." }, 429);
         const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 120_000 });
         const result: AiSheetResult = await readAiInput(client, input, env.AI_SHEET_MODEL || undefined);
         // 일시 오류는 캐시하지 않는다. 표 없음·검증 탈락은 다시 불러도 같으므로 캐시해 비용을 막는다
@@ -271,6 +307,7 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
         const key = `ai-relate/v${RELATE_VERSION}/${id}-${relateHash(a)}.json`;
         const hit = await env.AWARDS?.get(key);
         if (hit) return json(JSON.parse(new TextDecoder().decode(await hit.arrayBuffer())), 200, { "X-Cache": "HIT" });
+        if (!(await takeAiBudget(env.AWARDS, env.AI_DAILY_LIMIT))) return json({ status: "error", same: [], reason: "오늘 판정 한도에 다다랐습니다." }, 429);
         const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 60_000 });
         const result: RelateResult = await relateAll(client, a, env.AI_SHEET_MODEL || undefined);
         if (result.status !== "error" && env.AWARDS) ctx.waitUntil(env.AWARDS.put(key, JSON.stringify(result), { httpMetadata: { contentType: "application/json" } }));
@@ -392,34 +429,6 @@ async function recordPageView(req: Request, ns: MetricsNs) {
     { kind: "device", key: /Mobi|Android|iPhone|iPad/i.test(ua) ? "휴대폰·태블릿" : "PC" },
   ];
   await stub.fetch("https://metrics/rec", { method: "POST", body: JSON.stringify({ hits, uv }) });
-}
-
-/**
- * 무료 체험 회원가입 (src/components/ApplyForm.tsx). 로그인 기능이 생기기 전이라 비밀번호는 받지 않고,
- * 사업자번호마다 가입 정보 하나를 R2 members/{사업자번호}.json 에 둔다. 이미 가입된 번호는 덮어쓰지 않는다(다른 사람이 연락처를 바꾸지 못하게).
- * 무료 체험 건수는 같은 사업자번호의 trial/{사업자번호}.json 으로 센다.
- */
-async function signup(req: Request, bucket: NonNullable<Env["AWARDS"]>): Promise<[unknown, number]> {
-  const raw = await req.text();
-  if (raw.length > 8000) return [{ error: "입력이 너무 깁니다." }, 413];
-  let b: Record<string, unknown>;
-  try { b = JSON.parse(raw) as Record<string, unknown>; } catch { return [{ error: "잘못된 요청" }, 400]; }
-  const str = (k: string, max: number) => String(b[k] ?? "").trim().slice(0, max);
-  const list = (k: string, max: number) => (Array.isArray(b[k]) ? (b[k] as unknown[]).map((x) => String(x).trim().slice(0, 60)).filter(Boolean).slice(0, max) : []);
-  const bizno = normalizeBizno(str("bizno", 20));
-  const m = {
-    company: str("company", 100), bizno, name: str("name", 40), email: str("email", 120), phone: str("phone", 30),
-    licenses: list("licenses", 40), regions: list("regions", 20), size: str("size", 40), keywords: str("keywords", 200),
-    agreePrivacy: b.agreePrivacy === true, agreeMail: b.agreeMail === true, plan: str("plan", 20),
-  };
-  if (!m.company || !m.name || !m.phone) return [{ error: "회사명, 담당자 이름, 연락처를 입력해 주세요." }, 400];
-  if (!validBizno(bizno)) return [{ error: "올바른 사업자등록번호가 아닙니다." }, 400];
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.email)) return [{ error: "이메일 주소를 확인해 주세요." }, 400];
-  if (!m.agreePrivacy) return [{ error: "개인정보 수집·이용에 동의해 주세요." }, 400];
-  const key = `members/${bizno}.json`;
-  if (await bucket.get(key)) return [{ status: "exists" }, 200];
-  await bucket.put(key, JSON.stringify({ ...m, joinedAt: new Date().toISOString() }), { httpMetadata: { contentType: "application/json" } });
-  return [{ status: "ok" }, 200];
 }
 
 const PATENT_TTL_MS = 30 * 86400e3;

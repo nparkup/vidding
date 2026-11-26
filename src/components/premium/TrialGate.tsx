@@ -106,6 +106,8 @@ export function TrialLocked({ used, onPick, state }: { used: TrialEntry[]; onPic
           <ul className="mt-2 space-y-1">
             {shown.map((e) => {
               const label = e.title || e.k.replace(/^(nara|apt|nuri):/, "공고 ");
+              // 다른 기기에서 쓴 공고는 서버가 공고번호를 가려 보낸다 (x:해시): 건수만 보여 주고 열 수 없다
+              if (e.k.startsWith("x:")) return <li key={e.k} className="rounded-xl bg-paper px-3 py-2 text-sm text-ink-500">{label}</li>;
               return (
                 <li key={e.k}>
                   <button type="button" onClick={() => onPick(e)} className="w-full rounded-xl bg-paper px-3 py-2 text-left text-sm font-semibold hover:bg-ink-100/60">

@@ -11,7 +11,10 @@ workers_dev = true
 crons = ["10 15 * * *"]
 
 [vars]
-ALLOWED_ORIGINS = "https://nparkup.github.io,http://localhost:3000"
+# 운영에는 실제 사이트만 둔다. 로컬 개발은 wrangler dev --var ALLOWED_ORIGINS:http://localhost:3000 처럼 따로 준다
+ALLOWED_ORIGINS = "https://nparkup.github.io"
+# 배점표 판독·같은 사업 판정이 하루에 Claude를 새로 부르는 상한 (security.ts takeAiBudget)
+AI_DAILY_LIMIT = "1500"
 # 공고 배점표 AI 판독: 입력 파일(/ai-input/{공고}.json)을 읽어 올 사이트와 모델. 키는 비밀값 ANTHROPIC_API_KEY
 SITE_URL = "https://nparkup.github.io/vidding"
 AI_SHEET_MODEL = "claude-haiku-5-5"
@@ -38,3 +41,19 @@ class_name = "Metrics"
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Metrics"]
+
+# 요청 제한 (security.ts, IP마다 1분). namespace_id 는 계정 안에서 겹치지 않는 아무 숫자
+[[ratelimits]]
+name = "RL_AUTH"
+namespace_id = "2611001"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "RL_AI"
+namespace_id = "2611002"
+simple = { limit = 30, period = 60 }
+
+[[ratelimits]]
+name = "RL_API"
+namespace_id = "2611003"
+simple = { limit = 120, period = 60 }

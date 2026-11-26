@@ -14,7 +14,7 @@ type Entry = { label: string; href: string } | { label: string; items: Item[] };
 
 /** 상단 메뉴. 하위 화면이 많은 메뉴는 묶어서 펼침 메뉴로 보여 준다 */
 export const NAV: Entry[] = [
-  { label: "서비스", href: "/service" },
+  { label: "서비스 소개", href: "/service" },
   {
     label: "입찰공고 찾기",
     items: [

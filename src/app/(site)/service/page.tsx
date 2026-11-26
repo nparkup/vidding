@@ -95,7 +95,7 @@ export default async function ServicePage() {
 
       <section className="container-x pt-16">
         <div className="rounded-[28px] bg-paper p-6 sm:p-10">
-          <h2 className="text-2xl font-extrabold tracking-[-0.03em] sm:text-3xl">세 곳의 공고를 영업일 하루 세 번 새로 받습니다.</h2>
+          <h2 className="text-2xl font-extrabold tracking-[-0.03em] sm:text-3xl">하루 세 번! 새로운 공고를 업데이트 합니다.</h2>
           <p className="mt-2 text-ink-500">06:40 · 11:40 · 16:40에 공고를 받고, 맞춤 공고는 영업일 아침 메일로 보내 드립니다.</p>
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {sources.map((s) => (

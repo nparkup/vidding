@@ -76,8 +76,7 @@ export default async function ServicePage() {
       </section>
 
       <section className="container-x pt-16">
-        <h2 className="h-section">세 엔진으로 나눠 드립니다.</h2>
-        <div className="mt-8 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {ENGINE_LIST.map((e) => (
             <div key={e.id} className="card flex min-w-0 flex-col p-6">
               <p className="text-3xl font-extrabold tracking-[-0.03em] sm:text-[34px]"><EngineName id={e.id} /></p>

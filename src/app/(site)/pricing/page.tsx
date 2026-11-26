@@ -44,7 +44,7 @@ const cell = (v: Cell) => (v === true ? <span className="mx-auto grid h-6 w-6 pl
 export default function Pricing() {
   return (
     <>
-    <PageHero center title={<>비드매트릭스의 놀라운<br />입찰점수 예측을 경험해보세요!</>} lead={<>가입하면 바로 입찰공고 <TrialN />건을 무료로 분석해 볼 수 있습니다.<br />이후에는 필요한 공고 예측 건수에 맞춰 월간 이용권을 고르세요.<br />VAT 포함 · 약정 없음 · 언제든 해지</>} />
+    <PageHero center title={<>비드<span className="text-mint-600">매트릭스</span>의 놀라운<br /><span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">입찰점수 예측</span>을 경험해보세요!</>} lead={<>가입하면 바로 입찰공고 <TrialN />건을 무료로 분석해 볼 수 있습니다.<br />이후에는 필요한 공고 예측 건수에 맞춰 월간 이용권을 고르세요.<br />VAT 포함 · 약정 없음 · 언제든 해지</>} />
     <div className="container-x">
       <div className="relative z-10 -mt-6">
         <PricingCards />

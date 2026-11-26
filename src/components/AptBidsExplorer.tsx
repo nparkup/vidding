@@ -10,6 +10,7 @@ import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "./Badges";
 import { CloseDay } from "./CloseDay";
 import { Tile } from "./CategoryTiles";
+import { aptClosedLabel, EXCLUDE_CLOSED_LABEL } from "@/lib/openBid";
 import { ArrowUpDown, BrushCleaning, Building, Droplets, Ellipsis, HardHat, LayoutGrid, Package, PlugZap, Shield, SprayCan, type LucideIcon } from "lucide-react";
 
 /** 공동주택 입찰공고 업종별 선 아이콘 (공고 검색 업종 타일과 같은 모양) */
@@ -44,6 +45,8 @@ export function AptBidsExplorer() {
   const [cats, setCats] = useState<string[]>([]);
   const [region, setRegion] = useState("");
   const [urgent, setUrgent] = useState(false);
+  /** 지명경쟁(지명 업체만 참가) 공고 빼기, 기본 선택 */
+  const [hideClosed, setHideClosed] = useState(true);
   const [sort, setSort] = useState<Sort>("close");
   const [limit, setLimit] = useState(PAGE);
 
@@ -61,9 +64,9 @@ export function AptBidsExplorer() {
 
   const counts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const b of data?.items ?? []) if (hoursLeft(b.closeAt) > 0 && (!region || b.region === region)) m.set(b.category, (m.get(b.category) ?? 0) + 1);
+    for (const b of data?.items ?? []) if (hoursLeft(b.closeAt) > 0 && (!region || b.region === region) && (!hideClosed || !aptClosedLabel(b))) m.set(b.category, (m.get(b.category) ?? 0) + 1);
     return m;
-  }, [data, region]);
+  }, [data, region, hideClosed]);
 
   const shown = useMemo(() => {
     const all = q.trim().split(/\s+/).filter(Boolean);
@@ -72,6 +75,7 @@ export function AptBidsExplorer() {
     const xs = (data?.items ?? []).filter((b) => {
       const left = hoursLeft(b.closeAt);
       if (left <= 0 || (urgent && left > 72)) return false;
+      if (hideClosed && aptClosedLabel(b)) return false;
       if (cats.length && !cats.includes(b.category)) return false;
       if (region && b.region !== region) return false;
       const hay = norm(`${b.title} ${b.apt} ${b.classLabel} ${b.no}`);
@@ -83,7 +87,7 @@ export function AptBidsExplorer() {
       prior: (a, b) => (b.prior?.amount ?? -1) - (a.prior?.amount ?? -1),
     };
     return xs.sort(by[sort]);
-  }, [data, q, cats, region, urgent, sort]);
+  }, [data, q, cats, region, urgent, hideClosed, sort]);
 
   if (error) return <div className="card mt-6 p-10 text-center text-ink-500">공동주택 입찰공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
   if (!data) return <div className="card mt-6 p-10 text-center text-ink-500">공동주택 입찰공고를 불러오는 중…</div>;
@@ -107,9 +111,14 @@ export function AptBidsExplorer() {
           <option value="">전국</option>
           {APT_REGIONS.map((r) => <option key={r}>{r}</option>)}
         </select>
-        <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
-          <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
-        </label>
+        <div className="col-span-2 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 sm:col-span-3">
+          <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+            <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
+          </label>
+          <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+            <input type="checkbox" checked={hideClosed} onChange={(e) => { setHideClosed(e.target.checked); setLimit(PAGE); }} className="h-4 w-4 accent-[#0FA37F]" /> {EXCLUDE_CLOSED_LABEL}
+          </label>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">

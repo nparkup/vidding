@@ -17,7 +17,7 @@ export interface BizSummary {
 /** 출처 표기·색 (나라장터 진한 남색, 공동주택 민트, 누리장터 하늘색) */
 export const SOURCES: { key: SourceKey; label: string; desc: string; href: string; dot: string }[] = [
   { key: "g2b", label: "나라장터 공고", desc: "관공서·공공기관", href: "/bids", dot: "bg-ink-700" },
-  { key: "apt", label: "K-apt 공동주택 입찰공고", desc: "아파트 관리주체·입주자대표회의", href: "/apt-bids", dot: "bg-mint" },
+  { key: "apt", label: "공동주택 입찰 공고 K-apt", desc: "아파트 관리주체·입주자대표회의", href: "/apt-bids", dot: "bg-mint" },
   { key: "nuri", label: "누리장터 공고", desc: "민간 기업·조합·법인", href: "/nuri-bids", dot: "bg-sky-400" },
 ];
 
@@ -39,7 +39,7 @@ function SplitBar({ by, total, className = "" }: { by: Record<SourceKey, number>
 }
 
 /**
- * 메인 업종 섹션: 나라장터·K-apt 공동주택 입찰공고·누리장터 공고를 한 덩어리로 묶어
+ * 메인 업종 섹션: 나라장터·공동주택 입찰 공고 K-apt·누리장터 공고를 한 덩어리로 묶어
  * 용역·공사·물품별 진행 중 공고 수와 업종을 보여 준다. 출처는 막대와 숫자로만 나눠 보인다.
  */
 export function AllIndustries({ total, by, groups, aptWithPrior }: { total: number; by: Record<SourceKey, number>; groups: BizSummary[]; aptWithPrior: number }) {
@@ -47,7 +47,7 @@ export function AllIndustries({ total, by, groups, aptWithPrior }: { total: numb
     <section className="container-x pt-28">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <h2 className="h-section">용역·공사·물품,<br /> 모든 업종을 한 화면에서 봅니다.</h2>
-        <p className="max-w-md text-ink-500">비드파인더가 나라장터, K-apt 공동주택 입찰공고, 누리장터 공고를 함께 받아 같은 업종 기준으로 나누고, 귀사가 참가할 수 있는 공고만 골라 드립니다.</p>
+        <p className="max-w-md text-ink-500">비드파인더가 나라장터, 공동주택 입찰 공고 K-apt, 누리장터 공고를 함께 받아 같은 업종 기준으로 나누고, 귀사가 참가할 수 있는 공고만 골라 드립니다.</p>
       </div>
 
       {/* 합계와 출처 구성 */}

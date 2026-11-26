@@ -16,7 +16,7 @@ type Entry = { label: string; href: string } | { label: string; items: Item[] };
 export const NAV: Entry[] = [
   { label: "서비스", href: "/service" },
   {
-    label: "공고 찾기",
+    label: "입찰공고 찾기",
     items: [
       { href: "/bids", label: "나라장터 입찰 공고", desc: "나라장터 용역·공사·물품 전 업종" },
       { href: "/apt-bids", label: "공동주택 입찰 공고 K-apt", desc: "아파트 청소·경비·위탁관리 입찰" },
@@ -26,7 +26,7 @@ export const NAV: Entry[] = [
     ],
   },
   {
-    label: "입찰 분석",
+    label: "입찰데이터 분석",
     items: [
       { href: "/awards", label: "최근 낙찰 결과", desc: "최근 한 달 최종낙찰·개찰 순위" },
       { href: "/analysis/agency", label: "발주처 분석", desc: "수요기관별 낙찰률·사정율·주요 낙찰업체" },

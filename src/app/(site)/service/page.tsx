@@ -27,7 +27,7 @@ const MENUS: Record<EngineId, { t: string; href: string }[]> = {
   insight: [
     { t: "나라장터 입찰 예측", href: "/premium" },
     { t: "공동주택 입찰 예측", href: "/premium/apt" },
-    { t: "누리장터 공고 예측", href: "/premium/nuri" },
+    { t: "누리장터 입찰 예측", href: "/premium/nuri" },
   ],
 };
 

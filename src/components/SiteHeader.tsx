@@ -43,7 +43,7 @@ export const NAV: Entry[] = [
     items: [
       { href: "/premium", label: "나라장터 입찰 예측", desc: "적격심사·협상 예상 평가점수와 투찰률" },
       { href: "/premium/apt", label: "공동주택 입찰 예측", desc: "아파트 청소·경비 공고 예상 낙찰금액" },
-      { href: "/premium/nuri", label: "누리장터 공고 예측", desc: "누리장터 공고 예상 평가점수" },
+      { href: "/premium/nuri", label: "누리장터 입찰 예측", desc: "누리장터 공고 예상 평가점수" },
     ],
   },
   { label: "요금제", href: "/pricing" },

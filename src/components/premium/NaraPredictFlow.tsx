@@ -68,6 +68,7 @@ export function NaraPredictFlow() {
   const corpOk = !!corp && !blocker;
   const judge = useMemo(() => (corp ? makeListJudge(corp) : null), [corp]);
   const step: 1 | 2 | 3 = !corpOk ? 1 : !bidId ? 2 : 3;
+  const picked = bidId ? bids?.find((b) => b.id === bidId) : undefined;
 
   // 공고 상세의 '이 공고 점수 예측하기'로 들어오면, 기업 조회가 끝난 뒤 그 공고로 확인 창을 띄운다
   const urlBid = sp.get("bid");
@@ -170,14 +171,30 @@ export function NaraPredictFlow() {
           </div>
           <BidsExplorer picker={{ judge, onPick: setAsking }} />
         </section>
-      ) : null}
+      ) : (
+        // 3단계에서도 2단계는 고른 공고와 함께 남겨 둔다. 다른 공고 선택을 누르면 공고 목록이 다시 열린다
+        <section className="card min-w-0 p-6" aria-labelledby="flow-bid">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <StepTitle id="flow-bid" n={2} title="입찰 공고 선택" />
+            <button type="button" onClick={repick} className="btn-ghost btn-sm">다른 공고 선택</button>
+          </div>
+          {picked ? (
+            <div className="mt-4 rounded-2xl border border-mint/40 bg-mint-50/60 p-4">
+              <p className="text-xs font-semibold text-mint-700">선택한 입찰 공고</p>
+              <p className="mt-1 font-bold leading-snug [overflow-wrap:anywhere]"><CloseDdayBadge iso={picked.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={picked.closeAt} />{picked.title}</p>
+              <p className="mt-1 text-sm text-ink-500">{picked.demandAgency || picked.agency} · {picked.bizType ?? "용역"} · {picked.contractMethod} · 공고번호 {picked.bidNtceNo} · {picked.baseAmount ? `기초금액 ${won(picked.baseAmount)}` : "금액 미공개"}</p>
+            </div>
+          ) : <p className="mt-3 text-sm text-ink-300">고른 공고를 불러오는 중…</p>}
+        </section>
+      )}
 
       {/* 3. 입찰 점수 예측 */}
       {step === 3 && corp && bidId ? (
         <section className="min-w-0" aria-labelledby="flow-score">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          {/* 1·2단계와 같은 카드 머리말: 제목은 카드 안, 같은 여백 */}
+          <div className="card mb-6 p-6">
             <StepTitle id="flow-score" n={3} title="입찰 점수 예측" />
-            <button type="button" onClick={repick} className="btn-ghost btn-sm">2단계로 돌아가 다른 공고 선택</button>
+            <p className="mt-2 text-sm text-ink-500">선택한 공고의 평가 기준과 {corp.corpName ?? "조회한 기업"}의 정보로 참가자격, 예상 평가점수, 통과 가능한 투찰률, 낙찰 결과를 계산했습니다.</p>
           </div>
           <ScorePredictor flow={{ corp, bidId, onRepick: repick }} />
         </section>

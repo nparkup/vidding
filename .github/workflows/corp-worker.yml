@@ -5,6 +5,7 @@ name: 기업 정보 중계 서버 배포
 # 선택: ANTHROPIC_API_KEY (공고 배점표 AI 판독, ?aisheet=). 있으면 Worker 비밀값으로 넣는다
 # 선택: ADMIN_ID, ADMIN_PASSWORD (관리자 화면 /admin 로그인, 비밀번호 10자 이상). 있으면 Worker 비밀값으로 넣는다
 # 선택: KIPRIS_API_KEY (기업 특허 조회 예비 경로, KIPRIS Plus 인증키). 기본 경로는 공공데이터포털 등록원부라 없어도 된다
+# 선택: BACKUP_KEY (회원·결제 백업 암호화 키, 아무 긴 문자열). 있으면 Worker 비밀값으로 넣는다. 잃어버리면 암호화한 백업을 풀 수 없다
 # 선택: ADMIN_GITHUB_TOKEN (관리자 화면 GitHub Actions 실행 목록, Actions 읽기 권한만). 있으면 Worker 비밀값 GITHUB_TOKEN 으로 넣는다
 on:
   push:
@@ -27,6 +28,7 @@ on:
       - "src/lib/trialLimit.ts"
       - "src/lib/usagePeriod.ts"
       - "src/lib/patents.ts"
+      - "src/lib/privacy.ts"
       - ".github/workflows/corp-worker.yml"
   # PR에서는 배포하지 않고 Cloudflare 토큰·계정 ID가 맞는지만 확인한다
   pull_request:
@@ -48,6 +50,7 @@ on:
       - "src/lib/trialLimit.ts"
       - "src/lib/usagePeriod.ts"
       - "src/lib/patents.ts"
+      - "src/lib/privacy.ts"
       - ".github/workflows/corp-worker.yml"
   workflow_dispatch:
 
@@ -96,10 +99,41 @@ jobs:
       # Worker가 Anthropic SDK(@anthropic-ai/sdk)를 함께 묶는다
       - run: npm ci
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
+      # 회원·결제 백업 버킷(backup.ts). 없으면 만들고, 만들 권한이 없으면 백업 바인딩만 빼고 배포한다 (배포가 멈추지 않게)
+      - name: 백업 버킷 확인
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
+        working-directory: worker/corp-lookup
+        run: |
+          code=$(curl -sS -o /tmp/b.json -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/bidmate-backup")
+          if [ "$code" != "200" ]; then
+            code=$(curl -sS -o /tmp/c.json -w '%{http_code}' -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
+              -d '{"name":"bidmate-backup"}' "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets")
+            echo "백업 버킷 만들기: $code $(jq -c '.errors' /tmp/c.json 2>/dev/null)"
+          else
+            echo "백업 버킷 있음"
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::warning::백업 버킷 bidmate-backup 을 만들지 못해 백업 없이 배포합니다. Cloudflare 대시보드 R2에서 bidmate-backup 버킷을 만들어 주세요."
+            python3 - <<'PY'
+          import re
+          p = "wrangler.toml"
+          s = open(p).read()
+          s = re.sub(r'\[\[r2_buckets\]\]\nbinding = "BACKUP"\nbucket_name = "bidmate-backup"\n', "", s)
+          open(p, "w").write(s)
+          PY
+          fi
       - name: Worker 배포
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup
         run: npx --yes wrangler@4.40.0 deploy
+      - name: 백업 암호화 키를 Worker 비밀값으로 저장
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
+        working-directory: worker/corp-lookup
+        env:
+          BACKUP_KEY: ${{ secrets.BACKUP_KEY }}
+        run: |
+          if [ -z "$BACKUP_KEY" ]; then echo "BACKUP_KEY 없음: 백업은 암호화 없이 비공개 버킷에만 둡니다"; exit 0; fi
+          printf '%s' "$BACKUP_KEY" | npx --yes wrangler@4.40.0 secret put BACKUP_KEY
       - name: 서비스키를 Worker 비밀값으로 저장
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup

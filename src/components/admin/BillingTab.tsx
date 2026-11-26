@@ -45,6 +45,8 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
   }, [members, q, only]);
 
   function csv() {
+    // 개인정보 다운로드 기록 (관리자 > 시스템 정보 > 접속·로그 감사 기록)
+    call("download", { body: { what: "결제내역", rows: members.length } }).catch(() => undefined);
     const rows: (string | number)[][] = [];
     for (const m of members) for (const p of m.billing?.payments ?? []) rows.push([p.date, m.company, bizFmt(m.bizno), p.kind === "refund" ? "환불" : "결제", p.kind === "refund" ? -p.amount : p.amount, p.method, (m.billing!.plan ? planName(m.billing!.plan) : ""), p.memo]);
     rows.sort((a, b) => String(b[0]).localeCompare(String(a[0])));

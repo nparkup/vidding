@@ -67,6 +67,8 @@ export function MembersTab({ call, guard, members, withdrawn, addWithdrawn, limi
   }, [members]);
 
   function csv() {
+    // 개인정보 다운로드 기록 (관리자 > 시스템 정보 > 접속·로그 감사 기록)
+    call("download", { body: { what: "회원", rows: members.length } }).catch(() => undefined);
     downloadCsv("회원", ["회사명", "사업자등록번호", "담당자", "연락처", "이메일", "가입일", "상태", "결제", "요금제", "적용 한도", "개별 한도", "이번 기간 사용", "체험 사용", "분석한 공고", "메일 수신 동의", "업종·면허", "지역", "규모", "관심 키워드", "메모"],
       shown.map((m) => [
         m.company, bizFmt(m.bizno), m.name, m.phone, m.email, dt(m.joinedAt), m.status === "suspended" ? "이용 정지" : "정상",

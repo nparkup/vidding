@@ -12,6 +12,7 @@
  * - GET /?awards=사업자번호&biz=용역 : 그 업체의 최근 3년 낙찰을 공고 분류와 함께. 조달청 API를 부르지 않는다 (6시간 캐시)
  * - GET /?awardmeta=1 : 저장소 수집 범위·완료 여부
  *
+ * 백업 (backup.ts): 매일 0시 10분 회원·결제 자료를 bidmate-backup 버킷에, 탈퇴 회원 결제 기록 5년 보존·정리.
  * 보안 (security.ts): IP별 요청 제한(RL_AUTH·RL_AI·RL_API), Claude 하루 상한, 모든 응답 보안 헤더, 관리자 2단계 인증.
  *
  * 회원 로그인 (account.ts): ?account=동작. 가입·로그인·내 정보·이용권 공고 예측 건수 차감·내 서류함.
@@ -49,6 +50,7 @@ import { handleAdmin, readSiteConfig } from "./admin";
 import { handleAccount, processDueWithdrawals } from "./account";
 import { metricsStub, patchFetch, takePending, truncIp, type MetricsNs, type RecBody } from "./metrics";
 export { Metrics } from "./metrics";
+import { purgeRetained, runBackup, type BBucket } from "./backup";
 import { overLimit, takeAiBudget, withSecurityHeaders, type RateLimiter } from "./security";
 
 interface Env {
@@ -81,6 +83,10 @@ interface Env {
   /** 회원 로그인 토큰 서명 키 (선택, 16자 이상). 없으면 R2 config/auth-key.json 에 만들어 둔 무작위 키를 쓴다 */
   MEMBER_SECRET?: string;
   /** 실시간 이용자 수 (wrangler.toml durable_objects). 없으면 ?presence 는 503 */
+  /** 회원·결제 자료 백업 버킷 (wrangler.toml, bidmate-backup). 없으면 백업하지 않는다 */
+  BACKUP?: BBucket;
+  /** 백업 암호화 키 (Worker 비밀값, 선택). 없으면 암호화하지 않고 비공개 버킷에만 둔다 */
+  BACKUP_KEY?: string;
   /** 요청 제한 (wrangler.toml [[ratelimits]], IP마다 1분). 없으면 막지 않는다 */
   RL_AUTH?: RateLimiter;
   RL_AI?: RateLimiter;
@@ -126,7 +132,14 @@ export default {
   },
   /** 매일 0시 10분(한국, wrangler.toml crons): 마지막 이용일이 지난 회원 탈퇴 예약을 처리한다 */
   async scheduled(_ev: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
-    if (env.AWARDS) ctx.waitUntil(processDueWithdrawals(env.AWARDS).then(() => undefined));
+    if (!env.AWARDS) return;
+    const bucket = env.AWARDS;
+    ctx.waitUntil((async () => {
+      await processDueWithdrawals(bucket).catch(() => 0);
+      // 회원·결제 자료를 별도 버킷에 백업 (backup.ts). 보존 기간이 지난 기록 정리는 매달 1일
+      await runBackup(bucket as unknown as BBucket, env.BACKUP, env.BACKUP_KEY).catch(() => undefined);
+      if (new Date(Date.now() + 9 * 3600e3).getUTCDate() === 1) await purgeRetained(bucket as unknown as BBucket).catch(() => 0);
+    })());
   },
 };
 

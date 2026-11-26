@@ -26,7 +26,7 @@ export const NAV: Entry[] = [
     ],
   },
   {
-    label: "입찰데이터 분석",
+    label: "입찰 분석",
     items: [
       { href: "/awards", label: "최근 낙찰 결과", desc: "최근 한 달 최종낙찰·개찰 순위" },
       { href: "/analysis/agency", label: "발주처 분석", desc: "수요기관별 낙찰률·사정율·주요 낙찰업체" },

@@ -10,6 +10,9 @@
  * - POST use      : 공고 예측 1건 사용 { k: "nara:공고ID" | "apt:입찰번호" | "nuri:공고번호-차수", title }. 유료면 이용권 월 건수에서, 아니면 무료 체험에서 뺀다.
  *                   이미 쓴 공고는 다시 빼지 않는다
  * - GET  mybox / POST mybox : 내 서류함 (담은 공고 목록)
+ * - POST withdraw : 회원 탈퇴 { password, mode: "now" | "scheduled", reason }. 남은 이용권이 있으면 scheduled 로
+ *                   이용권 마지막 날까지 쓰고 다음 날 지울 수 있다(다음 결제 없음). now 는 바로 지우고 남은 기간은 환불하지 않는다
+ * - POST withdraw-cancel : 탈퇴 예약 취소
  *
  * 비밀번호는 PBKDF2-SHA256(10만 번, 사업자번호마다 다른 16바이트 salt)으로 만든 값만 저장한다. 원문은 어디에도 남기지 않는다.
  * 토큰 서명 키는 Worker 비밀값 MEMBER_SECRET, 없으면 처음 쓸 때 R2 config/auth-key.json 에 무작위로 만들어 둔다 (R2는 공개되지 않는다).
@@ -21,9 +24,11 @@
  * - usage/{사업자번호}/{기간 시작일}.json : 유료 이용권 공고 예측 사용 공고
  * - trial/{사업자번호}.json           : 무료 체험 사용 공고 (?trial= 과 같은 파일)
  * - mybox/{사업자번호}.json           : 내 서류함
+ * - withdraw/pending/{사업자번호}.json : 탈퇴 예약 (on = 마지막 이용일). 매일 0시 10분(한국) 예약 작업과 로그인·관리자 목록이 지난 예약을 처리한다
+ * - withdraw/done/{사업자번호}.json    : 탈퇴한 회원 기록 (회사명·사업자번호·탈퇴 방식·날짜만. 담당자·연락처·이메일은 남기지 않는다)
  */
 import { normalizeBizno, validBizno } from "../../src/lib/corpLookup";
-import { limitOf, type LimitInfo } from "../../src/lib/usagePeriod";
+import { kstToday, limitOf, passLastDay, type BillingLike, type LimitInfo, type WithdrawInfo } from "../../src/lib/usagePeriod";
 import { readSiteConfig, type AdminBucket } from "./admin";
 
 export interface AccountEnv {
@@ -119,7 +124,69 @@ export async function memberOfToken(token: string, env: AccountEnv, bucket: Admi
   if (!same(sig, m[4])) return null;
   const rec = await readJson(bucket, `members/${m[1]}.json`);
   if (!rec?.auth || rec.auth.ver !== Number(m[3])) return null;
+  if (await finishIfDue(bucket, rec)) return null;
   return rec;
+}
+
+/** 탈퇴 예약 마지막 이용일이 지났으면 지금 탈퇴 처리한다. 처리했으면 true */
+export async function finishIfDue(bucket: AdminBucket, rec: Rec | null, today = kstToday()): Promise<boolean> {
+  const w = rec?.withdraw as WithdrawInfo | undefined;
+  if (!rec || w?.mode !== "scheduled" || !w.on || today <= w.on) return false;
+  await finishWithdraw(bucket, rec, "scheduled", w.reason, w.requestedAt);
+  return true;
+}
+
+/**
+ * 탈퇴 처리: 가입 정보·로그인 계정·서류함·결제 기록을 지운다. 무료 체험 사용 기록(trial/)은 남긴다(다시 가입해도 체험 건수가 새로 생기지 않게).
+ * withdraw/done/ 에는 회사명·사업자번호·방식·날짜만 남긴다.
+ */
+export async function finishWithdraw(bucket: AdminBucket, rec: Rec, mode: "now" | "scheduled" | "admin", reason?: string, requestedAt?: string) {
+  const bizno = String(rec.bizno);
+  const billing = await readJson<BillingLike>(bucket, `billing/${bizno}.json`);
+  const today = kstToday();
+  const last = passLastDay(billing, today);
+  const done = {
+    bizno, company: String(rec.company ?? ""), mode, at: new Date().toISOString(), requestedAt: requestedAt ?? new Date().toISOString(),
+    joinedAt: rec.joinedAt ?? null, plan: billing?.plan || null,
+    passEnd: mode === "scheduled" ? ((rec.withdraw as WithdrawInfo | undefined)?.on ?? last) : last,
+    // 바로 탈퇴했는데 이용권 기간이 남아 있었으면 그 마지막 날 (환불 없음)
+    forfeit: mode !== "scheduled" && last && last >= today ? last : null,
+    reason: reason || undefined,
+  };
+  await putJson(bucket, `withdraw/done/${bizno}.json`, done);
+  await deleteAccountData(bucket, rec, bizno);
+  await bucket.delete(`members/${bizno}.json`);
+  await bucket.delete(`billing/${bizno}.json`);
+  await bucket.delete(`withdraw/pending/${bizno}.json`);
+  return done;
+}
+
+/** 매일 예약 작업: 마지막 이용일이 지난 탈퇴 예약을 처리한다 */
+export async function processDueWithdrawals(bucket: AdminBucket, today = kstToday()): Promise<number> {
+  let n = 0;
+  let cursor: string | undefined;
+  do {
+    const r = await bucket.list({ prefix: "withdraw/pending/", cursor, limit: 1000 });
+    for (const o of r.objects) {
+      const p = await readJson<{ bizno?: string; on?: string }>(bucket, o.key);
+      if (!p?.bizno || !p.on || today <= p.on) continue;
+      const rec = await readJson(bucket, `members/${p.bizno}.json`);
+      if (!rec) { await bucket.delete(o.key); continue; }
+      if (await finishIfDue(bucket, rec, today)) n++;
+      else if (!(rec.withdraw as WithdrawInfo | undefined)) await bucket.delete(o.key);
+    }
+    cursor = r.truncated ? r.cursor : undefined;
+  } while (cursor);
+  return n;
+}
+
+/** 탈퇴 예약 취소 (회원 또는 관리자) */
+export async function cancelWithdraw(bucket: AdminBucket, rec: Rec): Promise<Rec> {
+  const next: Rec = { ...rec };
+  delete next.withdraw;
+  await putJson(bucket, `members/${String(rec.bizno)}.json`, next);
+  await bucket.delete(`withdraw/pending/${String(rec.bizno)}.json`);
+  return next;
 }
 
 /** 화면에 돌려줄 가입 정보 (비밀번호 해시·관리 메모는 빼고) */
@@ -278,7 +345,8 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
       const digits = normalizeBizno(id);
       if (!id.includes("@") && digits.length === 10) bizno = digits;
       else bizno = (await readJson<{ bizno?: string }>(bucket, await emailKey(id)))?.bizno ?? "";
-      const rec = bizno ? await readJson(bucket, `members/${bizno}.json`) : null;
+      let rec = bizno ? await readJson(bucket, `members/${bizno}.json`) : null;
+      if (await finishIfDue(bucket, rec)) rec = null;
       if (!rec?.auth || !(await checkPassword(pw, rec.auth.pw))) {
         // 없는 아이디는 기록을 남기지 않고 늦추기만 한다
         if (rec) await fail(id); else await new Promise((r) => setTimeout(r, 800));
@@ -398,6 +466,33 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
       const { key: _k, ...usage } = u;
       void _k;
       return json({ ok, fresh, ...usage, ...(suspended ? { suspended: true } : {}) }, 200, noStore);
+    }
+    case "withdraw": {
+      if (!post) break;
+      if (!(await checkPassword(String(body.password ?? ""), rec.auth!.pw))) {
+        await new Promise((r) => setTimeout(r, 800));
+        return json({ error: "비밀번호가 맞지 않습니다." }, 400, noStore);
+      }
+      const reason = s(body.reason, 300);
+      const billing = await readJson<BillingLike>(bucket, `billing/${bizno}.json`);
+      const last = passLastDay(billing);
+      if (body.mode === "scheduled") {
+        if (!last) return json({ error: "남은 이용권이 없어 예약할 수 없습니다. 바로 탈퇴를 골라 주세요." }, 400, noStore);
+        const w: WithdrawInfo = { mode: "scheduled", on: last, requestedAt: nowIso(), ...(reason ? { reason } : {}) };
+        const next: Rec = { ...rec, withdraw: w };
+        await putJson(bucket, key, next);
+        await putJson(bucket, `withdraw/pending/${bizno}.json`, { bizno, on: last });
+        return json({ status: "scheduled", member: publicMember(next) }, 200, noStore);
+      }
+      if (body.mode !== "now") return json({ error: "탈퇴 방식을 골라 주세요." }, 400);
+      const prev = rec.withdraw as WithdrawInfo | undefined;
+      await finishWithdraw(bucket, rec, "now", reason || prev?.reason, prev?.requestedAt);
+      return json({ status: "withdrawn" }, 200, noStore);
+    }
+    case "withdraw-cancel": {
+      if (!post) break;
+      const next = await cancelWithdraw(bucket, rec);
+      return json({ status: "ok", member: publicMember(next) }, 200, noStore);
     }
     case "mybox": {
       const mk = `mybox/${bizno}.json`;

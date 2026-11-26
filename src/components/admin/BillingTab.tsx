@@ -89,6 +89,7 @@ export function BillingTab({ call, guard, members, busy, reload, updateMember }:
                   <span>{b?.plan ? planName(b.plan) : "-"}</span>
                   <span className="tabular-nums text-ink-500">{b?.start ? `${b.start} ~ ${b.end || ""}` : ""}</span>
                   <StatusBadge s={b?.status ?? "none"} />
+                  {m.withdraw && <span className="rounded-lg bg-coral-100 px-2 py-0.5 text-xs font-bold text-coral">탈퇴 예정 · 다음 결제 없음</span>}
                   <span className="font-semibold tabular-nums">{won(net(b))}</span>
                   <button type="button" onClick={() => setOpen(open === m.bizno ? null : m.bizno)} className="btn-ghost btn-sm">{open === m.bizno ? "닫기" : b ? "관리" : "결제 등록"}</button>
                 </div>

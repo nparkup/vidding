@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { TabProps } from "./AdminConsole";
-import { bizFmt, downloadCsv, dt, SIZE_LABEL, type Member } from "./adminApi";
+import { bizFmt, downloadCsv, dt, SIZE_LABEL, type Member, type Withdrawn } from "./adminApi";
 import { planName } from "@/lib/plans";
 import { MemberCreate } from "./MemberCreate";
 import { fullOf, LimitEditor, QuotaBadge, tierName, useMemberQuota } from "./limits";
@@ -11,12 +11,16 @@ const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const bidLink = (k: string) => (k.startsWith("apt:") ? `/apt-bids/view?no=${encodeURIComponent(k.slice(4))}` : k.startsWith("nuri:") ? `/nuri-bids/view?no=${encodeURIComponent(k.slice(5).replace(/-\d+$/, ""))}` : `/bids/view?id=${encodeURIComponent(k.slice(5))}`);
 
 type Use = "all" | "none" | "some" | "full" | "custom";
-type St = "all" | "active" | "suspended" | "paid" | "login" | "nologin";
+type St = "all" | "active" | "suspended" | "paid" | "login" | "nologin" | "withdraw";
+
+const day = (d: string) => `${d.slice(0, 4)}.${d.slice(5, 7)}.${d.slice(8, 10)}`;
+const nextDay = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) + 86400_000).toISOString().slice(0, 10);
+const W_MODE: Record<Withdrawn["mode"], string> = { now: "회원이 바로 탈퇴", scheduled: "이용권 종료 후 탈퇴", admin: "관리자 탈퇴 처리" };
 
 export const isPaid = (m: Member) => m.billing?.status === "active";
 
 /** 회원정보 관리: 검색·거르기, 가입 정보 고치기, 이용 정지·해제, 메모, 무료 체험 초기화, 탈퇴 처리, CSV */
-export function MembersTab({ call, guard, members, limit, busy, reload, updateMember, addMember, removeMember }: TabProps) {
+export function MembersTab({ call, guard, members, withdrawn, addWithdrawn, limit, busy, reload, updateMember, addMember, removeMember }: TabProps) {
   const [q, setQ] = useState("");
   const [mailOnly, setMailOnly] = useState(false);
   const [use, setUse] = useState<Use>("all");
@@ -42,6 +46,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
       if (st === "paid" && !isPaid(m)) return false;
       if (st === "login" && !m.login) return false;
       if (st === "nologin" && m.login) return false;
+      if (st === "withdraw" && !m.withdraw) return false;
       const hay = `${m.company} ${m.bizno} ${bizFmt(m.bizno)} ${m.name} ${m.email} ${m.phone} ${m.memo ?? ""}`.toLowerCase();
       return words.every((w) => hay.includes(w));
     });
@@ -57,6 +62,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
       used: members.filter((m) => m.trial.length > 0).length,
       suspended: members.filter((m) => m.status === "suspended").length,
       mail: members.filter((m) => m.agreeMail).length,
+      leaving: members.filter((m) => m.withdraw).length,
     };
   }, [members]);
 
@@ -85,7 +91,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
 
       {adding && <MemberCreate call={call} guard={guard} onClose={() => setAdding(false)} onCreated={(x, msg) => { addMember(x); setNote(msg); setQ(""); setSt("all"); setUse("all"); setMailOnly(false); }} />}
 
-      <Stats items={[["전체 회원", stats.total], ["최근 7일 가입", stats.recent], ["결제 중", stats.paid], ["로그인 계정", stats.login], ["체험 사용", stats.used], ["이용 정지", stats.suspended]]} />
+      <Stats cols="sm:grid-cols-4" items={[["전체 회원", stats.total], ["최근 7일 가입", stats.recent], ["결제 중", stats.paid], ["로그인 계정", stats.login], ["체험 사용", stats.used], ["이용 정지", stats.suspended], ["탈퇴 예정", stats.leaving], ["탈퇴한 회원", withdrawn.length]]} />
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <input className="input sm:max-w-xs" placeholder="회사명·사업자번호·담당자·연락처·메모" value={q} onChange={(e) => setQ(e.target.value)} aria-label="회원 검색" />
@@ -96,6 +102,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
           <option value="login">로그인 계정 있음</option>
           <option value="nologin">비밀번호 없는 예전 가입</option>
           <option value="suspended">이용 정지</option>
+          <option value="withdraw">탈퇴 예정</option>
         </select>
         <select className="input sm:w-auto" value={use} onChange={(e) => setUse(e.target.value as Use)} aria-label="이용 한도 사용">
           <option value="all">한도 사용 전체</option>
@@ -118,6 +125,7 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
                   <span className="font-semibold [overflow-wrap:anywhere]">{m.company}</span>
                   {m.status === "suspended" && <span className="rounded-lg bg-coral-100 px-2 py-0.5 text-xs font-bold text-coral">이용 정지</span>}
                   {isPaid(m) && <span className="rounded-lg bg-mint-50 px-2 py-0.5 text-xs font-bold text-mint-700">{planName(m.billing!.plan)}</span>}
+                  {m.withdraw && <span className="rounded-lg bg-coral-100 px-2 py-0.5 text-xs font-bold text-coral">탈퇴 예정 · {day(m.withdraw.on)}까지 이용</span>}
                   {!m.login && <span className="rounded-lg bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-400">비밀번호 없음</span>}
                 </p>
                 <p className="text-xs tabular-nums text-ink-400">{bizFmt(m.bizno)} · 가입 {dt(m.joinedAt)}{m.createdBy === "admin" ? " (관리자 등록)" : ""}</p>
@@ -131,21 +139,22 @@ export function MembersTab({ call, guard, members, limit, busy, reload, updateMe
             </div>
             {open === m.bizno && (
               <div className="mt-4 border-t border-ink-100 pt-4">
-                <MemberEditor m={m} limit={limit} call={call} guard={guard} onSaved={(x, msg) => { updateMember(x); setNote(msg); }} onDeleted={() => { removeMember(m.bizno); setOpen(null); setNote(`${m.company} 가입 정보를 삭제했습니다.`); }} />
+                <MemberEditor m={m} limit={limit} call={call} guard={guard} onSaved={(x, msg) => { updateMember(x); setNote(msg); }} onDeleted={(w) => { removeMember(m.bizno); if (w) addWithdrawn(w); setOpen(null); setNote(`${m.company} 탈퇴 처리했습니다.`); }} />
               </div>
             )}
           </li>
         ))}
         {!shown.length && <li className="card p-6 text-center text-sm text-ink-400">{stats.total ? "조건에 맞는 회원이 없습니다." : "아직 가입한 회원이 없습니다."}</li>}
       </ul>
-      <p className="mt-3 text-xs text-ink-400">탈퇴 처리는 가입 정보·로그인 계정·서류함과 결제 기록을 지우고, 이미 쓴 무료 체험 건수는 남겨 둡니다(다시 가입해도 {limit}건이 새로 생기지 않게). 이용 정지한 사업자번호는 로그인할 수 없고 무료 체험·이용권 공고가 더 늘지 않습니다. 결제 중(결제정보 '이용 중', 기간 안)인 회원은 무료 체험 대신 이용권 한 달 건수로 셉니다. 회원 상세의 이용 한도에서 회원마다 개별 한도를 정할 수 있습니다.</p>
+      <WithdrawnList list={withdrawn} />
+      <p className="mt-3 text-xs text-ink-400">회원은 내 정보에서 직접 탈퇴할 수 있습니다. 남은 이용권이 있으면 이용권 마지막 날까지 쓰고 다음 날 지우는 '탈퇴 예정'(다음 결제 없음)과 바로 탈퇴(남은 기간 환불 없음) 중에서 고릅니다. 탈퇴 예정 회원은 마지막 이용일 다음 날 0시 10분에 자동으로 지웁니다. 탈퇴 처리는 가입 정보·로그인 계정·서류함과 결제 기록을 지우고, 이미 쓴 무료 체험 건수는 남겨 둡니다(다시 가입해도 {limit}건이 새로 생기지 않게). 이용 정지한 사업자번호는 로그인할 수 없고 무료 체험·이용권 공고가 더 늘지 않습니다. 결제 중(결제정보 '이용 중', 기간 안)인 회원은 무료 체험 대신 이용권 한 달 건수로 셉니다. 회원 상세의 이용 한도에서 회원마다 개별 한도를 정할 수 있습니다.</p>
     </>
   );
 }
 
-export function Stats({ items }: { items: [string, number | string][] }) {
+export function Stats({ items, cols = "sm:grid-cols-3 xl:grid-cols-6" }: { items: [string, number | string][]; cols?: string }) {
   return (
-    <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-100 bg-ink-100 sm:grid-cols-3 xl:grid-cols-6">
+    <div className={`mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-100 bg-ink-100 ${cols}`}>
       {items.map(([k, v]) => (
         <div key={k} className="min-w-0 bg-white px-4 py-3">
           <p className="text-xs text-ink-400">{k}</p>
@@ -160,8 +169,38 @@ export function TrialBadge({ n, limit }: { n: number; limit: number }) {
   return <span className={`inline-block shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold tabular-nums ${n >= limit ? "bg-coral-100 text-coral" : n ? "bg-mint-50 text-mint-700" : "bg-ink-50 text-ink-400"}`}>체험 {n}/{limit}</span>;
 }
 
+/** 탈퇴한 회원 기록: 회사명·사업자번호·탈퇴 방식·날짜만 (담당자·연락처·이메일은 지운 뒤라 없다) */
+function WithdrawnList({ list }: { list: Withdrawn[] }) {
+  const [all, setAll] = useState(false);
+  if (!list.length) return null;
+  const shown = all ? list : list.slice(0, 10);
+  return (
+    <section className="card mt-5 p-4 sm:p-5">
+      <p className="font-bold">탈퇴한 회원 <span className="text-sm font-semibold text-ink-400">{list.length.toLocaleString()}곳</span></p>
+      <ul className="mt-2 divide-y divide-ink-100 text-sm">
+        {shown.map((w) => (
+          <li key={`${w.bizno}-${w.at}`} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-semibold [overflow-wrap:anywhere]">{w.company || "-"} <span className="text-xs font-normal tabular-nums text-ink-400">{bizFmt(w.bizno)}</span></p>
+              <p className="text-xs text-ink-500">
+                {W_MODE[w.mode] ?? w.mode}
+                {w.plan ? ` · ${planName(w.plan)}` : ""}
+                {w.forfeit ? ` · 남은 이용 기간(${day(w.forfeit)}까지) 소멸, 환불 없음` : ""}
+                {w.mode === "scheduled" && w.passEnd ? ` · ${day(w.passEnd)}까지 이용` : ""}
+              </p>
+              {w.reason && <p className="mt-0.5 text-xs text-ink-400 [overflow-wrap:anywhere]">사유: {w.reason}</p>}
+            </div>
+            <p className="shrink-0 text-xs tabular-nums text-ink-400">탈퇴 {dt(w.at)}{w.requestedAt && w.mode === "scheduled" ? ` · 신청 ${dt(w.requestedAt)}` : ""}</p>
+          </li>
+        ))}
+      </ul>
+      {list.length > shown.length && <button type="button" onClick={() => setAll(true)} className="mt-2 text-sm font-semibold text-mint-600 hover:underline">{list.length - shown.length}곳 더 보기</button>}
+    </section>
+  );
+}
+
 function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
-  m: Member; limit: number; call: TabProps["call"]; guard: TabProps["guard"]; onSaved: (m: Member, msg: string) => void; onDeleted: () => void;
+  m: Member; limit: number; call: TabProps["call"]; guard: TabProps["guard"]; onSaved: (m: Member, msg: string) => void; onDeleted: (w: Withdrawn | null) => void;
 }) {
   const [f, setF] = useState({
     company: m.company, name: m.name, phone: m.phone, email: m.email,
@@ -170,7 +209,7 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
   });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
-  const [confirm, setConfirm] = useState<"" | "delete" | "trial" | "temp">("");
+  const [confirm, setConfirm] = useState<"" | "delete" | "trial" | "temp" | "unwithdraw">("");
   const [temp, setTemp] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setF((x) => ({ ...x, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value }));
@@ -186,11 +225,20 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
   }
   async function del() {
     setSaving(true);
-    try { if (await guard(call("member-delete", { params: { bizno: m.bizno }, body: {} }))) onDeleted(); } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
+    try { const r = await guard(call<{ withdrawn?: Withdrawn | null }>("member-delete", { params: { bizno: m.bizno }, body: {} })); if (r) onDeleted(r.withdrawn ?? null); } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
   }
   async function resetTrial() {
     setSaving(true);
     try { if (await guard(call("trial-reset", { params: { bizno: m.bizno }, body: {} }))) onSaved({ ...m, trial: [], quota: m.quota && m.quota.tier === "trial" ? { ...m.quota, used: 0 } : m.quota }, `${m.company} 무료 체험 기록을 초기화했습니다.`); } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
+  }
+
+  async function unWithdraw() {
+    setSaving(true);
+    setErr("");
+    try {
+      const r = await guard(call<{ member: Member }>("withdraw-cancel", { params: { bizno: m.bizno }, body: {} }));
+      if (r) onSaved({ ...m, withdraw: null }, `${m.company} 탈퇴 예약을 취소했습니다.`);
+    } catch (e) { setErr((e as Error).message); } finally { setSaving(false); setConfirm(""); }
   }
 
   async function issueTemp() {
@@ -230,6 +278,13 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
         </div>
       </form>
       <div className="space-y-4 text-sm">
+        {m.withdraw && (
+          <div className="rounded-xl bg-coral-100/60 p-3">
+            <p className="text-xs font-semibold text-coral">탈퇴 예정</p>
+            <p className="mt-1">{day(m.withdraw.on)}까지 이용하고 {day(nextDay(m.withdraw.on))} 0시 10분에 가입 정보를 지웁니다.<br />다음 결제는 하지 않습니다.</p>
+            <p className="mt-1 text-xs text-ink-500">신청 {dt(m.withdraw.requestedAt)}{m.withdraw.reason ? ` · 사유: ${m.withdraw.reason}` : ""}</p>
+          </div>
+        )}
         <LimitEditor m={m} call={call} guard={guard} onSaved={onSaved} />
         <div>
           <p className="text-xs font-semibold text-ink-500">무료 체험으로 분석한 공고 ({m.trial.length}/{limit})</p>
@@ -262,13 +317,16 @@ function MemberEditor({ m, limit, call, guard, onSaved, onDeleted }: {
             <Confirm text={`무료 체험 기록을 지우면 ${limit}건을 다시 쓸 수 있습니다.`} label="초기화" onYes={resetTrial} onNo={() => setConfirm("")} busy={saving} />
           ) : confirm === "temp" ? (
             <Confirm text={`임시 비밀번호를 만들면 지금 비밀번호와 다른 기기의 로그인이 모두 풀립니다. 로그인 이메일: ${m.login?.email ?? m.email}`} label="발급" onYes={issueTemp} onNo={() => setConfirm("")} busy={saving} />
+          ) : confirm === "unwithdraw" ? (
+            <Confirm text={`${m.company} 탈퇴 예약을 취소할까요? 회원으로 계속 남습니다.`} label="예약 취소" onYes={unWithdraw} onNo={() => setConfirm("")} busy={saving} />
           ) : confirm === "delete" ? (
             <Confirm text={`${m.company} 가입 정보와 결제 기록을 지울까요? 되돌릴 수 없습니다.`} label="삭제" onYes={del} onNo={() => setConfirm("")} busy={saving} />
           ) : (
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setConfirm("temp")} className="btn-ghost btn-sm">임시 비밀번호 발급</button>
               <button type="button" onClick={() => setConfirm("trial")} className="btn-ghost btn-sm" disabled={!m.trial.length}>무료 체험 초기화</button>
-              <button type="button" onClick={() => setConfirm("delete")} className="btn-ghost btn-sm text-coral">탈퇴 처리</button>
+              {m.withdraw && <button type="button" onClick={() => setConfirm("unwithdraw")} className="btn-ghost btn-sm">탈퇴 예약 취소</button>}
+              <button type="button" onClick={() => setConfirm("delete")} className="btn-ghost btn-sm text-coral">{m.withdraw ? "지금 탈퇴 처리" : "탈퇴 처리"}</button>
             </div>
           )}
         </div>

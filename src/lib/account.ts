@@ -10,7 +10,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { saveMember } from "./member";
 import { loadMyBox, MYBOX_EVENT, MYBOX_KEY, type MyBoxItem } from "./mybox";
-import type { PaidPlanId } from "./usagePeriod";
+import type { PaidPlanId, WithdrawInfo } from "./usagePeriod";
 
 export const ACCOUNT_API = process.env.NEXT_PUBLIC_STATIC_SITE === "1" ? process.env.NEXT_PUBLIC_CORP_API ?? "" : "";
 export const AUTH_KEY = "bm-auth.v1";
@@ -31,6 +31,8 @@ export interface AccountMember {
   agreeMail?: boolean;
   joinedAt?: string;
   status?: "active" | "suspended";
+  /** 탈퇴 예약 (이용권 마지막 날까지 쓰고 다음 날 지운다) */
+  withdraw?: WithdrawInfo;
   login: { email: string; lastLogin: string | null; temp: boolean } | null;
 }
 

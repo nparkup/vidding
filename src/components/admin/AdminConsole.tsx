@@ -111,8 +111,9 @@ export function AdminConsole({ api }: { api: string }) {
   };
 
   const updateMember = (m: Member) => setMembers((l) => l?.map((x) => (x.bizno === m.bizno ? { ...x, ...m } : x)) ?? null);
+  const addMember = (m: Member) => setMembers((l) => [m, ...(l ?? []).filter((x) => x.bizno !== m.bizno)]);
   const removeMember = (bizno: string) => setMembers((l) => l?.filter((x) => x.bizno !== bizno) ?? null);
-  const shared = { call, guard, members: members ?? [], limit, busy, reload: () => load(token), updateMember, removeMember };
+  const shared = { call, guard, members: members ?? [], limit, busy, reload: () => load(token), updateMember, addMember, removeMember };
 
   return (
     <div className="min-h-screen bg-paper">
@@ -177,5 +178,6 @@ export interface TabProps {
   busy: boolean;
   reload: () => void;
   updateMember: (m: Member) => void;
+  addMember: (m: Member) => void;
   removeMember: (bizno: string) => void;
 }

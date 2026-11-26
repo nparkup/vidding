@@ -22,7 +22,6 @@ import { won } from "@/lib/format";
 import type { Bid } from "@/lib/types";
 import { useBids } from "@/lib/useBids";
 import { LoadingBar } from "./LoadingBar";
-import { StepBar, type StepState } from "./PredictSummary";
 import { CORP_LOOKUP_ON, fetchCorp, ScorePredictor } from "./ScorePredictor";
 
 const fmtBizno = (no: string) => no.replace(/^(\d{3})(\d{2})(\d{5})$/, "$1-$2-$3");
@@ -93,16 +92,8 @@ export function NaraPredictFlow() {
   };
   const repick = () => { setBidId(null); toTop(); };
 
-  const steps: { label: string; state: StepState }[] = [
-    { label: "입찰 기업 조회", state: step === 1 ? "now" : "done" },
-    { label: "입찰 공고 선택", state: step === 2 ? "now" : step > 2 ? "done" : "todo" },
-    { label: "입찰 점수 예측", state: step === 3 ? "now" : "todo" },
-  ];
-
   return (
     <div ref={top} className="scroll-mt-24 space-y-6">
-      <StepBar steps={steps} />
-
       {/* 1. 입찰 기업 조회 */}
       <section className="card min-w-0 p-6" aria-labelledby="flow-corp">
         <StepTitle id="flow-corp" n={1} title="입찰 기업 조회" />

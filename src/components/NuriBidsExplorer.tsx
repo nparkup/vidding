@@ -10,6 +10,7 @@ import { loadSiteJson } from "@/lib/useSiteJson";
 import { CloseDdayBadge } from "./Badges";
 import { CloseDay } from "./CloseDay";
 import { Tile } from "./CategoryTiles";
+import { EXCLUDE_CLOSED_LABEL, nuriClosedLabel } from "@/lib/openBid";
 
 const BIZ_ICONS: Record<string, LucideIcon> = { 용역: Wrench, 공사: HardHat, 물품: Package, 기타: Ellipsis };
 const PAGE = 50;
@@ -31,6 +32,8 @@ export function NuriBidsExplorer() {
   const [region, setRegion] = useState("");
   const [urgent, setUrgent] = useState(false);
   const [sheetOnly, setSheetOnly] = useState(false);
+  /** 참가 불가(수의시담·지명경쟁) 공고 빼기, 기본 선택 */
+  const [hideClosed, setHideClosed] = useState(true);
   const [sort, setSort] = useState<Sort>("close");
   const [limit, setLimit] = useState(PAGE);
 
@@ -46,7 +49,7 @@ export function NuriBidsExplorer() {
     setLimit(PAGE);
   }, [biz, region]);
 
-  const live = useMemo(() => (data?.items ?? []).filter((b) => hoursLeft(b.closeAt) > 0), [data]);
+  const live = useMemo(() => (data?.items ?? []).filter((b) => hoursLeft(b.closeAt) > 0 && (!hideClosed || !nuriClosedLabel(b))), [data, hideClosed]);
   const regions = useMemo(() => [...new Set(live.flatMap((b) => b.regions.map(sidoOf)))].sort(), [live]);
   /** 지역을 고르면 그 지역 제한 공고와 지역 제한이 없는 공고를 함께 보여 준다 */
   const inRegion = (b: NuriBid) => !region || !b.regions.length || b.regions.some((r) => sidoOf(r) === region);
@@ -96,12 +99,15 @@ export function NuriBidsExplorer() {
           <option value="">전국</option>
           {regions.map((r) => <option key={r}>{r}</option>)}
         </select>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+        <div className="col-span-2 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 sm:col-span-3">
           <label className="flex items-center gap-2 whitespace-nowrap text-sm">
             <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
           </label>
           <label className="flex items-center gap-2 whitespace-nowrap text-sm">
             <input type="checkbox" checked={sheetOnly} onChange={(e) => setSheetOnly(e.target.checked)} className="h-4 w-4 accent-[#0FA37F]" /> 배점표 있음
+          </label>
+          <label className="flex items-center gap-2 whitespace-nowrap text-sm">
+            <input type="checkbox" checked={hideClosed} onChange={(e) => { setHideClosed(e.target.checked); setLimit(PAGE); }} className="h-4 w-4 accent-[#0FA37F]" /> {EXCLUDE_CLOSED_LABEL}
           </label>
         </div>
       </div>
@@ -136,6 +142,7 @@ export function NuriBidsExplorer() {
 
 function NuriRow({ bid: b }: { bid: NuriBid }) {
   const amount = b.refAmount ?? b.budget;
+  const closed = nuriClosedLabel(b);
   return (
     <li className="min-w-0">
       <Link
@@ -151,6 +158,7 @@ function NuriRow({ bid: b }: { bid: NuriBid }) {
             {b.regions.length > 0 && <span className="chip">{b.regions.map(sidoOf).filter((x, i, a) => a.indexOf(x) === i).join("·")} 제한</span>}
             {b.method === "직찰" && <span className="chip">직접 제출</span>}
             {b.sheet && <span className="chip border-mint/40 bg-mint-100 text-mint-600">배점표 있음</span>}
+            {closed && <span className="chip border-coral/30 bg-coral-100/60 text-coral" title={closed}>참가 불가 · {closed.split(" · ")[1]}</span>}
             {b.state !== "등록공고" && <span className="chip border-amber/40 bg-amber-100/60 text-ink">{b.state}</span>}
           </div>
           <p className="mt-2 text-[16px] font-semibold leading-snug group-hover:text-mint-600 [overflow-wrap:anywhere]">

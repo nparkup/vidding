@@ -12,6 +12,8 @@ import { useBids } from "@/lib/useBids";
 import { bidHref } from "@/lib/links";
 import { perfCapOf } from "@/lib/perfCap";
 import { won } from "@/lib/format";
+import { closedLabel } from "@/lib/bidMethod";
+import { EXCLUDE_CLOSED_LABEL } from "@/lib/openBid";
 
 const PAGE = 50;
 
@@ -73,6 +75,8 @@ function Explorer({ bids }: { bids: Bid[] }) {
   const region = get("region");
   const urgent = get("urgent") === "1";
   const onlyOk = get("ok") === "1";
+  // 참가 불가(수의시담·지명경쟁) 공고는 기본으로 뺀다. 체크를 풀면 주소에 closed=1
+  const hideClosed = get("closed") !== "1";
   const lic = get("lic").split(",").filter(Boolean) as License[];
   const rg = get("rg").split(",").filter(Boolean) as Region[];
   const min = Number(get("min") || 0);
@@ -94,7 +98,7 @@ function Explorer({ bids }: { bids: Bid[] }) {
   };
 
   const { list, matches } = useMemo(() => {
-    let l = bids.filter((b) => daysLeft(b.closeAt) > 0);
+    let l = bids.filter((b) => daysLeft(b.closeAt) > 0 && (!hideClosed || !closedLabel(b)));
     if (q) l = l.filter(matchesQuery(q));
     if (biz) l = l.filter((b) => (b.bizType ?? "용역") === biz);
     if (cat) l = l.filter((b) => b.category === cat);
@@ -114,9 +118,9 @@ function Explorer({ bids }: { bids: Bid[] }) {
   // 업종 타일 숫자: 마감 전 공고 기준 업종별 건수
   const catCounts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const b of bids) if (daysLeft(b.closeAt) > 0) c[b.category] = (c[b.category] ?? 0) + 1;
+    for (const b of bids) if (daysLeft(b.closeAt) > 0 && (!hideClosed || !closedLabel(b))) c[b.category] = (c[b.category] ?? 0) + 1;
     return c;
-  }, [bids]);
+  }, [bids, hideClosed]);
   const groupOf = (c: string) => Object.entries(CATEGORY_GROUPS).find(([, cs]) => (cs as readonly string[]).includes(c))?.[0] ?? "";
 
   const shown = matches ? (onlyOk ? matches.filter((m) => m.eligible) : matches) : null;
@@ -127,13 +131,13 @@ function Explorer({ bids }: { bids: Bid[] }) {
       <CategoryTiles value={cat} counts={catCounts} onPick={(c) => go({ cat: c, biz: c && biz && groupOf(c) !== biz ? "" : biz })} />
       <form
         key={sp.toString()}
-        className="card mt-3 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto]"
+        className="card mt-3 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto_auto]"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           const nb = String(f.get("biz") ?? "");
           // 업무 구분을 바꿔 고른 업종과 맞지 않으면 업종 선택을 푼다
-          go({ q: String(f.get("q") ?? ""), biz: nb, cat: cat && nb && groupOf(cat) !== nb ? "" : cat, region: String(f.get("region") ?? ""), urgent: f.get("urgent") ? "1" : "" });
+          go({ q: String(f.get("q") ?? ""), biz: nb, cat: cat && nb && groupOf(cat) !== nb ? "" : cat, region: String(f.get("region") ?? ""), urgent: f.get("urgent") ? "1" : "", closed: f.get("hideClosed") ? "" : "1" });
         }}
       >
         <input name="q" defaultValue={q} placeholder="공고명, 발주기관, 공고번호 검색 (예: 청사 유지보수, R26BK01234567)" className="input sm:col-span-2 lg:col-span-1" />
@@ -147,6 +151,9 @@ function Explorer({ bids }: { bids: Bid[] }) {
         </select>
         <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
           <input type="checkbox" name="urgent" value="1" defaultChecked={urgent} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
+        </label>
+        <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
+          <input type="checkbox" name="hideClosed" value="1" defaultChecked={hideClosed} className="h-4 w-4 accent-[#0FA37F]" /> {EXCLUDE_CLOSED_LABEL}
         </label>
         <button className="btn-primary">검색</button>
       </form>

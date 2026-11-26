@@ -1,3 +1,4 @@
+import { Brand } from "@/components/BrandText";
 import Link from "next/link";
 import { TrialN } from "@/components/Cfg";
 import { Check, X } from "lucide-react";
@@ -178,7 +179,7 @@ export default async function Home() {
             <span>받은편지함 · 오전 7:00</span>
             <span className="rounded-full bg-mint-50 px-2 py-0.5 font-bold text-mint-600">새 메일</span>
           </div>
-          <p className="mt-2 text-sm font-bold">[비드매트릭스] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
+          <p className="mt-2 text-sm font-bold">[<Brand tail="매트릭스" />] {client.company} 맞춤 공고 {digest.recommended.length}건</p>
           <ul className="mt-3 divide-y divide-ink-100">
             {digest.recommended.slice(0, 4).map((r) => (
               <li key={r.bid.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -391,7 +392,7 @@ export default async function Home() {
             <span className="bg-gradient-to-r from-mint-600 to-sky bg-clip-text text-transparent">결정은 대표님과 실무자가!</span>
           </h1>
           <p className="lead mx-auto mt-6 max-w-3xl">
-            <b className="font-bold text-ink">비드파인더</b>가 나라장터·K-apt 공동주택 전 업종 입찰공고에서 참가할 수 있는 공고를 찾고,<br /><b className="font-bold text-ink">비드아틀라스</b>가 면허·지역·규모부터 경쟁 강도·실적·준비 기간까지 분석하고,<br /><b className="font-bold text-ink">비드인사이트</b>가 입찰 점수와 낙찰 가능성을 예측합니다.
+            <b className="font-bold text-ink"><Brand tail="파인더" /></b>가 나라장터·K-apt 공동주택 전 업종 입찰공고에서 참가할 수 있는 공고를 찾고,<br /><b className="font-bold text-ink"><Brand tail="아틀라스" /></b>가 면허·지역·규모부터 경쟁 강도·실적·준비 기간까지 분석하고,<br /><b className="font-bold text-ink"><Brand tail="인사이트" /></b>가 입찰 점수와 낙찰 가능성을 예측합니다.
           </p>
           <HeroStats builtAt={builtAt} notices={awardCount?.notices ?? null} aptNotices={aptNotices} awards={awardCount?.rows ?? null} aptAwards={aptAwards} />
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -442,7 +443,7 @@ export default async function Home() {
       {/* 핵심 기능 — 번갈아 배치 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <h2 className="h-section">찾고, 정리해서, 알려주는<br />비드매트릭스</h2>
+          <h2 className="h-section">찾고, 정리해서, 알려주는<br /><Brand tail="매트릭스" /></h2>
         </div>
         <div className="mt-16 space-y-20 sm:space-y-28">
           {FEATURES.map((f, i) => (
@@ -570,7 +571,7 @@ export default async function Home() {
       {/* 이런 업체에 */}
       <section className="container-x pt-28">
         <div className="text-center">
-          <h2 className="h-section">이런 기업에는 비드매트릭스가 필요해요.</h2>
+          <h2 className="h-section">이런 기업에는 <Brand tail="매트릭스" />가 필요해요.</h2>
         </div>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {PERSONAS.map((p) => (
@@ -594,7 +595,7 @@ export default async function Home() {
           <div className="container-x relative grid items-center gap-6 py-16 sm:py-20 lg:grid-cols-[1.1fr_1fr]">
             <div>
               <h2 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-5xl sm:leading-[1.15]">입찰 분석,<br />오늘부터 시작해 보세요.</h2>
-              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 그중 입찰공고 <TrialN />건은 비드인사이트로 평가점수를 무료 예측해 보실 수 있습니다.</p>
+              <p className="mt-5 max-w-lg text-ink-300">조건을 남겨 주시면 지금 참가 가능한 공고 목록을 바로 보여드리고, 그중 입찰공고 <TrialN />건은 <Brand tail="인사이트" dark />로 평가점수를 무료 예측해 보실 수 있습니다.</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/apply" className="btn-mint px-7 text-base">무료 체험 시작하기</Link>
                 <Link href="/pricing" className="btn-glass px-7 text-base">요금제 보기</Link>

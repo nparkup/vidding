@@ -50,6 +50,16 @@ const PERF_API = STATIC ? CORP_API : "/api/premium/perf";
 
 interface BidDocs { files: BidAttachment[]; sheet?: EvalSheet; sheetFile?: string; /** AI 판독 입력이 있으면 그 본문 해시 */ ai?: string; /** 빌드가 첨부를 모두 읽었으면 읽은 파일 이름 */ read?: string[]; notice?: NoticeCriteria; quant?: { items: EvalItem[]; total: number; quote: string }; qual?: BidQual }
 
+/** 사업자등록번호로 국세청·나라장터·금융위원회 기업 정보를 한 번에 조회한다 (입찰점수 예측 1단계와 공용) */
+export async function fetchCorp(no: string): Promise<CorpLookup> {
+  if (!CORP_API) throw new Error("기업 조회 서버에 연결할 수 없습니다.");
+  const r = await fetch(`${CORP_API}?bizno=${no}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "조회에 실패했습니다.");
+  return j as CorpLookup;
+}
+export const CORP_LOOKUP_ON = !!CORP_API;
+
 /** 정적 배포는 빌드 때 공고별로 만들어 둔 파일(첨부 목록 + 첨부에서 추출한 평가표)을, 서버 배포는 나라장터 첨부 목록을 바로 조회한다 */
 async function loadBidDocs(bid: Bid): Promise<BidDocs> {
   const url = STATIC
@@ -160,14 +170,21 @@ async function loadValidation(): Promise<Validation | null> {
  * source "nuri": 민간 예측(/premium/nuri). 누리장터 민간 공고 중 첨부 배점표를 읽은 공고만 고를 수 있고,
  * 낙찰 저장소·배점표 즉석 판독·기준표 검증은 나라장터 자료라 쓰지 않는다. 낙찰 결과 대신 지난 민간 개찰 1순위 투찰률을 보여 준다.
  */
-export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" } = {}) {
+/**
+ * flow: 나라장터 입찰 예측의 3단계 흐름(NaraPredictFlow). 1단계에서 조회한 기업과 2단계에서 고른 공고를 받아
+ * 3단계 '입찰 점수 예측'만 그린다. 공고 검색·기업 조회 칸은 숨기고, 다른 공고는 onRepick 으로 2단계로 돌아가 고른다.
+ */
+export interface PredictFlow { corp: CorpLookup; bidId: string; onRepick: () => void }
+
+export function ScorePredictor({ source = "nara", flow }: { source?: "nara" | "nuri"; flow?: PredictFlow } = {}) {
   const NURI = source === "nuri";
   const sp = useSearchParams();
   const nara = useBids(!NURI);
   const nuri = useNuriPredict(NURI);
   const bids = NURI ? nuri.data?.bids ?? null : nara.bids;
   const error = NURI ? nuri.error : nara.error;
-  const [bidId, setBidId] = useState<string | null>(sp.get("bid"));
+  const [ownBidId, setBidId] = useState<string | null>(flow ? null : sp.get("bid"));
+  const bidId = flow ? flow.bidId : ownBidId;
   const [query, setQuery] = useState("");
   /** 고객이 항목을 고치거나 더한 평가표. 없으면 공고 기준으로 만든 평가표를 쓴다 */
   const [sheet, setSheet] = useState<EvalSheet | null>(null);
@@ -217,7 +234,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
   const [memberNo, setMemberNo] = useState<string | undefined>();
   useEffect(() => {
     const m = readMember();
-    if (!m) return;
+    if (!m || flow) return;
     setMemberNo(m.bizno);
     setBizno((v) => v || `${m.bizno.slice(0, 3)}-${m.bizno.slice(3, 5)}-${m.bizno.slice(5)}`);
   }, []);
@@ -450,48 +467,56 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
     if (!validBizno(no)) { setCorpMsg("올바른 사업자등록번호가 아닙니다. 숫자를 다시 확인해 주세요."); return; }
     setCorpLoading(true);
     setCorp(null);
-    setTrustAuto({});
-    setPatentRes(null);
-    setPatentExtra(0);
-    setPerfBizno("");
-    setAutoPerf({ amount: 0, count: 0 });
     setCorpMsg("국세청·나라장터·금융위원회 정보를 조회하는 중…");
     try {
-      const r = await fetch(`${CORP_API}?bizno=${no}`);
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error);
-      const c = j as CorpLookup;
-      setCorp(c);
-      if (PERF_API && (c.corpName || c.nts?.registered)) setPerfBizno(c.bizno);
-      // 공공데이터로 얻을 수 있는 값을 1차로 채운다. 고객이 증빙 기준으로 고치면 '수정됨'으로 표시한다
-      const opened = c.nara?.openedAt ?? c.fsc?.establishedAt ?? c.openedAt;
-      const fin = c.finance.find((f) => f.equity !== undefined && f.assets);
-      const equityRatio = fin && fin.assets ? Math.round(((fin.equity ?? 0) / fin.assets) * 1000) / 10 : undefined;
-      const facts: Partial<Record<FactKey, AutoFact>> = {};
-      if (opened) facts.years = { value: yearsSince(opened), from: `${c.nara?.openedAt ? "나라장터 개업일" : "금융위원회 설립일"} ${opened.slice(0, 10)}` };
-      if (c.employees !== undefined) facts.employees = { value: c.employees, from: c.nara?.employees !== undefined ? "나라장터 조달업체 정보" : "금융위원회 기업기본정보" };
-      if (equityRatio !== undefined && fin) facts.equityRatio = { value: equityRatio, from: `금융위원회 ${fin.year} ${fin.basis} 재무제표` };
-      setAuto(facts);
-      const ta = trustFromCorp(c);
-      setTrustAuto(ta);
-      setCo((prev) => ({
-        ...prev,
-        trustItems: applyTrustAuto(prev.trustItems ?? [], ta),
-        corpName: c.corpName ?? prev.corpName,
-        bizno: c.bizno,
-        years: facts.years ? Number(facts.years.value) : prev.years,
-        employees: facts.employees ? Number(facts.employees.value) : prev.employees,
-        equityRatio: facts.equityRatio ? Number(facts.equityRatio.value) : prev.equityRatio,
-      }));
-      const filled = [facts.years && "업력", facts.employees && "종업원 수", facts.equityRatio && "자기자본비율", Object.keys(ta).length && "신뢰도 가감점 일부 항목"].filter(Boolean);
-      setCorpMsg(c.corpName || c.nts?.registered
-        ? filled.length ? `${filled.join("·")}를 공공데이터 조회 결과로 1차로 채웠습니다. 증빙 서류와 다르면 고쳐 주세요.` : "조회 결과에 업력·종업원 수가 없어 직접 입력해 주세요."
-        : "조회된 기업 정보가 없습니다. 번호를 확인하거나 직접 입력해 주세요.");
+      applyCorp(await fetchCorp(no));
     } catch (e) {
       setCorpMsg((e as Error).message || "조회에 실패했습니다.");
     } finally {
       setCorpLoading(false);
     }
+  }
+
+  // 3단계 흐름: 1단계에서 조회한 기업을 그대로 쓴다
+  const flowCorp = flow?.corp;
+  useEffect(() => {
+    if (flowCorp) applyCorp(flowCorp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowCorp]);
+
+  /** 조회한 기업 정보로 점수 계산 값(업력·종업원 수·자기자본비율·신뢰도 가감점)을 1차로 채운다 */
+  function applyCorp(c: CorpLookup) {
+    setTrustAuto({});
+    setPatentRes(null);
+    setPatentExtra(0);
+    setPerfBizno("");
+    setAutoPerf({ amount: 0, count: 0 });
+    setCorp(c);
+    if (PERF_API && (c.corpName || c.nts?.registered)) setPerfBizno(c.bizno);
+    // 공공데이터로 얻을 수 있는 값을 1차로 채운다. 고객이 증빙 기준으로 고치면 '수정됨'으로 표시한다
+    const opened = c.nara?.openedAt ?? c.fsc?.establishedAt ?? c.openedAt;
+    const fin = c.finance.find((f) => f.equity !== undefined && f.assets);
+    const equityRatio = fin && fin.assets ? Math.round(((fin.equity ?? 0) / fin.assets) * 1000) / 10 : undefined;
+    const facts: Partial<Record<FactKey, AutoFact>> = {};
+    if (opened) facts.years = { value: yearsSince(opened), from: `${c.nara?.openedAt ? "나라장터 개업일" : "금융위원회 설립일"} ${opened.slice(0, 10)}` };
+    if (c.employees !== undefined) facts.employees = { value: c.employees, from: c.nara?.employees !== undefined ? "나라장터 조달업체 정보" : "금융위원회 기업기본정보" };
+    if (equityRatio !== undefined && fin) facts.equityRatio = { value: equityRatio, from: `금융위원회 ${fin.year} ${fin.basis} 재무제표` };
+    setAuto(facts);
+    const ta = trustFromCorp(c);
+    setTrustAuto(ta);
+    setCo((prev) => ({
+      ...prev,
+      trustItems: applyTrustAuto(prev.trustItems ?? [], ta),
+      corpName: c.corpName ?? prev.corpName,
+      bizno: c.bizno,
+      years: facts.years ? Number(facts.years.value) : prev.years,
+      employees: facts.employees ? Number(facts.employees.value) : prev.employees,
+      equityRatio: facts.equityRatio ? Number(facts.equityRatio.value) : prev.equityRatio,
+    }));
+    const filled = [facts.years && "업력", facts.employees && "종업원 수", facts.equityRatio && "자기자본비율", Object.keys(ta).length && "신뢰도 가감점 일부 항목"].filter(Boolean);
+    setCorpMsg(c.corpName || c.nts?.registered
+      ? filled.length ? `${filled.join("·")}를 공공데이터 조회 결과로 1차로 채웠습니다. 증빙 서류와 다르면 고쳐 주세요.` : "조회 결과에 업력·종업원 수가 없어 직접 입력해 주세요."
+      : "조회된 기업 정보가 없습니다. 번호를 확인하거나 직접 입력해 주세요.");
   }
 
   function editItem(id: string, patch: Partial<EvalItem>) {
@@ -503,7 +528,10 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
     setSheet({ ...active, items: active.items.filter((i) => i.id !== id) });
   }
 
-  const searchBox = (
+  // 3단계 흐름에서는 검색 대신 2단계(입찰 공고 선택)로 돌아가는 버튼
+  const searchBox = flow ? (
+          <button type="button" onClick={flow.onRepick} className="btn-ghost btn-sm mt-3">다른 입찰 공고 선택</button>
+  ) : (
           <div className={`relative ${bid ? "mt-3" : "mt-4"}`}>
             <input className="input" placeholder={bid ? "다른 공고 찾기: 공고명·기관명·공고번호" : "공고명·기관명·공고번호로 검색"} value={query} onChange={(e) => setQuery(e.target.value)} />
             {matches.length > 0 && (
@@ -536,7 +564,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
     return (
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
-          <Step n={1} title="공고 선택" />
+          <Step n={flow ? "3-1" : 1} title={flow ? "선택한 입찰 공고" : "공고 선택"} />
           <div className="mt-4 rounded-2xl bg-paper p-4">
             <p className="text-xs text-ink-500">{bid.bizType ?? "용역"} · {bid.category} · {bid.contractType ?? "계약방법 미상"} · {bid.awardRaw ?? bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
             <p className="mt-1 font-bold leading-snug"><CloseDay iso={bid.closeAt} />{bid.title}</p>
@@ -562,7 +590,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
     return (
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
         <section className="card min-w-0 p-6">
-          <Step n={1} title="공고 선택" />
+          <Step n={flow ? "3-1" : 1} title={flow ? "선택한 입찰 공고" : "공고 선택"} />
           <div className="mt-4 rounded-2xl bg-paper p-4">
             <p className="text-xs text-ink-500">{pickedBid.bizType ?? "용역"} · {pickedBid.category} · {pickedBid.contractMethod} · 공고번호 {pickedBid.bidNtceNo}</p>
             <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={pickedBid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={pickedBid.closeAt} />{pickedBid.title}</p>
@@ -573,6 +601,11 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
         <TrialLocked used={trial.used} onPick={pickTrial} state={trial} />
       </div>
     );
+  }
+
+  // 3단계 흐름: 고른 공고 자료가 오기 전
+  if (flow && (!bid || !active || !result)) {
+    return <p className="card p-6 text-sm text-ink-300">{bids.some((b) => b.id === flow.bidId) ? "고른 공고의 평가 기준을 불러오는 중…" : "고른 공고를 찾지 못했습니다. 다른 입찰 공고를 선택해 주세요."}</p>;
   }
 
   // 공고를 고르기 전: 검색과 바로 고를 수 있는 공고 몇 건, 결과 자리에는 무엇이 나오는지만 둔다
@@ -698,11 +731,11 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
 
   return (
     <div className="space-y-6">
-    <StepBar steps={[
+    {!flow && <StepBar steps={[
       { label: "공고 선택", state: "done" },
       { label: "우리 회사 조회", state: corpDone ? "done" : "now", href: "#corp" },
       { label: "결과 확인", state: corpDone ? "now" : "todo", href: "#score" },
-    ]} />
+    ]} />}
     <PredictSummary
       title="한눈에 보기"
       tiles={tiles}
@@ -718,7 +751,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
       <div className="min-w-0 space-y-6">
         {/* 1. 공고 */}
         <section className="card p-6">
-          <Step n={1} title="공고 선택" />
+          <Step n={flow ? "3-1" : 1} title={flow ? "선택한 입찰 공고" : "공고 선택"} />
           <div className="mt-4 rounded-2xl bg-paper p-4">
             <p className="text-xs text-ink-500">{NURI ? "누리장터 공고 · " : ""}{bid.bizType ?? "용역"} · {bid.category} · {NURI ? (bid.awardRaw ?? bid.contractMethod).replace("에의한낙찰자결정", "") : bid.contractMethod} · 공고번호 {bid.bidNtceNo}</p>
             <p className="mt-1 font-bold leading-snug"><CloseDdayBadge iso={bid.closeAt} className="mr-1.5 align-[1px]" /><CloseDay iso={bid.closeAt} />{bid.title}</p>
@@ -773,11 +806,13 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
 
         {/* 2. 우리 회사 조회: 참가자격·기업 정보·유사 실적 */}
         <section id="corp" className="card scroll-mt-24 p-6">
-          <Step n={2} title="우리 회사 조회" />
-          <p className="mt-2 text-sm text-ink-500">사업자번호나 기업명 하나로 참가자격을 확인하고, 업력·종업원 수·유사 실적을 아래 3번에 채웁니다.</p>
+          <Step n={flow ? "3-2" : 2} title={flow ? "입찰 기업 참가자격" : "우리 회사 조회"} />
+          <p className="mt-2 text-sm text-ink-500">{flow
+            ? <>1단계에서 조회한 {corp?.corpName ?? "기업"}으로 이 공고의 참가자격을 확인하고, 업력·종업원 수·유사 실적을 아래 3-3에 채웠습니다.</>
+            : "사업자번호나 기업명 하나로 참가자격을 확인하고, 업력·종업원 수·유사 실적을 아래 3번에 채웁니다."}</p>
           <div className="mt-4">
             <div className="min-w-0">
-              <CorpSearch id="corp-no" label="사업자등록번호 또는 기업명" value={bizno} onChange={setBizno} onBizno={(no) => lookup(no)} busy={corpLoading} disabled={!CORP_API} />
+              {!flow && <CorpSearch id="corp-no" label="사업자등록번호 또는 기업명" value={bizno} onChange={setBizno} onBizno={(no) => lookup(no)} busy={corpLoading} disabled={!CORP_API} />}
               {corpLoading ? <LoadingBar label="국세청·나라장터·금융위원회 기업 정보를 조회하는 중" /> : <p className="mt-1 text-xs text-ink-500">
                 {corpMsg || (CORP_API
                   ? "국세청 사업자 상태, 나라장터 조달업체 등록 정보, 금융위원회 기업기본정보·재무정보를 한 번에 조회합니다."
@@ -800,7 +835,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
 
         {/* 3. 점수 계산에 쓰는 값 */}
         <section className="card p-6">
-          <Step n={3} title="점수 계산에 쓰는 값" />
+          <Step n={flow ? "3-3" : 3} title="점수 계산에 쓰는 값" />
           <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
             <p className="text-xs leading-relaxed text-ink-500 sm:col-span-3">
               값마다 출처를 표시합니다. <b className="text-mint-700">자동</b>은 공공데이터로 1차로 채운 값, <b className="text-ink">수정됨</b>은 고객이 증빙 서류 기준으로 고친 값, <b className="text-ink">직접 입력</b>은 공공데이터에 없어 고객이 넣는 값입니다.<br />심사에서는 증빙 서류 값이 기준입니다.
@@ -893,7 +928,7 @@ export function ScorePredictor({ source = "nara" }: { source?: "nara" | "nuri" }
 
         {/* 4. 투찰률 */}
         <section id="rate" className="card scroll-mt-24 p-6">
-          <Step n={4} title="투찰률" />
+          <Step n={flow ? "3-4" : 4} title="투찰률" />
           <div className="mt-4 grid gap-x-3 gap-y-4 sm:grid-cols-3">
             <Range
               label="투찰률 (예정가격 대비)"
@@ -1305,10 +1340,10 @@ function Row({ title, source, error, empty, children }: { title: string; source:
   );
 }
 
-function Step({ n, title }: { n: number; title: string }) {
+function Step({ n, title }: { n: number | string; title: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-xs font-bold text-white tabular-nums">{n}</span>
+      <span className={`grid h-7 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white tabular-nums ${typeof n === "string" ? "px-2" : "w-7"}`}>{n}</span>
       <h2 className="text-lg font-bold">{title}</h2>
     </div>
   );

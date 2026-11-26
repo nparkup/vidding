@@ -14,6 +14,16 @@ import { perfCapOf } from "@/lib/perfCap";
 import { won } from "@/lib/format";
 import { closedLabel } from "@/lib/bidMethod";
 import { EXCLUDE_CLOSED_LABEL } from "@/lib/openBid";
+import type { ListVerdict } from "@/lib/listEligibility";
+
+/**
+ * 공고 고르기 모드 (입찰점수 예측 2단계): 검색 조건을 주소 대신 화면 안에 두고,
+ * judge 가 '불가'로 본 공고(조회한 기업이 참가할 수 없는 공고)는 목록·업종 건수에서 뺀다. 카드를 누르면 onPick.
+ */
+export interface BidPicker {
+  judge: (b: Bid) => ListVerdict;
+  onPick: (b: Bid) => void;
+}
 
 const PAGE = 50;
 
@@ -56,18 +66,24 @@ export function matchesQuery(q: string): (b: Bid) => boolean {
 }
 
 /** 공고 검색 (필터·내 조건 점수 계산은 모두 브라우저에서 처리: 서버/정적 배포 공용) */
-export function BidsExplorer() {
+export function BidsExplorer({ picker }: { picker?: BidPicker } = {}) {
   const { bids, error } = useBids();
   if (error) return <div className="card mt-6 p-10 text-center text-ink-500">공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
   if (!bids) return <BidsExplorerFallback />;
-  return <Explorer bids={bids} />;
+  return <Explorer bids={bids} picker={picker} />;
 }
 
-function Explorer({ bids }: { bids: Bid[] }) {
-  const sp = useSearchParams();
+function Explorer({ bids: allBids, picker }: { bids: Bid[]; picker?: BidPicker }) {
+  const urlSp = useSearchParams();
+  const [localSp, setLocalSp] = useState(() => new URLSearchParams());
+  const sp = picker ? localSp : urlSp;
   const router = useRouter();
   const pathname = usePathname();
   const get = (k: string) => sp.get(k) ?? "";
+  // 고르기 모드: 참가할 수 없는 공고는 처음부터 뺀다
+  const judge = picker?.judge;
+  const bids = useMemo(() => (judge ? allBids.filter((b) => daysLeft(b.closeAt) > 0 && judge(b).verdict !== "불가") : allBids), [allBids, judge]);
+  const excluded = useMemo(() => (judge ? allBids.filter((b) => daysLeft(b.closeAt) > 0).length - bids.length : 0), [allBids, bids, judge]);
 
   const q = get("q").trim();
   const biz = get("biz");
@@ -76,8 +92,8 @@ function Explorer({ bids }: { bids: Bid[] }) {
   const urgent = get("urgent") === "1";
   const onlyOk = get("ok") === "1";
   // 참가 불가(수의시담·지명경쟁) 공고는 기본으로 뺀다. 체크를 풀면 주소에 closed=1
-  const hideClosed = get("closed") !== "1";
-  const lic = get("lic").split(",").filter(Boolean) as License[];
+  const hideClosed = !!picker || get("closed") !== "1";
+  const lic = picker ? [] : get("lic").split(",").filter(Boolean) as License[];
   const rg = get("rg").split(",").filter(Boolean) as Region[];
   const min = Number(get("min") || 0);
   const max = Number(get("max") || 10_000_000_000);
@@ -94,6 +110,7 @@ function Explorer({ bids }: { bids: Bid[] }) {
     setLimit(PAGE);
     const next = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(patch)) v ? next.set(k, v) : next.delete(k);
+    if (picker) { setLocalSp(next); return; }
     router.push(`${pathname}?${next}`, { scroll: false });
   };
 
@@ -152,9 +169,11 @@ function Explorer({ bids }: { bids: Bid[] }) {
         <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
           <input type="checkbox" name="urgent" value="1" defaultChecked={urgent} className="h-4 w-4 accent-[#0FA37F]" /> 3일 내 마감
         </label>
+        {picker ? <input type="hidden" name="hideClosed" value="1" /> : (
         <label className="flex items-center gap-2 whitespace-nowrap px-1 text-sm">
           <input type="checkbox" name="hideClosed" value="1" defaultChecked={hideClosed} className="h-4 w-4 accent-[#0FA37F]" /> {EXCLUDE_CLOSED_LABEL}
         </label>
+        )}
         <button className="btn-primary">검색</button>
       </form>
 
@@ -167,13 +186,13 @@ function Explorer({ bids }: { bids: Bid[] }) {
             <button type="button" onClick={() => go({ lic: "", rg: "", min: "", max: "", ok: "", p3: "", p5: "", perf: "" })} className="btn-ghost btn-sm">조건 해제</button>
           </div>
         </div>
-      ) : (
+      ) : picker ? null : (
         <ProfileForm onApply={(p) => go(p)} />
       )}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-ink-500">
-          {(shown ?? list).length.toLocaleString()}건{matches && ` · 참가 가능 ${matches.filter((m) => m.eligible).length.toLocaleString()}건`}
+          {picker ? `참가할 수 있는 공고 ${list.length.toLocaleString()}건${excluded ? ` · 참가 조건이 맞지 않는 공고 ${excluded.toLocaleString()}건 제외` : ""}` : <>{(shown ?? list).length.toLocaleString()}건{matches && ` · 참가 가능 ${matches.filter((m) => m.eligible).length.toLocaleString()}건`}</>}
         </p>
         <label className="flex items-center gap-2 text-sm text-ink-500">
           <span className="whitespace-nowrap">정렬</span>
@@ -192,8 +211,12 @@ function Explorer({ bids }: { bids: Bid[] }) {
       <div className="mt-3 space-y-3">
         {shown
           ? shown.slice(0, limit).map((m) => <BidRow key={m.bid.id} bid={m.bid} match={m} href={bidHref(m.bid.id, profileQs)} />)
-          : list.slice(0, limit).map((b) => <BidRow key={b.id} bid={b} />)}
-        {(shown ?? list).length === 0 && <div className="card p-10 text-center text-ink-500">검색 조건에 맞는 공고가 없습니다.</div>}
+          : list.slice(0, limit).map((b) => {
+            if (!picker) return <BidRow key={b.id} bid={b} />;
+            const v = picker.judge(b);
+            return <BidRow key={b.id} bid={b} onPick={picker.onPick} note={v.verdict === "확인 필요" ? `참가자격 확인 필요: ${v.reasons.join(" · ")}` : undefined} />;
+          })}
+        {(shown ?? list).length === 0 && <div className="card p-10 text-center text-ink-500">{picker && !bids.length ? "조회한 기업이 참가할 수 있는 마감 전 공고가 없습니다." : "검색 조건에 맞는 공고가 없습니다."}</div>}
       </div>
       {(shown ?? list).length > limit && (
         <button type="button" onClick={() => setLimit(limit + PAGE)} className="btn-ghost mt-4 w-full">

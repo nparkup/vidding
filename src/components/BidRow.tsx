@@ -8,13 +8,15 @@ import { bidHref } from "@/lib/links";
 import { closedLabel } from "@/lib/bidMethod";
 import { AgencyLogo } from "./AgencyLogo";
 
-export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; href?: string }) {
+/**
+ * 공고 카드. 기본은 공고 상세로 가는 링크, onPick 을 주면 고르기 버튼(입찰점수 예측 2단계)이 된다.
+ * note 는 공고명 아래 한 줄 안내 (예: 참가자격 확인 필요 사유).
+ */
+export function BidRow({ bid, match, href, onPick, note }: { bid: Bid; match?: MatchResult; href?: string; onPick?: (bid: Bid) => void; note?: string }) {
   const closed = closedLabel(bid);
-  return (
-    <Link
-      href={href ?? bidHref(bid.id)}
-      className="group grid min-w-0 grid-cols-1 gap-3 rounded-2xl border border-ink-100 bg-white p-4 transition hover:border-mint hover:shadow-card sm:grid-cols-[1fr_auto] sm:items-center sm:p-5"
-    >
+  const cls = "group grid w-full min-w-0 grid-cols-1 gap-3 rounded-2xl border border-ink-100 bg-white p-4 text-left transition hover:border-mint hover:shadow-card sm:grid-cols-[1fr_auto] sm:items-center sm:p-5";
+  const body = (
+    <>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <CloseDdayBadge iso={bid.closeAt} />
@@ -33,6 +35,7 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
           {bid.demandAgency} · 면허 {bid.licenseRaw || bid.licenses.join(", ") || "제한없음"}
         </p>
         {match && !match.eligible && <p className="mt-1 text-xs font-medium text-coral">{match.blockers.join(" · ")}</p>}
+        {note && <p className="mt-1 text-xs font-medium text-ink-500">{note}</p>}
       </div>
       <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-5">
         <div className="sm:text-right">
@@ -41,6 +44,8 @@ export function BidRow({ bid, match, href }: { bid: Bid; match?: MatchResult; hr
         </div>
         {match && <ScoreMeter grade={match.grade} score={match.score} />}
       </div>
-    </Link>
+    </>
   );
+  if (onPick) return <button type="button" onClick={() => onPick(bid)} className={cls}>{body}</button>;
+  return <Link href={href ?? bidHref(bid.id)} className={cls}>{body}</Link>;
 }

@@ -12,7 +12,7 @@ export default function MinePage() {
   return (
     <>
       <PageHero
-        eyebrow="입찰 분석 · 우리 회사"
+        eyebrow="입찰데이터 분석 · 우리 회사"
         title={<>우리 회사의<br />낙찰 실적과 투찰을 진단하세요.</>}
         lead="사업자번호나 기업명 하나로 나라장터 10년치 낙찰을 발주처·지역·금액 구간·계약방법별로 나누고, 낙찰하한율 위 폭과 사정율 습관을 진단합니다."
       />

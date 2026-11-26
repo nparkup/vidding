@@ -80,7 +80,7 @@ export default async function ServicePage() {
         <div className="mt-8 grid grid-cols-1 gap-3 lg:grid-cols-3">
           {ENGINE_LIST.map((e) => (
             <div key={e.id} className="card flex min-w-0 flex-col p-6">
-              <p className="text-2xl font-extrabold tracking-[-0.03em]"><EngineName id={e.id} /></p>
+              <p className="text-3xl font-extrabold tracking-[-0.03em] sm:text-[34px]"><EngineName id={e.id} /></p>
               <p className="mt-1 text-sm font-bold text-ink-700">{e.area}</p>
               <p className="mt-3 text-sm leading-relaxed text-ink-500">{SHORT[e.id]}</p>
               <ul className="mt-5 flex-1 divide-y divide-ink-100 border-t border-ink-100 text-sm">

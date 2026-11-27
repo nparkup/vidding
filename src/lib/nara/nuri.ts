@@ -180,7 +180,7 @@ export function nuriChanges(rows: { it: Item; biz: NuriBiz }[], live: Map<string
         closeAt: iso(it.bidClseDt) ?? iso(it.opengDt),
         baseAmount: nuriSnap(it).amount ?? (prev ? nuriSnap(prev).amount : undefined),
         fields: kind === "정정" && prev ? diffSnapshots(nuriSnap(prev), nuriSnap(it)) : [],
-        href: b && b.ord === ords[i] ? `/nuri-bids/view?no=${encodeURIComponent(no)}` : undefined,
+        href: b ? `/nuri-bids/view?no=${encodeURIComponent(no)}` : undefined,
         detailUrl: "https://nuri.g2b.go.kr",
       });
     }

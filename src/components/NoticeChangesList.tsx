@@ -13,6 +13,14 @@ type Scope = "all" | "key" | "mine";
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
+/** 진행 중인 공고의 사이트 안 상세 (나라장터 /bids/view, 누리장터·공동주택 각 상세) */
+export const liveHref = (c: NoticeChange) => (c.bidId ? bidHref(c.bidId) : c.href);
+
+/** 정정·취소 공고를 누르면 여는 곳: 진행 중이면 공고 상세, 아니면 정정·취소 상세 */
+export function changeHref(c: NoticeChange): string {
+  return liveHref(c) ?? `/changes/view?${new URLSearchParams({ src: changeSource(c), no: c.no, ...(c.ord ? { ord: c.ord } : {}) })}`;
+}
+
 /** 정정·취소 공고 목록 (필터는 브라우저에서) */
 export function NoticeChangesList() {
   const { data, error } = useNoticeChanges();
@@ -86,14 +94,12 @@ export function ChangeCard({ c, mine }: { c: NoticeChange; mine?: boolean }) {
       <div className="flex flex-wrap items-center gap-1.5">
         <span className={`chip font-bold ${c.kind === "취소" ? "border-coral/30 bg-coral-100/60 text-coral" : "border-amber/40 bg-amber-100/60 text-ink"}`}>{changeLabel(c)}</span>
         <span className="chip">{changeSource(c)}</span>
-        <span className="chip">{c.bizType ?? "용역"}{c.category && c.category !== c.bizType ? ` · ${c.category}` : ""}</span>
+        <span className="chip">{c.bizType ?? "용역"}{c.category && String(c.category) !== c.bizType ? ` · ${c.category}` : ""}</span>
         {mine && <span className="chip border-mint-100 bg-mint-50 text-mint-600">관심공고</span>}
         <span className="text-xs text-ink-300">{c.detected ? "변경 확인" : "게시"} {dateTime(c.at)}</span>
       </div>
       <p className="mt-2 text-[16px] font-semibold leading-snug">
-        {c.bidId ? <Link href={bidHref(c.bidId)} className="hover:text-mint-600">{title}</Link>
-          : c.href ? <Link href={c.href} className="hover:text-mint-600">{title}</Link>
-          : <a href={c.detailUrl} target="_blank" rel="noreferrer" className="hover:text-mint-600">{title}</a>}
+<Link href={changeHref(c)} className="hover:text-mint-600">{title}</Link>
       </p>
       <p className="mt-1 text-sm text-ink-500">{c.demandAgency || c.agency} · 공고번호 {changeNo(c)}{c.source === "공동주택" && c.prevOrd ? ` · 앞선 공고 ${c.prevOrd}` : ""}{c.baseAmount ? ` · ${won(c.baseAmount)}` : ""}</p>
       {c.fields.length > 0 ? (

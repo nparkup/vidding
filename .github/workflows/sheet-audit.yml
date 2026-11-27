@@ -52,7 +52,7 @@ jobs:
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: npx tsx --conditions=react-server scripts/score/sheet-audit.ts "${{ inputs.days || '20261112,20261113,20261116,20261117' }}" "${{ inputs.per || '8' }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: inputs.zip == '' && (inputs.days != '' || inputs.ids == '')
         with:
           name: sheet-audit

@@ -215,6 +215,8 @@ jobs:
           BIDS_FILE: data/bids.json
           PAGES_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_APPLY_EMAIL: ${{ vars.APPLY_EMAIL }}
+          # 로봇 확인 위젯 사이트 키 (Cloudflare Turnstile, 공개 값이라 변수). 비밀 키는 Secrets TURNSTILE_SECRET → Worker
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
           NEXT_PUBLIC_CORP_API: ${{ steps.corp.outputs.url }}
           NEXT_TELEMETRY_DISABLED: "1"
           # 정적 페이지 3만여 개를 만드는 워커마다 공고 파일 전체를 읽어 기본 힙(약 4GB)을 넘길 때가 있다 (2026-11-20 run 44705858677)

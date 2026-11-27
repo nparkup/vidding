@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ACCOUNT_API, accountCall, saveSession, useAccount, type AccountMember } from "@/lib/account";
 import { normalizeBizno, validBizno } from "@/lib/corpLookup";
+import { Turnstile, turnstileToken } from "@/components/Turnstile";
 
 type Session = { token: string; exp: number; member: AccountMember };
 
@@ -16,6 +17,7 @@ export function LoginForm({ email }: { email: string }) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [next, setNext] = useState("/account");
+  const [tsKey, setTsKey] = useState(0);
   useEffect(() => {
     // 로그인 뒤 돌아갈 화면 (사이트 안 주소만)
     const n = new URLSearchParams(window.location.search).get("next") ?? "";
@@ -38,13 +40,14 @@ export function LoginForm({ email }: { email: string }) {
     }
     setBusy(true);
     try {
-      const r = await accountCall<Session>(mode, body);
+      const r = await accountCall<Session>(mode, { ...body, turnstile: turnstileToken(f) });
       saveSession(r);
       router.push(next);
     } catch (err) {
       const e2 = err as Error & { code?: string };
       setMsg(e2.message);
       if (e2.code === "no-password") setMode("claim");
+      setTsKey((k) => k + 1); // 토큰은 한 번만 쓸 수 있어 새로 받는다
     } finally {
       setBusy(false);
     }
@@ -89,6 +92,7 @@ export function LoginForm({ email }: { email: string }) {
         </div>
       )}
 
+      <Turnstile resetKey={tsKey} />
       <button className="btn-mint w-full text-base" disabled={busy || !ACCOUNT_API}>{busy ? "확인하는 중…" : mode === "login" ? "로그인" : "비밀번호 정하고 로그인"}</button>
 
       <div className="space-y-2 border-t border-ink-100 pt-4 text-sm text-ink-500">

@@ -328,7 +328,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
       if (!post) break;
       let b: Record<string, unknown> = {};
       try { b = (await req.json()) as Record<string, unknown>; } catch { /* 빈 입력 */ }
-      audit("download", `${s(b.what, 20) || "CSV"} ${Math.max(0, Math.round(Number(b.rows) || 0))}명`);
+      audit("download", `${s(b.what, 80) || "CSV"} ${Math.max(0, Math.round(Number(b.rows) || 0))}명`);
       return json({ status: "ok" }, 200, noStore);
     }
     case "settings": {

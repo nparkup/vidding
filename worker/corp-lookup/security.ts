@@ -129,3 +129,26 @@ export async function writeTotp(bucket: Bucket, v: AdminTotp | null) {
   if (v) await putJson(bucket, TOTP_KEY, v); else await bucket.delete(TOTP_KEY);
   totpCache = { at: Date.now(), v };
 }
+
+// ---- Cloudflare Turnstile (로봇 확인) ----
+/**
+ * 가입·로그인·비밀번호 처음 정하기 요청의 Turnstile 토큰을 Cloudflare에 확인한다.
+ * Worker 비밀값 TURNSTILE_SECRET 이 없으면 확인하지 않는다(키를 넣기 전에도 사이트가 멈추지 않게).
+ * 화면은 저장소 변수 TURNSTILE_SITE_KEY → NEXT_PUBLIC_TURNSTILE_SITE_KEY 로 위젯을 띄운다 (src/components/Turnstile.tsx).
+ */
+export async function turnstileOk(secret: string | undefined, token: unknown, ip: string): Promise<boolean> {
+  if (!secret) return true;
+  const t = typeof token === "string" ? token : "";
+  if (!t || t.length > 4096) return false;
+  try {
+    const body = new FormData();
+    body.append("secret", secret);
+    body.append("response", t);
+    if (ip) body.append("remoteip", ip);
+    const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
+    const j = (await r.json()) as { success?: boolean };
+    return j.success === true;
+  } catch {
+    return false;
+  }
+}

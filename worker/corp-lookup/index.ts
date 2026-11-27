@@ -83,6 +83,8 @@ interface Env {
   ADMIN_PASSWORD?: string;
   /** 회원 로그인 토큰 서명 키 (선택, 16자 이상). 없으면 R2 config/auth-key.json 에 만들어 둔 무작위 키를 쓴다 */
   MEMBER_SECRET?: string;
+  /** Turnstile 비밀 키 (선택, 저장소 Secrets TURNSTILE_SECRET). 있으면 가입·로그인에서 로봇 확인 (security.ts) */
+  TURNSTILE_SECRET?: string;
   /** 실시간 이용자 수 (wrangler.toml durable_objects). 없으면 ?presence 는 503 */
   /** 회원·결제 자료 백업 버킷 (wrangler.toml, bidmate-backup). 없으면 백업하지 않는다 */
   BACKUP?: BBucket;
@@ -228,6 +230,26 @@ async function handle(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknow
       const stub = env.PRESENCE.get(env.PRESENCE.idFromName("site"));
       const r = await stub.fetch(`https://presence/?id=${id}`);
       return json(await r.json(), 200, { "Cache-Control": "no-store" });
+    }
+    if (sp.has("health")) {
+      // 이상 접근·장애 알림용 최근 1시간 숫자 (.github/workflows/alerts.yml 이 매시 부른다). 숫자만 돌려주고, 관리자 비밀번호에서 만든 키가 있어야 한다
+      const want = env.ADMIN_PASSWORD ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`bidmate-health:${env.ADMIN_PASSWORD}`))), (x) => x.toString(16).padStart(2, "0")).join("") : "";
+      if (!want || req.headers.get("X-Health-Key") !== want) return json({ error: "권한이 없습니다." }, 403);
+      if (!env.METRICS) return json({ error: "off" }, 503);
+      const since = Date.now() - 3600_000;
+      const stub = metricsStub(env.METRICS);
+      const logs = ((await (await stub.fetch("https://metrics/logs?limit=1000")).json()) as { rows: { ts: number; route: string; status: number }[] }).rows.filter((r) => r.ts >= since);
+      const audit = ((await (await stub.fetch("https://metrics/audit")).json()) as { rows: { ts: number; action: string }[] }).rows.filter((r) => r.ts >= since);
+      return json({
+        since: new Date(since).toISOString(),
+        requests: logs.length,
+        errors5xx: logs.filter((r) => r.status >= 500).length,
+        rateLimited: logs.filter((r) => r.status === 429).length,
+        memberLoginFail: logs.filter((r) => r.route === "account:login" && r.status === 401).length,
+        adminLoginFail: audit.filter((r) => r.action === "login-fail").length,
+        adminLocked: audit.filter((r) => r.action === "login-locked").length,
+        adminLogin: audit.filter((r) => r.action === "login").length,
+      }, 200, { "Cache-Control": "no-store" });
     }
     if (sp.has("config")) {
       // 사이트 설정 (공개 값만: 공지 띠·요금·무료 체험 건수·기능). 관리자 화면에서 바꾸면 1~2분 안에 반영된다
@@ -431,7 +453,7 @@ function routeOf(req: Request): string {
   const sp = new URL(req.url).searchParams;
   if (sp.has("admin") || sp.has("adminlogin") || sp.has("members")) return `admin:${(sp.get("admin") ?? (sp.has("adminlogin") ? "login" : "members")).slice(0, 20)}`;
   if (sp.has("account")) return `account:${(sp.get("account") ?? "").slice(0, 20)}`;
-  for (const k of ["pv", "config", "signup", "trial", "awards", "awardmeta", "corps", "aisheet", "relate", "patents", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
+  for (const k of ["health", "pv", "config", "signup", "trial", "awards", "awardmeta", "corps", "aisheet", "relate", "patents", "perf", "ntce", "presence", "bizno"]) if (sp.has(k)) return k;
   return "other";
 }
 

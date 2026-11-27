@@ -232,7 +232,7 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
         run: npx tsx scripts/awards/agencyCuts.ts out
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: out
 

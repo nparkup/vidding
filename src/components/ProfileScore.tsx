@@ -27,7 +27,7 @@ export function ProfileScore({ bid }: { bid: Bid }) {
         <p className="text-5xl font-extrabold tabular-nums text-mint">{ev.score}<span className="text-lg text-ink-300">/100</span></p>
         <GradeBadge grade={ev.grade} />
       </div>
-      <ul className="mt-5 space-y-4">
+      <ul className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
         {ev.factors.map((f) => (
           <li key={f.label}>
             <div className="mb-1 flex justify-between text-sm">
@@ -40,5 +40,21 @@ export function ProfileScore({ bid }: { bid: Bid }) {
         ))}
       </ul>
     </>
+  );
+}
+
+/** 공고 상세 위쪽 버튼 줄의 입찰 가능성 버튼. 조건이 없으면 공고 검색 조건 입력으로, 있으면 점수를 보여 주고 눌러서 항목별 점수를 펼친다 */
+export function ProfileScoreButton({ bid, open, onToggle }: { bid: Bid; open: boolean; onToggle: () => void }) {
+  const sp = useSearchParams();
+  const lic = (sp.get("lic") ?? "").split(",").filter(Boolean) as License[];
+  if (!lic.length) return <Link href="/bids" className="btn-ghost btn-sm">입찰 가능성 계산</Link>;
+  const rg = (sp.get("rg") ?? "").split(",").filter(Boolean) as Region[];
+  const max = Number(sp.get("max") ?? 1e10);
+  const ev = evaluate(bid, { licenses: lic, regions: rg, minAmount: Number(sp.get("min") ?? 0), maxAmount: max, pastPerformance: max });
+  return (
+    <button type="button" onClick={onToggle} aria-expanded={open} className={`btn-ghost btn-sm ${open ? "border-mint text-mint-700" : ""}`}>
+      입찰 가능성 <span className="font-extrabold tabular-nums text-mint">{ev.score}점</span>
+      <GradeBadge grade={ev.grade} />
+    </button>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CloseDdayBadge } from "@/components/Badges";
 import { DocList } from "@/components/DocList";
+import { PlanCtaButton } from "@/components/PlanCtaButton";
 import { aptDetailUrl, aptFileUrl, type AptBid } from "@/lib/apt";
 import { contractMonths, forecastAptPrice, type AptPriceModel } from "@/lib/aptPrice";
 import { dateTime, won, wonFull } from "@/lib/format";
@@ -116,8 +117,8 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
     <div className="container-x py-6 sm:py-8">
       <Link href="/apt-bids" className="text-sm text-ink-500 hover:text-ink">공동주택 입찰공고 목록으로</Link>
 
-      <header className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
-        <div className="min-w-0 lg:flex-1">
+      <header className="mt-3">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <CloseDdayBadge iso={b.closeAt} />
             <span className="chip">공동주택 · {b.category}</span>
@@ -130,18 +131,20 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">{b.title}</h1>
           <p className="mt-2 text-ink-500 [overflow-wrap:anywhere]">{b.apt}{b.region ? ` · ${b.region}` : ""}</p>
         </div>
-        <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap lg:justify-end">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <a href={aptDetailUrl(b.no)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">K-apt 원문</a>
           {b.link && <a href={b.link} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">{b.system ?? "입찰 시스템"}에서 보기</a>}
+          {forecast && <a href="#forecast" className="btn-ghost btn-sm">예상 낙찰금액 <span className="font-extrabold tabular-nums text-mint">{wonFull(round(forecast.mid))}</span></a>}
+          <Link href={`/premium/apt?apt=${encodeURIComponent(b.no)}`} className="btn-primary btn-sm">입찰가격 예측</Link>
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>
+          <PlanCtaButton />
         </div>
       </header>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="min-w-0 space-y-4">
+      <div className="mt-5 min-w-0 space-y-4">
           <section className="card p-5">
             <h2 className="text-lg font-bold">핵심 요약</h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 [&>*]:min-w-0">
               {shown.map((c) => (
                 <div key={c.k} className={`min-w-0 rounded-xl bg-paper p-3${c.wide ? " col-span-2" : ""}`}>
                   <dt className="text-xs text-ink-500">{c.k}</dt>
@@ -185,6 +188,30 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
                 </li>
               ))}
             </ol>
+          </section>
+
+          <section id="forecast" className="card scroll-mt-24 p-5">
+            <h2 className="text-lg font-bold">입찰가격 예측</h2>
+            <p className="mt-1 text-sm text-ink-500">같은 단지 직전 계약 × 과거 낙찰 변화율</p>
+            {forecast ? (
+              <>
+                <div className="mt-4 rounded-xl bg-ink p-4 text-white">
+                  <p className="text-xs text-ink-300">예상 낙찰금액</p>
+                  <p className="mt-1 text-2xl font-extrabold tabular-nums">{wonFull(round(forecast.mid))}</p>
+                  <p className="mt-2 text-xs text-ink-300">예상 구간 {won(round(forecast.low))} ~ {won(round(forecast.high))}</p>
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-ink-500">
+                  {forecast.basis} 낙찰 {forecast.stat.n.toLocaleString()}건에서 직전 계약 대비 가운데값 {forecast.stat.median >= 1 ? "+" : ""}{((forecast.stat.median - 1) * 100).toFixed(1)}% 달라졌습니다.
+                  {forecast.check && forecast.check.n > 0 ? ` 올해 낙찰로 맞춰 보면 예상 금액과 10% 안이 ${(forecast.check.within10 * 100).toFixed(0)}%입니다.` : ""}
+                </p>
+              </>
+            ) : (
+              <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">
+                {comparable ? "같은 단지 직전 계약 자료가 없어 예측하지 않습니다. 직전 계약금액을 알면 예측 화면에 직접 넣어 계산할 수 있습니다." : "공사·물품·기타 용역은 단지마다 과업이 달라 직전 계약과 비교하지 않습니다."}
+              </p>
+            )}
+            <p className="mt-3 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 투찰률 대신 직전 계약 대비 변화율로 계산합니다.<br />계약기간이 직전과 다르면 예측 화면에서 바꿔 보세요.</p>
+            {comparable && <Link href={`/premium/apt?apt=${encodeURIComponent(b.no)}`} className="btn-primary mt-4 w-full">계약기간 바꿔 계산하기</Link>}
           </section>
 
           {b.prior && (
@@ -231,39 +258,6 @@ export function AptBidDetailView({ bid: b, pricing }: { bid: AptBid; pricing?: A
             <p className="mt-1 mb-3 text-sm text-ink-500">최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
             <DocList groups={groups} />
           </section>
-        </div>
-
-        <aside className="min-w-0 space-y-4">
-          <section className="card p-5">
-            <h2 className="text-lg font-bold">입찰가격 예측</h2>
-            <p className="mt-1 text-sm text-ink-500">같은 단지 직전 계약 × 과거 낙찰 변화율</p>
-            {forecast ? (
-              <>
-                <div className="mt-4 rounded-xl bg-ink p-4 text-white">
-                  <p className="text-xs text-ink-300">예상 낙찰금액</p>
-                  <p className="mt-1 text-2xl font-extrabold tabular-nums">{wonFull(round(forecast.mid))}</p>
-                  <p className="mt-2 text-xs text-ink-300">예상 구간 {won(round(forecast.low))} ~ {won(round(forecast.high))}</p>
-                </div>
-                <p className="mt-3 text-xs leading-relaxed text-ink-500">
-                  {forecast.basis} 낙찰 {forecast.stat.n.toLocaleString()}건에서 직전 계약 대비 가운데값 {forecast.stat.median >= 1 ? "+" : ""}{((forecast.stat.median - 1) * 100).toFixed(1)}% 달라졌습니다.
-                  {forecast.check && forecast.check.n > 0 ? ` 올해 낙찰로 맞춰 보면 예상 금액과 10% 안이 ${(forecast.check.within10 * 100).toFixed(0)}%입니다.` : ""}
-                </p>
-              </>
-            ) : (
-              <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">
-                {comparable ? "같은 단지 직전 계약 자료가 없어 예측하지 않습니다. 직전 계약금액을 알면 예측 화면에 직접 넣어 계산할 수 있습니다." : "공사·물품·기타 용역은 단지마다 과업이 달라 직전 계약과 비교하지 않습니다."}
-              </p>
-            )}
-            <p className="mt-3 text-xs leading-relaxed text-ink-300">K-apt 입찰결과에는 예정가격·기초금액이 없어 투찰률 대신 직전 계약 대비 변화율로 계산합니다.<br />계약기간이 직전과 다르면 예측 화면에서 바꿔 보세요.</p>
-            {comparable && <Link href={`/premium/apt?apt=${encodeURIComponent(b.no)}`} className="btn-primary mt-4 w-full">계약기간 바꿔 계산하기</Link>}
-          </section>
-
-          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-5 text-white shadow-glow">
-            <p className="font-bold">이 공고, 함께 준비할까요?</p>
-            <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 이 공고 같은 조건의 새 공고를 매일 아침 메일로 받고, 입찰점수 예측을 공고 수 제한 없이 쓰실 수 있습니다.</p>
-            <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>
-          </section>
-        </aside>
       </div>
     </div>
   );

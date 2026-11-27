@@ -37,9 +37,10 @@ export function BidViewFallback() {
     <div className="container-x py-10 sm:py-14">
       <div className="h-4 w-24 animate-pulse rounded bg-ink-100" />
       <div className="mt-6 h-8 w-2/3 animate-pulse rounded bg-ink-100" />
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+      <div className="mt-6 h-9 w-full max-w-xl animate-pulse rounded-full bg-ink-100" />
+      <div className="mt-6 space-y-4">
         <div className="card h-80 animate-pulse" />
-        <div className="card h-80 animate-pulse" />
+        <div className="card h-48 animate-pulse" />
       </div>
     </div>
   );

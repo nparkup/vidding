@@ -251,7 +251,8 @@ export function splitOrders(rows: Item[], now = new Date()): { bids: Bid[]; chan
         demandAgency: next.demandAgency,
         bizType: next.bizType,
         category: next.category,
-        bidId: live && live.bidNtceOrd === ord ? live.id : undefined,
+        // 이 차수가 아니어도 같은 공고번호의 진행 중 공고가 있으면 그 상세로 잇는다 (정정 1차 → 지금 2차)
+        bidId: live?.id,
         closeAt: next.closeAt,
         baseAmount: next.baseAmount || prev?.baseAmount || undefined,
         fields: kind === "정정" && prev ? diffBids(prev, next) : [],

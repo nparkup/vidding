@@ -21,8 +21,10 @@ import { bidPriceGuide, documentChecklist, evaluate, rank } from "@/lib/analysis
 import { buildDigest } from "@/lib/digest";
 import { dday, won } from "@/lib/format";
 import { SEED_CLIENTS } from "@/lib/mock/seed";
-import { getAptBids, getAwardCount, getBids, getNuriBids } from "@/lib/store";
-import { CATEGORY_GROUPS, type BizType } from "@/lib/types";
+import { getAptBids, getAwardAnalyses, getAwardCount, getBids, getNuriBids } from "@/lib/store";
+import { forecast, priorOf, type AwardAnalysis } from "@/lib/awards/analysis";
+import type { MockInsight } from "@/components/home/ProductMockup";
+import { CATEGORY_GROUPS, type Bid, type BizType } from "@/lib/types";
 import { aptBidHref, bidHref } from "@/lib/links";
 
 export const revalidate = 600;
@@ -65,6 +67,30 @@ const PERSONAS = [
 ];
 
 
+/** 메인 예시 화면에 쓰지 않을 공고명 */
+const NO_SAMPLE = /(^|[^A-Za-z])AI([^A-Za-z]|$)|인공지능/i;
+
+/** 메인 제품 화면 오른쪽 패널: 공고 한 건의 낙찰 결과 기반 예측값 (입찰점수 예측 화면과 같은 계산) */
+function mockInsight(a: AwardAnalysis | undefined, bid: Bid): MockInsight {
+  if (!a) return {};
+  const fc = forecast(a, bid);
+  const prior = priorOf(a);
+  const rate = fc.suggestRate
+    ? { label: "과거 낙찰자 투찰률", value: fc.suggestRate.value, basis: fc.suggestRate.basis }
+    : fc.rival
+      ? { label: "예상 최저 경쟁 투찰률", value: fc.rival.value, basis: fc.rival.basis }
+      : fc.winRate
+        ? { label: "과거 낙찰률", value: fc.winRate.value, basis: fc.winRate.basis }
+        : undefined;
+  return {
+    pre: fc.pre,
+    rate,
+    bidders: fc.bidders?.q,
+    level: fc.competition?.level,
+    prior: prior ? { date: prior.date, rate: prior.rate, bidders: prior.bidders } : undefined,
+  };
+}
+
 /** 학교 이름을 "OOO 초등학교"처럼 가린다. "기초·최초·당초" 같은 낱말은 건드리지 않는다 */
 function maskSchool(text: string): string {
   return text.replace(/(^|[\s(])([가-힣]{1,6}?)(초등학교|초|중학교|고등학교)(?=[\s)]|$)/g, (m, pre: string, name: string, kind: string) => {
@@ -91,6 +117,7 @@ export default async function Home() {
   // 업종이 다른 예시 고객사들: [0] 전기·통신공사, [1] IT 용역, [2] 의료 물품, [3] 시설관리 용역, [4] 건축공사
   const client = SEED_CLIENTS[0];
   const digest = buildDigest(client, bids);
+  const analyses = await getAwardAnalyses();
   const cases = [
     { label: "전기·통신공사", c: SEED_CLIENTS[0] },
     { label: "IT·소프트웨어 용역", c: SEED_CLIENTS[1] },
@@ -98,7 +125,19 @@ export default async function Home() {
     { label: "시설관리 용역", c: SEED_CLIENTS[3] },
   ].map(({ label, c }) => {
     const d = buildDigest(c, bids);
-    return { label, digest: d, top: d.recommended[0] };
+    // 예시 화면에는 "AI·인공지능"이 들어간 공고명을 쓰지 않는다 (사이트 문구 규칙). 학교 이름은 가린다
+    const pick = rank(bids, c)
+      .filter((r) => r.eligible && !NO_SAMPLE.test(r.bid.title))
+      .map((r) => ({ ...r, bid: { ...r.bid, title: maskSchool(r.bid.title), demandAgency: maskSchool(r.bid.demandAgency) } }));
+    const recommended = pick.slice(0, 5);
+    // 분석 패널 공고: 낙찰 결과 분석이 있는 상위 공고를 먼저 쓴다
+    const top = recommended.find((r) => analyses[r.bid.id]) ?? recommended[0];
+    return {
+      label,
+      digest: { ...d, recommended: top ? [top, ...recommended.filter((r) => r !== top)] : recommended, closingSoon: pick.filter((r) => r.daysLeft <= 3).slice(0, 3) },
+      top,
+      insight: top ? mockInsight(analyses[top.bid.id], top.bid) : undefined,
+    };
   });
   // 분석 예시 공고는 IT 용역 고객사 기준
   const itClient = SEED_CLIENTS[1];

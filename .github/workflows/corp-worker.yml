@@ -158,6 +158,8 @@ jobs:
             exit 1
           fi
           echo "암호화 키 ID: $kid (지금 저장소 기준: ${cur:-아직 없음})"
+          # 암호화 진행 상태(건수만, 내용 없음): 매시 25분 예약 작업이 남은 평문을 암호화한다
+          if [ -s /tmp/seal.json ]; then echo "암호화 상태: $(jq -c '{sealed,plain,otherKey,done,at}' /tmp/seal.json 2>/dev/null)"; fi
           printf '%s' "$MEMBER_KEY" | npx --yes wrangler@4.40.0 secret put MEMBER_KEY
           if [ -n "$MEMBER_KEY_OLD" ]; then printf '%s' "$MEMBER_KEY_OLD" | npx --yes wrangler@4.40.0 secret put MEMBER_KEY_OLD; fi
       - name: 서비스키를 Worker 비밀값으로 저장

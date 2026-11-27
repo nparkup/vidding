@@ -8,7 +8,7 @@ import { ProfileScore, ProfileScoreButton } from "@/components/ProfileScore";
 import { DocList } from "@/components/DocList";
 import { bidPriceGuide, documentChecklist, keyPoints } from "@/lib/analysis";
 import { loadBidExtra } from "@/lib/attachments";
-import { BidContact, BidSummary, kstIso } from "@/components/BidSummary";
+import { BidSummary, kstIso } from "@/components/BidSummary";
 import { LicenseLaws } from "@/components/LicenseLaws";
 import type { BidQual } from "@/lib/eligibility";
 import { dateTime, won, wonFull } from "@/lib/format";
@@ -127,7 +127,6 @@ export function BidDetailView({ bid }: { bid: Bid }) {
               <p className="mt-1"><span className="text-ink-500">참가 업체 </span>{profile.who}</p>
               <p className="mt-0.5"><span className="text-ink-500">낙찰자 결정 </span>{profile.decide}</p>
             </div>
-            <BidContact info={info} />
             {points.length > 0 && (
               <ul className="mt-5 space-y-2">
                 {points.map((p) => (

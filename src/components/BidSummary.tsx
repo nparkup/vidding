@@ -109,26 +109,6 @@ export function BidSummary({ bid, qual }: { bid: Bid; qual?: BidQual }) {
   );
 }
 
-/** 공고기관 담당자 연락처 (입찰공고정보서비스 ntceInsttOfcl*, 집행관) */
-export function BidContact({ info }: { info?: NoticeInfo }) {
-  const o = info?.officer;
-  return (
-    <>
-      {(o || info?.executor) && (
-        <div className="mt-4 rounded-xl border border-ink-100 p-4 text-sm">
-          <p className="text-xs text-ink-500">공고 담당자</p>
-          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-            {o?.name && <span className="font-bold">{o.name}</span>}
-            {o?.tel && <a href={`tel:${o.tel.replace(/[^\d]/g, "")}`} className="tabular-nums hover:text-mint-600">{o.tel}</a>}
-            {o?.email && <a href={`mailto:${o.email}`} className="break-all hover:text-mint-600">{o.email}</a>}
-            {info?.executor && <span className="text-ink-500">집행관 {info.executor}</span>}
-          </p>
-        </div>
-      )}
-    </>
-  );
-}
-
 /** 'YYYY-MM-DD HH:mm'(한국 시간) → ISO */
 export function kstIso(s?: string): string | undefined {
   const m = s?.match(/^(\d{4}-\d\d-\d\d) (\d\d:\d\d)/);

@@ -1,7 +1,6 @@
 "use client";
 
 import { Brand } from "@/components/BrandText";
-import { EngineName } from "@/components/EngineName";
 import { useState } from "react";
 import type { Digest } from "@/lib/digest";
 import type { MatchResult } from "@/lib/analysis";
@@ -84,12 +83,11 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
       </ScrollRow>
 
       <div className="grid md:grid-cols-[200px_1fr] lg:grid-cols-[200px_1fr_300px]">
-        {/* 사이드바: 실제 상단 메뉴와 같은 이름, 엔진별로 묶음 */}
+        {/* 사이드바: 실제 상단 메뉴와 같은 이름, 묶음 사이는 선으로만 나눈다 */}
         <aside className="hidden border-r border-ink-100 p-4 md:block">
           {MENU.map((g) => (
-            <div key={g.engine} className="mb-4 last:mb-0">
-              <p className="px-2 text-[11px] font-bold text-ink-400"><EngineName id={g.engine} /></p>
-              <ul className="mt-1 space-y-0.5 text-[13px]">
+            <div key={g.engine} className="border-t border-ink-100 pt-2 mt-2 first:mt-0 first:border-t-0 first:pt-0">
+              <ul className="space-y-0.5 text-[13px]">
                 {g.items.map((t, i) => {
                   const on = g.engine === "finder" && i === 0;
                   return (
@@ -153,7 +151,7 @@ export function ProductMockup({ cases }: { cases: MockupCase[] }) {
         {/* 우측 분석 패널: 1순위 공고 */}
         {top && b && (
           <div className="hidden border-l border-ink-100 bg-paper/60 p-5 lg:block">
-            <p className="text-[11px] font-bold text-ink-400"><EngineName id="insight" /> 1순위 공고 분석</p>
+            <p className="text-[11px] font-bold text-ink-400">1순위 공고 분석</p>
             <p className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{b.title}</p>
             <div className="mt-3 flex items-end justify-between">
               <p className="text-xs text-ink-400">입찰 가능성</p>

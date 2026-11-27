@@ -31,11 +31,14 @@
 import { normalizeBizno, validBizno } from "../../src/lib/corpLookup";
 import { kstToday, limitOf, passLastDay, type BillingLike, type LimitInfo, type WithdrawInfo } from "../../src/lib/usagePeriod";
 import { readSiteConfig, type AdminBucket } from "./admin";
+import { turnstileOk } from "./security";
 import { BILLING_RETAIN_YEARS, PRIVACY_VERSION } from "../../src/lib/privacy";
 
 export interface AccountEnv {
   AWARDS?: AdminBucket;
   MEMBER_SECRET?: string;
+  /** Turnstile 비밀 키 (선택). 있으면 가입·로그인에서 로봇 확인 */
+  TURNSTILE_SECRET?: string;
 }
 
 type Json = (body: unknown, status?: number, extra?: Record<string, string>) => Response;
@@ -345,6 +348,10 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
 
   if (action === "signup" || action === "login" || action === "claim") {
     if (!post) return json({ error: "POST만 지원합니다." }, 405);
+    // 로봇 확인 (security.ts turnstileOk). 비밀값 TURNSTILE_SECRET 이 있을 때만
+    if (!(await turnstileOk(env.TURNSTILE_SECRET, body.turnstile, req.headers.get("CF-Connecting-IP") ?? ""))) {
+      return json({ error: "자동 입력 방지 확인을 마치지 못했습니다. 확인란을 다시 눌러 주세요.", code: "turnstile" }, 400, noStore);
+    }
     if (action === "login") {
       const id = s(body.id, 120);
       const pw = String(body.password ?? "");
@@ -405,8 +412,10 @@ export async function handleAccount(req: Request, env: AccountEnv, json: Json): 
     };
     if (!m.company || !m.name || !m.phone) return json({ error: "회사명, 담당자 이름, 연락처를 입력해 주세요." }, 400);
     if (!m.agreePrivacy) return json({ error: "개인정보 수집·이용에 동의해 주세요." }, 400);
-    if (cur) return json({ status: "exists", hasPassword: !!cur.auth }, 200, noStore);
-    if (!(await moveEmail(bucket, bizno, undefined, email))) return json({ error: "이미 다른 사업자번호로 가입된 이메일입니다. 로그인하거나 다른 이메일을 써 주세요." }, 409);
+    // 가입 여부를 알아낼 수 없게: 사업자번호가 이미 있든 이메일이 이미 쓰이든 같은 답을 준다
+    const TAKEN = "이 사업자등록번호 또는 이메일로는 새로 가입할 수 없습니다. 이미 가입하셨다면 로그인해 주세요. 비밀번호를 잊으셨으면 고객센터로 문의해 주세요.";
+    if (cur) { await new Promise((r) => setTimeout(r, 300)); return json({ error: TAKEN, code: "taken" }, 409, noStore); }
+    if (!(await moveEmail(bucket, bizno, undefined, email))) return json({ error: TAKEN, code: "taken" }, 409, noStore);
     // 동의 이력: 어느 판의 개인정보처리방침에 언제 동의했는지 (선택 동의인 메일 수신도 따로)
     const consent = { privacy: { version: PRIVACY_VERSION, at: nowIso() }, mail: { on: m.agreeMail, at: nowIso() } };
     const rec: Rec = { ...m, consent, joinedAt: nowIso(), auth: { email, pw: await hashPassword(pw), ver: 1, setAt: nowIso(), lastLogin: nowIso() } };

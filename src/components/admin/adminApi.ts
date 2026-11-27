@@ -117,3 +117,16 @@ export function downloadCsv(name: string, head: string[], rows: (string | number
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+/** 관리자 화면 목록에서 연락처를 가린다: 010-1234-5678 → 010-****-5678 */
+export function maskPhone(p: string): string {
+  const d = (p ?? "").replace(/\D/g, "");
+  if (d.length < 7) return p ? "****" : "";
+  return `${d.slice(0, 3)}-****-${d.slice(-4)}`;
+}
+/** 이메일을 가린다: abcdef@company.co.kr → ab****@company.co.kr */
+export function maskEmail(e: string): string {
+  const [id, host] = (e ?? "").split("@");
+  if (!host) return e ? "****" : "";
+  return `${id.slice(0, Math.min(2, Math.max(1, id.length - 1)))}****@${host}`;
+}

@@ -1,0 +1,20 @@
+# 라이브러리 보안 업데이트 (보안 체크리스트 118). 매주 월요일 아침 npm·GitHub Actions 업데이트 PR을 연다.
+# 한 번에 많이 열리지 않게 묶고 개수를 제한한다. 보안 취약점 알림 PR은 이 제한과 별개로 열린다.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      minor-patch:
+        update-types: ["minor", "patch"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2

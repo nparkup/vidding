@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { TabProps } from "./AdminConsole";
-import { bizFmt, downloadCsv, dt, SIZE_LABEL, type Member, type Withdrawn } from "./adminApi";
+import { bizFmt, downloadCsv, maskEmail, maskPhone, dt, SIZE_LABEL, type Member, type Withdrawn } from "./adminApi";
 import { planName } from "@/lib/plans";
 import { MemberCreate } from "./MemberCreate";
 import { fullOf, LimitEditor, QuotaBadge, tierName, useMemberQuota } from "./limits";
@@ -66,12 +66,21 @@ export function MembersTab({ call, guard, members, withdrawn, addWithdrawn, limi
     };
   }, [members]);
 
+  const [shownPI, setShownPI] = useState<Set<string>>(new Set());
+  function reveal(bizno: string) {
+    setShownPI((x) => new Set(x).add(bizno));
+    call("download", { body: { what: `연락처 보기 ${bizno}`, rows: 1 } }).catch(() => undefined);
+  }
+
   function csv() {
-    // 개인정보 다운로드 기록 (관리자 > 시스템 정보 > 접속·로그 감사 기록)
-    call("download", { body: { what: "회원", rows: members.length } }).catch(() => undefined);
+    // 사유를 적으면 연락처·이메일이 담긴 파일, 비워 두면 가린 파일. 어느 쪽이든 감사 기록에 남는다 (관리자 > 시스템 정보 > 접속·로그)
+    const why = window.prompt("내려받는 사유를 적어 주세요. 감사 기록에 남습니다.\n비워 두고 확인을 누르면 연락처·이메일을 가린 파일을 받습니다.");
+    if (why === null) return;
+    const full = why.trim().length > 0;
+    call("download", { body: { what: full ? `회원(전체) 사유: ${why.trim().slice(0, 60)}` : "회원(가림)", rows: shown.length } }).catch(() => undefined);
     downloadCsv("회원", ["회사명", "사업자등록번호", "담당자", "연락처", "이메일", "가입일", "상태", "결제", "요금제", "적용 한도", "개별 한도", "이번 기간 사용", "체험 사용", "분석한 공고", "메일 수신 동의", "업종·면허", "지역", "규모", "관심 키워드", "메모"],
       shown.map((m) => [
-        m.company, bizFmt(m.bizno), m.name, m.phone, m.email, dt(m.joinedAt), m.status === "suspended" ? "이용 정지" : "정상",
+        m.company, bizFmt(m.bizno), m.name, full ? m.phone : maskPhone(m.phone), full ? m.email : maskEmail(m.email), dt(m.joinedAt), m.status === "suspended" ? "이용 정지" : "정상",
         isPaid(m) ? planName(m.billing!.plan) : "", ...(() => { const q = quotaOf(m); return [tierName(q), q.quota === null ? "무제한" : q.quota, q.custom ? "예" : "", q.used]; })(), `${m.trial.length}/${limit}`, m.trial.map((t) => t.k).join(" "), m.agreeMail ? "동의" : "",
         (m.licenses ?? []).join(" "), (m.regions ?? []).join(" "), SIZE_LABEL[m.size ?? ""] ?? "", m.keywords ?? "", m.memo ?? "",
       ]));
@@ -131,7 +140,12 @@ export function MembersTab({ call, guard, members, withdrawn, addWithdrawn, limi
                   {!m.login && <span className="rounded-lg bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-400">비밀번호 없음</span>}
                 </p>
                 <p className="text-xs tabular-nums text-ink-400">{bizFmt(m.bizno)} · 가입 {dt(m.joinedAt)}{m.createdBy === "admin" ? " (관리자 등록)" : ""}</p>
-                <p className="mt-1.5 text-sm">{m.name} · <span className="tabular-nums">{m.phone}</span> · <a href={`mailto:${m.email}`} className="text-mint-600 [overflow-wrap:anywhere] hover:underline">{m.email}</a></p>
+                {/* 연락처·이메일은 가려 두고, 필요할 때만 '보기'로 연다 (감사 기록에 남는다) */}
+                <p className="mt-1.5 text-sm">{m.name} · {shownPI.has(m.bizno) ? (
+                  <><span className="tabular-nums">{m.phone}</span> · <a href={`mailto:${m.email}`} className="text-mint-600 [overflow-wrap:anywhere] hover:underline">{m.email}</a></>
+                ) : (
+                  <><span className="tabular-nums">{maskPhone(m.phone)}</span> · <span className="[overflow-wrap:anywhere]">{maskEmail(m.email)}</span> <button type="button" onClick={() => reveal(m.bizno)} className="ml-1 text-xs font-semibold text-mint-600 hover:underline">보기</button></>
+                )}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <QuotaBadge q={quotaOf(m)} />

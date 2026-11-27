@@ -14,6 +14,7 @@ import { keywordHits, parseKeywords, type KeywordHit } from "@/lib/keywords";
 import { bidHref } from "@/lib/links";
 import { normalizeBizno, validBizno } from "@/lib/corpLookup";
 import { readMember, saveMember } from "@/lib/member";
+import { Turnstile, turnstileToken } from "@/components/Turnstile";
 import { accountCall, saveSession, useAccount, type AccountMember } from "@/lib/account";
 import { TrialN } from "@/components/Cfg";
 
@@ -48,6 +49,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
   const [done, setDone] = useState<Done | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [tsKey, setTsKey] = useState(0);
   const [joined, setJoined] = useState<string | null>(null);
   const acc = useAccount();
   useEffect(() => { setJoined(readMember()?.company ?? null); }, []);
@@ -79,14 +81,14 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
     let hasPassword: boolean | undefined;
     try {
       if (!SIGNUP_API) throw new Error("off");
-      const j = await accountCall<{ status: "ok" | "exists"; hasPassword?: boolean; token?: string; exp?: number; member?: AccountMember }>("signup", { ...body, password });
+      const j = await accountCall<{ status: "ok" | "exists"; hasPassword?: boolean; token?: string; exp?: number; member?: AccountMember }>("signup", { ...body, password, turnstile: turnstileToken(f) });
       status = j.status;
       hasPassword = j.hasPassword;
       if (j.status === "ok" && j.token && j.exp && j.member) saveSession({ token: j.token, exp: j.exp, member: j.member });
     } catch (err) {
       // 입력이 잘못됐거나 이미 쓰는 이메일이면 고치게 한다. 서버에 닿지 못하면 이 브라우저로 체험은 시작한다
       const st = (err as { status?: number }).status;
-      if (st === 400 || st === 409) { setMsg((err as Error).message); setBusy(false); return; }
+      if (st === 400 || st === 409) { setMsg((err as Error).message); setBusy(false); setTsKey((k) => k + 1); return; }
     }
     if (status !== "exists") saveMember({ bizno, company: body.company, at: Date.now() });
 
@@ -251,6 +253,7 @@ export function ApplyForm({ action, error, plan, email = "" }: { action?: (f: Fo
             </label>
           </fieldset>
 
+          <Turnstile resetKey={tsKey} />
           <button className="btn-mint w-full text-base" disabled={busy}>{busy ? "가입하는 중…" : "가입하고 무료 체험 시작"}</button>
           <p className="text-center text-xs text-ink-300">가입하면 바로 로그인됩니다.<br />다른 기기에서는 이메일과 비밀번호로 로그인하세요.</p>
         </form>

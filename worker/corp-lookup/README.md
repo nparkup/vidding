@@ -53,3 +53,11 @@ Worker는 그 기간을 7일 단위로 다시 쪼개 조달청 낙찰정보서�
 공공데이터포털 서비스키(DATA_GO_KR_SERVICE_KEY)를 그대로 쓰므로 포털에서 활용신청(자동승인)만 하면 된다. 개발계정 하루 10,000회.
 예비: KIPRIS_API_KEY 가 있으면 등록원부가 실패할 때 KIPRIS Plus(출원인 법인 → 특허·실용 등록공보)로 찾는다 (월 상한 950회, KIPRIS_MONTHLY_LIMIT).
 결과는 R2 patents/{사업자번호}.json 에 30일 둔다 (src/lib/patents.ts).
+
+## 회원 개인정보 암호화 (sealed.ts)
+
+- 저장소 Secrets `MEMBER_KEY`(16자 이상 임의 문자열)를 넣으면 corp-worker.yml 이 Worker 비밀값으로 넣는다. 잃어버리면 회원 자료를 풀 수 없으니 따로 보관한다.
+- `members/`·`billing/`·`withdraw/`·`retain/`·`mybox/`, `config/auth-key.json`, `config/admin-totp.json` 을 AES-256-GCM(파일 경로를 AAD로)으로 암호화해 쓴다. 다른 자료는 그대로다.
+- 예전 평문 파일은 매시 25분 예약 작업(또는 관리자 화면 백업 카드의 '지금 암호화')이 암호화한다. 백업은 암호화된 그대로 복사한다.
+- 키를 바꿀 때는 예전 키를 `MEMBER_KEY_OLD` 에 함께 넣는다. 없이 바꾸면 배포 단계가 멈춘다.
+- 키 없이 암호화된 파일을 읽으면 오류를 낸다(빈 회원으로 보고 다시 가입받지 않게). 관리자 2단계 인증이 풀리지 않으면 R2 에서 `config/admin-totp.json` 을 지우면 꺼진다.

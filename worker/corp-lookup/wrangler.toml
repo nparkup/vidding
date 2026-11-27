@@ -7,8 +7,9 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # 매일 0시 10분(한국 = UTC 15:10): 이용권이 끝난 회원 탈퇴 예약 처리 (account.ts processDueWithdrawals), 회원·결제 자료 백업 (backup.ts)
+# 매시 25분: 회원 자료 암호화가 덜 끝났을 때만 이어서 한다 (sealed.ts, index.ts HOURLY_CRON)
 [triggers]
-crons = ["10 15 * * *"]
+crons = ["10 15 * * *", "25 * * * *"]
 
 [vars]
 # 운영에는 실제 사이트만 둔다. 로컬 개발은 wrangler dev --var ALLOWED_ORIGINS:http://localhost:3000 처럼 따로 준다

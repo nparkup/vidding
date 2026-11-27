@@ -52,6 +52,7 @@ import { metricsStub, patchFetch, takePending, truncIp, type MetricsNs, type Rec
 export { Metrics } from "./metrics";
 import { purgeRetained, runBackup, type BBucket } from "./backup";
 import { overLimit, takeAiBudget, withSecurityHeaders, type RateLimiter } from "./security";
+import { keyringOf, readSealState, sealBucket, sealExisting, type Keyring } from "./sealed";
 
 interface Env {
   DATA_GO_KR_SERVICE_KEY: string;
@@ -87,6 +88,12 @@ interface Env {
   BACKUP?: BBucket;
   /** 백업 암호화 키 (Worker 비밀값, 선택). 없으면 암호화하지 않고 비공개 버킷에만 둔다 */
   BACKUP_KEY?: string;
+  /** 회원 개인정보 암호화 키 (Worker 비밀값, sealed.ts). 바꿀 때는 예전 키를 MEMBER_KEY_OLD 에 둔다 */
+  MEMBER_KEY?: string;
+  MEMBER_KEY_OLD?: string;
+  /** sealedEnv 가 채운다: 감싸지 않은 원래 버킷과 키 묶음 */
+  AWARDS_RAW?: Env["AWARDS"];
+  SEAL_RING?: Keyring;
   /** 요청 제한 (wrangler.toml [[ratelimits]], IP마다 1분). 없으면 막지 않는다 */
   RL_AUTH?: RateLimiter;
   RL_AI?: RateLimiter;
@@ -112,8 +119,17 @@ export class Presence {
 }
 
 const CACHE_SECONDS = 12 * 3600;
+/** wrangler.toml crons 의 매시간 암호화 이어 하기 */
+const HOURLY_CRON = "25 * * * *";
 
 patchFetch();
+
+/** 회원 자료 경로를 암호화해 읽고 쓰는 버킷으로 바꾼 env (sealed.ts). 원래 버킷은 AWARDS_RAW 로 남긴다 */
+async function sealedEnv(env: Env): Promise<Env> {
+  if (!env.AWARDS) return env;
+  const ring = await keyringOf(env);
+  return { ...env, AWARDS: sealBucket(env.AWARDS, ring), AWARDS_RAW: env.AWARDS, SEAL_RING: ring };
+}
 
 export default {
   /** 요청마다 경로·상태·처리 시간과 그 사이 바깥 호출(공공데이터포털·Anthropic)을 지표 저장소(Metrics)에 남긴다 */
@@ -122,7 +138,7 @@ export default {
     let res: Response;
     let err = "";
     try {
-      res = await handle(req, env, ctx);
+      res = await handle(req, await sealedEnv(env), ctx);
     } catch (e) {
       err = (e as Error).message ?? String(e);
       res = new Response(JSON.stringify({ error: "중계 서버 오류" }), { status: 500, headers: { "Content-Type": "application/json; charset=utf-8" } });
@@ -130,14 +146,30 @@ export default {
     if (env.METRICS && req.method !== "OPTIONS") ctx.waitUntil(flushMetrics(req, res, Date.now() - t0, err, env.METRICS).catch(() => undefined));
     return withSecurityHeaders(res);
   },
-  /** 매일 0시 10분(한국, wrangler.toml crons): 마지막 이용일이 지난 회원 탈퇴 예약을 처리한다 */
-  async scheduled(_ev: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
-    if (!env.AWARDS) return;
-    const bucket = env.AWARDS;
+  /**
+   * 매일 0시 10분(한국, wrangler.toml crons): 남은 평문 회원 자료 암호화, 마지막 이용일이 지난 회원 탈퇴 예약 처리, 백업.
+   * 매시 25분: 암호화가 덜 끝났을 때만(키를 새로 넣었거나 바꾼 직후) 이어서 암호화한다.
+   */
+  async scheduled(ev: { cron?: string }, env0: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
+    if (!env0.AWARDS) return;
+    const raw = env0.AWARDS;
+    const env = await sealedEnv(env0);
+    const ring = env.SEAL_RING!;
+    const bucket = env.AWARDS!;
+    const sealRaw = raw as unknown as Parameters<typeof sealExisting>[0];
+    if (ev.cron === HOURLY_CRON) {
+      if (!ring.current) return;
+      ctx.waitUntil((async () => {
+        const st = await readSealState(sealRaw, ring).catch(() => null);
+        if (!st?.done) await sealExisting(sealRaw, ring).catch(() => undefined);
+      })());
+      return;
+    }
     ctx.waitUntil((async () => {
+      if (ring.current && !(await readSealState(sealRaw, ring).catch(() => null))?.done) await sealExisting(sealRaw, ring).catch(() => undefined);
       await processDueWithdrawals(bucket).catch(() => 0);
-      // 회원·결제 자료를 별도 버킷에 백업 (backup.ts). 보존 기간이 지난 기록 정리는 매달 1일
-      await runBackup(bucket as unknown as BBucket, env.BACKUP, env.BACKUP_KEY).catch(() => undefined);
+      // 회원·결제 자료를 별도 버킷에 백업 (backup.ts). 암호화된 파일은 암호화된 그대로 복사한다. 보존 기간이 지난 기록 정리는 매달 1일
+      await runBackup(raw as unknown as BBucket, env.BACKUP, env.BACKUP_KEY).catch(() => undefined);
       if (new Date(Date.now() + 9 * 3600e3).getUTCDate() === 1) await purgeRetained(bucket as unknown as BBucket).catch(() => 0);
     })());
   },

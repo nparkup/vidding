@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { makeCall } from "./adminApi";
 
-interface BackupList { ready: boolean; encrypted: boolean; items: { key: string; size: number }[]; last: { key: string; at: string; bytes: number; skipped: number; counts: Record<string, number> } | null }
+interface SealState { on: boolean; kid: string | null; sealed: number; plain: number; otherKey: number; at: string; done: boolean }
+interface BackupList { seal?: { on: boolean; state: SealState | null }; ready: boolean; encrypted: boolean; items: { key: string; size: number }[]; last: { key: string; at: string; bytes: number; skipped: number; counts: Record<string, number> } | null }
 interface Verify { ok: boolean; reason?: string; file?: string; at?: string; parsed?: number; compare?: Record<string, { backup: number; live: number; same: number }> }
 
 const PART: Record<string, string> = { "members/": "회원 정보", "billing/": "결제 기록", "retain/": "보존 중인 결제 기록" };
@@ -16,6 +17,20 @@ export function BackupCard({ call }: { call: ReturnType<typeof makeCall> }) {
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => { call<BackupList>("backup").then(setList).catch((e) => setMsg((e as Error).message)); }, [call]);
   useEffect(load, [load]);
+
+  async function seal() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await call<SealState>("backup", { body: { step: "seal" } });
+      setMsg(r.done ? `회원 자료 ${r.sealed}개를 모두 암호화했습니다.` : `암호화 ${r.sealed}개, 남은 파일 ${r.plain + r.otherKey}개. 한 번 더 눌러 주세요.`);
+      load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(step: "run" | "verify") {
     setBusy(true);
@@ -35,7 +50,7 @@ export function BackupCard({ call }: { call: ReturnType<typeof makeCall> }) {
   return (
     <section className="card mb-5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-extrabold">회원·결제 자료 백업</h2>
+        <h2 className="text-lg font-extrabold">회원·결제 자료 백업·암호화</h2>
         {list && <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${list.ready ? "bg-mint-50 text-mint-700" : "bg-coral-100 text-coral"}`}>{list.ready ? (list.encrypted ? "백업 중 · 암호화" : "백업 중 · 암호화 키 없음") : "백업 버킷 없음"}</span>}
       </div>
       <p className="mt-1 text-sm text-ink-500">매일 0시 10분에 회원 정보·결제 기록을 별도 비공개 저장소에 백업합니다. 매일 백업 14개, 매달 1일 백업 3개를 남깁니다.</p>
@@ -57,6 +72,25 @@ export function BackupCard({ call }: { call: ReturnType<typeof makeCall> }) {
               </ul>
             </>
           ) : <p className="text-coral">{verify.reason}</p>}
+        </div>
+      )}
+      {list?.seal && (
+        <div className="mt-4 border-t border-ink-100 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-bold">회원 개인정보 암호화</h3>
+            <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${list.seal.on && list.seal.state?.done ? "bg-mint-50 text-mint-700" : "bg-coral-100 text-coral"}`}>
+              {!list.seal.on ? "꺼짐 · 암호화 키 없음" : list.seal.state?.done ? "켜짐 · 모두 암호화" : "켜짐 · 암호화 진행 중"}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-ink-500">회원 가입 정보(회사명·담당자·연락처·이메일), 결제·탈퇴 기록, 서류함, 로그인 서명 키와 2단계 인증 비밀값을 AES-256-GCM으로 암호화해 저장합니다.</p>
+          {list.seal.state && (
+            <p className="mt-2 text-sm">마지막 확인 <b>{new Date(list.seal.state.at).toLocaleString("ko-KR")}</b> · 암호화 {list.seal.state.sealed}개{list.seal.state.plain ? ` · 평문 ${list.seal.state.plain}개` : ""}{list.seal.state.otherKey ? ` · 예전 키 ${list.seal.state.otherKey}개` : ""} · 키 ID {list.seal.state.kid ?? "-"}</p>
+          )}
+          {list.seal.on ? (
+            <button type="button" disabled={busy} onClick={seal} className="btn-ghost btn-sm mt-3">지금 암호화</button>
+          ) : (
+            <p className="mt-2 text-xs text-ink-400">저장소 Secrets에 MEMBER_KEY(16자 이상 임의 문자열)를 넣고 중계 서버를 다시 배포하면 켜집니다. 키를 잃어버리면 회원 자료를 풀 수 없으니 따로 안전하게 보관해 주세요.</p>
+          )}
         </div>
       )}
       {msg && <p className="mt-3 rounded-xl bg-paper p-3 text-sm text-ink-700">{msg}</p>}

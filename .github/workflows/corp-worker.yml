@@ -6,6 +6,7 @@ name: 기업 정보 중계 서버 배포
 # 선택: ADMIN_ID, ADMIN_PASSWORD (관리자 화면 /admin 로그인, 비밀번호 10자 이상). 있으면 Worker 비밀값으로 넣는다
 # 선택: KIPRIS_API_KEY (기업 특허 조회 예비 경로, KIPRIS Plus 인증키). 기본 경로는 공공데이터포털 등록원부라 없어도 된다
 # 선택: BACKUP_KEY (회원·결제 백업 암호화 키, 아무 긴 문자열). 있으면 Worker 비밀값으로 넣는다. 잃어버리면 암호화한 백업을 풀 수 없다
+# 권장: MEMBER_KEY (회원 개인정보 암호화 키, 16자 이상 임의 문자열). 잃어버리면 회원 자료를 풀 수 없다. 바꿀 때는 예전 키를 MEMBER_KEY_OLD 에
 # 선택: ADMIN_GITHUB_TOKEN (관리자 화면 GitHub Actions 실행 목록, Actions 읽기 권한만). 있으면 Worker 비밀값 GITHUB_TOKEN 으로 넣는다
 on:
   push:
@@ -134,6 +135,31 @@ jobs:
         run: |
           if [ -z "$BACKUP_KEY" ]; then echo "BACKUP_KEY 없음: 백업은 암호화 없이 비공개 버킷에만 둡니다"; exit 0; fi
           printf '%s' "$BACKUP_KEY" | npx --yes wrangler@4.40.0 secret put BACKUP_KEY
+      # 회원 개인정보 암호화 키 (sealed.ts). 저장소 Secrets MEMBER_KEY(16자 이상 임의 문자열). 잃어버리면 회원 자료를 풀 수 없으니 따로 보관한다.
+      # 키를 바꿀 때는 예전 키를 MEMBER_KEY_OLD 에 함께 넣는다. 지금 암호화에 쓰는 키와 다르고 MEMBER_KEY_OLD 도 없으면 바꾸지 않고 멈춘다(회원 자료가 잠기지 않게).
+      - name: 회원 정보 암호화 키를 Worker 비밀값으로 저장
+        if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
+        working-directory: worker/corp-lookup
+        env:
+          MEMBER_KEY: ${{ secrets.MEMBER_KEY }}
+          MEMBER_KEY_OLD: ${{ secrets.MEMBER_KEY_OLD }}
+        run: |
+          # Worker(sealed.ts)처럼 앞뒤 공백을 뺀 값으로 키 ID를 셈한다
+          MEMBER_KEY="${MEMBER_KEY#"${MEMBER_KEY%%[![:space:]]*}"}"; MEMBER_KEY="${MEMBER_KEY%"${MEMBER_KEY##*[![:space:]]}"}"
+          if [ -z "$MEMBER_KEY" ]; then echo "::warning::MEMBER_KEY 없음: 회원 정보는 아직 암호화하지 않습니다. 저장소 Secrets에 MEMBER_KEY(16자 이상 임의 문자열)를 넣고 이 배포를 다시 실행해 주세요."; exit 0; fi
+          if [ ${#MEMBER_KEY} -lt 16 ]; then echo "::error::MEMBER_KEY 는 16자 이상이어야 합니다."; exit 1; fi
+          kid=$(printf '%s' "bidmate-member-kid:$MEMBER_KEY" | sha256sum | cut -c1-8)
+          cur=""
+          if npx --yes wrangler@4.40.0 r2 object get bidmate-awards/config/seal-state.json --remote --pipe > /tmp/seal.json 2>/dev/null; then
+            cur=$(jq -r '.kid // ""' /tmp/seal.json 2>/dev/null || true)
+          fi
+          if [ -n "$cur" ] && [ "$cur" != "null" ] && [ "$cur" != "$kid" ] && [ -z "$MEMBER_KEY_OLD" ]; then
+            echo "::error::MEMBER_KEY 가 지금 암호화에 쓰는 키와 다릅니다. 예전 키를 MEMBER_KEY_OLD 에 넣어야 바꿀 수 있습니다 (그대로 바꾸면 회원 자료를 풀 수 없습니다)."
+            exit 1
+          fi
+          echo "암호화 키 ID: $kid (지금 저장소 기준: ${cur:-아직 없음})"
+          printf '%s' "$MEMBER_KEY" | npx --yes wrangler@4.40.0 secret put MEMBER_KEY
+          if [ -n "$MEMBER_KEY_OLD" ]; then printf '%s' "$MEMBER_KEY_OLD" | npx --yes wrangler@4.40.0 secret put MEMBER_KEY_OLD; fi
       - name: 서비스키를 Worker 비밀값으로 저장
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         working-directory: worker/corp-lookup

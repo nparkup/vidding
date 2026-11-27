@@ -29,6 +29,7 @@
 import { metricsStub, truncIp, type AuditRow, type MetricsNs } from "./metrics";
 import { actions, apiUsage, storage } from "./ops";
 import { listBackups, runBackup, verifyBackup, type BBucket } from "./backup";
+import { readSealState, sealExisting, type Keyring } from "./sealed";
 import { adminFail, adminFailClear, adminLocked, newTotpSecret, readTotp, totpOk, writeTotp, type AdminTotp } from "./security";
 import { adminMember, cancelWithdraw, createMemberByAdmin, finishWithdraw, issueTempPassword, processDueWithdrawals, moveEmail, normEmail, memberLimit, type MemberAuth } from "./account";
 import { limitOf, MAX_QUOTA } from "../../src/lib/usagePeriod";
@@ -65,6 +66,9 @@ export interface AdminEnv {
   BACKUP_KEY?: string;
   /** 기본 nparkup/vidding */
   GITHUB_REPO?: string;
+  /** 암호화로 감싸지 않은 원래 버킷과 키 묶음 (index.ts sealedEnv). 백업은 암호화된 그대로 복사한다 */
+  AWARDS_RAW?: AdminBucket;
+  SEAL_RING?: Keyring;
 }
 
 /** 관리자 로그인 유지 시간 */
@@ -93,6 +97,7 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
   if (!env.AWARDS) return json({ error: "off" }, 503);
   if (!env.ADMIN_ID || !env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 10) return json({ error: "관리자 계정이 아직 설정되지 않았습니다." }, 503);
   const bucket = env.AWARDS;
+  const raw = env.AWARDS_RAW ?? bucket;
 
   if (action === "login") {
     if (req.method !== "POST") return json({ error: "POST만 지원합니다." }, 405);
@@ -293,17 +298,27 @@ export async function handleAdmin(req: Request, env: AdminEnv, json: Json, ctx: 
     }
     case "backup": {
       // 회원·결제 자료 백업 (backup.ts). GET 목록, POST { step: "run" } 지금 백업, { step: "verify" } 복구 시험(덮어쓰지 않음)
-      if (!post) return json({ ...(await listBackups(env.BACKUP)), encrypted: !!env.BACKUP_KEY }, 200, noStore);
+      if (!post) {
+        const seal = env.SEAL_RING ? { on: !!env.SEAL_RING.current, state: await readSealState(raw, env.SEAL_RING) } : { on: false, state: null };
+        return json({ ...(await listBackups(env.BACKUP)), encrypted: !!env.BACKUP_KEY, seal }, 200, noStore);
+      }
       let b: Record<string, unknown> = {};
       try { b = (await req.json()) as Record<string, unknown>; } catch { return json({ error: "잘못된 요청" }, 400); }
       if (b.step === "run") {
-        const r = await runBackup(bucket as unknown as BBucket, env.BACKUP, env.BACKUP_KEY);
+        const r = await runBackup(raw as unknown as BBucket, env.BACKUP, env.BACKUP_KEY);
         audit("backup", "error" in r ? `실패: ${r.error}` : `${r.key} ${r.bytes}바이트`);
         return json(r, "error" in r ? 503 : 200, noStore);
       }
       if (b.step === "verify") {
-        const r = await verifyBackup(bucket as unknown as BBucket, env.BACKUP, env.BACKUP_KEY);
+        const r = await verifyBackup(raw as unknown as BBucket, env.BACKUP, env.BACKUP_KEY);
         audit("backup-verify", r.ok ? `${(r as { file: string }).file} 확인` : `실패: ${(r as { reason: string }).reason}`);
+        return json(r, 200, noStore);
+      }
+      if (b.step === "seal") {
+        // 회원 개인정보 암호화 (sealed.ts): 남은 평문·예전 키 파일을 지금 키로 다시 쓴다
+        if (!env.SEAL_RING?.current) return json({ error: "암호화 키(MEMBER_KEY)가 아직 없습니다. 저장소 Secrets에 넣고 중계 서버를 다시 배포해 주세요." }, 503, noStore);
+        const r = await sealExisting(raw as unknown as Parameters<typeof sealExisting>[0], env.SEAL_RING, { max: 500 });
+        audit("seal", `암호화 ${r.sealed} · 남은 평문 ${r.plain} · 예전 키 ${r.otherKey}`);
         return json(r, 200, noStore);
       }
       break;

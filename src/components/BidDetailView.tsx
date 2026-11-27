@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AgencyLogo } from "./AgencyLogo";
 import { Suspense, useEffect, useState } from "react";
 import { CloseDdayBadge } from "@/components/Badges";
-import { ProfileScore } from "@/components/ProfileScore";
+import { ProfileScore, ProfileScoreButton } from "@/components/ProfileScore";
 import { DocList } from "@/components/DocList";
 import { bidPriceGuide, documentChecklist, keyPoints } from "@/lib/analysis";
 import { loadBidExtra } from "@/lib/attachments";
@@ -22,6 +22,7 @@ import type { AwardAnalysis } from "@/lib/awards/analysis";
 import { usesAssess } from "@/lib/awards/assess";
 import { agencyId, isVagueAgency } from "@/lib/awards/agency";
 import { MyBoxButton } from "@/components/MyBoxButton";
+import { PlanCtaButton } from "@/components/PlanCtaButton";
 
 /** 공고 분석 화면 (서버 배포의 /bids/[id] 와 정적 배포의 /bids/view 공용) */
 export function BidDetailView({ bid }: { bid: Bid }) {
@@ -47,6 +48,7 @@ export function BidDetailView({ bid }: { bid: Bid }) {
     return () => { alive = false; };
   }, [bid]);
   const info = qual?.info;
+  const [scoreOpen, setScoreOpen] = useState(false);
 
   // 기초금액이 공개됐으면 투찰 가이드도 그 금액으로 계산한다 (공고 목록 금액은 배정예산·추정가격)
   const guide = bidPriceGuide(info?.base ? { ...bid, baseAmount: info.base } : bid);
@@ -70,8 +72,8 @@ export function BidDetailView({ bid }: { bid: Bid }) {
     <div className="container-x py-6 sm:py-8">
       <Link href="/bids" className="text-sm text-ink-500 hover:text-ink">공고 목록으로</Link>
 
-      <header className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
-        <div className="min-w-0 lg:flex-1">
+      <header className="mt-3">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <CloseDdayBadge iso={bid.closeAt} />
             <span className="chip">{bid.bizType ?? "용역"} · {bid.category}</span>
@@ -87,17 +89,33 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <Link href={`/analysis/industry?cat=${encodeURIComponent(bid.category)}`} className="ml-2 text-sm font-semibold text-mint-700 underline-offset-2 hover:underline">업종별 분석</Link>
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap lg:justify-end">
+        {/* 버튼 줄: 원문·입찰 가능성·입찰점수 예측·준비 도움·요금제 (예전 오른쪽 패널을 한 줄로) */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <MyBoxButton bid={bid} />
           <a href={bid.detailUrl} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">나라장터 원문</a>
+          <Suspense fallback={<span className="btn-ghost btn-sm text-ink-300">입찰 가능성</span>}>
+            <ProfileScoreButton bid={bid} open={scoreOpen} onToggle={() => setScoreOpen((v) => !v)} />
+          </Suspense>
+          <Link href={`/premium?bid=${encodeURIComponent(bid.id)}#predict`} className="btn-primary btn-sm">입찰점수 예측</Link>
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>
+          <PlanCtaButton />
         </div>
+        {scoreOpen && (
+          <section className="card mt-3 p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-lg font-bold">입찰 가능성</h2>
+              <p className="text-xs text-ink-400">알고리즘 분석 · 항목별 가중 평가</p>
+            </div>
+            <Suspense fallback={<p className="mt-4 text-sm text-ink-300">계산 중…</p>}>
+              <ProfileScore bid={bid} />
+            </Suspense>
+          </section>
+        )}
       </header>
 
       <BidChangeBanner bid={bid} />
 
-      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="min-w-0 space-y-4">
+      <div className="mt-5 min-w-0 space-y-4">
           {/* 요약 */}
           <section className="card p-5">
             <h2 className="text-lg font-bold">핵심 요약</h2>
@@ -140,6 +158,20 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             </ol>
           </section>
 
+          {/* 투찰 가이드: 가격 경쟁 공고는 왼쪽 사정율 분석·투찰금액이 대신한다 */}
+          {!priceBid && <section className="card p-5">
+            <h2 className="text-lg font-bold">투찰 금액 가이드</h2>
+            <p className="mt-1 text-sm text-ink-500">기초금액 × 예정가격 범위(±2%) × 낙찰하한율 {guide.rate.toFixed(3)}%</p>
+            <div className="mt-4 rounded-xl bg-ink p-4 text-white">
+              <p className="text-xs text-ink-300">권장 중심 금액</p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums">{wonFull(guide.center)}</p>
+              <p className="mt-2 text-xs text-ink-300">예상 범위 {won(guide.low)} ~ {won(guide.high)}</p>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-ink-300">
+              참고용 추정치입니다.<br />실제 예정가격은 복수예비가격 추첨으로 결정됩니다.
+            </p>
+          </section>}
+
           {priceBid && <BidPriceAnalysis bid={bid} info={info} analysis={award} />}
 
           {files.length > 0 && (
@@ -170,47 +202,6 @@ export function BidDetailView({ bid }: { bid: Bid }) {
             <p className="mt-1 mb-3 text-sm text-ink-500">최종 서류는 반드시 공고문 원문으로 확인하세요.</p>
             <DocList groups={docs} />
           </section>
-        </div>
-
-        <aside className="min-w-0 space-y-4">
-          {/* 가능성 */}
-          <section className="card p-5">
-            <h2 className="text-lg font-bold">입찰 가능성</h2>
-            <p className="mt-1 text-xs text-ink-400">알고리즘 분석 · 항목별 가중 평가</p>
-            <Suspense fallback={<p className="mt-4 text-sm text-ink-300">계산 중…</p>}>
-              <ProfileScore bid={bid} />
-            </Suspense>
-          </section>
-
-          {/* 투찰 가이드: 가격 경쟁 공고는 왼쪽 사정율 분석·투찰금액이 대신한다 */}
-          {!priceBid && <section className="card p-5">
-            <h2 className="text-lg font-bold">투찰 금액 가이드</h2>
-            <p className="mt-1 text-sm text-ink-500">기초금액 × 예정가격 범위(±2%) × 낙찰하한율 {guide.rate.toFixed(3)}%</p>
-            <div className="mt-4 rounded-xl bg-ink p-4 text-white">
-              <p className="text-xs text-ink-300">권장 중심 금액</p>
-              <p className="mt-1 text-2xl font-extrabold tabular-nums">{wonFull(guide.center)}</p>
-              <p className="mt-2 text-xs text-ink-300">예상 범위 {won(guide.low)} ~ {won(guide.high)}</p>
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-ink-300">
-              참고용 추정치입니다.<br />실제 예정가격은 복수예비가격 추첨으로 결정됩니다.
-            </p>
-          </section>}
-
-          <section className="card p-5">
-            <p className="text-xs font-semibold text-mint-600">프리미엄</p>
-            <h2 className="mt-1 text-lg font-bold">입찰점수 예측</h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink-500">
-              이 공고의 첨부파일에서 평가항목과 배점을 읽고, 귀사의 실적·신용등급·인력으로 {bid.contractMethod === "협상에 의한 계약" ? "기술점수와 협상적격 여부" : bid.contractMethod === "적격심사" ? "적격심사 예상 점수와 통과 가능한 투찰률" : "예상 점수"}를 계산합니다.
-            </p>
-            <Link href={`/premium?bid=${encodeURIComponent(bid.id)}#predict`} className="btn-primary mt-4 w-full">이 공고 점수 예측하기</Link>
-          </section>
-
-          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-5 text-white shadow-glow">
-            <p className="font-bold">이 공고, 함께 준비할까요?</p>
-            <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 이 공고 같은 조건의 새 공고를 매일 아침 메일로 받고, 입찰점수 예측을 공고 수 제한 없이 쓰실 수 있습니다.</p>
-            <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>
-          </section>
-        </aside>
       </div>
     </div>
   );

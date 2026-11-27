@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CloseDdayBadge } from "@/components/Badges";
 import { LicenseLaws } from "@/components/LicenseLaws";
+import { PlanCtaButton } from "@/components/PlanCtaButton";
 import { agencyKey, type NuriBid, type NuriBidsFile, type NuriContract, type NuriResult } from "@/lib/nuri";
 import { dateTime, won } from "@/lib/format";
 
@@ -81,18 +82,20 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">{b.title}</h1>
           <p className="mt-2 text-ink-500 [overflow-wrap:anywhere]">{b.agency}{b.refNo ? ` · ${b.refNo}` : ""}</p>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <a href={NURI_HOME} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">누리장터에서 보기</a>
+          {rate && <a href="#rate" className="btn-ghost btn-sm">지난 1순위 투찰률 <span className="font-extrabold tabular-nums text-mint">{pct(rate.p50)}</span></a>}
+          <Link href={`/premium/nuri?bid=${encodeURIComponent(`${b.no}-${b.ord}`)}#predict`} className="btn-primary btn-sm">입찰점수 예측</Link>
           <Link href="/apply" className="btn-mint btn-sm">이 공고 준비 도움받기</Link>
+          <PlanCtaButton />
         </div>
         <p className="mt-2 text-xs text-ink-400">누리장터에서 공고번호 {b.no}로 찾을 수 있습니다.</p>
       </header>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="min-w-0 space-y-4">
+      <div className="mt-5 min-w-0 space-y-4">
           <section className="card p-5">
             <h2 className="text-lg font-bold">핵심 요약</h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 [&>*]:min-w-0">
               {shown.map((c) => (
                 <div key={c.k} className={`min-w-0 rounded-xl bg-paper p-3${c.wide ? " col-span-2" : ""}`}>
                   <dt className="text-xs text-ink-500">{c.k}</dt>
@@ -140,6 +143,27 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
             </ol>
           </section>
 
+          <section id="rate" className="card scroll-mt-24 p-5">
+            <h2 className="text-lg font-bold">지난 개찰로 본 투찰률</h2>
+            <p className="mt-1 text-sm text-ink-500">누리장터 {b.biz} · {b.award?.replace("에의한낙찰자결정", "") ?? "낙찰방법"} 공고의 개찰 1순위</p>
+            {rate ? (
+              <>
+                <div className="mt-4 rounded-xl bg-ink p-4 text-white">
+                  <p className="text-xs text-ink-300">1순위 투찰률 가운데값</p>
+                  <p className="mt-1 text-2xl font-extrabold tabular-nums">{pct(rate.p50)}</p>
+                  {amount ? <p className="mt-1 text-sm tabular-nums text-ink-200">{b.refAmount ? "기준금액" : "배정예산"} 기준 {won(Math.round((amount * rate.p50) / 100 / 1000) * 1000)}</p> : null}
+                  <p className="mt-2 text-xs text-ink-300">절반이 {pct(rate.p25)} ~ {pct(rate.p75)} 사이 · 평균 {rate.bidders}개사 참가</p>
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-ink-500">{data.from ? `${data.from}부터 쌓은` : "최근"} 누리장터 개찰완료 {rate.n.toLocaleString()}건의 1순위 투찰률입니다. 누리장터가 투찰률을 공개하지 않아, 1순위 투찰금액을 그 공고의 기준금액(공개하지 않았으면 배정예산)으로 나눈 값입니다.</p>
+              </>
+            ) : (
+              <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">같은 업무·낙찰방법의 지난 개찰 결과가 5건이 안 돼 투찰률을 보여 주지 않습니다.</p>
+            )}
+            {past.length > 0 && (
+              <p className="mt-3 text-sm text-ink-700">같은 기관의 지난 개찰 {past.length}건, 평균 {avgBidders(past)}개사 참가</p>
+            )}
+          </section>
+
           <PastResults rows={past} agency={b.agency} from={data.from} />
           <PastContracts rows={deals} agency={b.agency} from={data.from} />
 
@@ -161,36 +185,6 @@ export function NuriBidDetailView({ bid: b, data }: { bid: NuriBid; data: NuriBi
               </ul>
             </section>
           )}
-        </div>
-
-        <aside className="min-w-0 space-y-4">
-          <section className="card p-5">
-            <h2 className="text-lg font-bold">지난 개찰로 본 투찰률</h2>
-            <p className="mt-1 text-sm text-ink-500">누리장터 {b.biz} · {b.award?.replace("에의한낙찰자결정", "") ?? "낙찰방법"} 공고의 개찰 1순위</p>
-            {rate ? (
-              <>
-                <div className="mt-4 rounded-xl bg-ink p-4 text-white">
-                  <p className="text-xs text-ink-300">1순위 투찰률 가운데값</p>
-                  <p className="mt-1 text-2xl font-extrabold tabular-nums">{pct(rate.p50)}</p>
-                  {amount ? <p className="mt-1 text-sm tabular-nums text-ink-200">{b.refAmount ? "기준금액" : "배정예산"} 기준 {won(Math.round((amount * rate.p50) / 100 / 1000) * 1000)}</p> : null}
-                  <p className="mt-2 text-xs text-ink-300">절반이 {pct(rate.p25)} ~ {pct(rate.p75)} 사이 · 평균 {rate.bidders}개사 참가</p>
-                </div>
-                <p className="mt-3 text-xs leading-relaxed text-ink-500">{data.from ? `${data.from}부터 쌓은` : "최근"} 누리장터 개찰완료 {rate.n.toLocaleString()}건의 1순위 투찰률입니다. 누리장터가 투찰률을 공개하지 않아, 1순위 투찰금액을 그 공고의 기준금액(공개하지 않았으면 배정예산)으로 나눈 값입니다.</p>
-              </>
-            ) : (
-              <p className="mt-4 rounded-xl bg-paper p-3 text-sm text-ink-500">같은 업무·낙찰방법의 지난 개찰 결과가 5건이 안 돼 투찰률을 보여 주지 않습니다.</p>
-            )}
-            {past.length > 0 && (
-              <p className="mt-3 text-sm text-ink-700">같은 기관의 지난 개찰 {past.length}건, 평균 {avgBidders(past)}개사 참가</p>
-            )}
-          </section>
-
-          <section className="rounded-3xl bg-gradient-to-br from-mint to-mint-700 p-5 text-white shadow-glow">
-            <p className="font-bold">이 공고, 함께 준비할까요?</p>
-            <p className="mt-2 text-sm opacity-90">요금제를 이용하시면 같은 조건의 새 공고를 매일 아침 메일로 받고, 입찰점수 예측을 쓰실 수 있습니다.</p>
-            <Link href="/pricing" className="btn mt-4 w-full bg-white text-ink hover:bg-paper">요금제 보기</Link>
-          </section>
-        </aside>
       </div>
     </div>
   );

@@ -96,7 +96,7 @@ export function BidSummary({ bid, qual }: { bid: Bid; qual?: BidQual }) {
           {info?.changeReason && <span className="text-ink-500"> · {info.changeReason.replace(/^\[[^\]]+\]\s*/, "")}</span>}
         </p>
       )}
-      <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
+      <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 [&>*]:min-w-0">
         {shown.map((c) => (
           <div key={c.k} className={`min-w-0 rounded-xl bg-paper p-3${c.wide ? " col-span-2" : ""}`}>
             <dt className="text-xs text-ink-500">{c.k}</dt>

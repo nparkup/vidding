@@ -93,7 +93,7 @@ jobs:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
       - uses: actions/checkout@v4
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.check.outputs.skip != '1' && github.event_name != 'pull_request'
         with:
           node-version: 20

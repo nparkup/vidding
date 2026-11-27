@@ -1,7 +1,7 @@
 import { Brand } from "@/components/BrandText";
 import type { Digest } from "@/lib/digest";
 import { date, dday, won } from "@/lib/format";
-import { changeSummary } from "@/lib/noticeChanges";
+import { changeLabel, changeSummary } from "@/lib/noticeChanges";
 
 /** 영업일 아침 맞춤 공고 요약 이메일 미리보기 */
 export function EmailPreview({ digest, compact = false }: { digest: Digest; compact?: boolean }) {
@@ -56,7 +56,7 @@ export function EmailPreview({ digest, compact = false }: { digest: Digest; comp
               {changes.slice(0, 3).map((w) => (
                 <li key={`${w.change.no}-${w.change.ord}`} className="py-2.5">
                   <p className="text-xs">
-                    <span className={`rounded-full px-2 py-0.5 font-bold ${w.change.kind === "취소" ? "bg-coral-100 text-coral" : "bg-amber-100 text-ink"}`}>{w.change.kind === "취소" ? "취소" : `정정 ${Number(w.change.ord)}차`}</span>
+                    <span className={`rounded-full px-2 py-0.5 font-bold ${w.change.kind === "취소" ? "bg-coral-100 text-coral" : "bg-amber-100 text-ink"}`}>{changeLabel(w.change)}</span>
                     <span className="ml-1.5 text-ink-300">{w.reason}</span>
                   </p>
                   <p className="mt-1 text-sm font-semibold">{w.change.title}</p>

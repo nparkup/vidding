@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { bidHref } from "@/lib/links";
 import { loadMyBox, MYBOX_EVENT, removeFromMyBox, updateMyBox, type MyBoxItem } from "@/lib/mybox";
 import { useBids } from "@/lib/useBids";
-import { changesByNo, changeSummary } from "@/lib/noticeChanges";
+import { changeLabel, changesByNo, changeSummary } from "@/lib/noticeChanges";
 import { useNoticeChanges } from "@/lib/useSiteJson";
 
 const DAY = 86400e3;
@@ -168,7 +168,7 @@ function NoticeChangeBadge({ no }: { no: string }) {
   if (!c) return null;
   return (
     <Link href="/changes" title={changeSummary(c)} className={`chip font-bold ${c.kind === "취소" ? "border-coral/30 bg-coral-100/60 text-coral" : "border-amber/40 bg-amber-100/60 text-ink"}`}>
-      {c.kind === "취소" ? "취소됨" : `정정 ${Number(c.ord)}차${c.fields.length ? ` · ${c.fields.slice(0, 2).map((f) => f.field).join("·")}` : ""}`}
+      {c.kind === "취소" ? "취소됨" : `${changeLabel(c)}${c.fields.length ? ` · ${c.fields.slice(0, 2).map((f) => f.field).join("·")}` : ""}`}
     </Link>
   );
 }

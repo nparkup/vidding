@@ -67,11 +67,11 @@ async function call(path: string, op: string, params: Record<string, string>): P
 }
 
 /** 한 조회의 모든 페이지 */
-async function all(path: string, op: string, params: Record<string, string>, maxPages = 80): Promise<Item[]> {
+async function all(path: string, op: string, params: Record<string, string>, maxPages = 80, st?: { failed: number }): Promise<Item[]> {
   // 첫 쪽이 게이트웨이 오류로 실패하면 30초 쉬고 한 번 더, 그래도 안 되면 이 조회만 빈 결과로 넘긴다
   const first = await call(path, op, params)
     .catch(async () => { await new Promise((r) => setTimeout(r, 30_000)); return call(path, op, params); })
-    .catch((e: Error) => { console.warn(`공동주택 ${op} ${JSON.stringify(params)}: 첫 쪽 실패, 건너뜀 (${e.message})`); return { items: [] as Item[], total: 0 }; });
+    .catch((e: Error) => { if (st) st.failed++; console.warn(`공동주택 ${op} ${JSON.stringify(params)}: 첫 쪽 실패, 건너뜀 (${e.message})`); return { items: [] as Item[], total: 0 }; });
   const items = [...first.items];
   const pages = Math.min(maxPages, Math.ceil(first.total / ROWS));
   // 999건 한 쪽이 몇 초씩 걸려 네 쪽씩 함께 받는다
@@ -79,6 +79,7 @@ async function all(path: string, op: string, params: Record<string, string>, max
   // 한 쪽이 끝내 실패해도 나머지는 쓴다 (낙찰 비교 자료가 조금 빠질 뿐)
   let failed = 0;
   const got = await mapLimit(rest, 4, async (p) => (await call(path, op, { ...params, pageNo: String(p) }).catch(() => { failed++; return { items: [] as Item[] }; })).items);
+  if (st) st.failed += failed;
   if (failed) console.warn(`공동주택 ${op} ${JSON.stringify(params)}: ${pages}쪽 중 ${failed}쪽 받지 못함`);
   return items.concat(...got);
 }
@@ -182,13 +183,18 @@ const kstYmd = (d: Date) => new Date(d.getTime() + 9 * 3600e3).toISOString().sli
 
 /** 공고일이 최근 days일인 공고 중 아직 마감 전인 것 (마감 임박순) */
 export async function fetchAptNotices(days = APT_NOTICE_DAYS, now = new Date()): Promise<AptBid[]> {
-  const items = await all(NOTICE, "getPblAncDeSearchV3", { startDate: kstYmd(new Date(now.getTime() - days * 86400e3)), endDate: kstYmd(now) });
-  const out = new Map<string, AptBid>();
-  for (const it of items) {
-    const b = toAptBid(it);
-    if (b && new Date(b.closeAt).getTime() > now.getTime()) out.set(b.no, b);
-  }
-  return [...out.values()].sort((a, b) => a.closeAt.localeCompare(b.closeAt));
+  return (await fetchAptNoticesAll(days, now)).open;
+}
+
+/** 공고일이 최근 days일인 공고 전부(마감 지난 것 포함, 정정 비교용)와 그중 마감 전인 것. complete 는 모든 쪽을 받았는지 */
+export async function fetchAptNoticesAll(days = APT_NOTICE_DAYS, now = new Date()): Promise<{ open: AptBid[]; all: AptBid[]; complete: boolean }> {
+  const st = { failed: 0 };
+  const items = await all(NOTICE, "getPblAncDeSearchV3", { startDate: kstYmd(new Date(now.getTime() - days * 86400e3)), endDate: kstYmd(now) }, 80, st);
+  const byNo = new Map<string, AptBid>();
+  for (const it of items) { const b = toAptBid(it); if (b) byNo.set(b.no, b); }
+  const allBids = [...byNo.values()];
+  const open = allBids.filter((b) => new Date(b.closeAt).getTime() > now.getTime()).sort((a, b) => a.closeAt.localeCompare(b.closeAt));
+  return { open, all: allBids, complete: !st.failed && items.length > 0 };
 }
 
 /** 낙찰·수의계약 한 건 (직전 계약 비교용) */

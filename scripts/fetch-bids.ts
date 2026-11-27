@@ -26,7 +26,8 @@ import type { AwardCount } from "../src/lib/awards/format";
 import { buildRateRows, type RateTable } from "../src/lib/rateTable";
 import { makeAiInputs } from "./aiSheets";
 import { fetchPreSpecs } from "../src/lib/nara/preSpec";
-import { attachPriors, COMPARABLE, fetchAptAwards, fetchAptNotices, fetchAptPrivateContracts, type AptAward } from "../src/lib/kapt/client";
+import { attachPriors, COMPARABLE, fetchAptAwards, fetchAptNoticesAll, fetchAptPrivateContracts, type AptAward } from "../src/lib/kapt/client";
+import { aptChanges } from "../src/lib/kapt/changes";
 import type { AptBidsFile } from "../src/lib/apt";
 import { buildAptPriceModel } from "../src/lib/aptPrice";
 import { attachAptHistory } from "../src/lib/kapt/history";
@@ -217,7 +218,16 @@ async function main() {
   // 공동주택(아파트) 입찰 (/apt-bids): 국토교통부 공동주택 입찰공고·입찰결과공지. 실패해도 배포는 계속
   let aptBids: AptBidsFile | undefined;
   try {
-    const items = await fetchAptNotices();
+    const notices = await fetchAptNoticesAll();
+    const items = notices.open;
+    // 정정·취소 (공고명 수정 표시 + 같은 공고번호의 변경). 나라장터 정정·취소 목록에 출처 '공동주택'으로 더한다
+    try {
+      const ac = aptChanges(notices.all, items, notices.complete);
+      changes.push(...ac.items);
+      console.log(ac.log);
+    } catch (e) {
+      console.warn("공동주택 정정·취소 건너뜀:", e instanceof Error ? e.message : e);
+    }
     let awards = 0, privates = 0, priors = 0;
     const prev: AptAward[] = [];
     try {
@@ -258,6 +268,7 @@ async function main() {
   try {
     const r = await fetchNuriBids(laws);
     nuriBids = r.file;
+    changes.push(...r.changes);
     console.log(r.log);
     try { console.log(await accumulateNuriResults(nuriBids, r.all)); } catch (e) { console.warn("누리장터 개찰 누적 건너뜀:", e instanceof Error ? e.message : e); }
     // 규칙으로 쓸 수 있는 표를 못 읽은 공고는 배점표 판독 입력을 만든다 (나라장터와 같은 /ai-input/{공고번호-차수}.json, 공고번호 체계가 같아 겹치지 않는다)

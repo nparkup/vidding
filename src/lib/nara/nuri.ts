@@ -5,6 +5,7 @@ import { call, classify, mapLimit } from "./client";
 import { groupLicenses } from "./qualification";
 import { applyIndustryLaws, type IndustryLawTable } from "./industryLaw";
 import type { BidQual } from "../eligibility";
+import { CHANGE_DAYS, diffSnapshots, type ChangeSnapshot, type NoticeChange } from "../noticeChanges";
 import { agencyKey, type NuriBid, type NuriBidsFile, type NuriBiz, type NuriContract, type NuriRateStat, type NuriResult } from "../nuri";
 
 /**
@@ -129,6 +130,64 @@ function toBid(it: Item, biz: NuriBiz, qual: BidQual | undefined, regions: strin
   };
 }
 
+/* ---------- 정정·취소 ---------- */
+
+/** 누리장터 공고 원문 → 비교 항목. 면허제한·지역 행에는 차수가 없어 비교하지 않는다 */
+function nuriSnap(it: Item): ChangeSnapshot {
+  return {
+    title: clean(it.ntceNm) ?? "",
+    amount: (it.refAmtOpenYn === "Y" ? num(it.refAmt) : undefined) ?? num(it.asignBdgtAmt),
+    closeAt: iso(it.bidClseDt), openAt: iso(it.opengDt),
+    award: clean(it.sucsfbidMthdNm), contract: clean(it.cntrctMthdNm),
+    briefingAt: iso(it.sptDscrptDt) ?? null,
+  };
+}
+
+/**
+ * 나라장터와 같은 방식: 공고번호별 차수를 모아, 최근 CHANGE_DAYS 안에 올라온 변경공고·취소공고를 바로 앞 차수와 비교한다.
+ * live 는 지금 진행 중인 공고 (상세 화면 주소를 붙인다)
+ */
+export function nuriChanges(rows: { it: Item; biz: NuriBiz }[], live: Map<string, NuriBid>, now = Date.now()): NoticeChange[] {
+  const byNo = new Map<string, Map<string, { it: Item; biz: NuriBiz }>>();
+  for (const r of rows) {
+    const no = r.it.bidNtceNo;
+    if (!no) continue;
+    const m = byNo.get(no) ?? byNo.set(no, new Map()).get(no)!;
+    const ord = r.it.bidNtceOrd ?? "000";
+    const cur = m.get(ord);
+    if (!cur || (cur.it.rgstDt ?? "") < (r.it.rgstDt ?? "")) m.set(ord, r);
+  }
+  const since = now - CHANGE_DAYS * 864e5;
+  const out: NoticeChange[] = [];
+  for (const [no, orders] of byNo) {
+    const ords = [...orders.keys()].sort();
+    for (let i = 0; i < ords.length; i++) {
+      const { it, biz } = orders.get(ords[i])!;
+      if (ords[i] === "000") continue;
+      const div = it.ntceDivNm ?? "";
+      const kind = /취소/.test(div) ? "취소" : /변경|정정/.test(div) ? "정정" : null;
+      if (!kind) continue;
+      const at = iso(it.nticeDt) ?? iso(it.rgstDt);
+      if (!at || new Date(at).getTime() < since) continue;
+      const prev = i > 0 ? orders.get(ords[i - 1])!.it : undefined;
+      const title = clean(it.ntceNm) ?? (prev ? clean(prev.ntceNm) : undefined) ?? "";
+      const b = live.get(no);
+      out.push({
+        source: "누리장터", no, ord: ords[i], prevOrd: prev?.bidNtceOrd ?? (prev ? "000" : undefined), kind, at, title,
+        agency: clean(it.ntceInsttNm) ?? "", demandAgency: clean(it.ntceInsttNm) ?? "",
+        bizType: biz === "기타" ? "용역" : biz,
+        category: b?.category as NoticeChange["category"],
+        closeAt: iso(it.bidClseDt) ?? iso(it.opengDt),
+        baseAmount: nuriSnap(it).amount ?? (prev ? nuriSnap(prev).amount : undefined),
+        fields: kind === "정정" && prev ? diffSnapshots(nuriSnap(prev), nuriSnap(it)) : [],
+        href: b && b.ord === ords[i] ? `/nuri-bids/view?no=${encodeURIComponent(no)}` : undefined,
+        detailUrl: "https://nuri.g2b.go.kr",
+      });
+    }
+  }
+  return out.sort((a, b) => b.at.localeCompare(a.at));
+}
+
 /* ---------- 개찰 결과 ---------- */
 
 const RESULT_KEYS = ["bidNtceNo", "bidNtceOrd", "rbidNo", "bidClsfcNo", "bidNtceNm", "dminsttNm", "opengDt", "prtcptCnum", "progrsDivCdNm"];
@@ -197,7 +256,7 @@ export function rateStats(results: NuriResult[]): NuriRateStat[] {
 
 /* ---------- 전체 ---------- */
 
-export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: NuriBidsFile; log: string; all: NuriResult[] }> {
+export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: NuriBidsFile; log: string; all: NuriResult[]; changes: NoticeChange[] }> {
   const st = { calls: 0, failed: 0 };
   const now = Date.now();
 
@@ -236,6 +295,9 @@ export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: Nu
     .filter((b): b is NuriBid => !!b && new Date(b.closeAt).getTime() > now)
     .sort((a, b) => a.closeAt.localeCompare(b.closeAt));
 
+  // 정정·취소 (최근 CHANGE_DAYS 일 게시분, 바로 앞 차수와 비교)
+  const changes = nuriChanges(rows, new Map(items.map((b) => [b.no, b])), now);
+
   // 3. 개찰 결과 (최근 26주) + 개찰완료 공고의 순위. 공고 업무·낙찰방법은 공고 목록에서 찾는다
   const resRows = await byWeeks(RES, "getPrvtOpengResultListInfo", HISTORY_WEEKS, pick(RESULT_KEYS), st);
   // 공고의 기준금액(공개한 경우) 또는 배정예산: 누리장터 개찰 순위에 투찰률 값이 비어 있어(2026-11-25 실측 0건) 이 금액 대비로 투찰률을 낸다
@@ -270,8 +332,8 @@ export async function fetchNuriBids(laws?: IndustryLawTable): Promise<{ file: Nu
   const rates = rateStats(results);
   const withRanks = results.filter((r) => r.ranks.length).length;
   const file: NuriBidsFile = { builtAt: new Date().toISOString(), items, results: keepResults, contracts: keepContracts, rates, from: `${weeks(HISTORY_WEEKS).at(-1)![0].replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")}` };
-  const log = `누리장터: 진행 중 공고 ${items.length.toLocaleString()}건 (용역 ${items.filter((b) => b.biz === "용역").length}, 공사 ${items.filter((b) => b.biz === "공사").length}, 물품 ${items.filter((b) => b.biz === "물품").length}, 면허제한 ${items.filter((b) => b.licenseGroups.length).length}, 지역제한 ${items.filter((b) => b.regions.length).length}), 개찰 결과 ${results.length.toLocaleString()}건 중 순위 ${withRanks.toLocaleString()}건(남은 순위 조회 ${rk.budget <= 0 ? "다음 빌드" : "없음"}), 계약 ${contracts.length.toLocaleString()}건, 투찰률 통계 ${rates.length}개 [${rates.map((r) => `${r.biz}·${r.award} ${r.n}건 가운데 ${r.p50}%`).join(", ")}] · 보낸 결과 ${keepResults.length}·계약 ${keepContracts.length} · 호출 ${st.calls}회 실패 ${st.failed}`;
-  return { file, log, all: results };
+  const log = `누리장터: 진행 중 공고 ${items.length.toLocaleString()}건 (용역 ${items.filter((b) => b.biz === "용역").length}, 공사 ${items.filter((b) => b.biz === "공사").length}, 물품 ${items.filter((b) => b.biz === "물품").length}, 면허제한 ${items.filter((b) => b.licenseGroups.length).length}, 지역제한 ${items.filter((b) => b.regions.length).length}), 개찰 결과 ${results.length.toLocaleString()}건 중 순위 ${withRanks.toLocaleString()}건(남은 순위 조회 ${rk.budget <= 0 ? "다음 빌드" : "없음"}), 계약 ${contracts.length.toLocaleString()}건, 투찰률 통계 ${rates.length}개 [${rates.map((r) => `${r.biz}·${r.award} ${r.n}건 가운데 ${r.p50}%`).join(", ")}] · 보낸 결과 ${keepResults.length}·계약 ${keepContracts.length} · 정정 ${changes.filter((c) => c.kind === "정정").length}건(바뀐 항목 비교 ${changes.filter((c) => c.fields.length).length}건)·취소 ${changes.filter((c) => c.kind === "취소").length}건 · 호출 ${st.calls}회 실패 ${st.failed}`;
+  return { file, log, all: results, changes };
 }
 
 /** 화면 파일에 담는 개찰 결과: 지금 공고와 같은 기관의 것, 또는 최근 4주 */

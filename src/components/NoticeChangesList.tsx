@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { bidHref } from "@/lib/links";
 import { dateTime, won } from "@/lib/format";
-import { KEY_FIELDS, changeSummary, type NoticeChange } from "@/lib/noticeChanges";
+import { CHANGE_SOURCES, KEY_FIELDS, changeLabel, changeNo, changeSource, changeSummary, type ChangeSource, type NoticeChange } from "@/lib/noticeChanges";
 import { useMyBoxNos, useNoticeChanges } from "@/lib/useSiteJson";
 import { useMyboxOn } from "@/lib/useMyboxOn";
 
@@ -21,6 +21,7 @@ export function NoticeChangesList() {
   const [kind, setKind] = useState<Kind>("");
   const [scope, setScope] = useState<Scope>("all");
   const [biz, setBiz] = useState("");
+  const [src, setSrc] = useState<"" | ChangeSource>("");
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(30);
 
@@ -28,16 +29,18 @@ export function NoticeChangesList() {
     const words = q.split(/\s+/).map(norm).filter(Boolean);
     return (data?.items ?? []).filter((c) =>
       (!kind || c.kind === kind)
+      && (!src || changeSource(c) === src)
       && (!biz || (c.bizType ?? "용역") === biz)
       && (scope !== "key" || c.kind === "취소" || c.fields.some((f) => KEY_FIELDS.includes(f.field)))
       && (scope !== "mine" || mine.has(c.no))
       && words.every((w) => norm(`${c.title} ${c.agency} ${c.demandAgency} ${c.no}`).includes(w)));
-  }, [data, kind, scope, biz, q, mine]);
+  }, [data, kind, scope, biz, src, q, mine]);
 
   if (error) return <div className="card mt-6 p-10 text-center text-ink-500">정정·취소 공고를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>;
   if (!data) return <div className="mt-6 space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-ink-100/60" />)}</div>;
 
   const counts = { 정정: data.items.filter((c) => c.kind === "정정").length, 취소: data.items.filter((c) => c.kind === "취소").length };
+  const bySource = (k: ChangeSource) => data.items.filter((c) => changeSource(c) === k).length;
   const btn = (on: boolean) => `rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-ink bg-ink text-white" : "border-ink-100 bg-white text-ink-500 hover:border-ink-300"}`;
   return (
     <div className="mt-6">
@@ -51,9 +54,13 @@ export function NoticeChangesList() {
             <button key={k} type="button" onClick={() => { setScope(k); setShown(30); }} className={btn(scope === k)}>{l}</button>
           ))}
         </div>
-        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[1fr_160px]">
-          <input value={q} onChange={(e) => { setQ(e.target.value); setShown(30); }} placeholder="공고명, 기관, 공고번호 검색" className="input" />
-          <select value={biz} onChange={(e) => { setBiz(e.target.value); setShown(30); }} className="input">
+        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_160px]">
+          <input value={q} onChange={(e) => { setQ(e.target.value); setShown(30); }} placeholder="공고명, 기관·단지, 공고번호 검색" className="input" />
+          <select value={src} onChange={(e) => { setSrc(e.target.value as "" | ChangeSource); setShown(30); }} className="input" aria-label="출처">
+            <option value="">출처 전체</option>
+            {CHANGE_SOURCES.map((k) => <option key={k} value={k}>{k} {bySource(k).toLocaleString()}</option>)}
+          </select>
+          <select value={biz} onChange={(e) => { setBiz(e.target.value); setShown(30); }} className="input" aria-label="업무">
             <option value="">업무 전체</option>
             {["용역", "공사", "물품", "외자"].map((b) => <option key={b}>{b}</option>)}
           </select>
@@ -77,15 +84,18 @@ export function ChangeCard({ c, mine }: { c: NoticeChange; mine?: boolean }) {
   return (
     <li className="min-w-0 rounded-2xl border border-ink-100 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`chip font-bold ${c.kind === "취소" ? "border-coral/30 bg-coral-100/60 text-coral" : "border-amber/40 bg-amber-100/60 text-ink"}`}>{c.kind === "취소" ? "취소" : `정정 ${Number(c.ord)}차`}</span>
-        <span className="chip">{c.bizType ?? "용역"}{c.category ? ` · ${c.category}` : ""}</span>
+        <span className={`chip font-bold ${c.kind === "취소" ? "border-coral/30 bg-coral-100/60 text-coral" : "border-amber/40 bg-amber-100/60 text-ink"}`}>{changeLabel(c)}</span>
+        <span className="chip">{changeSource(c)}</span>
+        <span className="chip">{c.bizType ?? "용역"}{c.category && c.category !== c.bizType ? ` · ${c.category}` : ""}</span>
         {mine && <span className="chip border-mint-100 bg-mint-50 text-mint-600">관심공고</span>}
-        <span className="text-xs text-ink-300">게시 {dateTime(c.at)}</span>
+        <span className="text-xs text-ink-300">{c.detected ? "변경 확인" : "게시"} {dateTime(c.at)}</span>
       </div>
       <p className="mt-2 text-[16px] font-semibold leading-snug">
-        {c.bidId ? <Link href={bidHref(c.bidId)} className="hover:text-mint-600">{title}</Link> : <a href={c.detailUrl} target="_blank" rel="noreferrer" className="hover:text-mint-600">{title}</a>}
+        {c.bidId ? <Link href={bidHref(c.bidId)} className="hover:text-mint-600">{title}</Link>
+          : c.href ? <Link href={c.href} className="hover:text-mint-600">{title}</Link>
+          : <a href={c.detailUrl} target="_blank" rel="noreferrer" className="hover:text-mint-600">{title}</a>}
       </p>
-      <p className="mt-1 text-sm text-ink-500">{c.demandAgency || c.agency} · 공고번호 {c.no}-{c.ord}{c.baseAmount ? ` · ${won(c.baseAmount)}` : ""}</p>
+      <p className="mt-1 text-sm text-ink-500">{c.demandAgency || c.agency} · 공고번호 {changeNo(c)}{c.source === "공동주택" && c.prevOrd ? ` · 앞선 공고 ${c.prevOrd}` : ""}{c.baseAmount ? ` · ${won(c.baseAmount)}` : ""}</p>
       {c.fields.length > 0 ? (
         <dl className="mt-3 grid min-w-0 grid-cols-1 gap-x-3 gap-y-1.5 rounded-xl bg-paper p-3 text-sm sm:grid-cols-[110px_1fr]">
           {c.fields.map((f) => (
